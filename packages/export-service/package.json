@@ -1,0 +1,9 @@
+{
+  "name": "@routemarket/export-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}

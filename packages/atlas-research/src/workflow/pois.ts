@@ -6,6 +6,7 @@ import {
   type ResearchPack,
   type ProjectRepository
 } from "../../../atlas-core/src/index.js";
+import { GooglePlacesProvider } from "../providers/google-places-provider.js";
 
 export async function extractPois(project: RouteProject, repository?: ProjectRepository): Promise<Poi[]> {
   const now = new Date().toISOString();
@@ -20,9 +21,19 @@ export async function extractPois(project: RouteProject, repository?: ProjectRep
   candidates.push(...researchPois);
 
   // 3. De-duplicate by name and coordinates
-  const uniquePois = deduplicatePois(candidates);
+  let uniquePois = deduplicatePois(candidates);
 
-  // 4. Save candidates
+  // 4. Enrich with Google Places if key is available
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (googleKey) {
+    const googlePlaces = new GooglePlacesProvider(googleKey);
+    uniquePois = await Promise.all(uniquePois.map(async (poi) => {
+      // Only enrich if it has coordinates or we can find it by name
+      return await googlePlaces.enrichPoi(poi as any) as any;
+    }));
+  }
+
+  // 5. Save candidates
   if (repository) {
     await repository.saveArtifact(project.id, "poi_candidates", {
       projectId: project.id,
@@ -125,21 +136,25 @@ async function extractFromResearch(project: RouteProject, repository?: ProjectRe
       ? await repository.readProjectFile(project.id, "deep_research.json").then(c => JSON.parse(c) as any)
       : await readJsonFileFallback<any>(join(project.folderPath, "deep_research.json"));
 
-    if (deep && Array.isArray(deep.pois)) {
-      deep.pois.forEach((p: any, index: number) => {
-        pois.push({
-          id: `poi_deep_${index}_${Date.now()}`,
-          name: p.name,
-          type: p.type || "landmark",
-          lat: p.lat || 0,
-          lng: p.lng || 0,
-          description: p.description || "",
-          contactPhone: p.contactPhone,
-          website: p.website,
-          isVerifiedByDeepResearch: true,
-          status: "suggested",
-          sortOrder: index
-        });
+    if (deep && Array.isArray(deep.runs)) {
+      deep.runs.forEach((run: any) => {
+        if (Array.isArray(run.candidatePois)) {
+          run.candidatePois.forEach((p: any, index: number) => {
+            pois.push({
+              id: `poi_deep_${index}_${Date.now()}`,
+              name: p.name,
+              type: p.type || "landmark",
+              lat: p.lat || 0,
+              lng: p.lng || 0,
+              description: p.description || "",
+              contactPhone: p.contactPhone,
+              website: p.website,
+              isVerifiedByDeepResearch: true,
+              status: "suggested",
+              sortOrder: pois.length
+            });
+          });
+        }
       });
     }
   } catch {}

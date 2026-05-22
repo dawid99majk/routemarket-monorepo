@@ -26,7 +26,7 @@ export async function writeGuideOutline(project: RouteProject, repository?: Proj
   return outline;
 }
 
-export async function generateGuideDraft(input: { project: RouteProject; sources?: any[]; concept?: string }): Promise<string> {
+export async function generateLegacyGuideDraft(input: { project: RouteProject; sources?: any[]; concept?: string }): Promise<string> {
   // Legacy method for MVP1 compatibility
   const guide = `# ${input.project.title} (Draft)
 

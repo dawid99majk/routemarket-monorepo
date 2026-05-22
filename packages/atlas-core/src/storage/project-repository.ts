@@ -48,6 +48,9 @@ export interface ProjectRepository {
   loadEvents(slug: string): Promise<ProjectEvent[]>;
   saveEvents(slug: string, events: ProjectEvent[]): Promise<void>;
 
+  loadPois(slug: string): Promise<any[]>;
+  savePois(slug: string, pois: any[]): Promise<void>;
+
   loadInputManifest(slug: string): Promise<InputManifest>;
   saveInputManifest(slug: string, manifest: InputManifest): Promise<void>;
   

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { generateRouteConcept } from "@routemarket/atlas-writer/src/index.js";
-import { loadProject, loadProjectSources } from "./load-project.js";
+import { loadProject, loadProjectSources, loadProjectClaims, loadProjectPois } from "./load-project.js";
 
 export function registerWriteConceptCommand(program: Command): void {
   program
@@ -10,7 +10,9 @@ export function registerWriteConceptCommand(program: Command): void {
     .action(async (options) => {
       const project = await loadProject(process.cwd(), options.project);
       const sources = await loadProjectSources(project);
-      const concept = await generateRouteConcept({ project, sources });
+      const claims = await loadProjectClaims(project);
+      const pois = await loadProjectPois(project);
+      const concept = await generateRouteConcept({ project, sources, claims, pois });
       console.log(`Wrote route concept for ${project.id} (${concept.length} characters)`);
     });
 }

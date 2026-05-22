@@ -10,7 +10,16 @@
     "resolveJsonModule": true,
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@routemarket/atlas-core/*": ["../../packages/atlas-core/*"],
+      "@routemarket/atlas-gis/*": ["../../packages/atlas-gis/*"],
+      "@routemarket/atlas-research/*": ["../../packages/atlas-research/*"],
+      "@routemarket/atlas-workflow/*": ["../../packages/atlas-workflow/*"],
+      "@routemarket/atlas-publisher/*": ["../../packages/atlas-publisher/*"],
+      "@routemarket/atlas-writer/*": ["../../packages/atlas-writer/*"]
+    }
   },
   "include": ["apps/**/*.ts", "../../packages/**/*.ts", "tests/**/*.ts"]
 }

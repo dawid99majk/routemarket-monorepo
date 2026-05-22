@@ -30,7 +30,7 @@ export default function Index() {
   const { user, loading: authLoading, isAdmin, login, logout } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedArchetypeFilter, setSelectedArchetypeFilter] = useState<'all' | 'aesthetic' | 'mountain' | 'city' | 'family'>('all');
+  const [selectedArchetypeFilter, setSelectedArchetypeFilter] = useState<'all' | 'aesthetic' | 'mountain' | 'family'>('all');
 
   // Fetching essential data for routes and statistics
   const { data: routes = [] } = usePublishedRoutes();
@@ -51,19 +51,20 @@ export default function Index() {
   const filteredRoutes = useMemo(() => {
     let result = routes.filter(r => !/\b(test|1234)\b/i.test(r.title));
     
-    // 1. Keep only our 4 premium disciplines to get rid of legacy categories
-    result = result.filter(r => ['Motorcycling', 'Cycling', 'Hiking', 'City'].includes(r.category_name));
+    // 1. Keep only our 3 premium disciplines to get rid of legacy categories
+    result = result.filter(r => ['Motorcycling', 'Cycling', 'Hiking'].includes(r.category_name));
 
     // 2. Filter by premium archetype selection
     if (selectedArchetypeFilter !== 'all') {
       const categoryMap: Record<string, string> = {
         aesthetic: 'Motorcycling',
         mountain: 'Hiking',
-        city: 'City',
         family: 'Cycling'
       };
-      const targetCategory = categoryMap[selectedArchetypeFilter];
-      result = result.filter(r => r.category_name === targetCategory);
+      const targetCategory = categoryMap[selectedArchetypeFilter as keyof typeof categoryMap];
+      if (targetCategory) {
+        result = result.filter(r => r.category_name === targetCategory);
+      }
     }
 
     // 3. Filter by text search query
@@ -275,7 +276,7 @@ export default function Index() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               
               {/* Archetype 1: Szosowy Esteta */}
               <div 
@@ -292,11 +293,11 @@ export default function Index() {
                       Szosowy Esteta
                     </span>
                     <h3 className="text-lg font-bold mt-2.5 text-slate-800 group-hover:text-rose-600 transition-colors">
-                      Motocykle i Scenic Drive
+                      Motocykl Szosowy
                     </h3>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Priorytet dla idealnej nawierzchni bitumicznej, sekwencji ciasnych zakrętów, malowniczych panoram oraz nastrojowych motocyklowych kawiarni.
+                    Priorytet dla idealnej nawierzchni bitumicznej, sekwencji ciasnych zakrętów, malowniczych panoram oraz nastrojowych kawiarni i parkingów.
                   </p>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
@@ -311,7 +312,7 @@ export default function Index() {
                     </li>
                     <li className="flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-rose-500" />
-                      Kamera 3D w zakrętach
+                      Kamera 3D i krętość
                     </li>
                   </ul>
                   <div className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
@@ -320,7 +321,50 @@ export default function Index() {
                 </div>
               </div>
 
-              {/* Archetype 2: Górski Wyjadacz */}
+              {/* Archetype 2: Rowerzysta */}
+              <div 
+                onClick={() => handleArchetypeSelect('family')}
+                className="group cursor-pointer rounded-2xl border border-emerald-100 bg-white hover:bg-emerald-50/10 p-6 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[360px]"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/[0.02] rounded-full blur-2xl group-hover:bg-emerald-500/[0.05] transition-colors" />
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:scale-110 transition-transform duration-300">
+                    <Bike className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                      Dwa Oblicza
+                    </span>
+                    <h3 className="text-lg font-bold mt-2.5 text-slate-800 group-hover:text-emerald-600 transition-colors">
+                      Rower (Szosa vs Gravel/MTB)
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Stworzone dla kolarzy szosowych szukających doskonałego asfaltu lub pasjonatów gravela/MTB pragnących leśnych duktów i bezdroży.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+                  <ul className="space-y-1.5 text-[11px] text-slate-500">
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                      Wybór nawierzchni (Asfalt vs Szuter)
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                      Audyt punktów serwisowych i wiat
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                      Dopasowanie do e-bike i sakw
+                    </li>
+                  </ul>
+                  <div className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    Twórz trasę rowerową <ChevronRight className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Archetype 3: Górski Wyjadacz */}
               <div 
                 onClick={() => handleArchetypeSelect('mountain')}
                 className="group cursor-pointer rounded-2xl border border-amber-100 bg-white hover:bg-amber-50/10 p-6 shadow-sm hover:shadow-md hover:border-amber-300 transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[360px]"
@@ -335,116 +379,30 @@ export default function Index() {
                       Górski Wyjadacz
                     </span>
                     <h3 className="text-lg font-bold mt-2.5 text-slate-800 group-hover:text-amber-600 transition-colors">
-                      Trekking, MTB i Trail
+                      Trekking (1 do 14 dni)
                     </h3>
                   </div>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Skrojony pod trudny teren, strome przewyższenia, schroniska górskie i leśne ścieżki. Pełen audyt wzniosów oraz bezpieczeństwa.
+                    Od krótkich jednodniowych wycieczek po wymagające 14-dniowe trekkingi górskie. Pełny audyt bezpieczeństwa, noclegów i zasobów wody.
                   </p>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
                   <ul className="space-y-1.5 text-[11px] text-slate-500">
                     <li className="flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-amber-500" />
-                      Interaktywne profile wysokości
+                      Schroniska, źródła wody i wiaty
                     </li>
                     <li className="flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-amber-500" />
-                      Topograficzne mapy OSM
+                      Interaktywne profile wysokości szlaku
                     </li>
                     <li className="flex items-center gap-1.5">
                       <span className="w-1 h-1 rounded-full bg-amber-500" />
-                      Ostrzeżenia o nachyleniu
+                      Ostrzeżenia o nachyleniu i GSM
                     </li>
                   </ul>
                   <div className="text-[11px] font-semibold text-amber-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                     Twórz wyprawę górską <ChevronRight className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Archetype 3: Miejski Odkrywca */}
-              <div 
-                onClick={() => handleArchetypeSelect('city')}
-                className="group cursor-pointer rounded-2xl border border-sky-100 bg-white hover:bg-sky-50/10 p-6 shadow-sm hover:shadow-md hover:border-sky-300 transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[360px]"
-              >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-sky-500/[0.02] rounded-full blur-2xl group-hover:bg-sky-500/[0.05] transition-colors" />
-                <div className="space-y-4">
-                  <div className="w-12 h-12 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 border border-sky-100 group-hover:scale-110 transition-transform duration-300">
-                    <Award className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 border border-sky-100 px-2 py-0.5 rounded-full">
-                      Miejski Odkrywca
-                    </span>
-                    <h3 className="text-lg font-bold mt-2.5 text-slate-800 group-hover:text-sky-600 transition-colors">
-                      Zabytki, Architektura i Spacer
-                    </h3>
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Układa idealne pętle kulturowe po starych miastach. Wzbogaca trasę o rysy historyczne punktów POI i polecane spoty fotograficzne.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
-                  <ul className="space-y-1.5 text-[11px] text-slate-500">
-                    <li className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-sky-500" />
-                      Głęboka synteza historii POI
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-sky-500" />
-                      Chronologiczne etapy zwiedzania
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-sky-500" />
-                      Połączenia z komunikacją
-                    </li>
-                  </ul>
-                  <div className="text-[11px] font-semibold text-sky-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    Twórz spacer miejski <ChevronRight className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Archetype 4: Rodzinny Piknikowicz */}
-              <div 
-                onClick={() => handleArchetypeSelect('family')}
-                className="group cursor-pointer rounded-2xl border border-emerald-100 bg-white hover:bg-emerald-50/10 p-6 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all duration-300 relative overflow-hidden flex flex-col justify-between min-h-[360px]"
-              >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/[0.02] rounded-full blur-2xl group-hover:bg-emerald-500/[0.05] transition-colors" />
-                <div className="space-y-4">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:scale-110 transition-transform duration-300">
-                    <Star className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                      Rodzinny Piknikowicz
-                    </span>
-                    <h3 className="text-lg font-bold mt-2.5 text-slate-800 group-hover:text-emerald-600 transition-colors">
-                      Rower i Rekreacja
-                    </h3>
-                  </div>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Nacisk na bezpieczeństwo dzieci. Separacja od ruchu kołowego, wyszukiwanie placów zabaw, wiat piknikowych i płaski profil drogi.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
-                  <ul className="space-y-1.5 text-[11px] text-slate-500">
-                    <li className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                      Filtry bezkolizyjnych ścieżek
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                      Analiza stref wypoczynkowych
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
-                      Płaskie drogi (nachylenie &lt; 3%)
-                    </li>
-                  </ul>
-                  <div className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    Twórz bezpieczną trasę <ChevronRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
               </div>
@@ -569,10 +527,9 @@ export default function Index() {
               <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-hide border-b border-slate-200/60 scroll-smooth">
                 {[
                   { id: 'all', label: 'Wszystkie trasy', color: 'hover:border-purple-300 active:bg-purple-50 active:border-purple-500', activeStyle: 'bg-purple-50 border-purple-500 text-purple-700 shadow-sm' },
-                  { id: 'aesthetic', label: 'Szosowy Esteta (Moto)', color: 'hover:border-rose-300 active:bg-rose-50 active:border-rose-500', activeStyle: 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm' },
-                  { id: 'mountain', label: 'Górski Wyjadacz (Piesze)', color: 'hover:border-amber-300 active:bg-amber-50 active:border-amber-500', activeStyle: 'bg-amber-50 border-amber-500 text-amber-850 shadow-sm' },
-                  { id: 'city', label: 'Miejski Odkrywca (Miasto)', color: 'hover:border-sky-300 active:bg-sky-50 active:border-sky-500', activeStyle: 'bg-sky-50 border-sky-500 text-sky-700 shadow-sm' },
-                  { id: 'family', label: 'Rodzinny Piknikowicz (Rower)', color: 'hover:border-emerald-300 active:bg-emerald-50 active:border-emerald-500', activeStyle: 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' },
+                  { id: 'aesthetic', label: 'Motocykl Szosowy (Scenic)', color: 'hover:border-rose-300 active:bg-rose-50 active:border-rose-500', activeStyle: 'bg-rose-50 border-rose-500 text-rose-700 shadow-sm' },
+                  { id: 'mountain', label: 'Trekking (1-14 dni)', color: 'hover:border-amber-300 active:bg-amber-50 active:border-amber-500', activeStyle: 'bg-amber-50 border-amber-500 text-amber-850 shadow-sm' },
+                  { id: 'family', label: 'Rower (Szosa/Gravel/MTB)', color: 'hover:border-emerald-300 active:bg-emerald-50 active:border-emerald-500', activeStyle: 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm' },
                 ].map((item) => {
                   const isActive = selectedArchetypeFilter === item.id;
                   return (

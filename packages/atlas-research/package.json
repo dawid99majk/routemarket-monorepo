@@ -1,0 +1,11 @@
+{
+  "name": "@routemarket/atlas-research",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@routemarket/atlas-core": "workspace:*",
+    "@routemarket/atlas-gis": "workspace:*",
+    "zod": "^3.25.76"
+  }
+}

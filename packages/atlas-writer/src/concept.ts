@@ -1,52 +1,26 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { RouteProject, Source, ProjectRepository } from "../../atlas-core/src/index.js";
+import type { RouteProject, Source, ProjectRepository, Claim, Poi } from "../../atlas-core/src/index.js";
 
 export type GenerateRouteConceptInput = {
   project: RouteProject;
   sources?: Source[];
+  claims?: Claim[];
+  pois?: Poi[];
   repository?: ProjectRepository;
+  apiKey?: string;
+  model?: string;
 };
 
 export async function generateRouteConcept(input: GenerateRouteConceptInput): Promise<string> {
-  const sourceCount = input.sources?.length ?? 0;
-  const concept = `# Route Concept
-
-## Working title
-
-${input.project.title}
-
-## Route promise
-
-A practical ${input.project.category} route in ${input.project.region}, designed for RouteMarket review with transparent source coverage and clear uncertainty.
-
-## Target traveler
-
-${targetTraveler(input.project.category)}
-
-## Proposed structure
-
-- Start and finish: use validated GPX coordinates and editor-approved place names.
-- Distance and elevation: use the approved route summary only.
-- Difficulty: derive from distance, elevation, route category, and human review.
-- Surface and season: include only when creator notes or trusted sources support them.
-- Safety: separate verified route risks from general preparation advice.
-
-## Key research basis
-
-Current source count: ${sourceCount}
-
-## Draft route logic
-
-1. Start with the most accessible logistics base.
-2. Connect the highest-value scenic or cultural segments.
-3. Add safety and practical checkpoints before writing final claims.
-4. Keep uncertain distances and surfaces out of the public draft until validated.
-
-## RouteMarket readiness
-
-Status: concept only. Do not publish before source verification, GPX validation, and quality review.
-`;
+  const apiKey = input.apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  
+  let concept: string;
+  if (apiKey) {
+    concept = await generateAiConcept(input, apiKey);
+  } else {
+    concept = generateTemplateConcept(input);
+  }
 
   if (input.repository) {
     await input.repository.writeProjectFile(input.project.id, "route_concept.md", concept);
@@ -54,6 +28,84 @@ Status: concept only. Do not publish before source verification, GPX validation,
     await writeFile(join(input.project.folderPath, "route_concept.md"), concept, "utf8");
   }
   return concept;
+}
+
+async function generateAiConcept(input: GenerateRouteConceptInput, apiKey: string): Promise<string> {
+  const model = input.model ?? "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const sourceContext = (input.sources ?? []).map(s => `- ${s.title}: ${s.url}`).join("\n");
+  const claimContext = (input.claims ?? []).map(c => `- ${c.claim} (${c.status})`).join("\n");
+  const poiContext = (input.pois ?? []).map(p => `- ${p.name} [${p.lat}, ${p.lng}]: ${p.description}`).join("\n");
+
+  const prompt = `You are RouteMarket Atlas Strategist. Your goal is to create a "Route Master Blueprint" - a detailed concept for a new route.
+
+PROJECT:
+Title: ${input.project.title}
+Category: ${input.project.category}
+Region: ${input.project.region}
+
+RESEARCH DATA:
+SOURCES:
+${sourceContext}
+
+CLAIMS:
+${claimContext}
+
+POI:
+${poiContext}
+
+INSTRUCTIONS:
+1. Be precise and factual. Strictly use the provided research data.
+2. Avoid hallucinations. If info is missing, mark it as "to be verified".
+3. Language: Polish (professional, technical).
+4. Structure:
+# Route Master Blueprint: ${input.project.title}
+## 1. Wizja i Charakterystyka Trasy
+## 2. Dlaczego warto? (USP)
+## 3. Geographic Backbone (Critical POIs and flow)
+## 4. Analiza Trudności i Bezpieczeństwa
+## 5. Logistyka i Sprzęt
+
+Return ONLY Markdown.`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7 }
+    })
+  });
+
+  if (!response.ok) {
+    console.warn("AI Concept generation failed, falling back to template.");
+    return generateTemplateConcept(input);
+  }
+
+  const data = await response.json() as any;
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || generateTemplateConcept(input);
+}
+
+function generateTemplateConcept(input: GenerateRouteConceptInput): string {
+  const sourceCount = input.sources?.length ?? 0;
+  return `# Route Concept (Template)
+
+## Working title
+${input.project.title}
+
+## Route promise
+A practical ${input.project.category} route in ${input.project.region}.
+
+## Target traveler
+${targetTraveler(input.project.category)}
+
+## Key research basis
+Current source count: ${sourceCount}
+
+## Note
+This is a fallback template because GEMINI_API_KEY was not provided.
+`;
 }
 
 function targetTraveler(category: string): string {

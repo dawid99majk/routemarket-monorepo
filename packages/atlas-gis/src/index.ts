@@ -1,4 +1,5 @@
 export * from './gpx-validator.js';
+export * from './gpx-analyzer.js';
 export * from './geojson-validator.js';
 export * from './routing/types.js';
 export * from './routing/mock-provider.js';

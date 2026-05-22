@@ -210,6 +210,37 @@ export class FileProjectRepository implements ProjectRepository {
     await writeJsonFile(join(this.getProjectPath(slug), "events.json"), events);
   }
 
+  async loadPois(slug: string): Promise<any[]> {
+    const path = join(this.getProjectPath(slug), "poi.geojson");
+    if (!(await exists(path))) return [];
+    try {
+      const content = await readFile(path, "utf8");
+      const geojson = JSON.parse(content);
+      return geojson.features.map((f: any) => ({
+        id: f.properties?.id,
+        name: f.properties?.name,
+        type: f.properties?.type,
+        lat: f.geometry?.coordinates[1],
+        lng: f.geometry?.coordinates[0],
+        description: f.properties?.description
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async savePois(slug: string, pois: any[]): Promise<void> {
+    const geojson = {
+      type: "FeatureCollection",
+      features: pois.map(p => ({
+        type: "Feature",
+        properties: { id: p.id, name: p.name, type: p.type, description: p.description },
+        geometry: { type: "Point", coordinates: [p.lng, p.lat] }
+      }))
+    };
+    await writeFile(join(this.getProjectPath(slug), "poi.geojson"), JSON.stringify(geojson, null, 2), "utf8");
+  }
+
   async loadInputManifest(slug: string): Promise<InputManifest> {
     const path = join(this.getProjectPath(slug), "input_manifest.json");
     const data = await readJsonFile<unknown>(path);
