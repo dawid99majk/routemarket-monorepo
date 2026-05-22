@@ -8,20 +8,11 @@ import Logo from '@/components/Logo';
 import Footer from '@/components/Footer';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
-import SEO, { buildProductSchema, buildReviewSchema, buildBreadcrumbSchema } from '@/components/SEO';
-import { trackEvent } from '@/lib/analytics';
-import { isFeatureEnabled } from '@/lib/feature-flags';
-import { useQuery } from '@tanstack/react-query';
-import Logo from '@/components/Logo';
-import Footer from '@/components/Footer';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouteById, useRouteStats, useRouteImages } from '@/hooks/use-routes';
 import { useHasPurchased } from '@/hooks/use-purchases';
 import { useRoutePdfs } from '@/hooks/use-route-pdfs';
+import { useRoutePois } from '@/hooks/use-route-pois';
 import { getLanguageFlag, getLanguageName } from '@/lib/languages';
 import { useRouteTranslation, getUserLanguage } from '@/hooks/use-translations';
 import TranslationManager from '@/components/TranslationManager';
@@ -40,7 +31,7 @@ import {
   Clock, Mountain, Ruler, Gauge, TreePine, Sun, RotateCcw, Loader2,
   ChevronLeft, ChevronRight, AlertTriangle, Backpack, CalendarCheck, ShieldAlert,
   Bot, Users, Compass, Footprints, CheckCircle2, Award, TrendingUp, MessageCircle,
-  Instagram, Youtube, Globe, Expand, Box,
+  Instagram, Youtube, Globe, Expand, Box, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -143,6 +134,48 @@ function PriceDisplay({ price, currency }: { price: number; currency: string }) 
           ≈ {formatPrice(converted.converted, userCurrency)}
         </p>
       )}
+    </div>
+  );
+}
+
+function PoiCard({ poi, badgeLabel, badgeColor }: { 
+  poi: RoutePoi; 
+  badgeLabel?: string; 
+  badgeColor?: string;
+}) {
+  return (
+    <div className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+      <div className="font-semibold text-foreground flex justify-between gap-2">
+        <span>{poi.name}</span>
+        {badgeLabel && <Badge variant="outline" className={`text-[8px] h-4.5 px-1 py-0 uppercase ${badgeColor}`}>{badgeLabel}</Badge>}
+      </div>
+      {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
+      <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
+        <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
+            onClick={() => {
+              navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
+              toast.success('Skopiowano współrzędne GPS!');
+            }}
+          >
+            Kopiuj GPS
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
+            onClick={() => {
+              window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
+            }}
+          >
+            <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -366,6 +399,8 @@ export default function RouteDetail() {
       setConsentOpen(false);
     }
   };
+
+  const { data: routePois = [] } = useRoutePois(routeId);
 
   // Build "who is this for" items based on route data
   const whoIsThisFor = (() => {
@@ -664,6 +699,97 @@ export default function RouteDetail() {
                 {route.loop_type && <MetricPill icon={RotateCcw} label={t('route_detail.type')} value={route.loop_type.replace(/-/g, ' ')} />}
               </div>
             </section>
+
+            {/* ── Logistyka POI ── */}
+            {(purchased || isOwner) && (
+              <section className="bg-card rounded-xl p-6 shadow-token-sm border border-border/40">
+                <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-primary" /> Logistyka i Punkty (POI)
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                  {/* Sekcja: Parking */}
+                  <div className="p-3 rounded-lg border border-blue-500/10 bg-blue-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-blue-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>🅿️</span> Parking / Start
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => poi.type === 'parking').length > 0 ? (
+                        routePois.filter(poi => poi.type === 'parking').map((poi, idx) => (
+                          <PoiCard key={poi.id || idx} poi={poi} />
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak danych o parkingu.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Gastronomia */}
+                  <div className="p-3 rounded-lg border border-orange-500/10 bg-orange-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-orange-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>🍽️</span> Gastronomia
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => ['dining', 'food', 'restaurant'].includes(poi.type)).length > 0 ? (
+                        routePois.filter(poi => ['dining', 'food', 'restaurant'].includes(poi.type)).map((poi, idx) => (
+                          <PoiCard key={poi.id || idx} poi={poi} />
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak punktów gastronomicznych.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Nocleg */}
+                  <div className="p-3 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-emerald-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>🛌</span> Nocleg / Schronisko
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => ['hotel', 'shelter', 'accommodation', 'campground'].includes(poi.type)).length > 0 ? (
+                        routePois.filter(poi => ['hotel', 'shelter', 'accommodation', 'campground'].includes(poi.type)).map((poi, idx) => (
+                          <PoiCard key={poi.id || idx} poi={poi} />
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak danych o noclegach.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Woda */}
+                  <div className="p-3 rounded-lg border border-cyan-500/10 bg-cyan-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-cyan-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>💧</span> Dostęp do wody
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => poi.type === 'water').length > 0 ? (
+                        routePois.filter(poi => poi.type === 'water').map((poi, idx) => (
+                          <PoiCard key={poi.id || idx} poi={poi} />
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych źródeł wody.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Co zobaczyć / Widoki */}
+                  <div className="p-3 rounded-lg border border-purple-500/10 bg-purple-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-purple-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>📸</span> Co zobaczyć / Widoki
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => poi.type === 'viewpoint').length > 0 ? (
+                        routePois.filter(poi => poi.type === 'viewpoint').map((poi, idx) => (
+                          <PoiCard key={poi.id || idx} poi={poi} badgeLabel="Widok" badgeColor="bg-purple-500/5 border-purple-500/20 text-purple-500" />
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych punktów widokowych.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* ── Safety & Risk Panel — above the fold ── */}
             {safetyPanelEnabled && (route as any).risk_level && (route as any).risk_level !== 'unknown' && (
@@ -1119,6 +1245,27 @@ export default function RouteDetail() {
           setPurchaseModalOpen(false);
         }}
       />
+
+      {/* ── Print-only POI Section ── */}
+      <div className="hidden print:block mt-8 border-t pt-8">
+        <h2 className="text-xl font-bold mb-4">Logistyka i Punkty POI</h2>
+        <div className="space-y-4">
+          {routePois.map((poi, idx) => (
+            <div key={poi.id || idx} className="border-b pb-2">
+              <p className="font-semibold">
+                {poi.type === 'parking' ? '🅿️ Parking' : 
+                 poi.type === 'hotel' ? '🛌 Nocleg' : 
+                 poi.type === 'shelter' ? '⛺ Schronisko' : 
+                 poi.type === 'dining' || poi.type === 'food' ? '🍽️ Gastronomia' : 
+                 poi.type === 'water' ? '💧 Woda' : 
+                 poi.type === 'viewpoint' ? '📸 Widok' : '📍 Punkt'}: {poi.name}
+              </p>
+              <p className="text-sm text-gray-600">GPS: {poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</p>
+              {poi.description && <p className="text-sm mt-1">{poi.description}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

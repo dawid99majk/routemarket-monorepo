@@ -20,7 +20,7 @@ import {
   Search, User, Plus, ShoppingBag, LayoutDashboard, Heart,
   Map as MapIcon, X, ShieldCheck, LogOut, MessageSquare,
   Sparkles, Compass, ArrowRight, Shield, Activity, CloudRain,
-  BookOpen, Star, Award, Zap, ChevronRight, Upload
+  BookOpen, Star, Award, Zap, ChevronRight, Upload, Bike
 } from 'lucide-react';
 import RouteCard from '@/components/RouteCard';
 import { useCardHighlights } from '@/hooks/use-card-highlights';
