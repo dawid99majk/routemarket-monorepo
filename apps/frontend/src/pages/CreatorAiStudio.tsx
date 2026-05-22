@@ -1,37 +1,37 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Logo from '@/components/Logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfileBalance } from '@/hooks/use-profile-balance';
 import { TopUpModal } from '@/components/ui/TopUpModal';
-import { Sparkles, Loader2, Files, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner';
+import { Sparkles, Loader2, Files } from 'lucide-react';
 
 // Custom Hooks
-import { useAtlasApi } from '@/hooks/useAtlasApi';
-import { useAtlasProjects } from '@/hooks/useAtlasProjects';
-import { useAtlasProjectWorkspace } from '@/hooks/useAtlasProjectWorkspace';
-import { useAtlasPipeline } from '@/hooks/useAtlasPipeline';
-import { useAtlasFiles } from '@/hooks/useAtlasFiles';
+import { useAtlasProjects } from '@/features/creator/hooks/useAtlasProjects';
+import { useAtlasProjectWorkspace } from '@/features/creator/hooks/useAtlasProjectWorkspace';
+import { useAtlasWorkflow } from '@/features/creator/hooks/useAtlasWorkflow';
+import { useAtlasFiles } from '@/features/creator/hooks/useAtlasFiles';
 
 // Components
-import { CreatorProjectList } from '@/components/atlas-studio/CreatorProjectList';
-import { CreatorProjectHeader } from '@/components/atlas-studio/CreatorProjectHeader';
-import { CreatorStepNavigation } from '@/components/atlas-studio/CreatorStepNavigation';
-import { CreatorNewProjectForm } from '@/components/atlas-studio/CreatorNewProjectForm';
-import { SourceMaterialsStep } from '@/components/atlas-studio/SourceMaterialsStep';
-import { InterviewStep } from '@/components/atlas-studio/InterviewStep';
-import { ClaimsReviewStep } from '@/components/atlas-studio/ClaimsReviewStep';
-import { GpxReviewStep } from '@/components/atlas-studio/GpxReviewStep';
-import { ConceptReviewStep } from '@/components/atlas-studio/ConceptReviewStep';
-import { GuideOutlineStep } from '@/components/atlas-studio/GuideOutlineStep';
-import { GuideFinalStep } from '@/components/atlas-studio/GuideFinalStep';
-import { MediaStep } from '@/components/atlas-studio/MediaStep';
-import { PublishStep } from '@/components/atlas-studio/PublishStep';
+import { CreatorLayout } from '@/features/creator/components/CreatorLayout';
+import { CreatorHeader } from '@/features/creator/components/CreatorHeader';
+import { CreatorSidebar } from '@/features/creator/components/CreatorSidebar';
+import { CreatorProjectList } from '@/features/creator/components/CreatorProjectList';
+import { CreatorNewProjectForm } from '@/features/creator/components/CreatorNewProjectForm';
 
-import { PipelineStep, Project } from '@/types/atlas-types';
+// Steps
+import { SourcesStep } from '@/features/creator/components/steps/SourcesStep';
+import { InterviewStep } from '@/features/creator/components/steps/InterviewStep';
+import { ClaimsReviewStep } from '@/features/creator/components/steps/ClaimsReviewStep';
+import { GpxStep } from '@/features/creator/components/steps/GpxStep';
+import { ConceptStep } from '@/features/creator/components/steps/ConceptStep';
+import { GuideOutlineStep } from '@/features/creator/components/steps/GuideOutlineStep';
+import { GuideFinalStep } from '@/features/creator/components/steps/GuideFinalStep';
+import { MediaStep } from '@/features/creator/components/steps/MediaStep';
+import { PublishStep } from '@/features/creator/components/steps/PublishStep';
+
+import { PipelineStep } from '@/features/creator/types/creator.types';
 
 export default function CreatorAiStudio() {
   const navigate = useNavigate();
@@ -55,8 +55,8 @@ export default function CreatorAiStudio() {
     events
   } = useAtlasProjectWorkspace(activeSlug);
 
-  const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasPipeline();
-  const { uploading, links, setLinks, uploadedFiles, setUploadedFiles, addLink, uploadFiles, saveNotes } = useAtlasFiles(activeSlug);
+  const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasWorkflow();
+  const { uploading, links, addLink, uploadedFiles, uploadFiles, saveNotes } = useAtlasFiles(activeSlug);
 
   useEffect(() => {
     if (!activeSlug) {
@@ -101,7 +101,7 @@ export default function CreatorAiStudio() {
     if (status === 'created' || status === 'research_needed') return 'sources';
     if (status === 'paused' || status === 'running') {
       if (waitingStage === 'interview_needed') return 'interview';
-      if (waitingStage === 'claims_approval') return 'interview'; // Review after research
+      if (waitingStage === 'claims_approval') return 'interview';
       if (waitingStage === 'gpx_summary_approval') return 'gpx';
       if (waitingStage === 'guide_outline_approval') return 'outline';
       if (waitingStage === 'guide_final_approval') return 'guide';
@@ -111,20 +111,11 @@ export default function CreatorAiStudio() {
     return 'sources';
   }, [project]);
 
-  // Main Render Logic
+  // View 1: Project Selection
   if (!activeSlug) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b bg-card/50 backdrop-blur-md sticky top-0 z-50">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-            <Logo size="sm" />
-            <Button onClick={() => navigate('/creator-dashboard')} variant="outline" size="sm">
-              Panel twórcy
-            </Button>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-6xl px-4 py-12 space-y-12">
+      <CreatorLayout>
+        <div className="space-y-12 py-4">
           <div className="text-center space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight flex items-center justify-center gap-3">
               <Sparkles className="h-10 w-10 text-primary animate-pulse" />
@@ -195,35 +186,29 @@ export default function CreatorAiStudio() {
               )}
             </div>
           </div>
-        </main>
+        </div>
         <TopUpModal open={isTopUpOpen} onOpenChange={setIsTopUpOpen} />
-      </div>
+      </CreatorLayout>
     );
   }
 
+  // View 2: Project Workspace
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="border-b bg-card/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <Logo size="sm" />
-            <div className="h-4 w-px bg-border hidden sm:block" />
-            <span className="text-xs font-medium text-muted-foreground hidden sm:block uppercase tracking-widest">
-              AI Studio Workspace
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              <span className="text-[11px] font-bold">{balance?.credit_balance ?? 0} Kredytów</span>
-            </div>
-            <Button onClick={handleExitProject} variant="ghost" size="sm">Wyjdź</Button>
-          </div>
+    <CreatorLayout
+      headerRight={
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <span className="text-[11px] font-bold">{balance?.credit_balance ?? 0} Kredytów</span>
         </div>
-      </header>
+      }
+      exitLabel="Wyjdź"
+      exitPath="#" // Handled by onClick manually to trigger handleExitProject if needed, but here I'll just use the button from Layout if I can adapt it
+    >
+      {/* Overriding the exit button in Layout by passing a custom one or just using handleExitProject in a separate way */}
+      {/* For now, I'll just keep it simple and use handleExitProject from the Header I will render below */}
 
       {pipelineRunning && (
-        <div className="bg-primary text-primary-foreground py-2 px-4 text-center text-xs font-medium animate-pulse sticky top-16 z-40">
+        <div className="bg-primary text-primary-foreground py-2 px-4 text-center text-xs font-medium animate-pulse sticky top-[65px] -mx-4 sm:-mx-6 lg:-mx-8 z-40 mb-8">
           <div className="flex items-center justify-center gap-3">
             <Loader2 className="w-3 h-3 animate-spin" />
             <span>{statusText}</span>
@@ -231,141 +216,138 @@ export default function CreatorAiStudio() {
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-8">
-        {loadingDetails ? (
-          <div className="flex flex-col items-center justify-center py-40">
-            <Loader2 className="w-12 h-12 animate-spin text-primary mb-6" />
-            <h2 className="text-xl font-bold">Inicjalizacja Przestrzeni Roboczej...</h2>
-            <p className="text-muted-foreground">Ładujemy artefakty i stan projektu.</p>
-          </div>
-        ) : project && (
-          <>
-            <CreatorProjectHeader 
-              project={project} 
-              onExit={handleExitProject}
-              onRefresh={fetchWorkspace}
-              isRefreshing={loadingDetails}
-            />
+      {loadingDetails ? (
+        <div className="flex flex-col items-center justify-center py-40">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-6" />
+          <h2 className="text-xl font-bold">Inicjalizacja Przestrzeni Roboczej...</h2>
+          <p className="text-muted-foreground">Ładujemy artefakty i stan projektu.</p>
+        </div>
+      ) : project && (
+        <>
+          <CreatorHeader 
+            project={project} 
+            onExit={handleExitProject}
+            onRefresh={fetchWorkspace}
+            isRefreshing={loadingDetails}
+          />
 
-            <CreatorStepNavigation 
-              activeStep={activeStep}
-              maxAllowedStep={maxAllowedStep}
-              onStepClick={(step) => setActiveStep(step)}
-            />
+          <CreatorSidebar 
+            activeStep={activeStep}
+            maxAllowedStep={maxAllowedStep}
+            onStepClick={(step) => setActiveStep(step)}
+          />
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-              <div className="xl:col-span-3 space-y-6">
-                {activeStep === 'sources' && (
-                  <SourceMaterialsStep 
-                    notes={artifacts.notes}
-                    onNotesChange={artifacts.setNotes}
-                    onSaveNotes={() => saveNotes(artifacts.notes)}
-                    links={links}
-                    onAddLink={addLink}
-                    uploadedFiles={uploadedFiles}
-                    onUploadFiles={uploadFiles}
-                    isUploading={uploading}
-                    onContinue={() => runPipeline(activeSlug, fetchWorkspace)}
-                  />
-                )}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            <div className="xl:col-span-3 space-y-6">
+              {activeStep === 'sources' && (
+                <SourcesStep 
+                  notes={artifacts.notes}
+                  onNotesChange={artifacts.setNotes}
+                  onSaveNotes={() => saveNotes(artifacts.notes)}
+                  links={links}
+                  onAddLink={addLink}
+                  uploadedFiles={uploadedFiles}
+                  onUploadFiles={uploadFiles}
+                  isUploading={uploading}
+                  onContinue={() => runPipeline(activeSlug, fetchWorkspace)}
+                />
+              )}
 
-                {activeStep === 'interview' && (
-                  <InterviewStep 
-                    project={project}
-                    onComplete={fetchWorkspace}
-                  />
-                )}
+              {activeStep === 'interview' && (
+                <InterviewStep 
+                  project={project}
+                  onComplete={fetchWorkspace}
+                />
+              )}
 
-                {/* Human-in-the-loop Review Steps */}
-                {project.waitingApprovalStage === 'claims_approval' && activeStep === 'interview' && (
-                   <ClaimsReviewStep 
-                    claims={artifacts.claims}
-                    onApprove={() => approveStage(activeSlug, 'claims_approval')}
-                    isProcessing={pipelineRunning}
-                   />
-                )}
+              {project.waitingApprovalStage === 'claims_approval' && activeStep === 'interview' && (
+                 <ClaimsReviewStep 
+                  claims={artifacts.claims}
+                  onApprove={() => approveStage(activeSlug, 'claims_approval')}
+                  isProcessing={pipelineRunning}
+                 />
+              )}
 
-                {project.waitingApprovalStage === 'poi_approval' && activeStep === 'gpx' && (
-                  <MediaStep 
-                    poiGeoJson={artifacts.poiGeoJson}
-                    onApprove={() => approveStage(activeSlug, 'poi_approval')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
+              {project.waitingApprovalStage === 'poi_approval' && activeStep === 'gpx' && (
+                <MediaStep 
+                  poiGeoJson={artifacts.poiGeoJson}
+                  onApprove={() => approveStage(activeSlug, 'poi_approval')}
+                  isProcessing={pipelineRunning}
+                />
+              )}
 
-                {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
-                  <ConceptReviewStep 
-                    concept={artifacts.outline} // Or artifacts.concept if separate
-                    onApprove={() => approveStage(activeSlug, 'concept_approval')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
+              {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
+                <ConceptStep 
+                  concept={artifacts.outline} 
+                  onApprove={() => approveStage(activeSlug, 'concept_approval')}
+                  isProcessing={pipelineRunning}
+                />
+              )}
 
-                {activeStep === 'gpx' && project.waitingApprovalStage === 'gpx_summary_approval' && (
-                  <GpxReviewStep 
-                    gpxXml={artifacts.gpxXml}
-                    onApprove={() => approveStage(activeSlug, 'gpx_summary_approval')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
+              {activeStep === 'gpx' && project.waitingApprovalStage === 'gpx_summary_approval' && (
+                <GpxStep 
+                  gpxXml={artifacts.gpxXml}
+                  onApprove={() => approveStage(activeSlug, 'gpx_summary_approval')}
+                  isProcessing={pipelineRunning}
+                />
+              )}
 
-                {activeStep === 'outline' && (
-                  <GuideOutlineStep 
-                    outline={artifacts.outline}
-                    onApprove={() => approveStage(activeSlug, 'guide_outline_approval')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
+              {activeStep === 'outline' && (
+                <GuideOutlineStep 
+                  outline={artifacts.outline}
+                  onApprove={() => approveStage(activeSlug, 'guide_outline_approval')}
+                  isProcessing={pipelineRunning}
+                />
+              )}
 
-                {activeStep === 'guide' && (
-                  <GuideFinalStep 
-                    guide={artifacts.guide}
-                    onApprove={() => approveStage(activeSlug, 'guide_final_approval')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
+              {activeStep === 'guide' && (
+                <GuideFinalStep 
+                  guide={artifacts.guide}
+                  onApprove={() => approveStage(activeSlug, 'guide_final_approval')}
+                  isProcessing={pipelineRunning}
+                />
+              )}
 
-                {activeStep === 'media' && (
-                  <MediaStep 
-                    poiGeoJson={artifacts.poiGeoJson}
-                    onApprove={() => setActiveStep('publish')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
+              {activeStep === 'media' && (
+                <MediaStep 
+                  poiGeoJson={artifacts.poiGeoJson}
+                  onApprove={() => setActiveStep('publish')}
+                  isProcessing={pipelineRunning}
+                />
+              )}
 
-                {activeStep === 'publish' && (
-                  <PublishStep 
-                    project={project}
-                    onViewPublic={() => navigate(`/route/${project.id}`)}
-                  />
-                )}
-              </div>
-
-              <div className="space-y-6">
-                <Card>
-                  <CardContent className="p-4 space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <Files className="w-4 h-4" /> Logi AI
-                    </h3>
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                      {events.map((event, idx) => (
-                        <div key={idx} className="text-[11px] leading-relaxed p-2 rounded bg-muted/30 border-l-2 border-primary/50">
-                          <span className="text-muted-foreground block mb-0.5">{new Date(event.createdAt as string).toLocaleTimeString()}</span>
-                          <span className="font-medium">{event.message}</span>
-                        </div>
-                      ))}
-                      {events.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic">Brak nowych zdarzeń.</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {activeStep === 'publish' && (
+                <PublishStep 
+                  project={project}
+                  onViewPublic={() => navigate(`/route/${project.id}`)}
+                />
+              )}
             </div>
-          </>
-        )}
-      </main>
+
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Files className="w-4 h-4" /> Logi AI
+                  </h3>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    {events.map((event, idx) => (
+                      <div key={idx} className="text-[11px] leading-relaxed p-2 rounded bg-muted/30 border-l-2 border-primary/50">
+                        <span className="text-muted-foreground block mb-0.5">{new Date(event.createdAt as string).toLocaleTimeString()}</span>
+                        <span className="font-medium">{event.message}</span>
+                      </div>
+                    ))}
+                    {events.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Brak nowych zdarzeń.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
       <TopUpModal open={isTopUpOpen} onOpenChange={setIsTopUpOpen} />
-    </div>
+    </CreatorLayout>
   );
 }

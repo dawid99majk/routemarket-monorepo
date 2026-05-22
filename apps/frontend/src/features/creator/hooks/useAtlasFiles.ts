@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAtlasApi } from './useAtlasApi';
-import { SourceFile } from '@/types/atlas-types';
+import { SourceFile } from '@/features/creator/types/creator.types';
 import { toast } from 'sonner';
 
 export function useAtlasFiles(slug: string | null) {

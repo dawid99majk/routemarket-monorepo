@@ -1,4 +1,4 @@
-import { PipelineStep } from '@/types/atlas-types';
+import { PipelineStep } from '@/features/creator/types/creator.types';
 import { Button } from '@/components/ui/button';
 import { Files, MessageSquare, FileText, Route, Pencil, Image, CheckCircle2 } from 'lucide-react';
 
@@ -18,17 +18,17 @@ const steps: Step[] = [
   { id: 'publish', label: '7. Publikacja', icon: CheckCircle2 },
 ];
 
-interface CreatorStepNavigationProps {
+interface CreatorSidebarProps {
   activeStep: PipelineStep;
   maxAllowedStep: PipelineStep;
   onStepClick: (step: PipelineStep) => void;
 }
 
-export function CreatorStepNavigation({ 
+export function CreatorSidebar({ 
   activeStep, 
   maxAllowedStep, 
   onStepClick 
-}: CreatorStepNavigationProps) {
+}: CreatorSidebarProps) {
   const getStepStatus = (stepId: PipelineStep) => {
     const stepOrder: PipelineStep[] = ['sources', 'interview', 'outline', 'gpx', 'guide', 'media', 'publish'];
     const activeIdx = stepOrder.indexOf(activeStep);

@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { URL } from "node:url";
+import { randomUUID } from "node:crypto";
 import { AtlasWorkflowService } from "@routemarket/atlas-workflow/src/index.js";
 import { FileProjectRepository, PostgresProjectRepository } from "@routemarket/atlas-core/src/index.js";
 import { badRequest, HttpError, notFound, unauthorized } from "./errors.js";
@@ -47,6 +48,8 @@ type HandlerContext = {
   jobs: JobManager;
   corsOrigin: string;
   apiToken?: string;
+  requestId: string;
+  workflowId?: string;
 };
 
 type Handler = (context: HandlerContext) => Promise<unknown>;
@@ -93,8 +96,14 @@ export function createAtlasApiServer(options: AtlasApiOptions): Server {
 
     const url = new URL(req.url ?? "/", "http://localhost");
     const matchedRoute = matchRoute(routes, req.method ?? "GET", url.pathname);
+    const requestId = req.headers["x-request-id"] as string || randomUUID();
+    let errorToLog: unknown = undefined;
+
     if (!matchedRoute) {
       sendError(res, notFound("Endpoint not found."));
+      if (logRequests) {
+        console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: "WARN", method: req.method ?? "GET", url: url.pathname, status: res.statusCode, durationMs: Date.now() - startedAt, requestId, message: "Endpoint not found" }));
+      }
       return;
     }
 
@@ -110,14 +119,31 @@ export function createAtlasApiServer(options: AtlasApiOptions): Server {
         service,
         jobs,
         corsOrigin,
-        apiToken
+        apiToken,
+        requestId,
       });
       if (!res.writableEnded) sendJson(res, 200, result);
     } catch (error) {
+      errorToLog = error;
       sendError(res, error);
     } finally {
       if (logRequests) {
-        console.log(`${req.method ?? "GET"} ${url.pathname} ${res.statusCode} ${Date.now() - startedAt}ms`);
+        const logLevel = res.statusCode >= 500 ? "ERROR" : res.statusCode >= 400 ? "WARN" : "INFO";
+        const logData: any = {
+          timestamp: new Date().toISOString(),
+          level: logLevel,
+          method: req.method ?? "GET",
+          url: url.pathname,
+          status: res.statusCode,
+          durationMs: Date.now() - startedAt,
+          requestId,
+          message: `${req.method ?? "GET"} ${url.pathname} completed`
+        };
+        if (errorToLog) {
+          logData.error = errorToLog instanceof Error ? errorToLog.message : String(errorToLog);
+          if (errorToLog instanceof Error && errorToLog.stack) logData.stack = errorToLog.stack;
+        }
+        console.log(JSON.stringify(logData));
       }
     }
   });

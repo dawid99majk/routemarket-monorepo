@@ -25,14 +25,15 @@ const PAGE_H = 841.89;
 const MARGIN = 50;
 const CONTENT_W = PAGE_W - 2 * MARGIN;
 
-const BRAND = rgb(0.4, 0.494, 0.918); // #667eea
-const BRAND_DARK = rgb(0.3, 0.38, 0.75);
-const WHITE = rgb(1, 1, 1);
-const BLACK = rgb(0.1, 0.1, 0.18);
-const GRAY = rgb(0.4, 0.4, 0.45);
-const LIGHT_BG = rgb(0.97, 0.97, 0.98);
-const WARN_BG = rgb(1, 0.95, 0.8);
-const WARN_BORDER = rgb(1, 0.76, 0.03);
+const BG_COLOR = rgb(0.05, 0.05, 0.05);
+const BRAND = rgb(0.85, 0.65, 0.13); // Gold/Amber
+const BRAND_DARK = rgb(0.7, 0.5, 0.1);
+const WHITE = rgb(0.95, 0.95, 0.95);
+const BLACK = rgb(0.9, 0.9, 0.9); // Inverted: used for main text
+const GRAY = rgb(0.5, 0.5, 0.5);
+const LIGHT_BG = rgb(0.1, 0.1, 0.12);
+const WARN_BG = rgb(0.15, 0.1, 0.05);
+const WARN_BORDER = rgb(0.85, 0.65, 0.13);
 
 function wrapText(text: string, font: any, size: number, maxWidth: number): string[] {
   const safeText = sanitize(text);
@@ -58,7 +59,9 @@ function wrapText(text: string, font: any, size: number, maxWidth: number): stri
 }
 
 function addPage(doc: any) {
-  return doc.addPage([PAGE_W, PAGE_H]);
+  const page = doc.addPage([PAGE_W, PAGE_H]);
+  page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: BG_COLOR });
+  return page;
 }
 
 // ── Localized labels per PDF language ──
@@ -248,7 +251,8 @@ serve(async (req) => {
 
     // ── Cover page ──
     let page = addPage(doc);
-    page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: BRAND });
+    // Draw an accent line or something minimalist instead of full BRAND color
+    page.drawRectangle({ x: 0, y: PAGE_H - 100, width: PAGE_W, height: 4, color: BRAND });
 
     const titleLines = wrapText(routeData.title || "", fontB, 28, CONTENT_W);
     let cy = PAGE_H / 2 + titleLines.length * 17;
@@ -464,7 +468,7 @@ serve(async (req) => {
     y -= 30;
     // Lined area
     for (let i = 0; i < 25; i++) {
-      page.drawRectangle({ x: MARGIN, y, width: CONTENT_W, height: 0.5, color: rgb(0.85, 0.85, 0.88) });
+      page.drawRectangle({ x: MARGIN, y, width: CONTENT_W, height: 0.5, color: rgb(0.2, 0.2, 0.22) });
       y -= 26;
     }
 

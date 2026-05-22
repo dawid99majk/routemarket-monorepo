@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAtlasApi } from './useAtlasApi';
 import { toast } from 'sonner';
 
-export function useAtlasPipeline() {
+export function useAtlasWorkflow() {
   const { invokeAtlas } = useAtlasApi();
   const [running, setRunning] = useState(false);
   const [statusText, setStatusText] = useState('');

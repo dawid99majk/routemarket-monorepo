@@ -167,27 +167,27 @@ export async function generateGuideV2(project: RouteProject, repository?: Projec
   const routeValue = extractConceptSection(concept!, "Route promise");
   const audience = targetAudience(project.category);
 
-  const guideBlocks = [
-    `# ${project.title}`,
-    `## Quick facts\n${quickFacts}`,
-    audience ? `## Target audience\n\n${audience}` : null,
-    routeValue ? `## Route value\n\n${routeValue}` : null,
-    `## Route overview\n\nThis guide is based on validated GPX facts, creator materials and reviewed route claims. The route covers ${summary.distanceKm} km in ${project.region}, with ${summary.isLoop ? "a loop format" : "a point-to-point format"}.`,
-    segmentsText ? `## Segment description\n\n${segmentsText}` : null,
-    poisText ? `## Points of interest\n\n${poisText}` : null,
-    sectionClaims.logistics.length ? `## Logistics\n\n${renderClaims(sectionClaims.logistics)}` : null,
-    sectionClaims.safety.length ? `## Safety\n\n${renderClaims(sectionClaims.safety)}` : null,
-    sectionClaims.season.length ? `## Season notes\n\n${renderClaims(sectionClaims.season)}` : null,
-    `## Preparation\n\n- Download the GPX before departure.\n- Check weather, road or trail closures, and local access rules before starting.\n- Carry backup navigation and enough water, food, fuel or battery for the route category.`,
-    `## Variants\n\n- Shorten the route at a verified settlement, trailhead or road junction before committing to remote sections.\n- Extend only after validating extra GPX distance, surface and daylight.`,
-    trustedMaterials.length ? `## Sources\n\n${trustedMaterials.map((material: any) => `- ${material.title}${material.sourceUrl ? ` (${material.sourceUrl})` : ""}`).join("\n")}` : null,
-    claims.some(c => c.usedInSections?.length) ? `## Sources and verification\n\n${claims.filter(c => c.usedInSections?.length).map(c => `- ${c.claim} [${c.sources.join(", ")}] used in ${c.usedInSections!.join(", ")}`).join("\n")}` : null,
-    `## Review summary\n\n${reviewSummary(sectionClaims)}`,
-    warningsText ? `## Warnings and validation notes\n\n${warningsText}` : null,
-    `## Disclaimer\n\nThis guide is an editorial navigation aid, not a guarantee of access, safety, weather, legality or current field conditions. Verify critical facts before publishing and before travel.`
-  ].filter(Boolean).join("\n\n");
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  let guide: string;
 
-  const guide = guideBlocks + "\n";
+  if (apiKey) {
+    try {
+      guide = await generateAiGuideV2({
+        project,
+        summary,
+        claims,
+        pois,
+        concept: concept || "",
+        sources: trustedMaterials,
+        apiKey
+      });
+    } catch (error) {
+      console.warn("AI Guide generation failed, falling back to template:", error);
+      guide = constructTemplateGuideV2(project, summary, segmentsText, poisText, sectionClaims, audience, routeValue, trustedMaterials, claims, warningsText);
+    }
+  } else {
+    guide = constructTemplateGuideV2(project, summary, segmentsText, poisText, sectionClaims, audience, routeValue, trustedMaterials, claims, warningsText);
+  }
 
   if (repository) {
     await repository.writeProjectFile(project.id, "guide.md", guide);
@@ -195,6 +195,159 @@ export async function generateGuideV2(project: RouteProject, repository?: Projec
     await writeFile(join(project.folderPath, "guide.md"), guide, "utf8");
   }
   return guide;
+}
+
+function constructTemplateGuideV2(
+  project: RouteProject,
+  summary: RouteSummary,
+  segmentsText: string,
+  poisText: string,
+  sectionClaims: any,
+  audience: string,
+  routeValue: string,
+  trustedMaterials: any[],
+  claims: Claim[],
+  warningsText: string
+): string {
+  const quickFacts = [
+    `Distance: ${summary.distanceKm} km`,
+    summary.elevationGainM !== undefined ? `Elevation gain: ${summary.elevationGainM} m` : null,
+    summary.estimatedTimeH !== undefined ? `Estimated time: ${summary.estimatedTimeH} h` : null,
+    summary.difficulty ? `Difficulty: ${summary.difficulty}` : null,
+    summary.loopType ? `Loop type: ${summary.loopType}` : null,
+    summary.startPoint ? `Start: ${summary.startPoint}` : null,
+    summary.endPoint ? `Finish: ${summary.endPoint}` : null
+  ].filter(Boolean).map(f => `- ${f}`).join("\n");
+
+  const guideBlocks = [
+    `# ${project.title}`,
+    `## Overview\n\nThis guide is based on validated GPX facts, creator materials and reviewed route claims. The route covers ${summary.distanceKm} km in ${project.region}, with ${summary.isLoop ? "a loop format" : "a point-to-point format"}.\n\nTarget audience: ${audience}\nRoute value: ${routeValue}`,
+    `## Route Facts\n${quickFacts}`,
+    `## Day by Day\n\n${segmentsText || "Refer to GPX segments."}`,
+    `## Parking\n\n${renderClaims(sectionClaims.practical)}`,
+    `## Food\n\nCheck local settlements along the route.`,
+    `## Water\n\n${renderClaims(sectionClaims.logistics)}`,
+    `## Accommodation\n\nCheck local options in ${project.region}.`,
+    `## Danger\n\n${renderClaims(sectionClaims.safety)}\n${warningsText}`,
+    `## Weather\n\n${renderClaims(sectionClaims.season)}`,
+    `## Gear\n\n- GPX navigation device\n- Water and nutrition\n- First aid kit`,
+    `## Tips\n\nCheck local regulations and seasonal accessibility.`,
+    `## POI\n\n${poisText || "See GPX for POIs."}`,
+    `## Alternatives\n\n- Shorten the route at a verified settlement, trailhead or road junction.\n- Extend only after validating extra GPX distance.`,
+    `## Checklist\n\n- [ ] GPX downloaded\n- [ ] Weather checked\n- [ ] Gear verified\n- [ ] Emergency contacts shared`,
+    trustedMaterials.length ? `## Sources\n\n${trustedMaterials.map((material: any) => `- ${material.title}${material.sourceUrl ? ` (${material.sourceUrl})` : ""}`).join("\n")}` : null,
+    `## Disclaimer\n\nThis guide is an editorial navigation aid, not a guarantee of access, safety, weather, legality or current field conditions.`
+  ].filter(Boolean).join("\n\n");
+
+  return guideBlocks + "\n";
+}
+
+async function generateAiGuideV2(input: {
+  project: RouteProject;
+  summary: RouteSummary;
+  claims: Claim[];
+  pois: Poi[];
+  concept: string;
+  sources: any[];
+  apiKey: string;
+  model?: string;
+}): Promise<string> {
+  const model = input.model ?? "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${input.apiKey}`;
+
+  const claimContext = input.claims.map(c => `- ${c.claim} (Status: ${c.status}, Type: ${c.claimType})`).join("\n");
+  const poiContext = input.pois.map(p => `- ${p.name}: ${p.description}`).join("\n");
+  const sourceContext = input.sources.map(s => `- ${s.title} (${s.sourceUrl || "no URL"})`).join("\n");
+
+  const categoryFocus = getCategorySpecificPrompt(input.project.category);
+
+  const prompt = `You are a RouteMarket Premium Guide Writer. Your goal is to create a "Premium Route Guide 2.0" - a highly structured, professional, and practical guide for a ${input.project.category} route.
+
+PROJECT:
+Title: ${input.project.title}
+Region: ${input.project.region}
+Category: ${input.project.category}
+
+ROUTE FACTS:
+Distance: ${input.summary.distanceKm} km
+Elevation Gain: ${input.summary.elevationGainM ?? "N/A"} m
+Estimated Time: ${input.summary.estimatedTimeH ?? "N/A"} h
+Difficulty: ${input.summary.difficulty ?? "N/A"}
+Loop: ${input.summary.isLoop ? "Yes" : "No"}
+
+CONCEPT:
+${input.concept}
+
+CLAIMS & RESEARCH:
+${claimContext}
+
+POINTS OF INTEREST:
+${poiContext}
+
+SOURCES:
+${sourceContext}
+
+REQUIRED SECTIONS:
+You MUST use the following exact Markdown headers in this order:
+## Overview
+## Route Facts
+## Day by Day
+## Parking
+## Food
+## Water
+## Accommodation
+## Danger
+## Weather
+## Gear
+## Tips
+## POI
+## Alternatives
+## Checklist
+
+CATEGORY SPECIFIC FOCUS:
+${categoryFocus}
+
+INSTRUCTIONS:
+1. Language: Polish (professional, technical, helpful).
+2. Content: Be precise and factual. Strictly use the provided research data and claims.
+3. If information for a section is missing from the data, do not hallucinate. Write "Brak danych" or "Do zweryfikowania" but keep the header.
+4. "Day by Day" should be a logical breakdown of the route (e.g. into days or stages).
+5. "Checklist" should be a practical list of things to do/take.
+6. Return ONLY Markdown.
+`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7 }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`AI Guide generation failed: ${response.statusText}`);
+  }
+
+  const data = await response.json() as any;
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!content) throw new Error("AI Guide generation returned empty content");
+  
+  return content;
+}
+
+function getCategorySpecificPrompt(category: string): string {
+  const cat = category.toLowerCase();
+  if (cat.includes("motorcycle")) {
+    return "Focus on asphalt quality, serpentines (serpentyny), parking, and fuel (paliwo).";
+  }
+  if (cat.includes("bike") || cat.includes("cycling")) {
+    return "Focus on surface (nawierzchnia), elevation (przewyższenia), and service points (serwis).";
+  }
+  if (cat.includes("trekking") || cat.includes("hiking")) {
+    return "Focus on water access (woda), accommodation/shelters (noclegi), permits (permit), and safety/weather risks.";
+  }
+  return "";
 }
 
 function isWeakConcept(concept: string): boolean {

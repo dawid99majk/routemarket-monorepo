@@ -147,6 +147,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.7
         version: 1.2.8(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@routemarket/shared-workflow':
+        specifier: workspace:*
+        version: link:../../packages/shared-workflow
       '@supabase/supabase-js':
         specifier: ^2.99.2
         version: 2.106.1
@@ -376,6 +379,24 @@ importers:
       '@routemarket/atlas-core':
         specifier: workspace:*
         version: link:../atlas-core
+
+  packages/export-service:
+    dependencies:
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
+
+  packages/google-integrations:
+    dependencies:
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  packages/shared-workflow:
+    dependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
 
 packages:
 

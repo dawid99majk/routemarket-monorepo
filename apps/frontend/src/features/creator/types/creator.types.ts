@@ -1,3 +1,5 @@
+import { WorkflowStage, ApprovalStage } from '@routemarket/shared-workflow';
+
 export type PipelineStep = 'sources' | 'interview' | 'outline' | 'gpx' | 'guide' | 'media' | 'publish';
 export type ApprovalState = 'pending' | 'approved';
 

@@ -15,9 +15,9 @@ import {
   Shield, 
   Sparkles 
 } from 'lucide-react';
-import { SourceFile } from '@/types/atlas-types';
+import { SourceFile } from '@/features/creator/types/creator.types';
 
-interface SourceMaterialsStepProps {
+interface SourcesStepProps {
   notes: string;
   onNotesChange: (val: string) => void;
   onSaveNotes: () => void;
@@ -42,7 +42,7 @@ const getLinkIconAndBrand = (url: string) => {
   return { icon: LinkIcon, brand: 'Blog / Strona', color: 'text-muted-foreground bg-muted/40 border-border/80' };
 };
 
-export function SourceMaterialsStep({
+export function SourcesStep({
   notes,
   onNotesChange,
   onSaveNotes,
@@ -52,7 +52,7 @@ export function SourceMaterialsStep({
   onUploadFiles,
   isUploading,
   onContinue
-}: SourceMaterialsStepProps) {
+}: SourcesStepProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkInput, setLinkInput] = useState('');
 

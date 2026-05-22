@@ -101,6 +101,7 @@ export async function analyzeGpx(project: RouteProject, repository?: ProjectRepo
     hasTime: stats.hasTime,
     isLoop: stats.isLoop,
     routeSegments: stats.routeSegments,
+    dangerSections: stats.dangerSections,
     warnings: warnings.map(w => ({ code: w.code, message: w.message })),
     validationStatus: "needs_validation",
     curvatureScore: stats.curvatureScore,
@@ -177,6 +178,7 @@ function calculateStats(points: GpxPoint[], category?: string) {
   let elevationGainM = 0;
   const elevationProfile: { d: number; e: number }[] = [];
   const warnings: RouteWarning[] = [];
+  const dangerSections: { type: "teleport" | "elevation_jump" | "time_jump" | "extreme_slope"; startIndex: number; endIndex: number; message: string; severity: "low" | "medium" | "high" }[] = [];
   const routeSegments: RouteSegment[] = [];
   const segmentLines: Array<RouteSegment & { coordinates: number[][]; pointCount: number }> = [];
   let segmentDistance = 0;
@@ -188,14 +190,73 @@ function calculateStats(points: GpxPoint[], category?: string) {
     const p2 = points[i + 1];
     
     const d = haversineDistance(p1.lat, p1.lon, p2.lat, p2.lon);
+
+    // 1. Teleport detection (> 5km jump)
+    if (d > 5) {
+      dangerSections.push({
+        type: "teleport",
+        startIndex: i,
+        endIndex: i + 1,
+        message: `Teleport detected: jump of ${d.toFixed(2)} km between points.`,
+        severity: "high"
+      });
+      warnings.push({ code: "teleport_detected", message: `Large distance jump (${d.toFixed(2)} km) at point ${i}.`, severity: "high" });
+    }
+
     distanceKm += d;
     segmentDistance += d;
 
     if (p1.ele !== undefined && p2.ele !== undefined) {
-      const diff = p2.ele - p1.ele;
-      if (diff > 0) {
-        elevationGainM += diff;
-        segmentGain += diff;
+      const eleDiff = p2.ele - p1.ele;
+      
+      // 2. Bad elevation detection (> 500m jump)
+      if (Math.abs(eleDiff) > 500) {
+        dangerSections.push({
+          type: "elevation_jump",
+          startIndex: i,
+          endIndex: i + 1,
+          message: `Elevation jump: ${eleDiff.toFixed(1)} m change between points.`,
+          severity: "high"
+        });
+        warnings.push({ code: "elevation_jump", message: `Sudden elevation change (${eleDiff.toFixed(1)} m) at point ${i}.`, severity: "high" });
+      }
+
+      // 3. Extreme slope detection (> 30%)
+      if (d > 0.02) { 
+        const slope = Math.abs(eleDiff) / (d * 1000);
+        if (slope > 0.3) {
+          dangerSections.push({
+            type: "extreme_slope",
+            startIndex: i,
+            endIndex: i + 1,
+            message: `Extreme slope: ${(slope * 100).toFixed(1)}% slope detected.`,
+            severity: "medium"
+          });
+        }
+      }
+
+      if (eleDiff > 0) {
+        elevationGainM += eleDiff;
+        segmentGain += eleDiff;
+      }
+    }
+
+    // 4. Time jump (nieciągłości) > 12 hours
+    if (p1.time && p2.time) {
+      const t1 = Date.parse(p1.time);
+      const t2 = Date.parse(p2.time);
+      if (!isNaN(t1) && !isNaN(t2)) {
+        const timeDiffHours = (t2 - t1) / 3_600_000;
+        if (timeDiffHours > 12) {
+          dangerSections.push({
+            type: "time_jump",
+            startIndex: i,
+            endIndex: i + 1,
+            message: `Time discontinuity: ${timeDiffHours.toFixed(1)} hours gap.`,
+            severity: "medium"
+          });
+          warnings.push({ code: "time_discontinuity", message: `Large time gap (${timeDiffHours.toFixed(1)} hours) at point ${i}.`, severity: "medium" });
+        }
       }
     }
 
@@ -278,7 +339,21 @@ function calculateStats(points: GpxPoint[], category?: string) {
     surfaceDistribution = { asfalt: 98, szuter: 2 };
   }
 
-  return { distanceKm, elevationGainM, isLoop, hasElevation, hasTime, elapsedHours, elevationProfile, routeSegments, segmentLines, warnings, curvatureScore, surfaceDistribution };
+  return { 
+    distanceKm, 
+    elevationGainM, 
+    isLoop, 
+    hasElevation, 
+    hasTime, 
+    elapsedHours, 
+    elevationProfile, 
+    routeSegments, 
+    segmentLines, 
+    warnings, 
+    curvatureScore, 
+    surfaceDistribution,
+    dangerSections
+  };
 }
 
 function buildSegmentsGeoJson(projectId: string, segments: Array<RouteSegment & { coordinates: number[][]; pointCount: number }>, fullPoints: GpxPoint[]) {

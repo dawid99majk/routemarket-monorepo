@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAtlasApi } from './useAtlasApi';
-import { Project, EventLog, PipelineStep, PoiGeoJson } from '@/types/atlas-types';
+import { Project, EventLog, PipelineStep, PoiGeoJson } from '@/features/creator/types/creator.types';
 import { toast } from 'sonner';
 
 export function useAtlasProjectWorkspace(slug: string | null) {

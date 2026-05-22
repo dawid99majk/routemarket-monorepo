@@ -1,20 +1,25 @@
-FROM node:24-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+FROM node:24-slim AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
-FROM node:24-alpine AS build
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+FROM base AS build
+WORKDIR /usr/src/app
 COPY . .
-RUN npm run build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm --filter @routemarket/atlas-engine build
+RUN pnpm deploy --filter=@routemarket/atlas-engine --prod /app
 
-FROM node:24-alpine AS runtime
+FROM base AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY docs ./docs
+ENV PORT=8080
+COPY --from=build /app .
+# Copy built files and assets explicitly as pnpm deploy may skip them due to .gitignore
+COPY --from=build /usr/src/app/apps/atlas-engine/dist ./dist
+COPY --from=build /usr/src/app/apps/atlas-engine/docs ./docs
+
 RUN mkdir -p /app/data /app/routes
+
+EXPOSE 8080
 CMD ["node", "dist/apps/api/src/index.js"]

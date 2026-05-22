@@ -3,7 +3,7 @@
 
 {$APP_DOMAIN}, www.{$APP_DOMAIN} {
     encode zstd gzip
-    reverse_proxy frontend:80
+    reverse_proxy frontend:8080
 }
 
 # Self-hosted Supabase API (Kong gateway from supabase/docker).

@@ -14,10 +14,30 @@ export type PracticalPoiCategory =
   | 'store'
   | 'bicycle_store'
   | 'shelter'
-  | 'evacuation_point';
+  | 'evacuation_point'
+  | 'viewpoint'
+  | 'drinking_water'
+  | 'campground'
+  | 'dangerous_area';
+
+export type VehicleType = 'motorcycle' | 'bicycle' | 'trekking';
 
 export class NearbyPracticalPois {
   constructor(private readonly placesProvider: GooglePlacesProvider) {}
+
+  async findForVehicle(location: { lat: number, lng: number }, vehicleType: VehicleType): Promise<PracticalPoi[]> {
+    let categories: PracticalPoiCategory[] = [];
+
+    if (vehicleType === 'motorcycle') {
+      categories = ['parking', 'gas_station', 'viewpoint', 'restaurant', 'lodging'];
+    } else if (vehicleType === 'bicycle') {
+      categories = ['drinking_water', 'store', 'bicycle_store', 'dangerous_area'];
+    } else if (vehicleType === 'trekking') {
+      categories = ['drinking_water', 'lodging', 'campground'];
+    }
+
+    return this.findForRoutePoint(location, categories);
+  }
 
   async findForRoutePoint(location: { lat: number, lng: number }, categories: PracticalPoiCategory[]): Promise<PracticalPoi[]> {
     const results: PracticalPoi[] = [];
@@ -25,12 +45,16 @@ export class NearbyPracticalPois {
     const categoryMap: Record<PracticalPoiCategory, string[]> = {
       parking: ['parking'],
       restaurant: ['restaurant', 'cafe'],
-      lodging: ['lodging', 'hotel', 'campground'],
+      lodging: ['lodging', 'hotel'],
       gas_station: ['gas_station'],
       store: ['store', 'supermarket'],
       bicycle_store: ['bicycle_store'],
-      shelter: ['lodging'], // Fallback
-      evacuation_point: ['hospital', 'police']
+      shelter: ['lodging'], 
+      evacuation_point: ['hospital', 'police'],
+      viewpoint: ['tourist_attraction'],
+      drinking_water: ['cafe'], // Fallback for drinking water
+      campground: ['campground'],
+      dangerous_area: ['police'] // Fallback/Mock for dangerous areas
     };
 
     for (const category of categories) {

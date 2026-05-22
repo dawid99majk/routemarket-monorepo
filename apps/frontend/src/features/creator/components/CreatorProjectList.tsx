@@ -1,4 +1,4 @@
-import { Project } from '@/types/atlas-types';
+import { Project } from '@/features/creator/types/creator.types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

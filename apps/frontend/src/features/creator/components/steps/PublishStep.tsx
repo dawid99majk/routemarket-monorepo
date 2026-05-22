@@ -10,7 +10,7 @@ import {
   Shield,
   Sparkles
 } from 'lucide-react';
-import { Project } from '@/types/atlas-types';
+import { Project } from '@/features/creator/types/creator.types';
 
 interface PublishStepProps {
   project: Project;

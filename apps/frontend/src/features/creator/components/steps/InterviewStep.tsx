@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { AtlasInterviewWizard } from '@/components/atlas/AtlasInterviewWizard';
-import { Project } from '@/types/atlas-types';
+import { Project } from '@/features/creator/types/creator.types';
 
 interface InterviewStepProps {
   project: Project;

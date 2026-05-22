@@ -346,7 +346,6 @@ export class AtlasWorkflowService {
     };
 
     const isApproved = async (stage: string) => {
-      if (options.autoApprove && process.env.NODE_ENV !== "production") return true;
       try {
         const approvals = await this.repository.loadApprovals(projectSlug);
         return approvals.approvals.some((a: any) => a.stage === stage && a.decision === "approved");

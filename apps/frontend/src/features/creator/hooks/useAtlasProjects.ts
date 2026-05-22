@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAtlasApi } from './useAtlasApi';
-import { Project } from '@/types/atlas-types';
+import { Project } from '@/features/creator/types/creator.types';
 import { toast } from 'sonner';
 
 export function useAtlasProjects() {

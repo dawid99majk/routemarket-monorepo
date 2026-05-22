@@ -1,21 +1,21 @@
-import { Project } from '@/types/atlas-types';
+import { Project } from '@/features/creator/types/creator.types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Clock3, Map, RefreshCw } from 'lucide-react';
 
-interface CreatorProjectHeaderProps {
+interface CreatorHeaderProps {
   project: Project;
   onExit: () => void;
   onRefresh: () => void;
   isRefreshing?: boolean;
 }
 
-export function CreatorProjectHeader({ 
+export function CreatorHeader({ 
   project, 
   onExit, 
   onRefresh, 
   isRefreshing 
-}: CreatorProjectHeaderProps) {
+}: CreatorHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
       <div className="flex items-center gap-4">

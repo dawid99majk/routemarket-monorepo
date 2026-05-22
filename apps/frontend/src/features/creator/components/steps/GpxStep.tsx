@@ -14,17 +14,17 @@ import {
 } from 'lucide-react';
 import RouteTerrain3D from '@/components/RouteTerrain3D';
 
-interface GpxReviewStepProps {
+interface GpxStepProps {
   gpxXml: string;
   onApprove: () => void;
   isProcessing: boolean;
 }
 
-export function GpxReviewStep({
+export function GpxStep({
   gpxXml,
   onApprove,
   isProcessing
-}: GpxReviewStepProps) {
+}: GpxStepProps) {
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
 
   return (

@@ -22,6 +22,13 @@ export const RouteSummarySchema = z.object({
     elevationGainM: z.number().nonnegative().optional(),
     estimatedTimeH: z.number().positive().optional()
   })).default([]),
+  dangerSections: z.array(z.object({
+    type: z.enum(["teleport", "elevation_jump", "time_jump", "extreme_slope"]),
+    startIndex: z.number(),
+    endIndex: z.number(),
+    message: z.string(),
+    severity: z.enum(["low", "medium", "high"])
+  })).default([]),
   warnings: z.array(z.object({
     code: z.string(),
     message: z.string()
