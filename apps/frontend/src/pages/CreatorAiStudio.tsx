@@ -285,7 +285,23 @@ export default function CreatorAiStudio() {
                    />
                 )}
 
-                {activeStep === 'gpx' && (
+                {project.waitingApprovalStage === 'poi_approval' && activeStep === 'gpx' && (
+                  <MediaStep 
+                    poiGeoJson={artifacts.poiGeoJson}
+                    onApprove={() => approveStage(activeSlug, 'poi_approval')}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
+
+                {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
+                  <ConceptReviewStep 
+                    concept={artifacts.outline} // Or artifacts.concept if separate
+                    onApprove={() => approveStage(activeSlug, 'concept_approval')}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
+
+                {activeStep === 'gpx' && project.waitingApprovalStage === 'gpx_summary_approval' && (
                   <GpxReviewStep 
                     gpxXml={artifacts.gpxXml}
                     onApprove={() => approveStage(activeSlug, 'gpx_summary_approval')}
