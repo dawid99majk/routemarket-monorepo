@@ -1,0 +1,20 @@
+# RouteMarket cutover checklist
+
+Current state on VPS:
+- frontend responds on http://213.165.94.18:8089
+- nginx reverse proxy is prepared for Host: routemarket.io -> 172.17.0.1:8089
+- nginx reverse proxy is prepared for Host: supabase.routemarket.io -> 172.17.0.1:8001
+- self-hosted Supabase is running on the same VPS
+
+To complete public cutover:
+1. Set DNS A record: routemarket.io -> 213.165.94.18
+2. Set DNS A record: www.routemarket.io -> 213.165.94.18
+3. Set DNS A record: supabase.routemarket.io -> 213.165.94.18
+4. After DNS propagates, issue TLS certs for routemarket.io, www.routemarket.io, supabase.routemarket.io
+5. Add HTTPS server blocks to nginx and redirect HTTP -> HTTPS
+6. Configure SMTP, Google OAuth and Stripe webhook for the new domain
+
+Verification after DNS cutover:
+- curl -I http://routemarket.io
+- curl -I http://supabase.routemarket.io/auth/v1/health
+- open the app and test signup/login/create route flow

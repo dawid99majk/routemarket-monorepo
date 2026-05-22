@@ -1,0 +1,1 @@
+DELETE FROM public.route_images WHERE id IN (29, 30, 31, 32, 33, 34, 36);

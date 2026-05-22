@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <!-- Rotated ink badge -->
+  <g transform="rotate(45 40 40)">
+    <rect x="8" y="8" width="64" height="64" rx="12" fill="#252521"/>
+  </g>
+  <!-- Burnt-orange route line -->
+  <path d="M12 60 Q 28 44, 40 40 T 68 20" stroke="#D4925A" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <!-- Waypoints -->
+  <circle cx="12" cy="60" r="4" fill="#D4925A"/>
+  <circle cx="68" cy="20" r="4.8" fill="#F7F7F4" stroke="#D4925A" stroke-width="3"/>
+  <!-- RM monogram -->
+  <text x="40" y="48" text-anchor="middle"
+    font-family="'Archivo Narrow', system-ui, sans-serif"
+    font-weight="700" font-size="22" letter-spacing="1"
+    fill="#F7F7F4">RM</text>
+</svg>

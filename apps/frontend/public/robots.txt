@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /auth
+Disallow: /auth/callback
+Disallow: /auth/error
+Disallow: /profile
+Disallow: /my-routes
+Disallow: /my-purchases
+Disallow: /favorites
+Disallow: /creator-dashboard
+Disallow: /creator-routes
+Disallow: /creator-earnings
+Disallow: /creator-stats
+Disallow: /create
+Disallow: /edit-route/
+Disallow: /payment-success
+Disallow: /messages
+
+Sitemap: https://routemarket.io/sitemap.xml
+Sitemap: https://yzisjpkesqwwzonvlfzb.supabase.co/functions/v1/sitemap

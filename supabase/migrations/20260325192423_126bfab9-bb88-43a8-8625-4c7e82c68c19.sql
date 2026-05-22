@@ -1,0 +1,1 @@
+ALTER TABLE public.routes ADD COLUMN IF NOT EXISTS preview_track jsonb DEFAULT NULL;

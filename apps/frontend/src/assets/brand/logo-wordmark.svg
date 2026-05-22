@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 96" width="420" height="96">
+  <!-- Mark -->
+  <g transform="translate(12, 12)">
+    <g transform="rotate(45 36 36)">
+      <rect x="8" y="8" width="56" height="56" rx="11" fill="#252521"/>
+    </g>
+    <path d="M10 56 Q 26 40, 36 36 T 62 16" stroke="#D4925A" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <circle cx="10" cy="56" r="3.6" fill="#D4925A"/>
+    <circle cx="62" cy="16" r="4.4" fill="#F7F7F4" stroke="#D4925A" stroke-width="2.6"/>
+    <text x="36" y="44" text-anchor="middle"
+      font-family="'Archivo Narrow', system-ui, sans-serif"
+      font-weight="700" font-size="20" letter-spacing="1"
+      fill="#F7F7F4">RM</text>
+  </g>
+  <!-- Wordmark -->
+  <text x="100" y="52"
+    font-family="'Archivo Narrow', 'Inter', system-ui, sans-serif"
+    font-weight="700" font-size="34" letter-spacing="1.4"
+    fill="#252521">ROUTE<tspan fill="#D4925A">/</tspan>MARKET</text>
+  <!-- Tagline -->
+  <text x="100" y="74"
+    font-family="'JetBrains Mono', ui-monospace, monospace"
+    font-weight="500" font-size="10" letter-spacing="3.5"
+    fill="#7A7A72">FIND · RIDE · EXPLORE</text>
+</svg>

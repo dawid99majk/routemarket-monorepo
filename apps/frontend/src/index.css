@@ -1,0 +1,404 @@
+/* ── Routemarket — Clean Modern Outdoor — Webfonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..600,0..100;1,9..144,300..600,0..100&family=Archivo+Narrow:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Core palette — Clean Modern Outdoor ── */
+    /* Off-white canvas with mineral mist gradient */
+    --background: 60 12% 97%;          /* off-white #F7F7F4 */
+    --surface-top: 0 0% 100%;          /* pure white at top */
+    --surface-bottom: 90 8% 95%;       /* mineral mist at bottom */
+    --foreground: 60 6% 14%;           /* #252521 ink (slightly deeper for white bg) */
+
+    --card: 0 0% 100%;                 /* clean white cards */
+    --card-foreground: 60 6% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 60 6% 16%;
+
+    /* Forest sage — primary brand (deeper, more pine) */
+    --primary: 158 28% 32%;            /* #3B6655 deep forest sage */
+    --primary-foreground: 60 12% 97%;
+
+    /* Mineral sunken surfaces */
+    --secondary: 60 10% 94%;
+    --secondary-foreground: 60 6% 16%;
+
+    --muted: 60 8% 94%;
+    --muted-foreground: 40 5% 43%;     /* keep WCAG AA */
+
+    /* Burnt sienna — warm accent */
+    --accent: 22 60% 58%;              /* #D4925A */
+    --accent-foreground: 60 6% 16%;
+
+    /* Dusty terracotta, never pure red */
+    --destructive: 4 48% 48%;
+    --destructive-foreground: 60 12% 97%;
+
+    /* ── Extended semantic palette (muted) ── */
+    --success: 158 28% 38%;
+    --success-foreground: 60 12% 97%;
+
+    --warning: 38 70% 52%;
+    --warning-foreground: 36 60% 18%;
+
+    --danger: 4 48% 48%;
+    --danger-foreground: 60 12% 97%;
+
+    --neutral: 40 5% 43%;
+    --neutral-foreground: 60 12% 97%;
+
+    /* ── Borders / inputs / ring — lighter for white bg ── */
+    --border: 60 6% 88%;
+    --input: 60 6% 88%;
+    --ring: 158 28% 38%;
+
+    /* ── Radius — softer modern ── */
+    --radius: 0.5rem;                  /* 8px */
+    --radius-sm: 0.1875rem;            /* 3px */
+    --radius-md: 0.375rem;             /* 6px (buttons) */
+    --radius-lg: 0.5rem;               /* 8px */
+    --radius-xl: 0.75rem;              /* 12px */
+    --radius-full: 9999px;             /* pills */
+
+    /* ── Shadows — softer, more diffused (lifted paper) ── */
+    --shadow-xs: 0 1px 2px 0 hsl(60 6% 16% / 0.04);
+    --shadow-sm: 0 2px 6px -1px hsl(60 6% 16% / 0.07), 0 1px 2px -1px hsl(60 6% 16% / 0.05);
+    --shadow-md: 0 12px 28px -10px hsl(158 28% 18% / 0.14), 0 4px 8px -4px hsl(60 6% 16% / 0.06);
+    --shadow-lg: 0 24px 50px -14px hsl(158 28% 18% / 0.20), 0 8px 16px -8px hsl(60 6% 16% / 0.08);
+    --shadow-xl: 0 40px 72px -18px hsl(158 28% 18% / 0.28), 0 12px 24px -12px hsl(60 6% 16% / 0.10);
+
+    /* ── Brand tokens ── */
+    --forest: 158 28% 32%;
+    --forest-foreground: 60 12% 97%;
+    --burnt-orange: 22 60% 58%;
+    --burnt-orange-foreground: 60 6% 16%;
+    --sage: 158 28% 32%;
+    --sage-foreground: 60 12% 97%;
+    --dusty-blue: 200 30% 48%;         /* mineral blue — technical data */
+    --dusty-blue-foreground: 60 12% 97%;
+    --moss: 75 25% 42%;                /* third nature accent */
+    --moss-foreground: 60 12% 97%;
+    --tan: 22 60% 58%;
+    --tan-foreground: 60 6% 16%;
+    --ink: 60 6% 14%;
+
+    /* Forest deep — linework icon accent */
+    --forest-deep: 158 73% 17%;
+    --forest-deep-foreground: 60 12% 97%;
+
+    --surface: 60 12% 97%;
+    --surface-card: 0 0% 100%;
+    --text-primary: 60 6% 14%;
+    --text-secondary: 48 5% 28%;
+    --text-muted: 40 5% 43%;
+
+    /* ── Sidebar — match paper palette ── */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 48 5% 28%;
+    --sidebar-primary: 158 28% 32%;
+    --sidebar-primary-foreground: 60 12% 97%;
+    --sidebar-accent: 60 10% 94%;
+    --sidebar-accent-foreground: 60 6% 16%;
+    --sidebar-border: 60 6% 88%;
+    --sidebar-ring: 158 28% 32%;
+  }
+
+  .dark {
+    /* Inverted soft palette — ink ground, sage glow */
+    --background: 60 6% 11%;
+    --foreground: 42 31% 94%;
+    --card: 60 6% 14%;
+    --card-foreground: 42 31% 94%;
+    --popover: 60 6% 14%;
+    --popover-foreground: 42 31% 94%;
+    --primary: 97 18% 58%;             /* sage-400 brighter on dark */
+    --primary-foreground: 60 6% 11%;
+    --secondary: 60 6% 18%;
+    --secondary-foreground: 42 31% 94%;
+    --muted: 60 6% 18%;
+    --muted-foreground: 40 8% 65%;
+    --accent: 33 35% 60%;
+    --accent-foreground: 60 6% 11%;
+    --destructive: 4 42% 50%;
+    --destructive-foreground: 42 31% 94%;
+
+    --success: 97 18% 58%;
+    --success-foreground: 60 6% 11%;
+    --warning: 42 56% 54%;
+    --warning-foreground: 60 6% 11%;
+    --danger: 4 42% 50%;
+    --danger-foreground: 42 31% 94%;
+    --neutral: 40 8% 65%;
+    --neutral-foreground: 60 6% 11%;
+
+    --border: 60 6% 22%;
+    --input: 60 6% 22%;
+    --ring: 97 18% 58%;
+
+    --shadow-xs: 0 1px 0 hsl(0 0% 0% / 0.2);
+    --shadow-sm: 0 1px 3px hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.35), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.4), 0 8px 10px -6px hsl(0 0% 0% / 0.3);
+
+    --forest: 97 18% 58%;
+    --forest-foreground: 60 6% 11%;
+    --burnt-orange: 33 35% 60%;
+    --burnt-orange-foreground: 60 6% 11%;
+    --sage: 97 18% 58%;
+    --sage-foreground: 60 6% 11%;
+    --dusty-blue: 203 25% 62%;
+    --dusty-blue-foreground: 60 6% 11%;
+    --tan: 33 35% 60%;
+    --tan-foreground: 60 6% 11%;
+    --ink: 42 31% 94%;
+
+    --forest-deep: 158 40% 55%;
+    --forest-deep-foreground: 60 6% 11%;
+
+    --surface: 60 6% 11%;
+    --surface-card: 60 6% 14%;
+    --text-primary: 42 31% 94%;
+    --text-secondary: 40 8% 75%;
+    --text-muted: 40 8% 65%;
+
+    --sidebar-background: 60 6% 14%;
+    --sidebar-foreground: 40 8% 75%;
+    --sidebar-primary: 97 18% 58%;
+    --sidebar-primary-foreground: 60 6% 11%;
+    --sidebar-accent: 60 6% 18%;
+    --sidebar-accent-foreground: 42 31% 94%;
+    --sidebar-border: 60 6% 22%;
+    --sidebar-ring: 97 18% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground font-sans antialiased;
+    background: linear-gradient(
+      to bottom,
+      hsl(90 10% 94%) 0%,
+      hsl(75 8% 93%) 40%,
+      hsl(90 8% 92%) 100%
+    );
+    background-attachment: fixed;
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.14);
+    color: hsl(var(--foreground));
+  }
+
+  /* ── Typography scale — editorial display + humanist body ── */
+  h1, h2, h3, h4 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-variation-settings: 'opsz' 64, 'SOFT' 30;
+    letter-spacing: -0.015em;
+  }
+  h1 {
+    @apply text-3xl tracking-tight sm:text-4xl;
+    font-weight: 350;
+  }
+  h2 {
+    @apply text-2xl tracking-tight;
+    font-weight: 400;
+  }
+  h3 {
+    @apply text-xl;
+    font-weight: 500;
+  }
+  .text-body {
+    @apply text-base leading-relaxed;
+  }
+  .text-small {
+    @apply text-sm leading-normal text-muted-foreground;
+  }
+
+  /* Editorial display (hero) — Fraunces light, magazine feel */
+  .h-display {
+    font-family: 'Fraunces', Georgia, serif;
+    font-variation-settings: 'opsz' 144, 'SOFT' 50;
+    font-weight: 300;
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+  }
+  .h-display-italic {
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-variation-settings: 'opsz' 144, 'SOFT' 80;
+    font-weight: 300;
+  }
+
+  /* Condensed eyebrow / category label */
+  .eyebrow, .h-condensed {
+    font-family: 'Archivo Narrow', 'Archivo', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.6875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Mono — technical data (GPX, distance, elevation) */
+  .mono, code, kbd, samp, pre {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Spacing aliases ── */
+  .gap-space-1 { gap: 0.25rem; }
+  .gap-space-2 { gap: 0.5rem; }
+  .gap-space-3 { gap: 0.75rem; }
+  .gap-space-4 { gap: 1rem; }
+  .gap-space-6 { gap: 1.5rem; }
+  .gap-space-8 { gap: 2rem; }
+
+  /* ── Shadow utilities ── */
+  .shadow-token-xs { box-shadow: var(--shadow-xs); }
+  .shadow-token-sm { box-shadow: var(--shadow-sm); }
+  .shadow-token-md { box-shadow: var(--shadow-md); }
+  .shadow-token-lg { box-shadow: var(--shadow-lg); }
+  .shadow-token-xl { box-shadow: var(--shadow-xl); }
+
+  /* ── Safe area for notched devices ── */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  /* ── Topographic contour pattern (subtle watermark) ── */
+  .bg-contour {
+    background-image: url('/src/assets/patterns/contour.svg');
+    background-repeat: repeat;
+    background-size: 480px auto;
+  }
+  .bg-contour-soft {
+    position: relative;
+  }
+  .bg-contour-soft::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/src/assets/patterns/contour.svg');
+    background-repeat: repeat;
+    background-size: 720px auto;
+    opacity: 0.035;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bg-contour-soft > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Topographic SVG line — section separator */
+  .topo-divider {
+    height: 14px;
+    background-image: url('/src/assets/patterns/contour.svg');
+    background-repeat: repeat-x;
+    background-size: auto 28px;
+    background-position: center;
+    opacity: 0.18;
+    pointer-events: none;
+  }
+
+  /* ── Brand fonts ── */
+  .font-display { font-family: 'Fraunces', Georgia, serif; }
+  .font-display-italic { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+  .font-narrow { font-family: 'Archivo Narrow', 'Archivo', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* Soft horizontal divider — editorial accent */
+  .divider-soft {
+    height: 1px;
+    width: 4rem;
+    background: linear-gradient(to right, hsl(var(--border)), transparent);
+  }
+
+  /* Thin scrollbar */
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; }
+  *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+  *::-webkit-scrollbar-track { background: transparent; }
+
+  /* ── Premium Aesthetic Additions ── */
+  .glass-premium {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+  .dark .glass-premium {
+    background: rgba(20, 20, 20, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .hover-lift {
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .badge-glow-primary {
+    box-shadow: 0 0 12px 1px hsl(var(--primary) / 0.2);
+  }
+
+  .badge-glow-accent {
+    box-shadow: 0 0 12px 1px hsl(var(--accent) / 0.2);
+  }
+
+  .bg-gradient-premium {
+    background: linear-gradient(135deg, hsl(158 28% 32% / 0.08) 0%, hsl(22 60% 58% / 0.06) 100%);
+  }
+
+  .dark .bg-gradient-premium {
+    background: linear-gradient(135deg, hsl(97 18% 20% / 0.2) 0%, hsl(33 35% 20% / 0.15) 100%);
+  }
+
+  .glow-border {
+    position: relative;
+    z-index: 0;
+  }
+  .glow-border::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .glow-border:hover::after {
+    opacity: 0.45;
+  }
+}
+

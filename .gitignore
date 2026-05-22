@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+build
+.next
+.vercel
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode
+.idea
+
+# Project specific
+.temp
+supabase/.temp
+apps/atlas-engine/api.log
+
+# Git subdirectories (after migration)
+**/.git

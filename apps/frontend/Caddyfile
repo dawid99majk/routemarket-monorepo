@@ -1,0 +1,14 @@
+# Reverse proxy + auto-HTTPS via Let's Encrypt.
+# Configure APP_DOMAIN and SUPABASE_UPSTREAM in the environment.
+
+{$APP_DOMAIN}, www.{$APP_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy frontend:80
+}
+
+# Self-hosted Supabase API (Kong gateway from supabase/docker).
+# By default it proxies to a separately running Supabase stack on the same VPS.
+supabase.{$APP_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy {$SUPABASE_UPSTREAM:-host.docker.internal:8000}
+}

@@ -1,0 +1,1 @@
+ALTER TABLE public.routes ADD COLUMN pets_friendly BOOLEAN NOT NULL DEFAULT false;

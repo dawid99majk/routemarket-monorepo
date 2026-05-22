@@ -1,0 +1,4 @@
+Supabase URL: http://213.165.94.18:8001
+Publishable Key: eyJhbGciOi...
+Success fetching atlas_projects! Rows count: 1
+Keys in row: ["slug","data","updated_at"]
