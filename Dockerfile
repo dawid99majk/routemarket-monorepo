@@ -7,7 +7,7 @@ RUN corepack enable
 
 FROM base AS deps
 WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/atlas-engine/package.json ./apps/atlas-engine/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY packages/atlas-core/package.json ./packages/atlas-core/
@@ -28,7 +28,6 @@ FROM base AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN CI=true pnpm --filter @routemarket/atlas-engine build
 RUN pnpm deploy --filter=@routemarket/atlas-engine --prod /prod --legacy
 
 FROM base AS runner
@@ -39,8 +38,16 @@ ENV NODE_ENV=production
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nodejs
 
 COPY --from=build /prod ./
+COPY --from=build /app/packages /app/packages
 COPY --from=build /app/apps/atlas-engine/dist ./dist
 COPY --from=build /app/apps/atlas-engine/docs ./docs
+
+# Merge compiled package JS files into node_modules, following symlinks to the virtual store
+RUN for pkg in atlas-core atlas-gis atlas-workflow atlas-writer atlas-publisher atlas-research; do \
+      if [ -d "/app/node_modules/@routemarket/$pkg" ]; then \
+        cp -r /app/dist/packages/$pkg/. /app/node_modules/@routemarket/$pkg/; \
+      fi; \
+    done
 
 # Create data directories with correct permissions
 RUN mkdir -p /app/data /app/routes && chown -R nodejs:nodejs /app/data /app/routes
