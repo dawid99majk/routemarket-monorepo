@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { RouteProject } from "../../atlas-core/src/index.js";
+import type { ProjectRepository, RouteProject } from "../../atlas-core/src/index.js";
 import { readJsonFile } from "../../atlas-core/src/index.js";
 import { findStaleApprovals, hashImportantArtifacts } from "./artifact-hashes.js";
 import type { QualityIssue } from "./quality-gates.js";
@@ -18,11 +18,12 @@ export async function buildImportReadiness(input: {
   project: RouteProject;
   qualityIssues?: QualityIssue[];
   payloadPath?: string;
+  repository?: ProjectRepository;
 }): Promise<RouteMarketImportReadiness> {
   const payloadPath = input.payloadPath ?? join(input.project.folderPath, "routemarket_payload.json");
   const qualityIssues = input.qualityIssues ?? [];
-  const approvals = await readApprovals(input.project);
-  const artifactHashes = await hashImportantArtifacts(input.project);
+  const approvals = await readApprovals(input.project, input.repository);
+  const artifactHashes = await hashImportantArtifacts(input.project, input.repository);
   const staleApprovals = findStaleApprovals(approvals, artifactHashes).map((item) => item.stage);
   const missingApprovals = requiredApprovalStages.filter((stage) => {
     return !approvals.approvals.some((approval: any) => approval.stage === stage && approval.decision === "approved");
@@ -66,8 +67,9 @@ export async function buildImportReadiness(input: {
   };
 }
 
-async function readApprovals(project: RouteProject): Promise<any> {
+async function readApprovals(project: RouteProject, repository?: ProjectRepository): Promise<any> {
   try {
+    if (repository) return await repository.loadApprovals(project.id);
     return await readJsonFile<any>(join(project.folderPath, "approvals.json"));
   } catch {
     return { projectId: project.id, approvals: [] };

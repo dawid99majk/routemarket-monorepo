@@ -14,7 +14,7 @@ services:
       ATLAS_LOG_REQUESTS: "true"
       ATLAS_MAX_JOBS: "200"
       GEMINI_API_KEY: ""
-      GEMINI_MODEL: "gemini-2.5-flash"
+      GEMINI_MODEL: "gemini-3.5-flash"
       GOOGLE_API_KEY: ""
       GOOGLE_MAPS_API_KEY: ""
     volumes:

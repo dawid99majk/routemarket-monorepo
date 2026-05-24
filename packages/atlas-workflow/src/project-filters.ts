@@ -6,6 +6,7 @@ export type ProjectListFilters = {
   q?: string;
   limit?: number;
   offset?: number;
+  ownerUserId?: string;
 };
 
 export type FilteredProjects = {
@@ -18,6 +19,7 @@ export type FilteredProjects = {
 export function filterProjects(projects: RouteProject[], filters: ProjectListFilters = {}): FilteredProjects {
   const q = filters.q?.trim().toLowerCase();
   const filtered = projects.filter((project) => {
+    if (filters.ownerUserId && project.ownerUserId !== filters.ownerUserId) return false;
     if (filters.status && project.status !== filters.status) return false;
     if (filters.category && project.category !== filters.category) return false;
     if (q) {

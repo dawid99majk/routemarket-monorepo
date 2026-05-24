@@ -18,7 +18,7 @@ export class GoogleGroundedSearchProvider implements SearchProvider {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly options: GeminiGroundedSearchOptions) {
-    this.model = options.model ?? process.env.GEMINI_SEARCH_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+    this.model = options.model ?? process.env.GEMINI_SEARCH_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 

@@ -252,7 +252,7 @@ async function generateAiGuideV2(input: {
   apiKey: string;
   model?: string;
 }): Promise<string> {
-  const model = input.model ?? "gemini-2.5-flash";
+  const model = input.model ?? "gemini-3.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${input.apiKey}`;
 
   const claimContext = input.claims.map(c => `- ${c.claim} (Status: ${c.status}, Type: ${c.claimType})`).join("\n");

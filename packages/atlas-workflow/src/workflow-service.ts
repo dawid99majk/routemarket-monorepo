@@ -49,6 +49,7 @@ export type CreateProjectRequest = {
   category?: string;
   region?: string;
   language?: string;
+  ownerUserId?: string;
 };
 
 export type DiscoverRequest = {
@@ -109,7 +110,8 @@ export class AtlasWorkflowService {
       title: input.topic,
       category: input.category,
       region: input.region,
-      language: input.language ?? "en"
+      language: input.language ?? "en",
+      ownerUserId: input.ownerUserId
     });
     await appendProjectEvent(project.id, this.repository, {
       type: "project.created",
@@ -140,8 +142,20 @@ export class AtlasWorkflowService {
     return buildDashboardSummary((await this.listProjects({ limit: 200 })).projects);
   }
 
-  getProject(projectSlug: string) {
-    return this.repository.getProject(projectSlug);
+  async getProject(projectSlug: string) {
+    const project = await this.repository.getProject(projectSlug);
+    try {
+      const state = await readWorkflowState(project, this.repository);
+      return {
+        ...project,
+        waitingApprovalStage: state.waitingApprovalStage,
+        currentStep: state.currentStep,
+        nextStep: state.nextStep,
+        completedSteps: state.completedSteps
+      };
+    } catch {
+      return project;
+    }
   }
 
   async collectSources(projectSlug: string, input: CollectSourcesRequest = {}) {
@@ -270,33 +284,63 @@ export class AtlasWorkflowService {
   private async addTextInputThroughRepository(projectSlug: string, input: AddTextInputRequest & { type: "note" | "gpx" }) {
     const fileName = safeInputName(input.fileName);
     const isGpx = input.type === "gpx";
-    if (isGpx && !fileName.toLowerCase().endsWith(".gpx")) throw new Error("Only .gpx files are allowed.");
-    if (!isGpx && !(fileName.toLowerCase().endsWith(".md") || fileName.toLowerCase().endsWith(".txt"))) {
-      throw new Error("Only .md and .txt files are allowed.");
+    const loweredName = fileName.toLowerCase();
+
+    const isDocument = loweredName.endsWith(".pdf") || loweredName.endsWith(".doc") || loweredName.endsWith(".docx");
+    const isText = loweredName.endsWith(".md") || loweredName.endsWith(".txt") || loweredName.endsWith(".csv") || loweredName.endsWith(".json") || loweredName.endsWith(".geojson") || loweredName.endsWith(".kml");
+
+    if (isGpx && !loweredName.endsWith(".gpx")) throw new Error("Only .gpx files are allowed.");
+    if (!isGpx && !isText && !isDocument) {
+      throw new Error("Unsupported file type. Allowed: .md, .txt, .csv, .json, .geojson, .kml, .pdf, .doc, .docx");
     }
 
-    const maxSize = isGpx ? 10_000_000 : 2_000_000;
-    const sizeBytes = Buffer.byteLength(input.content, "utf8");
+    const maxSize = isGpx ? 10_000_000 : (isDocument ? 10_000_000 : 2_000_000);
+
+    let content: string | Buffer = input.content;
+    if (isDocument || (isGpx && input.content.startsWith("data:"))) {
+      if (input.content.startsWith("data:")) {
+        const base64Data = input.content.split(",")[1];
+        content = Buffer.from(base64Data, "base64");
+      } else if (/^[a-zA-Z0-9+/=]+$/.test(input.content) && input.content.length % 4 === 0) {
+        // Likely base64 encoded binary
+        content = Buffer.from(input.content, "base64");
+      }
+    }
+
+    const sizeBytes = Buffer.isBuffer(content) ? content.length : Buffer.byteLength(content, "utf8");
     if (sizeBytes > maxSize) throw new Error(`Input is too large. Max size is ${maxSize} bytes.`);
 
     const manifest = await this.repository.loadInputManifest(projectSlug);
     const now = new Date().toISOString();
-    const targetPath = `input/${isGpx ? "gpx" : "notes"}/${fileName}`;
-    await this.repository.writeProjectFile(projectSlug, targetPath, input.content);
+
+    let targetSubDir = "notes";
+    if (isGpx) targetSubDir = "gpx";
+    else if (isDocument) targetSubDir = "docs";
+
+    const targetPath = `input/${targetSubDir}/${fileName}`;
+
+    // repository.writeProjectFile might need to be updated to handle Buffer if it doesn't
+    // but Node.js fs.writeFile handles it, and we saw FileProjectRepository uses fs.writeFile.
+    // We should cast it to any if TypeScript complains, or update the interface.
+    const storedContent = Buffer.isBuffer(content)
+      ? (isGpx ? content.toString("utf8") : input.content)
+      : content;
+
+    await this.repository.writeProjectFile(projectSlug, targetPath, storedContent);
 
     if (isGpx) {
-      await this.repository.writeProjectFile(projectSlug, "route.gpx", input.content);
+      await this.repository.writeProjectFile(projectSlug, "route.gpx", storedContent);
     }
 
     const item = {
-      id: `${input.type}_${Date.now()}`,
-      type: input.type,
+      id: `${isDocument ? "doc" : input.type}_${Date.now()}`,
+      type: isDocument ? "document" as const : input.type,
       path: targetPath,
       originalName: fileName,
       mimeType: mimeTypeForFile(fileName),
       sizeBytes,
       addedAt: now,
-      status: "added" as const,
+      status: externalInputStatus(isDocument ? "document" : input.type, fileName, mimeTypeForFile(fileName)),
       notes: input.note
     };
     manifest.items.push(item);
@@ -331,6 +375,12 @@ export class AtlasWorkflowService {
 
   async runMvp2WithProgress(projectSlug: string, onProgress?: WorkflowProgressCallback, startStep?: string, options: { autoApprove?: boolean } = {}) {
     let { project, sources } = await this.loadProjectBundle(projectSlug);
+
+    // Ensure status is 'running' when starting the workflow
+    if (project.status === "research_needed" || project.status === "sources_collected") {
+      project = await this.setProjectStatus(projectSlug, "running");
+    }
+
     const progress = async (message: string, value: number, currentStep: string, waitContext?: any) => {
       onProgress?.({ message, progress: value, currentStep, waitContext } as any);
       await appendProjectEvent(project.id, this.repository, {
@@ -373,7 +423,7 @@ export class AtlasWorkflowService {
           } catch (err) {
             console.warn("GPX analysis failed or file missing, continuing...");
           }
-          
+
           if (!await isApproved("gpx_summary_approval")) {
             await progress("GPX analyzed. Waiting for summary approval.", 15, "gpx_summary_approval", {
               type: "approval_needed",
@@ -388,7 +438,7 @@ export class AtlasWorkflowService {
         run: async () => {
           await progress("Generating claims.", 25, "claims");
           await generateClaims(project, this.repository);
-          
+
           if (!await isApproved("claims_approval")) {
             await progress("Claims generated. Waiting for approval.", 30, "claims_approval", {
               type: "approval_needed",
@@ -403,7 +453,7 @@ export class AtlasWorkflowService {
         run: async () => {
           await progress("Extracting POI.", 40, "pois");
           await extractPois(project, this.repository);
-          
+
           if (!await isApproved("poi_approval")) {
             await progress("POI extracted. Waiting for verification.", 45, "poi_approval", {
               type: "approval_needed",
@@ -418,7 +468,7 @@ export class AtlasWorkflowService {
         run: async () => {
           await progress("Writing route concept.", 55, "concept");
           await generateRouteConcept({ project, sources, repository: this.repository });
-          
+
           if (!await isApproved("concept_approval")) {
             await progress("Concept generated. Waiting for approval.", 60, "concept_approval", {
               type: "approval_needed",
@@ -434,7 +484,7 @@ export class AtlasWorkflowService {
           await progress("Generating guide outline.", 70, "guide_outline");
           const { writeGuideOutline } = await import("../../atlas-writer/src/index.js");
           await writeGuideOutline(project, this.repository);
-          
+
           if (!await isApproved("guide_outline_approval")) {
             await progress("Outline generated. Waiting for approval.", 75, "guide_outline_approval", {
               type: "approval_needed",
@@ -450,7 +500,7 @@ export class AtlasWorkflowService {
           await progress("Writing final guide.", 80, "guide");
           const { generateGuideV2 } = await import("../../atlas-writer/src/index.js");
           await generateGuideV2(project, this.repository);
-          
+
           if (!await isApproved("guide_final_approval")) {
             await progress("Guide written. Waiting for final approval.", 85, "guide_final_approval", {
               type: "approval_needed",
@@ -469,8 +519,8 @@ export class AtlasWorkflowService {
           await prepareMediaPack(project, this.repository);
           await generateQualityReport({ project, sources, gpxValid: true, geojsonValid: true, repository: this.repository });
           await writeReviewChecklist(project, this.repository);
-          await prepareRouteMarketDraft(project);
-          
+          await prepareRouteMarketDraft(project, this.repository);
+
           project = await updateProjectStatus(project, "draft_generated");
           await appendProjectEvent(project.id, this.repository, {
             type: "project.status_changed",
@@ -507,7 +557,10 @@ export class AtlasWorkflowService {
 
     for (let i = startIndex; i < steps.length; i++) {
       const result = await steps[i].run() as any;
-      if (result?.pause) return { project, status: "paused", step: steps[i].id, stage: result.stage };
+      if (result?.pause) {
+        await this.setProjectStatus(projectSlug, "paused");
+        return { project, status: "paused", step: steps[i].id, stage: result.stage };
+      }
       const state = await readWorkflowState(project, this.repository);
       await writeWorkflowState(project, {
         completedSteps: [...new Set([...state.completedSteps, steps[i].id])],
@@ -525,11 +578,11 @@ export class AtlasWorkflowService {
   async preparePublish(projectSlug: string) {
     const project = await this.repository.getProject(projectSlug);
     const { checkQualityGates, QualityGateError } = await import("./quality-gates.js");
-    const issues = await checkQualityGates(project);
+    const issues = await checkQualityGates(project, this.repository);
     if (issues.length > 0) {
       throw new QualityGateError(issues);
     }
-    return prepareRouteMarketDraft(project);
+    return prepareRouteMarketDraft(project, this.repository);
   }
 
   async listArtifacts(projectSlug: string) {
@@ -556,12 +609,12 @@ export class AtlasWorkflowService {
       this.loadSources(projectSlug),
       this.loadClaims(projectSlug)
     ]);
-    
+
     const { checkQualityGates } = await import("./quality-gates.js");
-    const qualityIssues = await checkQualityGates(project);
-    
+    const qualityIssues = await checkQualityGates(project, this.repository);
+
     const readiness = assessProjectReadiness({ project, artifacts, sources, claims, qualityIssues });
-    readiness.importReadiness = await buildImportReadiness({ project, qualityIssues });
+    readiness.importReadiness = await buildImportReadiness({ project, qualityIssues, repository: this.repository });
     return readiness;
   }
 
@@ -573,7 +626,7 @@ export class AtlasWorkflowService {
       this.loadClaims(projectSlug)
     ]);
     const { checkQualityGates } = await import("./quality-gates.js");
-    const qualityIssues = await checkQualityGates(project);
+    const qualityIssues = await checkQualityGates(project, this.repository);
     return buildProjectReviewBundle({ project, repository: this.repository, artifacts, sources, claims, qualityIssues });
   }
 
@@ -627,7 +680,7 @@ export class AtlasWorkflowService {
   }
 
   async readProjectFile(projectSlug: string, file: string): Promise<string> {
-    if (!allowedProjectFiles.has(file) || file.includes("..") || file.startsWith("/") || file.startsWith("\\")) {
+    if (!isAllowedProjectFile(file, "read")) {
       throw new Error("Invalid file path.");
     }
     return this.repository.readProjectFile(projectSlug, file);
@@ -635,7 +688,7 @@ export class AtlasWorkflowService {
 
   async writeProjectFile(projectSlug: string, file: string, content: string): Promise<{ path: string; content: string }> {
     const project = await this.getProject(projectSlug);
-    if (!writableProjectFiles.has(file) || file.includes("..") || file.startsWith("/") || file.startsWith("\\")) {
+    if (!isAllowedProjectFile(file, "write")) {
       throw new Error("File is not writable through Atlas API.");
     }
     await this.repository.writeProjectFile(projectSlug, file, content);
@@ -676,11 +729,11 @@ export class AtlasWorkflowService {
 
 
 function safeInputName(fileName: string): string {
-  const base = fileName.split(/[\\/]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, "_") ?? "";
+  const base = fileName.split(/[\\/]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) ?? "";
   if (!base || base === "." || base === ".." || base.startsWith(".") || base.includes("..")) {
     throw new Error("Invalid filename.");
   }
-  if (base !== fileName || fileName.includes("/") || fileName.includes("\\")) {
+  if (fileName.includes("/") || fileName.includes("\\")) {
     throw new Error("Invalid filename.");
   }
   return base;
@@ -702,7 +755,7 @@ function externalInputStatus(type: InputItemType, fileName: string, mimeType: st
   if (type === "note" && (lowered.endsWith(".md") || lowered.endsWith(".txt"))) return "needs_parser" as const;
   if (type === "gpx" && lowered.endsWith(".gpx")) return "needs_parser" as const;
   if (type === "photo" && mimeType.startsWith("image/")) return "needs_review" as const;
-  if (type === "document" && (lowered.endsWith(".pdf") || lowered.endsWith(".docx"))) return "needs_parser" as const;
+  if (type === "document" && (lowered.endsWith(".pdf") || lowered.endsWith(".docx") || lowered.endsWith(".doc"))) return "needs_parser" as const;
   return "unsupported" as const;
 }
 
@@ -713,8 +766,10 @@ const allowedProjectFiles = new Set([
   "claims.json",
   "notes.md",
   "poi.geojson",
+  "route.gpx",
   "approvals.json",
   "route_concept.md",
+  "guide_outline.md",
   "guide.md",
   "tips.json",
   "recommendations.json",
@@ -743,11 +798,50 @@ const writableProjectFiles = new Set([
   "brief.md",
   "notes.md",
   "route_concept.md",
+  "guide_outline.md",
+  "route.gpx",
+  "poi.geojson",
   "guide.md",
   "quality_report.md",
   "review_checklist.md",
   "media/license_report.md"
 ]);
+
+function isAllowedProjectFile(file: string, mode: "read" | "write"): boolean {
+  if (!isSafeProjectFilePath(file)) return false;
+  if (mode === "read" && allowedProjectFiles.has(file)) return true;
+  if (mode === "write" && writableProjectFiles.has(file)) return true;
+
+  if (mode === "read") {
+    return isAllowedInputReadPath(file) || isAllowedOutputReadPath(file);
+  }
+
+  return false;
+}
+
+function isSafeProjectFilePath(file: string): boolean {
+  return Boolean(file)
+    && !file.includes("..")
+    && !file.startsWith("/")
+    && !file.startsWith("\\")
+    && !file.includes("\\")
+    && /^[a-zA-Z0-9_./-]+$/.test(file);
+}
+
+function isAllowedInputReadPath(file: string): boolean {
+  if (file.startsWith("input/notes/")) return /\.(md|txt)$/i.test(file);
+  if (file.startsWith("input/gpx/")) return /\.gpx$/i.test(file);
+  if (file.startsWith("input/docs/")) return /\.(pdf|doc|docx)$/i.test(file);
+  return false;
+}
+
+function isAllowedOutputReadPath(file: string): boolean {
+  return [
+    "output/guide_outline.md",
+    "output/route.gpx",
+    "output/poi.geojson"
+  ].includes(file);
+}
 
 function getStageForStep(stepId: string): string | undefined {
   const map: Record<string, string> = {

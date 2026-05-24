@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,23 +51,23 @@ export default function CreatorAiStudio() {
   const { projects, loading: loadingProjects, fetchProjects, createProject: apiCreateProject } = useAtlasProjects();
 
   // Workspace & Pipeline
-  const { 
-    project, 
-    loading: loadingDetails, 
-    activeStep, 
-    setActiveStep, 
-    artifacts, 
+  const {
+    project,
+    loading: loadingDetails,
+    activeStep,
+    setActiveStep,
+    maxAllowedStep,
+    artifacts,
     fetchWorkspace,
     events
   } = useAtlasProjectWorkspace(activeSlug);
 
   const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasWorkflow();
-  const { uploading, links, addLink, uploadedFiles, uploadFiles, saveNotes } = useAtlasFiles(activeSlug);
-  const { invokeAtlas } = useAtlasWorkflow(); // Assuming useAtlasWorkflow exposes invokeAtlas, wait let me check useAtlasWorkflow
+  const { uploading, links, addLink, uploadedFiles, uploadFiles, saveNotes, saveNamedNote, saveProjectFile } = useAtlasFiles(activeSlug);
 
   // Helper to generate GPX XML from coordinate points
   const generateGpxXml = (points: Array<{ lat: number; lng: number; ele?: number }>, title: string): string => {
-    const trkpts = points.map(pt => 
+    const trkpts = points.map(pt =>
       `      <trkpt lat="${pt.lat}" lon="${pt.lng}">
         ${pt.ele !== undefined ? `<ele>${pt.ele}</ele>` : ''}
       </trkpt>`
@@ -98,41 +98,65 @@ ${trkpts}
       const { data, error } = await supabase.functions.invoke('import-youtube-route', {
         body: { youtube_url: url }
       });
-      
+
       if (error) throw error;
       if (!data) throw new Error('Brak odpowiedzi z asystenta AI.');
-      
+      if (data.isMock) throw new Error('Import YouTube zwrócił dane testowe. Produkcja wymaga realnej analizy Gemini.');
+      if (data.needs_more_input) {
+        throw new Error(data.missing || 'Materiał YouTube nie zawiera dość danych. Dodaj notatki albo transkrypcję.');
+      }
+
       toast.loading('Generowanie śladu GPX i zapisywanie szczegółów trasy...', { id: toastId });
-      
+
       // 1. Zapisanie tytułu i notatek przewodnika
       // Note: These need to be handled by the backend/atlas service
       if (data.description) {
         artifacts.setNotes(data.description);
         await saveNotes(data.description);
       }
-      
+
       // 2. Generowanie pliku GPX i wstrzyknięcie do kreatora
-      if (Array.isArray(data.gpx_points) && data.gpx_points.length > 0) {
+      const hasGpxPoints = Array.isArray(data.gpx_points) && data.gpx_points.length > 0;
+      const hasPois = Array.isArray(data.pois) && data.pois.length > 0;
+
+      if (hasGpxPoints) {
         const xml = generateGpxXml(data.gpx_points, data.title || 'Trasa z YouTube');
-        // In a real scenario, we'd save this GPX file to the project
-        // For now we just update the UI state
+        await saveProjectFile('route.gpx', xml);
+        artifacts.setGpxXml(xml);
       }
 
       // 3. Wstrzyknięcie punktów POI i dopasowanie typów
-      if (Array.isArray(data.pois) && data.pois.length > 0) {
-        const mappedPois = data.pois.map((poi: any) => ({
-          name: poi.name,
-          type: poi.category || 'viewpoint',
-          lat: poi.lat,
-          lng: poi.lng,
-          description: poi.description || ''
-        }));
-        // Update project with POIs via Atlas API
-        await approveStage(activeSlug, 'import_draft', { customPois: mappedPois });
+      if (hasPois) {
+        const geojson = {
+          type: 'FeatureCollection',
+          features: data.pois
+            .filter((poi: any) => Number.isFinite(Number(poi.lat)) && Number.isFinite(Number(poi.lng)))
+            .map((poi: any, index: number) => ({
+              type: 'Feature',
+              properties: {
+                id: poi.id || `youtube_poi_${index + 1}`,
+                name: poi.name,
+                type: poi.category || poi.type || 'viewpoint',
+                description: poi.description || '',
+                status: 'needs_review'
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: [Number(poi.lng), Number(poi.lat)]
+              }
+            }))
+        };
+        await saveProjectFile('poi.geojson', `${JSON.stringify(geojson, null, 2)}\n`);
+        artifacts.setPoiGeoJson(geojson as any);
       }
 
-      toast.success('Pomyślnie zaimportowano trasę z vloga YouTube! Ślad GPX oraz 5 kategorii POI zostały naniesione na mapę.', { id: toastId });
-      
+      toast.success(
+        hasGpxPoints || hasPois
+          ? 'Zaimportowano dane z YouTube do projektu.'
+          : 'YouTube został przeanalizowany, ale materiał nie zawierał punktów trasy ani POI.',
+        { id: toastId }
+      );
+
       // Automatyczne przejście do weryfikacji mapy i GPX
       setActiveStep('gpx');
       fetchWorkspace();
@@ -142,6 +166,29 @@ ${trkpts}
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const handleInterviewComplete = async (
+    proposal: { title?: string; description?: string; highlights?: string[] },
+    answers: Array<{ q: string; a: string }>
+  ) => {
+    if (!activeSlug) return;
+    const markdown = [
+      '# Odpowiedzi z wywiadu Atlas',
+      '',
+      `Wybrany wariant: ${proposal.title || 'brak tytułu'}`,
+      '',
+      proposal.description || '',
+      '',
+      '## Najważniejsze założenia',
+      ...(proposal.highlights || []).map((item) => `- ${item}`),
+      '',
+      '## Odpowiedzi',
+      ...answers.map((answer, index) => `${index + 1}. ${answer.q}\n   - ${answer.a}`)
+    ].join('\n');
+
+    await saveNamedNote('interview_answers.md', markdown);
+    await runPipeline(activeSlug, fetchWorkspace);
   };
 
   useEffect(() => {
@@ -167,35 +214,20 @@ ${trkpts}
   const handleCreateProject = async (params: any) => {
     try {
       const cost = params.deepResearch ? 50 : 25;
+      const newProject = await apiCreateProject(params);
+
       await spendCredits.mutateAsync({
         amount: cost,
         purpose: params.deepResearch ? 'route_deep_research' : 'route_creation'
       });
 
-      const newProject = await apiCreateProject(params);
       handleSelectProject(newProject.id);
     } catch (err) {
       // Error handled in hook
     }
   };
 
-  const maxAllowedStep = useMemo<PipelineStep>(() => {
-    if (!project) return 'sources';
-    const status = project.status;
-    const waitingStage = project.waitingApprovalStage;
 
-    if (status === 'created' || status === 'research_needed') return 'sources';
-    if (status === 'paused' || status === 'running') {
-      if (waitingStage === 'interview_needed') return 'interview';
-      if (waitingStage === 'claims_approval') return 'interview';
-      if (waitingStage === 'gpx_summary_approval') return 'gpx';
-      if (waitingStage === 'guide_outline_approval') return 'outline';
-      if (waitingStage === 'guide_final_approval') return 'guide';
-      return 'sources';
-    }
-    if (status === 'draft_generated' || status === 'completed') return 'publish';
-    return 'sources';
-  }, [project]);
 
   // View 1: Project Selection
   if (!activeSlug) {
@@ -222,10 +254,10 @@ ${trkpts}
                   </Button>
                 )}
               </div>
-              
-              <CreatorProjectList 
-                projects={projects} 
-                loading={loadingProjects} 
+
+              <CreatorProjectList
+                projects={projects}
+                loading={loadingProjects}
                 activeSlug={activeSlug}
                 onSelectProject={handleSelectProject}
                 onCreateNew={() => setShowNewProjectForm(true)}
@@ -235,14 +267,14 @@ ${trkpts}
             <div className="space-y-8">
               {showNewProjectForm ? (
                 <div className="sticky top-24">
-                  <CreatorNewProjectForm 
+                  <CreatorNewProjectForm
                     balance={balance?.credit_balance ?? 100}
                     onTopUp={() => setIsTopUpOpen(true)}
                     onCreate={handleCreateProject}
                     isCreating={loadingProjects}
                   />
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     onClick={() => setShowNewProjectForm(false)}
                     className="w-full mt-4"
                   >
@@ -310,14 +342,14 @@ ${trkpts}
         </div>
       ) : project && (
         <>
-          <CreatorHeader 
-            project={project} 
+          <CreatorHeader
+            project={project}
             onExit={handleExitProject}
             onRefresh={fetchWorkspace}
             isRefreshing={loadingDetails}
           />
 
-          <CreatorSidebar 
+          <CreatorSidebar
             activeStep={activeStep}
             maxAllowedStep={maxAllowedStep}
             onStepClick={(step) => setActiveStep(step)}
@@ -335,7 +367,7 @@ ${trkpts}
                   className="space-y-6"
                 >
                   {activeStep === 'sources' && (
-                    <SourcesStep 
+                    <SourcesStep
                       notes={artifacts.notes}
                       onNotesChange={artifacts.setNotes}
                       onSaveNotes={() => saveNotes(artifacts.notes)}
@@ -351,62 +383,69 @@ ${trkpts}
                   )}
 
                   {activeStep === 'interview' && (
-                    <InterviewStep 
+                    <InterviewStep
                       project={project}
-                      onComplete={fetchWorkspace}
+                      onComplete={handleInterviewComplete}
                     />
                   )}
 
-                  {project.waitingApprovalStage === 'claims_approval' && activeStep === 'interview' && (
-                    <ClaimsReviewStep 
+                  {(activeStep === 'interview' || project.waitingApprovalStage === 'claims_approval') && artifacts.claims.length > 0 && (
+                    <ClaimsReviewStep
                       claims={artifacts.claims}
-                      onApprove={() => approveStage(activeSlug, 'claims_approval')}
-                      isProcessing={pipelineRunning}
-                    />
-                  )}
-
-                  {project.waitingApprovalStage === 'poi_approval' && activeStep === 'gpx' && (
-                    <MediaStep 
-                      poiGeoJson={artifacts.poiGeoJson}
-                      onApprove={() => approveStage(activeSlug, 'poi_approval')}
+                      onApprove={() => approveStage(activeSlug, 'claims_approval', fetchWorkspace)}
                       isProcessing={pipelineRunning}
                     />
                   )}
 
                   {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
-                    <ConceptStep 
-                      concept={artifacts.outline} 
-                      onApprove={() => approveStage(activeSlug, 'concept_approval')}
+                    <ConceptStep
+                      concept={artifacts.outline}
+                      onApprove={() => approveStage(activeSlug, 'concept_approval', fetchWorkspace)}
                       isProcessing={pipelineRunning}
                     />
                   )}
 
-                  {activeStep === 'gpx' && project.waitingApprovalStage === 'gpx_summary_approval' && (
-                    <GpxStep 
-                      gpxXml={artifacts.gpxXml}
-                      onApprove={() => approveStage(activeSlug, 'gpx_summary_approval')}
-                      isProcessing={pipelineRunning}
-                    />
+                  {activeStep === 'gpx' && (
+                    <div className="space-y-6">
+                      {artifacts.gpxXml ? (
+                        <GpxStep
+                          gpxXml={artifacts.gpxXml}
+                          onApprove={() => approveStage(activeSlug, 'gpx_summary_approval', fetchWorkspace)}
+                          isProcessing={pipelineRunning}
+                        />
+                      ) : (
+                        <Card className="p-12 text-center flex flex-col items-center justify-center space-y-4">
+                          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
+                          <div className="space-y-1">
+                            <h3 className="font-bold text-lg">Przygotowywanie śladu GPX...</h3>
+                            <p className="text-sm text-muted-foreground">Silnik AI generuje mapę Twojej trasy. Może to potrwać kilkanaście sekund.</p>
+                          </div>
+                          <Button variant="outline" onClick={fetchWorkspace} disabled={loadingDetails}>
+                            Sprawdź ponownie
+                          </Button>
+                        </Card>
+                      )}
+                    </div>
                   )}
 
-                  {activeStep === 'outline' && (
-                    <GuideOutlineStep 
+                  {activeStep === 'outline' && project.waitingApprovalStage !== 'concept_approval' && (
+                    <GuideOutlineStep
                       outline={artifacts.outline}
-                      onApprove={() => approveStage(activeSlug, 'guide_outline_approval')}
+                      onApprove={() => approveStage(activeSlug, 'guide_outline_approval', fetchWorkspace)}
                       isProcessing={pipelineRunning}
                     />
                   )}
 
                   {activeStep === 'guide' && (
-                    <GuideFinalStep 
+                    <GuideFinalStep
                       guide={artifacts.guide}
-                      onApprove={() => approveStage(activeSlug, 'guide_final_approval')}
+                      onApprove={() => approveStage(activeSlug, 'guide_final_approval', fetchWorkspace)}
                       isProcessing={pipelineRunning}
                     />
                   )}
 
                   {activeStep === 'media' && (
-                    <MediaStep 
+                    <MediaStep
                       poiGeoJson={artifacts.poiGeoJson}
                       onApprove={() => setActiveStep('publish')}
                       isProcessing={pipelineRunning}
@@ -414,7 +453,7 @@ ${trkpts}
                   )}
 
                   {activeStep === 'publish' && (
-                    <PublishStep 
+                    <PublishStep
                       project={project}
                       onViewPublic={() => navigate(`/route/${project.id}`)}
                     />

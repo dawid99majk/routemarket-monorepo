@@ -14,7 +14,7 @@ Ensure the following environment variables are set in the Cloud Run service conf
 | `SUPABASE_URL` | Your Supabase project URL | `https://xyz.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role Key | `ey...` |
 | `GEMINI_API_KEY` | Google Gemini API Key | `AIza...` |
-| `GEMINI_MODEL` | Gemini model to use | `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Gemini model to use | `gemini-3.5-flash` |
 | `ATLAS_MAX_JOBS` | Maximum concurrent jobs | `200` |
 | `ATLAS_LOG_REQUESTS` | Enable request logging | `true` |
 

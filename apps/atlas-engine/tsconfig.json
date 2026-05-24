@@ -9,7 +9,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "outDir": "dist",
-    "rootDir": ".",
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
@@ -21,5 +20,14 @@
       "@routemarket/atlas-writer/*": ["../../packages/atlas-writer/*"]
     }
   },
-  "include": ["apps/**/*.ts", "../../packages/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "apps/**/*.ts", 
+    "../../packages/atlas-core/**/*.ts",
+    "../../packages/atlas-gis/**/*.ts",
+    "../../packages/atlas-research/**/*.ts",
+    "../../packages/atlas-workflow/**/*.ts",
+    "../../packages/atlas-publisher/**/*.ts",
+    "../../packages/atlas-writer/**/*.ts",
+    "../../packages/shared-workflow/**/*.ts"
+  ]
 }

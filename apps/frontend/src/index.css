@@ -9,7 +9,7 @@
   :root {
     /* ── Core palette — Clean Modern Outdoor ── */
     /* Off-white canvas with mineral mist gradient */
-    --background: 60 12% 97%;          /* off-white #F7F7F4 */
+    --background: 158 8% 97%;          /* luksusowa szałwiowa mgła mineralna */
     --surface-top: 0 0% 100%;          /* pure white at top */
     --surface-bottom: 90 8% 95%;       /* mineral mist at bottom */
     --foreground: 60 6% 14%;           /* #252521 ink (slightly deeper for white bg) */
@@ -185,12 +185,9 @@
 
   body {
     @apply text-foreground font-sans antialiased;
-    background: linear-gradient(
-      to bottom,
-      hsl(90 10% 94%) 0%,
-      hsl(75 8% 93%) 40%,
-      hsl(90 8% 92%) 100%
-    );
+    background: radial-gradient(at 0% 0%, hsl(158 20% 93%) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, hsl(200 15% 92%) 0px, transparent 50%),
+                hsl(158 8% 97%);
     background-attachment: fixed;
     min-height: 100vh;
     font-family: 'Inter', system-ui, sans-serif;

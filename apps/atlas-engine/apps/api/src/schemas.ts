@@ -5,8 +5,8 @@ const SafeFileNameSchema = z.string()
   .min(1)
   .max(120)
   .refine(
-    (name) => /^[a-zA-Z0-9_\-\.]+$/.test(name) && !name.startsWith(".") && !name.includes("..") && !name.includes("/") && !name.includes("\\"),
-    { message: "Invalid file name. Only alphanumeric characters, dashes, underscores and dots are allowed. Cannot start with a dot or contain path segments." }
+    (name) => !name.startsWith(".") && !name.includes("..") && !name.includes("/") && !name.includes("\\"),
+    { message: "Invalid file name. Cannot start with a dot or contain path segments." }
   );
 
 export const DiscoverBodySchema = z.object({
@@ -20,7 +20,8 @@ export const CreateProjectBodySchema = z.object({
   topic: z.string().min(1).max(200),
   category: z.string().min(1).optional(),
   region: z.string().min(1).optional(),
-  language: z.string().min(2).default("en")
+  language: z.string().min(2).default("en"),
+  ownerUserId: z.string().optional()
 });
 
 export const EmptyBodySchema = z.object({}).passthrough();
@@ -67,8 +68,11 @@ export const ArchiveProjectBodySchema = z.object({
 });
 
 export const AddNoteBodySchema = z.object({
-  fileName: SafeFileNameSchema.refine((name) => name.endsWith(".md") || name.endsWith(".txt"), { message: "Only .md and .txt files are allowed." }),
-  content: z.string().min(1).max(2_000_000), // 2MB limit for notes
+  fileName: SafeFileNameSchema.refine(
+    (name) => /\.(md|txt|csv|json|geojson|kml|pdf|doc|docx)$/i.test(name),
+    { message: "Allowed note/document types: .md, .txt, .csv, .json, .geojson, .kml, .pdf, .doc, .docx." }
+  ),
+  content: z.string().min(1).max(10_000_000), // service enforces tighter text limits and 10MB document limits
   note: z.string().max(500).optional()
 });
 

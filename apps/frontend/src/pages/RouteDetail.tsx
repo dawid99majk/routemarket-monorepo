@@ -8,11 +8,20 @@ import Logo from '@/components/Logo';
 import Footer from '@/components/Footer';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
+import SEO, { buildProductSchema, buildReviewSchema, buildBreadcrumbSchema } from '@/components/SEO';
+import { trackEvent } from '@/lib/analytics';
+import { isFeatureEnabled } from '@/lib/feature-flags';
+import { useQuery } from '@tanstack/react-query';
+import Logo from '@/components/Logo';
+import Footer from '@/components/Footer';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouteById, useRouteStats, useRouteImages } from '@/hooks/use-routes';
 import { useHasPurchased } from '@/hooks/use-purchases';
 import { useRoutePdfs } from '@/hooks/use-route-pdfs';
-import { useRoutePois } from '@/hooks/use-route-pois';
 import { getLanguageFlag, getLanguageName } from '@/lib/languages';
 import { useRouteTranslation, getUserLanguage } from '@/hooks/use-translations';
 import TranslationManager from '@/components/TranslationManager';
@@ -20,7 +29,6 @@ import BuyerConsentModal from '@/components/BuyerConsentModal';
 import { TokenPurchaseModal } from '@/components/ui/TokenPurchaseModal';
 import { supabase } from '@/integrations/supabase/client';
 import { openSignedPdf } from '@/lib/open-signed-pdf';
-import { useConvertedPrice, detectUserCurrency, getCurrencySymbol, formatPrice } from '@/hooks/use-currency';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,7 +39,7 @@ import {
   Clock, Mountain, Ruler, Gauge, TreePine, Sun, RotateCcw, Loader2,
   ChevronLeft, ChevronRight, AlertTriangle, Backpack, CalendarCheck, ShieldAlert,
   Bot, Users, Compass, Footprints, CheckCircle2, Award, TrendingUp, MessageCircle,
-  Instagram, Youtube, Globe, Expand, Box, ExternalLink,
+  Instagram, Youtube, Globe, Expand, Box, ExternalLink, Coins,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -121,63 +129,81 @@ function difficultyColor(d: string | null) {
   }
 }
 
-function PriceDisplay({ price, currency }: { price: number; currency: string }) {
-  const userCurrency = detectUserCurrency();
-  const { data: converted } = useConvertedPrice(price, currency, userCurrency);
-  const showConverted = currency !== userCurrency && converted;
-
+function PriceDisplay({ price }: { price: number }) {
   return (
-    <div className="mb-4">
-      <span className="text-3xl font-bold">{formatPrice(price, currency)}</span>
-      {showConverted && (
-        <p className="text-sm text-muted-foreground mt-0.5">
-          ≈ {formatPrice(converted.converted, userCurrency)}
-        </p>
+    <div className="mb-4 flex items-center gap-2">
+      {Number(price) === 0 ? (
+        <span className="text-3xl font-bold text-emerald-600">FREE</span>
+      ) : (
+        <>
+          <Coins className="w-8 h-8 text-amber-500 shrink-0" />
+          <span className="text-3xl font-extrabold text-foreground tracking-tight">5 TOK</span>
+        </>
       )}
     </div>
   );
 }
 
-function PoiCard({ poi, badgeLabel, badgeColor }: { 
-  poi: RoutePoi; 
-  badgeLabel?: string; 
-  badgeColor?: string;
-}) {
-  return (
-    <div className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
-      <div className="font-semibold text-foreground flex justify-between gap-2">
-        <span>{poi.name}</span>
-        {badgeLabel && <Badge variant="outline" className={`text-[8px] h-4.5 px-1 py-0 uppercase ${badgeColor}`}>{badgeLabel}</Badge>}
-      </div>
-      {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
-      <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
-        <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
-            onClick={() => {
-              navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
-              toast.success('Skopiowano współrzędne GPS!');
-            }}
-          >
-            Kopiuj GPS
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
-            onClick={() => {
-              window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
-            }}
-          >
-            <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+function enrichGpxWithPois(gpxXml: string, pois: any[]): string {
+  if (!pois || pois.length === 0) return gpxXml;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(gpxXml, 'application/xml');
+    const gpxNode = doc.querySelector('gpx');
+    if (!gpxNode) return gpxXml;
+
+    // Find the first element to insert waypoints before them (conform to GPX schema)
+    const firstChild = gpxNode.querySelector('metadata, trk, rte');
+
+    pois.forEach(poi => {
+      const lat = poi.lat;
+      const lon = poi.lng;
+      if (typeof lat !== 'number' || typeof lon !== 'number') return;
+
+      const wptNode = doc.createElement('wpt');
+      wptNode.setAttribute('lat', lat.toString());
+      wptNode.setAttribute('lon', lon.toString());
+
+      if (poi.name) {
+        const nameNode = doc.createElement('name');
+        nameNode.textContent = poi.name;
+        wptNode.appendChild(nameNode);
+      }
+
+      if (poi.description) {
+        const descNode = doc.createElement('desc');
+        descNode.textContent = poi.description;
+        wptNode.appendChild(descNode);
+      }
+
+      if (poi.type) {
+        const typeNode = doc.createElement('type');
+        typeNode.textContent = poi.type;
+        wptNode.appendChild(typeNode);
+
+        const symNode = doc.createElement('sym');
+        let symbol = 'Flag, Blue';
+        if (poi.type === 'parking') symbol = 'Parking Area';
+        else if (poi.type === 'dining' || poi.type === 'restaurant' || poi.type === 'food') symbol = 'Restaurant';
+        else if (poi.type === 'hotel' || poi.type === 'shelter') symbol = 'Lodging';
+        else if (poi.type === 'water') symbol = 'Drinking Water';
+        symNode.textContent = symbol;
+        wptNode.appendChild(symNode);
+      }
+
+      if (firstChild) {
+        gpxNode.insertBefore(wptNode, firstChild);
+      } else {
+        gpxNode.appendChild(wptNode);
+      }
+    });
+
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(doc);
+  } catch (err) {
+    console.error('Error enriching GPX XML:', err);
+    return gpxXml;
+  }
 }
 
 export default function RouteDetail() {
@@ -207,6 +233,41 @@ export default function RouteDetail() {
   const userLang = getUserLanguage();
   const { data: translation } = useRouteTranslation(routeId, userLang);
   const { data: creatorReliability } = useCreatorReliability(route?.user_id);
+
+  // Load route POIs and Recommendations
+  const { data: routePois = [] } = useQuery({
+    queryKey: ['route-pois', routeId],
+    enabled: !!routeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('route_pois')
+        .select('*')
+        .eq('route_id', routeId)
+        .order('sort_order', { ascending: true });
+      if (error) {
+        console.error('Error fetching POIs:', error);
+        return [];
+      }
+      return data ?? [];
+    }
+  });
+
+  const { data: routeRecommendations = [] } = useQuery({
+    queryKey: ['route-recommendations', routeId],
+    enabled: !!routeId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('route_recommendations')
+        .select('*')
+        .eq('route_id', routeId)
+        .order('sort_order', { ascending: true });
+      if (error) {
+        console.error('Error fetching recommendations:', error);
+        return [];
+      }
+      return data ?? [];
+    }
+  });
 
   // Use translated content if available, fallback to original
   const displayTitle = translation?.title || route?.title || '';
@@ -400,8 +461,6 @@ export default function RouteDetail() {
     }
   };
 
-  const { data: routePois = [] } = useRoutePois(routeId);
-
   // Build "who is this for" items based on route data
   const whoIsThisFor = (() => {
     const items: { icon: React.ElementType; text: string }[] = [];
@@ -487,7 +546,7 @@ export default function RouteDetail() {
           ]),
         ]}
       />
-      <header className="sticky top-0 z-40 bg-card border-b border-border">
+      <header className="sticky top-0 z-40 bg-background/70 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
           <div className="flex items-center">
             <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mr-2 sm:mr-4 min-h-[44px] min-w-[44px]"><ArrowLeft className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">{t('common.back')}</span></Button>
@@ -503,10 +562,19 @@ export default function RouteDetail() {
       <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Mobile purchase CTA — above the fold */}
         <div className="lg:hidden mb-4">
-          <div className="bg-card rounded-xl shadow-token-sm p-4 flex items-center justify-between gap-3">
+          <div className="glass-premium rounded-xl shadow-md border-border/80 p-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-xl font-bold">{formatPrice(route.price, (route as any).currency || 'USD')}</p>
-              {route.difficulty && <Badge className={`${difficultyColor(route.difficulty)} capitalize mt-1`}>{route.difficulty}</Badge>}
+              <div className="flex items-center gap-1.5 mb-1">
+                {Number(route.price) === 0 ? (
+                  <span className="text-xl font-bold text-emerald-600">FREE</span>
+                ) : (
+                  <>
+                    <Coins className="w-5 h-5 text-amber-500 shrink-0" />
+                    <span className="text-xl font-extrabold text-foreground tracking-tight">5 TOK</span>
+                  </>
+                )}
+              </div>
+              {route.difficulty && <Badge className={`${difficultyColor(route.difficulty)} capitalize`}>{route.difficulty}</Badge>}
             </div>
             {purchased || isOwner ? (
               <Button size="sm" onClick={() => navigate('/my-routes')} className="min-h-[44px]">
@@ -591,7 +659,7 @@ export default function RouteDetail() {
                     Open 3D
                   </Button>
                 </div>
-                <div className="overflow-hidden rounded-xl border border-border bg-card shadow-token-sm">
+                <div className="overflow-hidden rounded-xl border border-border/80 glass-premium shadow-md">
                   <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -700,100 +768,9 @@ export default function RouteDetail() {
               </div>
             </section>
 
-            {/* ── Logistyka POI ── */}
-            {(purchased || isOwner) && (
-              <section className="bg-card rounded-xl p-6 shadow-token-sm border border-border/40">
-                <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-primary" /> Logistyka i Punkty (POI)
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-                  {/* Sekcja: Parking */}
-                  <div className="p-3 rounded-lg border border-blue-500/10 bg-blue-500/[0.01] space-y-2">
-                    <h3 className="text-xs font-bold text-blue-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
-                      <span>🅿️</span> Parking / Start
-                    </h3>
-                    <div className="space-y-2">
-                      {routePois.filter(poi => poi.type === 'parking').length > 0 ? (
-                        routePois.filter(poi => poi.type === 'parking').map((poi, idx) => (
-                          <PoiCard key={poi.id || idx} poi={poi} />
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic">Brak danych o parkingu.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sekcja: Gastronomia */}
-                  <div className="p-3 rounded-lg border border-orange-500/10 bg-orange-500/[0.01] space-y-2">
-                    <h3 className="text-xs font-bold text-orange-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
-                      <span>🍽️</span> Gastronomia
-                    </h3>
-                    <div className="space-y-2">
-                      {routePois.filter(poi => ['dining', 'food', 'restaurant'].includes(poi.type)).length > 0 ? (
-                        routePois.filter(poi => ['dining', 'food', 'restaurant'].includes(poi.type)).map((poi, idx) => (
-                          <PoiCard key={poi.id || idx} poi={poi} />
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic">Brak punktów gastronomicznych.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sekcja: Nocleg */}
-                  <div className="p-3 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.01] space-y-2">
-                    <h3 className="text-xs font-bold text-emerald-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
-                      <span>🛌</span> Nocleg / Schronisko
-                    </h3>
-                    <div className="space-y-2">
-                      {routePois.filter(poi => ['hotel', 'shelter', 'accommodation', 'campground'].includes(poi.type)).length > 0 ? (
-                        routePois.filter(poi => ['hotel', 'shelter', 'accommodation', 'campground'].includes(poi.type)).map((poi, idx) => (
-                          <PoiCard key={poi.id || idx} poi={poi} />
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic">Brak danych o noclegach.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sekcja: Woda */}
-                  <div className="p-3 rounded-lg border border-cyan-500/10 bg-cyan-500/[0.01] space-y-2">
-                    <h3 className="text-xs font-bold text-cyan-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
-                      <span>💧</span> Dostęp do wody
-                    </h3>
-                    <div className="space-y-2">
-                      {routePois.filter(poi => poi.type === 'water').length > 0 ? (
-                        routePois.filter(poi => poi.type === 'water').map((poi, idx) => (
-                          <PoiCard key={poi.id || idx} poi={poi} />
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych źródeł wody.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sekcja: Co zobaczyć / Widoki */}
-                  <div className="p-3 rounded-lg border border-purple-500/10 bg-purple-500/[0.01] space-y-2">
-                    <h3 className="text-xs font-bold text-purple-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
-                      <span>📸</span> Co zobaczyć / Widoki
-                    </h3>
-                    <div className="space-y-2">
-                      {routePois.filter(poi => poi.type === 'viewpoint').length > 0 ? (
-                        routePois.filter(poi => poi.type === 'viewpoint').map((poi, idx) => (
-                          <PoiCard key={poi.id || idx} poi={poi} badgeLabel="Widok" badgeColor="bg-purple-500/5 border-purple-500/20 text-purple-500" />
-                        ))
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych punktów widokowych.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-
             {/* ── Safety & Risk Panel — above the fold ── */}
             {safetyPanelEnabled && (route as any).risk_level && (route as any).risk_level !== 'unknown' && (
-              <section className="bg-card rounded-xl p-5 shadow-token-sm border-l-4 border-l-amber-400">
+              <section className="glass-premium rounded-xl p-5 shadow-md border-border/80 border-l-4 border-l-amber-400">
                 <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-amber-500" /> {t('route_detail.safety_title', 'Safety & Risk')}
                 </h2>
@@ -857,7 +834,7 @@ export default function RouteDetail() {
 
 
             {/* ── About ── */}
-            <section className="bg-card rounded-xl p-6 shadow-token-sm">
+            <section className="glass-premium rounded-xl p-6 shadow-md border-border/80">
               <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-3">{t('route_detail.about')}</h2>
               <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{displayDescription}</p>
               {translation?.is_auto_translated && (
@@ -886,8 +863,290 @@ export default function RouteDetail() {
               )}
             </section>
 
+            {/* ── Niezbędnik Logistyczny Wyprawy ── */}
+            {(purchased || isOwner) ? (
+              <section className="glass-premium rounded-xl p-6 shadow-md border-border/80 space-y-4">
+                <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-primary" />
+                  Niezbędnik Logistyczny Wyprawy (Magic AI Partner)
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Poniższy zestaw punktów logistycznych i polecanych miejsc został wygenerowany przez asystenta AI oraz uzupełniony przez autora trasy. 
+                  Możesz skopiować współrzędne GPS bezpośrednio do swojej nawigacji.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                  {/* Sekcja: Gdzie zaparkować */}
+                  <div className="p-3 rounded-lg border border-blue-500/10 bg-blue-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-blue-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>🅿️</span> Gdzie zaparkować
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => poi.type === 'parking').length > 0 ? (
+                        routePois.filter(poi => poi.type === 'parking').map((poi, idx) => (
+                          <div key={poi.id || idx} className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+                            <div className="font-semibold text-foreground flex justify-between gap-2">
+                              <span>{poi.name}</span>
+                              {poi.fun_fact && <Badge variant="outline" className="text-[9px] h-4.5 px-1 py-0">{poi.fun_fact}</Badge>}
+                            </div>
+                            {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
+                            <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
+                              <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
+                                    toast.success('Skopiowano współrzędne GPS!');
+                                  }}
+                                >
+                                  Kopiuj GPS
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
+                                  onClick={() => {
+                                    window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
+                                  }}
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych dedykowanych parkingów.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Gdzie spać */}
+                  <div className="p-3 rounded-lg border border-amber-500/10 bg-amber-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-amber-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>🛌</span> Gdzie spać
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => ['hotel', 'shelter'].includes(poi.type)).length > 0 ? (
+                        routePois.filter(poi => ['hotel', 'shelter'].includes(poi.type)).map((poi, idx) => (
+                          <div key={poi.id || idx} className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+                            <div className="font-semibold text-foreground flex justify-between gap-2">
+                              <span>{poi.name}</span>
+                              <Badge variant="outline" className="text-[8px] h-4.5 px-1 py-0 uppercase">{poi.type === 'hotel' ? 'Nocleg' : 'Schronisko'}</Badge>
+                            </div>
+                            {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
+                            <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
+                              <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
+                                    toast.success('Skopiowano współrzędne GPS!');
+                                  }}
+                                >
+                                  Kopiuj GPS
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
+                                  onClick={() => {
+                                    window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
+                                  }}
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych miejsc noclegowych.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Gdzie zjeść */}
+                  <div className="p-3 rounded-lg border border-pink-500/10 bg-pink-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-pink-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>🍽️</span> Gdzie zjeść
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => ['food', 'dining'].includes(poi.type)).length > 0 || routeRecommendations.length > 0 ? (
+                        <>
+                          {routePois.filter(poi => ['food', 'dining'].includes(poi.type)).map((poi, idx) => (
+                            <div key={poi.id || idx} className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+                              <div className="font-semibold text-foreground flex justify-between gap-2">
+                                <span>{poi.name}</span>
+                                <Badge variant="outline" className="text-[8px] h-4.5 px-1 py-0 uppercase">Gastronomia</Badge>
+                              </div>
+                              {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
+                              <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
+                                <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
+                                      toast.success('Skopiowano współrzędne GPS!');
+                                    }}
+                                  >
+                                    Kopiuj GPS
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
+                                    onClick={() => {
+                                      window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
+                                    }}
+                                  >
+                                    <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {routeRecommendations.map((rec, idx) => (
+                            <div key={rec.id || idx} className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+                              <div className="font-semibold text-foreground flex justify-between gap-2">
+                                <span>{rec.name}</span>
+                                {rec.price_range && <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px] h-4.5 px-1 py-0 uppercase font-mono">{rec.price_range}</Badge>}
+                              </div>
+                              {rec.description && <p className="text-muted-foreground text-[10px] leading-normal">{rec.description}</p>}
+                              {rec.what_to_order && (
+                                <p className="text-[9px] text-emerald-600 bg-emerald-500/5 px-1.5 py-0.5 rounded italic">
+                                  Polecane danie: {rec.what_to_order}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak polecanych punktów gastronomicznych.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Dostęp do wody */}
+                  <div className="p-3 rounded-lg border border-cyan-500/10 bg-cyan-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-cyan-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>💧</span> Dostęp do wody
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => poi.type === 'water').length > 0 ? (
+                        routePois.filter(poi => poi.type === 'water').map((poi, idx) => (
+                          <div key={poi.id || idx} className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+                            <div className="font-semibold text-foreground flex justify-between gap-2">
+                              <span>{poi.name}</span>
+                              <Badge variant="outline" className="text-[8px] h-4.5 px-1 py-0 uppercase bg-cyan-500/5 border-cyan-500/20 text-cyan-500">Woda</Badge>
+                            </div>
+                            {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
+                            <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
+                              <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
+                                    toast.success('Skopiowano współrzędne GPS!');
+                                  }}
+                                >
+                                  Kopiuj GPS
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
+                                  onClick={() => {
+                                    window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
+                                  }}
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych dedykowanych punktów z wodą.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sekcja: Co zobaczyć / Widoki */}
+                  <div className="p-3 rounded-lg border border-purple-500/10 bg-purple-500/[0.01] space-y-2">
+                    <h3 className="text-xs font-bold text-purple-500 flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                      <span>📸</span> Co zobaczyć / Widoki
+                    </h3>
+                    <div className="space-y-2">
+                      {routePois.filter(poi => poi.type === 'viewpoint').length > 0 ? (
+                        routePois.filter(poi => poi.type === 'viewpoint').map((poi, idx) => (
+                          <div key={poi.id || idx} className="text-xs space-y-1 p-2 bg-card rounded border border-border/60">
+                            <div className="font-semibold text-foreground flex justify-between gap-2">
+                              <span>{poi.name}</span>
+                              <Badge variant="outline" className="text-[8px] h-4.5 px-1 py-0 uppercase bg-purple-500/5 border-purple-500/20 text-purple-500">Widok</Badge>
+                            </div>
+                            {poi.description && <p className="text-muted-foreground text-[10px] leading-normal">{poi.description}</p>}
+                            <div className="flex items-center justify-between text-[9px] text-muted-foreground font-mono mt-1 pt-1 border-t border-border/40">
+                              <span>{poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</span>
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-primary hover:text-primary-hover font-semibold"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${poi.lat}, ${poi.lng}`);
+                                    toast.success('Skopiowano współrzędne GPS!');
+                                  }}
+                                >
+                                  Kopiuj GPS
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/5 font-semibold flex items-center gap-0.5"
+                                  onClick={() => {
+                                    window.open(`https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`, '_blank');
+                                  }}
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" /> Nawiguj
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Brak oznaczonych punktów widokowych.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="glass-premium rounded-xl p-6 shadow-md border-border/80 space-y-3">
+                <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 opacity-70">
+                  <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                  Niezbędnik Logistyczny Wyprawy (Magic AI Partner)
+                </h2>
+                <p className="text-xs text-muted-foreground leading-normal">
+                  Kompletny, luksusowy panel logistyczny (zweryfikowane miejsca parkingowe, noclegi, schroniska, gastronomia oraz naturalne i miejskie źródła wody pitnej z dokładnymi współrzędnymi GPS) odblokujesz po pobraniu trasy za 5 tokenów.
+                </p>
+              </section>
+            )}
+
             {/* ── Who is this route for ── */}
-            <section className="bg-card rounded-xl p-6 shadow-token-sm">
+            <section className="glass-premium rounded-xl p-6 shadow-md border-border/80">
               <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4">{t('route_detail.who_title', 'Who is this for')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {whoIsThisFor.map(({ icon: I, text }, idx) => (
@@ -902,7 +1161,7 @@ export default function RouteDetail() {
             </section>
 
             {/* ── What You Get — Icon Cards ── */}
-            <section className="bg-card rounded-xl p-6 shadow-token-sm">
+            <section className="glass-premium rounded-xl p-6 shadow-md border-border/80">
               <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4">{t('route_detail.what_you_get')}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
@@ -923,7 +1182,7 @@ export default function RouteDetail() {
 
             {/* ── AI Disclosure ── */}
             {(route as any).ai_assisted && (
-              <section className="bg-card rounded-xl p-5 shadow-token-sm border-l-4 border-l-violet-400">
+              <section className="glass-premium rounded-xl p-5 shadow-md border-border/80 border-l-4 border-l-violet-400">
                 <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
                   <Bot className="w-4 h-4 text-violet-500" /> AI Disclosure
                 </h2>
@@ -948,7 +1207,7 @@ export default function RouteDetail() {
             )}
 
             {/* ── Reviews ── */}
-            <section className="bg-card rounded-xl p-6 shadow-token-sm">
+            <section className="glass-premium rounded-xl p-6 shadow-md border-border/80">
               <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" /> {t('route_detail.reviews')}
               </h2>
@@ -990,7 +1249,7 @@ export default function RouteDetail() {
           {/* ════════ Right Column — Sticky Purchase Sidebar ════════ */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-24 space-y-4">
-              <div className="bg-card rounded-xl shadow-token-md overflow-hidden">
+              <div className="glass-premium rounded-xl shadow-md border-border/80 overflow-hidden">
                 {/* Title block */}
                 <div className="p-5 pb-0">
                   <h1 className="text-xl font-bold leading-snug mb-2">{displayTitle}</h1>
@@ -1034,9 +1293,33 @@ export default function RouteDetail() {
                     <div className="space-y-2">
                       <Button className="w-full" onClick={async () => {
                         if (!route.gpx_file_key) { toast.info('Brak pliku GPX'); return; }
-                        const { data, error } = await supabase.storage.from('gpx-files').createSignedUrl(route.gpx_file_key, 300);
-                        if (error || !data?.signedUrl) { toast.error('Nie udało się pobrać pliku'); return; }
-                        window.open(data.signedUrl, '_blank');
+                        const toastId = toast.loading('Przygotowywanie pliku GPX z punktami POI...');
+                        try {
+                          const { data, error } = await supabase.storage.from('gpx-files').createSignedUrl(route.gpx_file_key, 300);
+                          if (error || !data?.signedUrl) {
+                            toast.error('Nie udało się pobrać pliku', { id: toastId });
+                            return;
+                          }
+                          const response = await fetch(data.signedUrl);
+                          if (!response.ok) throw new Error('Błąd pobierania pliku GPX');
+                          const rawGpx = await response.text();
+                          const enrichedGpx = enrichGpxWithPois(rawGpx, routePois);
+                          
+                          const blob = new Blob([enrichedGpx], { type: 'application/gpx+xml' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${route.title || 'trasa'}_z_logistyka.gpx`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                          
+                          toast.success('Pobrano plik GPX wzbogacony o punkty logistyczne!', { id: toastId });
+                        } catch (err: any) {
+                          console.error(err);
+                          toast.error('Nie udało się pobrać pliku: ' + err?.message, { id: toastId });
+                        }
                       }}>
                         <Download className="w-4 h-4 mr-2" /> {t('route_detail.download_gpx')}
                       </Button>
@@ -1059,6 +1342,9 @@ export default function RouteDetail() {
                           <FileText className="w-4 h-4 mr-2" /> {t('route_detail.download_pdf')} — brak
                         </Button>
                       )}
+                      <Button variant="outline" className="w-full bg-accent/5 hover:bg-accent/10 border-accent/20 text-accent font-semibold" onClick={() => window.print()}>
+                        <FileText className="w-4 h-4 mr-2" /> Drukuj Przewodnik / PDF
+                      </Button>
                       {isOwner && (
                         <Button variant="outline" className="w-full" onClick={() => navigate(`/edit-route/${route.id}`)}>
                           <Pencil className="w-4 h-4 mr-2" /> {t('route_detail.edit_route')}
@@ -1084,7 +1370,7 @@ export default function RouteDetail() {
               </div>
 
               {/* ── Trust & Safety Module ── */}
-              {safetyPanelEnabled && <div className="bg-card rounded-xl shadow-token-sm border border-border overflow-hidden">
+              {safetyPanelEnabled && <div className="glass-premium rounded-xl shadow-md border-border/80 overflow-hidden">
                 <div className="px-4 py-3 border-b border-border bg-muted/30">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                     <Shield className="w-3.5 h-3.5 text-primary" /> {t('route_detail.trust_safety', 'Trust & Safety')}
@@ -1177,7 +1463,7 @@ export default function RouteDetail() {
 
               {/* ── Creator Reliability ── */}
               {creatorReliability && (
-                <div className="bg-card rounded-xl shadow-token-sm border border-border overflow-hidden">
+                <div className="glass-premium rounded-xl shadow-md border-border/80 overflow-hidden">
                   <div className="px-4 py-3 border-b border-border bg-muted/30">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                       <Award className="w-3.5 h-3.5 text-primary" /> {t('route_detail.creator_reliability', 'Creator Reliability')}
@@ -1246,26 +1532,120 @@ export default function RouteDetail() {
         }}
       />
 
-      {/* ── Print-only POI Section ── */}
-      <div className="hidden print:block mt-8 border-t pt-8">
-        <h2 className="text-xl font-bold mb-4">Logistyka i Punkty POI</h2>
-        <div className="space-y-4">
-          {routePois.map((poi, idx) => (
-            <div key={poi.id || idx} className="border-b pb-2">
-              <p className="font-semibold">
-                {poi.type === 'parking' ? '🅿️ Parking' : 
-                 poi.type === 'hotel' ? '🛌 Nocleg' : 
-                 poi.type === 'shelter' ? '⛺ Schronisko' : 
-                 poi.type === 'dining' || poi.type === 'food' ? '🍽️ Gastronomia' : 
-                 poi.type === 'water' ? '💧 Woda' : 
-                 poi.type === 'viewpoint' ? '📸 Widok' : '📍 Punkt'}: {poi.name}
-              </p>
-              <p className="text-sm text-gray-600">GPS: {poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</p>
-              {poi.description && <p className="text-sm mt-1">{poi.description}</p>}
+      {/* CSS @media print block to guarantee high-end, clean styled roadbook print */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          body, html, #root {
+            background: white !important;
+            color: black !important;
+            font-family: 'Inter', system-ui, sans-serif !important;
+          }
+          /* Hide all standard web layouts */
+          header, footer, nav, aside, button, .no-print, [role="button"], main, #root > div {
+            display: none !important;
+          }
+          /* Ensure our print-only layout is visible and takes full width */
+          .print-only {
+            display: block !important;
+            visibility: visible !important;
+            width: 100% !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            color: black !important;
+          }
+          .page-break-inside-avoid {
+            page-break-inside: avoid !important;
+          }
+          .page-break-before-avoid {
+            page-break-before: avoid !important;
+          }
+        }
+      `}} />
+
+      {/* ── printable roadbook layout ── */}
+      <div className="print-only hidden p-8 bg-white text-black space-y-6">
+        <div className="border-b-2 border-black pb-4">
+          <h1 className="text-3xl font-bold tracking-tight">{displayTitle}</h1>
+          <p className="text-sm text-gray-500 mt-1">Przewodnik i Książka Drogowa RouteMarket.io — Autor: {route.creator_name}</p>
+          <div className="flex flex-wrap gap-4 text-xs font-mono text-gray-600 mt-2">
+            <span>Kategoria: {route.category_name}</span>
+            {route.distance_km && <span>Dystans: {route.distance_km} km</span>}
+            {route.elevation_gain_m && <span>Przewyższenie: {route.elevation_gain_m} m</span>}
+            {route.estimated_time_h && <span>Czas trwania: {route.estimated_time_h} h</span>}
+            {route.difficulty && <span className="uppercase">Trudność: {route.difficulty}</span>}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1">O wyprawie</h2>
+            <p className="text-xs leading-relaxed text-gray-800 whitespace-pre-line">{displayDescription}</p>
+          </div>
+
+          {fullDescription && (
+            <div className="space-y-2 pt-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1">Szczegółowy opis trasy</h2>
+              <p className="text-xs leading-relaxed text-gray-800 whitespace-pre-line">{fullDescription}</p>
             </div>
-          ))}
+          )}
+
+          {(route.start_point || route.end_point) && (
+            <div className="grid grid-cols-2 gap-4 text-xs pt-2 border-t border-gray-100">
+              {route.start_point && <div><strong>Start wyprawy:</strong> {route.start_point}</div>}
+              {route.end_point && <div><strong>Koniec wyprawy:</strong> {route.end_point}</div>}
+            </div>
+          )}
+
+          {routePois.length > 0 && (
+            <div className="space-y-3 pt-4 page-break-before-avoid">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1">Niezbędnik Logistyczny & POI</h2>
+              <div className="space-y-2">
+                {routePois.map((poi, idx) => (
+                  <div key={poi.id || idx} className="border border-gray-300 p-2.5 rounded text-xs space-y-1 page-break-inside-avoid">
+                    <div className="font-bold flex justify-between">
+                      <span>{poi.name}</span>
+                      <span className="uppercase text-[9px] font-mono border border-gray-400 px-1.5 py-0.25 rounded text-gray-600">
+                        {poi.type === 'parking' ? '🅿️ Parking' : poi.type === 'hotel' ? '🛌 Nocleg' : poi.type === 'shelter' ? '⛺ Schronisko' : poi.type === 'dining' || poi.type === 'food' ? '🍽️ Gastronomia' : poi.type === 'water' ? '💧 Woda' : poi.type === 'viewpoint' ? '📸 Widok' : '📍 Punkt'}
+                      </span>
+                    </div>
+                    {poi.description && <p className="text-gray-700 text-[10px] leading-relaxed">{poi.description}</p>}
+                    {poi.fun_fact && <p className="text-gray-500 italic text-[10px]">Wskazówka/Ciekawostka: {poi.fun_fact}</p>}
+                    <p className="text-[9px] text-gray-500 font-mono pt-1">GPS: {poi.lat.toFixed(6)}, {poi.lng.toFixed(6)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {routeRecommendations.length > 0 && (
+            <div className="space-y-3 pt-4 page-break-before-avoid">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-1">Polecane Gastronomie krakowskie i lokalne</h2>
+              <div className="space-y-2">
+                {routeRecommendations.map((rec, idx) => (
+                  <div key={rec.id || idx} className="border border-gray-300 p-2.5 rounded text-xs space-y-1 page-break-inside-avoid">
+                    <div className="font-bold flex justify-between">
+                      <span>{rec.name}</span>
+                      {rec.price_range && <span className="font-mono text-gray-500 text-[10px]">Przedział cenowy: {rec.price_range}</span>}
+                    </div>
+                    {rec.description && <p className="text-gray-700 text-[10px] leading-relaxed">{rec.description}</p>}
+                    {rec.what_to_order && <p className="text-emerald-700 italic text-[10px] font-medium">Polecane danie: {rec.what_to_order}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-400 pt-4 mt-8 text-center text-[10px] text-gray-400">
+          Przewodnik wygenerowany za pomocą portalu RouteMarket.io. Wszystkie prawa zastrzeżone.
         </div>
       </div>
     </div>
   );
 }
+
+

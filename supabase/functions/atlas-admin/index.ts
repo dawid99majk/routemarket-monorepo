@@ -17,16 +17,23 @@ type AtlasAction =
   | "providers"
   | "list_projects"
   | "get_project"
+  | "get_workflow_state"
   | "list_events"
   | "create_project"
   | "delete_project"
   | "collect_sources"
   | "deep_research"
   | "run_mvp2"
+  | "start_run_mvp2_job"
+  | "get_project_jobs"
+  | "get_job"
+  | "get_job_logs"
+  | "approve_job"
   | "get_review"
   | "submit_review_decision"
   | "approve_stage"
   | "prepare_publish"
+  | "start_prepare_publish_job"
   | "import_draft"
   | "bulk_import_drafts"
   | "import_payload"
@@ -37,6 +44,26 @@ type AtlasAction =
   | "research_pack"
   | "get_file"
   | "put_file";
+
+type AtlasProject = {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  ownerUserId?: string;
+  [key: string]: unknown;
+};
+
+type AtlasJob = {
+  id: string;
+  type?: string;
+  projectSlug?: string;
+  status?: string;
+  currentStep?: string;
+  waitingForStage?: string;
+  pendingApprovalContext?: { stage?: string };
+  [key: string]: unknown;
+};
 
 type AtlasPreparedDraft = {
   project?: {
@@ -130,84 +157,169 @@ serve(async (req) => {
 
     if (!roles || roles.length === 0) return json({ error: "Unauthorized: admin or creator role required" }, 403);
 
+    const isAdmin = roles.some((r) => r.role === "admin");
+
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? "") as AtlasAction;
     const input = body.input ?? {};
 
+    console.log(`[Atlas Admin] Action: ${action}, User: ${userId}, Admin: ${isAdmin}`);
+
+    // Helper to ensure creator only sees/edits their own projects
+    const checkOwnership = async (slug: string) => {
+      if (isAdmin) return;
+      console.log(`[Atlas Admin] Checking ownership for slug: ${slug}`);
+      try {
+        const projRes = await atlasJson<{ project: AtlasProject }>("GET", `/projects/${encodeURIComponent(slug)}`);
+        if (projRes.project?.ownerUserId && projRes.project.ownerUserId !== userId) {
+          console.warn(`[Atlas Admin] Ownership check failed for user ${userId} on project ${slug}`);
+          throw new Error("Unauthorized: you do not own this project");
+        }
+        console.log(`[Atlas Admin] Ownership check passed for slug: ${slug}`);
+      } catch (err) {
+        console.error(`[Atlas Admin] Ownership check error: ${err.message}`);
+        throw err;
+      }
+    };
+
+    const checkJobOwnership = async (jobId: string): Promise<AtlasJob> => {
+      const jobRes = await atlasJson<{ job: AtlasJob }>("GET", `/jobs/${encodeURIComponent(jobId)}`);
+      const projectSlug = jobRes.job?.projectSlug ?? projectSlugFromJob(jobRes.job);
+      if (!projectSlug) throw new Error("Job is not attached to an Atlas project.");
+      await checkOwnership(projectSlug);
+      return jobRes.job;
+    };
+
     switch (action) {
       case "providers":
         return atlasRequest("GET", "/providers");
-      case "list_projects":
-        return atlasRequest("GET", `/projects${buildQuery(input)}`);
+      case "list_projects": {
+        const query = buildQuery({
+          ...input,
+          ownerUserId: isAdmin ? (input.ownerUserId ?? undefined) : userId,
+        });
+        return atlasRequest("GET", `/projects${query}`);
+      }
       case "get_project":
+        await checkOwnership(input.slug);
         return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}`);
+      case "get_workflow_state":
+        await checkOwnership(input.slug);
+        return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/files?path=workflow_state.json`);
       case "list_events":
+        await checkOwnership(input.slug);
         return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/events`);
       case "delete_project":
+        await checkOwnership(input.slug);
         return atlasRequest("DELETE", `/projects/${encodeURIComponent(input.slug)}`);
       case "create_project":
-        return atlasRequest("POST", "/projects", {
-          topic: input.topic,
-          category: input.category,
-          region: input.region,
-          language: input.language ?? "en",
+        return json({
+          project: await atlasJson("POST", "/projects", {
+            topic: input.topic,
+            category: input.category,
+            region: input.region,
+            language: input.language ?? "en",
+            ownerUserId: userId, // Always force owner to current user
+          })
         });
       case "collect_sources":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/collect-sources`, {
           provider: input.provider ?? "auto",
           limit: input.limit ?? 20,
         });
       case "deep_research":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/deep-research`, {
           sourceLimit: input.sourceLimit ?? 3,
         });
       case "run_mvp2":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/run-mvp2`, {});
+      case "start_run_mvp2_job":
+        await checkOwnership(input.slug);
+        return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/jobs/run-mvp2`, {});
+      case "get_project_jobs": {
+        await checkOwnership(input.slug);
+        const data = await atlasJson<{ jobs?: AtlasJob[] }>("GET", `/projects/${encodeURIComponent(input.slug)}/jobs`);
+        return json({ jobs: data.jobs ?? [] });
+      }
+      case "get_job":
+        await checkJobOwnership(input.jobId);
+        return atlasRequest("GET", `/jobs/${encodeURIComponent(input.jobId)}`);
+      case "get_job_logs":
+        await checkJobOwnership(input.jobId);
+        return atlasRequest("GET", `/jobs/${encodeURIComponent(input.jobId)}/logs`);
+      case "approve_job":
+        await checkJobOwnership(input.jobId);
+        return atlasRequest("POST", `/jobs/${encodeURIComponent(input.jobId)}/approve`, {
+          approvalData: input.approvalData ?? {}
+        });
       case "get_review":
+        await checkOwnership(input.slug);
         return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/review`);
       case "submit_review_decision":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/review/decision`, {
           decision: input.decision,
           reviewer: input.reviewer,
           notes: input.notes,
         });
       case "approve_stage":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/approvals/${encodeURIComponent(input.stage)}`, {
           decision: input.decision,
           reviewer: input.reviewer,
           notes: input.notes,
         });
       case "prepare_publish":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/prepare-publish`, {});
+      case "start_prepare_publish_job":
+        await checkOwnership(input.slug);
+        return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/jobs/prepare-publish`, {});
       case "import_draft":
+        await checkOwnership(input.slug);
         return json(await importDraftFromAtlas(supabase, userId, input));
       case "bulk_import_drafts":
+        // bulkImportDraftsFromAtlas already calls importDraftFromAtlas which has ownership check
         return json(await bulkImportDraftsFromAtlas(supabase, userId, input));
       case "import_payload":
-        return json(await importDraftFromPayload(supabase, userId, input));
+        // For import_payload, we ensure ownerUserId is correct
+        return json(await importDraftFromPayload(supabase, userId, {
+          ...input,
+          ownerUserId: isAdmin ? (input.ownerUserId ?? userId) : userId
+        }));
       case "add_notes":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/inputs/notes`, {
           fileName: input.fileName,
           content: input.content,
           note: input.note,
         });
       case "add_gpx":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/inputs/gpx`, {
           fileName: input.fileName,
           content: input.content,
         });
       case "add_link":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/inputs/links`, {
           url: input.url,
           note: input.note,
         });
       case "analyze_gpx":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/analyze-gpx`, {});
       case "research_pack":
+        await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/research-pack`, {});
       case "get_file":
+        await checkOwnership(input.slug);
         return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/files?path=${encodeURIComponent(input.path)}`);
       case "put_file":
+        await checkOwnership(input.slug);
         return atlasRequest("PUT", `/projects/${encodeURIComponent(input.slug)}/files?path=${encodeURIComponent(input.path)}`, {
           content: input.content,
         });
@@ -618,7 +730,9 @@ async function atlasRequest(method: string, path: string, body?: unknown): Promi
 }
 
 async function atlasFetch(method: string, path: string, body?: unknown): Promise<Response> {
-  return fetch(`${ATLAS_API_BASE_URL!.replace(/\/+$/, "")}${path}`, {
+  const url = `${ATLAS_API_BASE_URL!.replace(/\/+$/, "")}${path}`;
+  console.log(`[Atlas Admin] Fetching ${method} ${url}`);
+  return fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -647,6 +761,16 @@ function buildQuery(input: Record<string, unknown>): string {
   }
   const raw = params.toString();
   return raw ? `?${raw}` : "";
+}
+
+function projectSlugFromJob(job?: AtlasJob): string | undefined {
+  if (!job) return undefined;
+  if (job.projectSlug && typeof job.projectSlug === "string") return job.projectSlug;
+  if (typeof job.type === "string" && job.type.includes(":")) {
+    const [, slug] = job.type.split(":");
+    return slug || undefined;
+  }
+  return undefined;
 }
 
 function slugify(value: string): string {

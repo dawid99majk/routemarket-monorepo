@@ -14,7 +14,7 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 // --- MACHINE CONFIGURATION ---
 // 1. MÓZG OPERACJI: Gemini 2.5 Flash (Główny Architekt, 2M context)
-const BRAIN_MODEL = "gemini-2.5-flash"; 
+const BRAIN_MODEL = "gemini-3.5-flash"; 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${BRAIN_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 Deno.serve(async (req) => {

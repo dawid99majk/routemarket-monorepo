@@ -47,7 +47,7 @@ Set this only when real Google-backed search should be active:
 
 ```txt
 GEMINI_API_KEY=<your key>
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Without the key, `auto` remains safe for local and VPS smoke flows because it falls back to `mock`.
@@ -60,4 +60,4 @@ Deep Research uses a separate provider interface:
 DeepResearchProvider.scrapeAndExtract(sourceUrl, topicContext)
 ```
 
-Set `GEMINI_API_KEY` to enable real deep research extraction. Optional: set `GEMINI_MODEL` (defaults to `gemini-2.5-flash`). Google Places enrichment uses `GOOGLE_MAPS_API_KEY` or `GOOGLE_API_KEY` when available.
+Set `GEMINI_API_KEY` to enable real deep research extraction. Optional: set `GEMINI_MODEL` (defaults to `gemini-3.5-flash`). Google Places enrichment uses `GOOGLE_MAPS_API_KEY` or `GOOGLE_API_KEY` when available.

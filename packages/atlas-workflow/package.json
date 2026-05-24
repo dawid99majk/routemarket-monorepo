@@ -5,6 +5,10 @@
   "type": "module",
   "dependencies": {
     "@routemarket/atlas-core": "workspace:*",
+    "@routemarket/atlas-gis": "workspace:*",
+    "@routemarket/atlas-publisher": "workspace:*",
+    "@routemarket/atlas-research": "workspace:*",
+    "@routemarket/atlas-writer": "workspace:*",
     "zod": "^3.25.76"
   }
 }

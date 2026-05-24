@@ -84,7 +84,7 @@ export function SourcesStep({
           ref={fileInputRef} 
           type="file" 
           multiple 
-          accept=".md,.markdown,.txt,.csv,.json,.geojson,.kml,.gpx" 
+          accept=".md,.markdown,.txt,.csv,.json,.geojson,.kml,.gpx,.pdf,.doc,.docx" 
           className="hidden" 
           onChange={(e) => e.target.files && onUploadFiles(e.target.files)} 
         />
@@ -98,7 +98,7 @@ export function SourcesStep({
           >
             {isUploading ? <Loader2 className="h-7 w-7 animate-spin text-primary" /> : <Upload className="h-7 w-7 text-primary" />}
             Prześlij pliki
-            <span className="text-center text-xs font-normal">Teksty (.txt/.md), GPX lub GeoJSON</span>
+            <span className="text-center text-xs font-normal">Teksty (.txt/.md), PDF, Word, GPX</span>
           </button>
           
           <div className="rounded-lg border border-border bg-muted/30 p-3 sm:col-span-2 space-y-2">
@@ -150,28 +150,40 @@ export function SourcesStep({
         </div>
 
         {(uploadedFiles.length > 0 || links.length > 0) && (
-          <div className="space-y-2 rounded-lg bg-muted/40 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-primary" />
-              Załadowane źródła w projekcie
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {uploadedFiles.map((file, index) => (
-                <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground border">
-                  {file.name.endsWith('.gpx') ? <Route className="h-3.5 w-3.5 text-emerald-500" /> : <FileText className="h-3.5 w-3.5 text-primary" />}
-                  <span className="max-w-[240px] truncate">{file.name}</span>
-                </span>
-              ))}
-              {links.map((link) => {
-                const brandInfo = getLinkIconAndBrand(link);
-                const Icon = brandInfo.icon;
-                return (
-                  <span key={link} className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${brandInfo.color}`}>
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className="max-w-[280px] truncate">{brandInfo.brand}: {link}</span>
+          <div className="space-y-4">
+            <div className="space-y-2 rounded-lg bg-muted/40 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-primary" />
+                Załadowane źródła w projekcie
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {uploadedFiles.map((file, index) => (
+                  <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground border">
+                    {file.name.endsWith('.gpx') ? <Route className="h-3.5 w-3.5 text-emerald-500" /> : <FileText className="h-3.5 w-3.5 text-primary" />}
+                    <span className="max-w-[240px] truncate">{file.name}</span>
                   </span>
-                );
-              })}
+                ))}
+                {links.map((link) => {
+                  const brandInfo = getLinkIconAndBrand(link);
+                  const Icon = brandInfo.icon;
+                  return (
+                    <span key={link} className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${brandInfo.color}`}>
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="max-w-[280px] truncate">{brandInfo.brand}: {link}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button 
+                onClick={onContinue} 
+                size="lg"
+                className="w-full sm:w-auto gap-2 shadow-lg shadow-primary/20"
+              >
+                Zatwierdź materiały i kontynuuj <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         )}

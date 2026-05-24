@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAtlasApi } from './useAtlasApi';
 import { Project } from '@/features/creator/types/creator.types';
 import { toast } from 'sonner';
@@ -8,7 +8,7 @@ export function useAtlasProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
       const data = await invokeAtlas('list_projects', { limit: 100 }) as { projects?: Project[] };
@@ -22,9 +22,9 @@ export function useAtlasProjects() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [invokeAtlas]);
 
-  const createProject = async (params: { topic: string, category: string, region: string, language: string }) => {
+  const createProject = useCallback(async (params: { topic: string, category: string, region: string, language: string }) => {
     try {
       const data = await invokeAtlas('create_project', params) as { project: Project };
       await fetchProjects();
@@ -34,9 +34,9 @@ export function useAtlasProjects() {
       toast.error('Błąd podczas tworzenia projektu: ' + (err as Error).message);
       throw err;
     }
-  };
+  }, [invokeAtlas, fetchProjects]);
 
-  const deleteProject = async (slug: string) => {
+  const deleteProject = useCallback(async (slug: string) => {
     try {
       await invokeAtlas('delete_project', { slug });
       await fetchProjects();
@@ -45,7 +45,7 @@ export function useAtlasProjects() {
       console.error(err);
       toast.error('Błąd podczas usuwania projektu: ' + (err as Error).message);
     }
-  };
+  }, [invokeAtlas, fetchProjects]);
 
   return {
     projects,

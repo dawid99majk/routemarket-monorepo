@@ -6,79 +6,86 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
-const MODEL = "gemini-2.5-flash";
-const URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const MODEL = Deno.env.get("GEMINI_INTERVIEW_MODEL") ?? Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash-lite";
+const URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY ?? "")}`;
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { context, answers, last_message, youtube_url } = await req.json();
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured.");
 
-    const prompt = `Jesteś Atlas Interviewerem — elitarnym architektem wypraw i ekspertem planowania optymalnych tras podróżniczych. Twoim kluczowym zadaniem jest przeprowadzenie pogłębionego, w 100% spersonalizowanego "wywiadu" z twórcą trasy, aby zebrać precyzyjne dane do budowy doskonałego planu wyprawy.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
-KONTEKST WYPRAWY (Co już wiemy od użytkownika):
-- Temat/Nazwa trasy: ${context?.topic || "Nie określono"}
-- Kategoria/Środek transportu: ${context?.category || "Nie określono"}
-- Region geograficzny: ${context?.region || "Nie określono"}
-- Oryginalne notatki i materiały twórcy:
-"""
-${context?.notes || "Brak dodatkowych notatek"}
-"""
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userRes, error: userErr } = await supabaseAuth.auth.getUser();
+    if (userErr || !userRes.user) return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: corsHeaders });
 
-KROKI WYWIADU I DOTYCHCZASOWE ODPOWIEDZI:
+    const userId = userRes.user.id;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", ["admin", "creator"]);
+
+    if (!roles || roles.length === 0) {
+      return new Response(JSON.stringify({ error: "Unauthorized: admin or creator role required" }), { status: 403, headers: corsHeaders });
+    }
+
+    const { context, answers, youtube_url } = await req.json();
+
+    // Limits
+    if (context?.notes?.length > 20000) throw new Error("Notes too long.");
+    if (JSON.stringify(answers || []).length > 10000) throw new Error("Interview history too long.");
+    if (youtube_url?.length > 500) throw new Error("URL too long.");
+
+    const prompt = `Jesteś Atlas Interviewerem. Twoim celem jest szybki wywiad (decyzje, nie rozmowa).
+Działaj jak kreator: krótkie pytania, konkretne opcje.
+
+KONTEKST:
+- Temat: ${context?.topic || "Nie określono"}
+- Kategoria: ${context?.category || "Nie określono"}
+- Region: ${context?.region || "Nie określono"}
+- Notatki: ${context?.notes || "Brak"}
+
+HISTORIA ODPOWIEDZI:
 ${JSON.stringify(answers || [])}
 
-${youtube_url ? `DODATKOWE MATERIAŁY (Link YouTube z transkrypcją/kontekstem): ${youtube_url}` : ""}
+ZASADY:
+1. Pytanie: MAKSYMALNIE 120 znaków.
+2. Opis pomocniczy (hint): MAKSYMALNIE 1 krótkie zdanie.
+3. Opcje: MAKSYMALNIE 4, każda MAKSYMALNIE 3-5 słów.
+4. Styl: Zero marketingu, zero "premium", techniczny i konkretny.
+5. Progresja: Najpierw najważniejsze (styl, trudność, tempo, logistyka).
+6. Jeśli masz komplet danych albo użytkownik odpowiedział na 4+ pytań, ustaw status "proposal".
+7. Propozycje: Tytuł, 2 zdania opisu, 3 krótkie wyróżniki (maks 4 słowa każdy).
 
-KRYTYCZNE ZASADY I BEZWZGLĘDNE WYMAGANIA:
+BANK PYTAŃ (Inspiracja):
+- Motocykl: Styl jazdy? Drogi? Czas dziennie? Co omijać?
+- Rower: Nawierzchnia? Tempo? Przewyższenia? Logistyka?
+- Trekking: Dni? Trudność? Nocleg? Waga bagażu?
 
-1. GŁĘBOKA PERSONALIZACJA (Pokaż, że znasz szczegóły):
-   - W KAŻDYM pytaniu nawiąż bezpośrednio do informacji podanych przez użytkownika w "Oryginalnych notatkach" lub dotychczasowych odpowiedziach (np. "Wspomniałeś o trekkingu w Dolomitach ze startem w Cortinie. Czy...", "Skoro planujesz spanie pod namiotem w rejonie...").
-   - Język musi być profesjonalny, pełen pasji i dostosowany do danej aktywności (używaj pojęć branżowych jak: via ferrata, bivouac, przewyższenie, singletrack, szuter, offroad, winiety itp. w zależności od profilu wyprawy).
-
-2. ZERO REDUNDANCJI (Zakaz powtarzania pytań i pytań o rzeczy już podane):
-   - Dokładnie przeanalizuj "Oryginalne notatki i materiały twórcy". Jeśli użytkownik napisał tam np., że śpi wyłącznie w schroniskach (rifugio) i ma już rezerwacje, ALBO że jedzie sam, ALBO że trasa potrwa dokładnie 5 dni — ABSOLUTNIE NIE zadawaj pytania o styl noclegu, liczbę uczestników czy czas trwania!
-   - Zamiast tego przejdź do innych szczegółów technicznych (np. "Skoro noclegi w schroniskach masz już zarezerwowane, czy planujesz trasę z lekkim plecakiem jednodniowym, czy niesiesz pełen ekwipunek górski?").
-
-3. RYGORSTYCZNE DOSTOSOWANIE DO KATEGORII AKTYWNOŚCI:
-    Przeanalizuj kategorię wyprawy (${context?.category}) oraz treść notatek, aby zdefiniować styl podróżowania. Stosuj poniższe wykluczenia i reguły:
-
-    A) MOTOCYKL SZOSOWY (Scenic Asphalt, Asfalt Touring, tylko drogi utwardzone):
-       - Skup się wyłącznie na: jakości asfaltu, sekwencjach krętych zakrętów, punktach widokowych, bezpiecznych parkingach, stacjach paliw oraz restauracjach/kawiarniach motocyklowych przy trasie.
-       - !!! BEZWZGLĘDNY ZAKAZ !!! proponowania jakichkolwiek odcinków szutrowych, leśnych czy off-road. Trasa musi być w 100% asfaltowa.
-
-    B) ROWER (Dwa warianty do wyboru: Szosa/Asfalt lub Gravel/MTB):
-       - Doprecyzuj wariant: czy użytkownik preferuje gładkie asfalty i szybką szosę (skup się na punktach serwisowych, niskim natężeniu ruchu aut), czy woli szuter, leśne dukty i bezdroża dla Gravel/MTB (skup się na wiatach, leśnych ścieżkach, trudności zjazdów/podjazdów i bezpieczeństwie w terenie).
-
-    C) TREKKING (Wycieczki piesze od krótkich 1-dniowych po długie, 14-dniowe wyprawy):
-       - Skup się na: czasie trwania (krótki 1 dzień vs wyprawa 2-4 dni vs długa ekspedycja do 14 dni), bezpieczeństwie górskim, schroniskach (baza noclegowa), punktach poboru wody pitnej, miejscach do biwakowania/bivouac i dziennych etapach marszu (przewyższenia, dystans).
-       - !!! BEZWZGLĘDNY ZAKAZ !!! zadawania pytań o paliwo, winiety drogowe, parkingi na trasie pieszej czy typ opon motocyklowych.
-
-4. FORMAT I STRUKTURA ODPOWIEDZI:
-   - Wygeneruj pytanie z precyzyjnie sformułowanymi 3-4 opcjami wyboru (przyciskami), które są głęboko powiązane z tematem wyprawy.
-   - Każda opcja musi być krótka, wyrazista i mieć przypisaną ikonę Lucide odpowiadającą jej znaczeniu.
-
-5. PROPOZYCJE TRASY (Zakończenie wywiadu):
-   - Przeprowadź wywiad składający się z maksymalnie 4-5 pytań (chyba że notatki są tak wyczerpujące, że możesz to zrobić wcześniej).
-   - Gdy masz pełny obraz (status "proposal"), zaoferuj użytkownikowi dwie kontrastujące, niezwykle atrakcyjne alternatywy trasy:
-     - Opcja A: Klasyczna, optymalna, sprawdzona, oparta o najbardziej widowiskowe punkty i pewne punkty noclegowe/logistyczne.
-     - Opcja B: Przygodowa, bardziej wymagająca, "off-the-beaten-track", stawiająca na dzikość, alternatywne podejścia lub ekstremalne przeżycia.
-     - Opisy propozycji muszą brzmieć luksusowo i pasjonująco.
-
-ZWRÓĆ WYŁĄCZNIE CZYSTY I POPRAWNY JSON:
+FORMAT JSON:
 {
   "status": "interviewing" | "proposal",
-  "question": "Treść spersonalizowanego pytania (lub wstęp do propozycji przy statusie 'proposal')",
+  "question": "Krótkie pytanie",
+  "hint": "Krótka podpowiedź pomocnicza",
   "options": [
-    { "label": "Etykieta przycisku", "value": "wartosc_techniczna", "icon": "ikona-lucide (np. Mountain, Compass, Tent, Bike, Car, ShieldAlert)" }
+    { "label": "Etykieta", "value": "kod", "icon": "LucideIcon" }
   ],
   "proposals": [
-    { "id": "A", "title": "Tytuł Opcji A", "description": "Szczegółowy, inspirujący opis Opcji A, wprost odwołujący się do notatek i preferencji", "highlights": ["Wyróżnik 1", "Wyróżnik 2", "Wyróżnik 3"] },
-    { "id": "B", "title": "Tytuł Opcji B", "description": "Szczegółowy, pociągający opis Opcji B (alternatywnej / dzikiej)", "highlights": ["Wyróżnik 1", "Wyróżnik 2", "Wyróżnik 3"] }
+    { "id": "A", "title": "Tytuł", "description": "Opis 2 zdania", "highlights": ["h1", "h2", "h3"] }
   ],
-  "summary": "Podsumowanie postępu, np. 'Pytanie 2 z 4' lub 'Propozycje tras'"
+  "summary": "Pytanie X/5"
 }`;
 
     const resp = await fetch(URL, {
@@ -86,13 +93,33 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY I POPRAWNY JSON:
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+        generationConfig: { temperature: 0.4, responseMimeType: "application/json" }
       }),
     });
 
     if (!resp.ok) throw new Error(`Gemini failed: ${await resp.text()}`);
     const data = await resp.json();
     const result = JSON.parse(data.candidates[0].content.parts[0].text);
+
+    // SERVER-SIDE VALIDATION & TRUNCATION
+    if (result.status === "interviewing") {
+      if (result.question) result.question = result.question.substring(0, 140);
+      if (result.hint) result.hint = result.hint.substring(0, 160);
+      if (result.options) {
+        result.options = result.options.slice(0, 4).map((o: any) => ({
+          ...o,
+          label: o.label.substring(0, 32)
+        }));
+      }
+      // Force proposal if too many answers
+      if ((answers || []).length >= 5) {
+        result.status = "proposal";
+        result.question = "Wybierz jeden z przygotowanych wariantów:";
+      }
+    }
+    if (result.status === "proposal" && (!Array.isArray(result.proposals) || result.proposals.length === 0)) {
+      result.proposals = buildFallbackProposals(context, answers || []);
+    }
 
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -106,3 +133,17 @@ ZWRÓĆ WYŁĄCZNIE CZYSTY I POPRAWNY JSON:
     });
   }
 });
+
+function buildFallbackProposals(context: any, answers: Array<{ q: string; a: string }>) {
+  const topic = context?.topic || "Nowa trasa";
+  const region = context?.region || "wybrany region";
+  const highlights = answers.slice(-3).map((item) => String(item.a).slice(0, 32));
+  return [
+    {
+      id: "A",
+      title: `${topic}: wariant główny`,
+      description: `Trasa w regionie ${region}, oparta na dotychczasowych odpowiedziach. Atlas przejdzie teraz do konspektu i GPX.`,
+      highlights: highlights.length ? highlights : ["spójny plan", "krótki wywiad", "gotowe założenia"]
+    }
+  ];
+}

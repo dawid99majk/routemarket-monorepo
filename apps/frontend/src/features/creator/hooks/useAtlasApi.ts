@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
+import { useCallback } from 'react';
 
 export function useAtlasApi() {
-  const invokeAtlas = async (action: string, input?: Record<string, unknown>) => {
+  const invokeAtlas = useCallback(async (action: string, input?: Record<string, unknown>) => {
     try {
       const { data, error } = await supabase.functions.invoke('atlas-admin', {
         body: { action, input },
@@ -33,7 +34,7 @@ export function useAtlasApi() {
       console.error('invokeAtlas error:', err);
       throw err;
     }
-  };
+  }, []);
 
   return { invokeAtlas };
 }

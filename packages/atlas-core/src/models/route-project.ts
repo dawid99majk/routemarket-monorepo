@@ -3,6 +3,8 @@ import { z } from "zod";
 export const ProjectStatusSchema = z.enum([
   "research_needed",
   "sources_collected",
+  "running",
+  "paused",
   "draft_generated",
   "ready_for_review",
   "changes_requested",
@@ -24,6 +26,7 @@ export const RouteProjectSchema = z.object({
   language: z.string().min(2),
   status: ProjectStatusSchema,
   folderPath: z.string().min(1),
+  ownerUserId: z.string().optional(),
   routemarketRouteId: z.number().optional(),
   createdAt: z.string(),
   updatedAt: z.string()

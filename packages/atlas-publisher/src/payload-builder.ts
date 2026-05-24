@@ -1,14 +1,14 @@
 import { access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import type { Poi, Recommendation, RouteProject, RouteTip, Claim } from "../../atlas-core/src/index.js";
+import type { Poi, Recommendation, ProjectRepository, RouteProject, RouteTip, Claim } from "../../atlas-core/src/index.js";
 import { readJsonFile } from "../../atlas-core/src/index.js";
 import { getRouteMarketCategoryId } from "./category-mapping.js";
 import type { PreparedRouteMarketDraft, RouteMarketDraftPayload } from "./types.js";
 import { hashImportantArtifacts } from "../../atlas-workflow/src/artifact-hashes.js";
 import { buildImportReadiness } from "../../atlas-workflow/src/import-readiness.js";
 
-export async function prepareRouteMarketDraft(project: RouteProject): Promise<PreparedRouteMarketDraft> {
+export async function prepareRouteMarketDraft(project: RouteProject, repository?: ProjectRepository): Promise<PreparedRouteMarketDraft> {
   const guidePath = join(project.folderPath, "guide.md");
   const routeSummaryPath = join(project.folderPath, "route_summary.json");
   const tipsPath = join(project.folderPath, "tips.json");
@@ -19,22 +19,22 @@ export async function prepareRouteMarketDraft(project: RouteProject): Promise<Pr
   const approvalsPath = join(project.folderPath, "approvals.json");
 
   const { checkQualityGates, QualityGateError } = await import("../../atlas-workflow/src/quality-gates.js");
-  const issues = await checkQualityGates(project);
+  const issues = await checkQualityGates(project, repository);
   if (issues.length > 0) {
     throw new QualityGateError(issues);
   }
 
   const claimsPath = join(project.folderPath, "claims.json");
-  const claims = await readOptionalJson<Claim[]>(claimsPath, []);
+  const claims = repository ? await repository.loadClaims(project.id) : await readOptionalJson<Claim[]>(claimsPath, []);
   const allVerified = claims.length > 0 && claims.every(c => c.status === "verified" || c.id.startsWith("claim_tech_"));
 
-  const description = await readOptionalText(guidePath);
-  const routeSummary = await readOptionalJson<any>(routeSummaryPath);
-  const tips = await readOptionalJson<RouteTip[]>(tipsPath, []);
-  const pois = await readPoisFromGeoJson(poisPath);
-  const recommendations = await readOptionalJson<Recommendation[]>(recommendationsPath, []);
-  const mediaManifest = await readOptionalJson<any>(mediaPath, undefined);
-  const sourceArtifactHashes = await hashImportantArtifacts(project);
+  const description = repository ? await readOptionalProjectText(repository, project.id, "guide.md") : await readOptionalText(guidePath);
+  const routeSummary = repository ? await repository.loadSummary(project.id) : await readOptionalJson<any>(routeSummaryPath);
+  const tips = repository ? await readOptionalProjectJson<RouteTip[]>(repository, project.id, "tips.json", []) : await readOptionalJson<RouteTip[]>(tipsPath, []);
+  const pois = repository ? await readPoisFromRepository(repository, project.id) : await readPoisFromGeoJson(poisPath);
+  const recommendations = repository ? await readOptionalProjectJson<Recommendation[]>(repository, project.id, "recommendations.json", []) : await readOptionalJson<Recommendation[]>(recommendationsPath, []);
+  const mediaManifest = repository ? await readOptionalProjectJson<any>(repository, project.id, "media/manifest.json", undefined) : await readOptionalJson<any>(mediaPath, undefined);
+  const sourceArtifactHashes = await hashImportantArtifacts(project, repository);
   const generatedAt = new Date().toISOString();
   const payloadId = createHash("sha256")
     .update(`${project.slug}:${generatedAt}:${JSON.stringify(sourceArtifactHashes)}`)
@@ -44,7 +44,8 @@ export async function prepareRouteMarketDraft(project: RouteProject): Promise<Pr
   const importReadiness = await buildImportReadiness({
     project,
     qualityIssues: issues,
-    payloadPath
+    payloadPath,
+    repository
   });
 
   const draft: RouteMarketDraftPayload = {
@@ -109,11 +110,16 @@ export async function prepareRouteMarketDraft(project: RouteProject): Promise<Pr
     }
   };
 
-  if (await exists(gpxPath)) {
+  if (repository ? await repository.exists(project.id, "route.gpx") : await exists(gpxPath)) {
     prepared.gpx = { path: gpxPath, attachMode: "gpx_xml" };
   }
 
-  await writeFile(payloadPath, `${JSON.stringify(prepared, null, 2)}\n`, "utf8");
+  const payloadContent = `${JSON.stringify(prepared, null, 2)}\n`;
+  if (repository) {
+    await repository.writeProjectFile(project.id, "routemarket_payload.json", payloadContent);
+  } else {
+    await writeFile(payloadPath, payloadContent, "utf8");
+  }
   return prepared;
 }
 
@@ -201,6 +207,60 @@ async function readPoisFromGeoJson(path: string): Promise<Poi[]> {
     }
 
   return pois;
+}
+
+async function readPoisFromRepository(repository: ProjectRepository, slug: string): Promise<Poi[]> {
+  try {
+    const content = await repository.readProjectFile(slug, "poi.geojson");
+    const geojson = JSON.parse(content) as { features?: Array<Record<string, unknown>> };
+    const pois: Poi[] = [];
+    for (const [index, feature] of (geojson.features ?? []).entries()) {
+      const geometry = feature.geometry as { coordinates?: number[] } | undefined;
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const coordinates = geometry?.coordinates;
+      if (!coordinates || coordinates.length < 2 || !props.name) continue;
+      pois.push({
+        id: optionalString(props.id) ?? `poi_${String(index + 1).padStart(3, "0")}`,
+        name: String(props.name),
+        type: normalizePoiType(props.type),
+        lat: Number(coordinates[1]),
+        lng: Number(coordinates[0]),
+        description: optionalString(props.description),
+        funFact: optionalString(props.fun_fact ?? props.funFact),
+        sortOrder: index,
+        contactPhone: optionalString(props.contactPhone ?? props.contact_phone),
+        contactEmail: optionalString(props.contactEmail ?? props.contact_email),
+        website: optionalString(props.website),
+        priceRange: optionalString(props.priceRange ?? props.price_range),
+        openingHours: optionalString(props.openingHours ?? props.opening_hours),
+        waterAvailability: ["unknown", "available", "seasonal", "none"].includes(String(props.waterAvailability ?? props.water_availability))
+          ? (props.waterAvailability ?? props.water_availability) as Poi["waterAvailability"]
+          : undefined,
+        facilities: Array.isArray(props.facilities) ? props.facilities.map(String) : undefined,
+        isVerifiedByDeepResearch: typeof props.isVerifiedByDeepResearch === "boolean" ? props.isVerifiedByDeepResearch : typeof props.is_verified_by_deep_research === "boolean" ? props.is_verified_by_deep_research : undefined,
+        status: (props.status as any) || "confirmed"
+      });
+    }
+    return pois;
+  } catch {
+    return [];
+  }
+}
+
+async function readOptionalProjectText(repository: ProjectRepository, slug: string, file: string): Promise<string | undefined> {
+  try {
+    return await repository.readProjectFile(slug, file);
+  } catch {
+    return undefined;
+  }
+}
+
+async function readOptionalProjectJson<T>(repository: ProjectRepository, slug: string, file: string, fallback: T): Promise<T> {
+  try {
+    return JSON.parse(await repository.readProjectFile(slug, file)) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 async function readOptionalText(path: string): Promise<string | undefined> {

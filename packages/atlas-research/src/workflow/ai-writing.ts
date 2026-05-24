@@ -9,7 +9,7 @@ export async function generateAiConcept(input: {
   apiKey: string;
   model?: string;
 }): Promise<string> {
-  const model = input.model ?? "gemini-3.5-flash";
+  const model = input.model ?? "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${input.apiKey}`;
 
   const prompt = `Jesteś RouteMaster AI, elitarnym architektem wypraw w systemie Atlas. 
@@ -90,7 +90,7 @@ export async function generateAiGpx(input: {
   apiKey: string;
   model?: string;
 }): Promise<string> {
-  const model = input.model ?? "gemini-3.5-flash";
+  const model = input.model ?? "gemini-2.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${input.apiKey}`;
 
   const prompt = `Jesteś RouteMarket Atlas GIS Specialist. Twoim zadaniem jest wygenerowanie poprawnego pliku GPX XML dla trasy na podstawie danych badawczych.

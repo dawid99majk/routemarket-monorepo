@@ -32,7 +32,7 @@ export async function generateGuideDraft(input: GenerateGuideDraftInput): Promis
 }
 
 async function generateAiGuide(input: GenerateGuideDraftInput, apiKey: string): Promise<string> {
-  const model = input.model ?? "gemini-2.5-flash";
+  const model = input.model ?? "gemini-3.5-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const sourceContext = (input.sources ?? []).map(s => `- ${s.title}: ${s.url}`).join("\n");

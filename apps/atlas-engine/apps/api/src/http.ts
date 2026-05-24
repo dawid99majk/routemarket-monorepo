@@ -110,7 +110,7 @@ export function createAtlasApiServer(options: AtlasApiOptions): Server {
     try {
       if (apiToken && !matchedRoute.public) assertAuthorized(req, apiToken);
       if (matchedRoute.params.slug) validateSlug(matchedRoute.params.slug);
-      
+
       const result = await matchedRoute.handler({
         req,
         res,
@@ -194,15 +194,29 @@ function createRoutes(): Route[] {
       const body = SubmitReviewDecisionBodySchema.parse(await readJson(req));
       return service.submitReviewDecision(params.slug, body);
     }),
-    route("POST", "/projects/:slug/approvals/:stage", async ({ req, params, service }) => {
+    route("POST", "/projects/:slug/approvals/:stage", async ({ req, params, service, jobs }) => {
       validateApprovalStage(params.stage);
       const body = SubmitStageApprovalBodySchema.parse(await readJson(req));
       await service.approveStage(params.slug, params.stage, body.decision, body.notes, body.reviewer);
-      return { stage: params.stage, decision: body.decision };
+      const waitingJob = jobs.list().find((job) =>
+        job.projectSlug === params.slug &&
+        job.status === "waiting_for_approval" &&
+        (job.waitingForStage === params.stage || job.currentStep === params.stage || job.pendingApprovalContext?.stage === params.stage)
+      );
+
+      if (body.decision === "approved" && waitingJob) {
+        const nextStep = nextStepAfterApprovalStage(params.stage);
+        jobs.resume(waitingJob.id, { stage: params.stage, decision: body.decision }, (update) =>
+          service.runMvp2WithProgress(params.slug, update, nextStep)
+        );
+        return { stage: params.stage, decision: body.decision, jobId: waitingJob.id, resumed: true };
+      }
+
+      return { stage: params.stage, decision: body.decision, resumed: false };
     }),
     route("PATCH", "/projects/:slug/status", async ({ req, params, service }) => {
       const body = UpdateProjectStatusBodySchema.parse(await readJson(req));
-      return { project: await service.setProjectStatus(params.slug, body.status) };
+      return { project: await service.setProjectStatus(params.slug, body.status as any) };
     }),
     route("GET", "/projects/:slug/artifacts", async ({ params, service }) => service.listArtifacts(params.slug)),
     route("GET", "/projects/:slug/events", async ({ params, service }) => service.listEvents(params.slug)),
@@ -222,7 +236,7 @@ function createRoutes(): Route[] {
       };
     }),
     route("POST", "/projects/:slug/inputs/notes", async ({ req, params, service }) => {
-      const body = AddNoteBodySchema.parse(await readJson(req, 2_500_000)); // 2.5MB raw buffer limit for 2MB content string
+      const body = AddNoteBodySchema.parse(await readJson(req, 11_000_000)); // supports 10MB documents encoded as data URLs
       return service.addNoteText(params.slug, body);
     }),
     route("POST", "/projects/:slug/inputs/gpx", async ({ req, params, service }) => {
@@ -269,6 +283,9 @@ function createRoutes(): Route[] {
       return { job: jobs.start(`run-mvp2:${params.slug}`, (update) => service.runMvp2WithProgress(params.slug, update), params.slug) };
     }),
     route("GET", "/jobs", async ({ jobs }) => ({ jobs: jobs.list() })),
+    route("GET", "/projects/:slug/jobs", async ({ params, jobs }) => ({
+      jobs: jobs.list().filter((job) => job.projectSlug === params.slug)
+    })),
     route("GET", "/jobs/pending-approvals", async ({ jobs }) => ({
       jobs: jobs.list().filter(j => j.status === "waiting_for_approval")
     })),
@@ -308,7 +325,7 @@ function createRoutes(): Route[] {
       await service.approveStage(projectSlug, stage, "approved", "Approved through job resume endpoint.");
       const nextStep = nextStepMap[stage] ?? "input";
 
-      jobs.resume(params.id, body.approvalData, (update) => 
+      jobs.resume(params.id, body.approvalData, (update) =>
         service.runMvp2WithProgress(projectSlug, update, nextStep)
       );
 
@@ -337,7 +354,7 @@ function createRoutes(): Route[] {
       await service.approveStage(projectSlug, stage, "approved", "Approved through job resume endpoint.");
       const nextStep = nextStepMap[stage] ?? "input";
 
-      jobs.resume(params.id, body.approvalData, (update) => 
+      jobs.resume(params.id, body.approvalData, (update) =>
         service.runMvp2WithProgress(projectSlug, update, nextStep)
       );
 
@@ -411,6 +428,18 @@ function matchRoute(routes: Route[], method: string, pathname: string): (Route &
     return { ...routeDef, params };
   }
   return undefined;
+}
+
+function nextStepAfterApprovalStage(stage: string): string {
+  const map: Record<string, string> = {
+    gpx_summary_approval: "claims",
+    claims_approval: "pois",
+    poi_approval: "concept",
+    concept_approval: "guide_outline",
+    guide_outline_approval: "guide",
+    guide_final_approval: "finalize"
+  };
+  return map[stage] ?? "input";
 }
 
 async function readJson(req: IncomingMessage, maxBytes: number = 1_000_000): Promise<any> {
@@ -555,6 +584,7 @@ function apiManifest(authEnabled: boolean) {
       "POST /projects/:slug/deep-research",
       "POST /projects/:slug/run-mvp2",
       "POST /projects/:slug/jobs/run-mvp2",
+      "GET /projects/:slug/jobs",
       "GET /jobs/pending-approvals",
       "POST /jobs/:id/approve",
       "GET /api/jobs/pending-approvals",
@@ -576,6 +606,7 @@ function projectFiltersFromUrl(url: URL) {
   return {
     status: url.searchParams.get("status") ?? undefined,
     category: url.searchParams.get("category") ?? undefined,
+    ownerUserId: url.searchParams.get("ownerUserId") ?? undefined,
     q: url.searchParams.get("q") ?? undefined,
     limit: limit ? Number(limit) : undefined,
     offset: offset ? Number(offset) : undefined

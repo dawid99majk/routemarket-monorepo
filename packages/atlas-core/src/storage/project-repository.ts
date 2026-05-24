@@ -7,6 +7,7 @@ export type CreateProjectInput = {
   region?: string;
   language?: string;
   topicId?: string;
+  ownerUserId?: string;
 };
 
 export type ProjectEvent = {

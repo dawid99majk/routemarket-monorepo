@@ -6,9 +6,9 @@ RUN corepack enable
 FROM base AS build
 WORKDIR /usr/src/app
 COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store CI=true pnpm install --no-frozen-lockfile --ignore-scripts
 RUN pnpm --filter @routemarket/atlas-engine build
-RUN pnpm deploy --filter=@routemarket/atlas-engine --prod /app
+RUN pnpm deploy --filter=@routemarket/atlas-engine --prod /app --legacy
 
 FROM base AS runtime
 WORKDIR /app

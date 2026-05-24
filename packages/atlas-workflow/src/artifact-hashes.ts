@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { RouteProject } from "../../atlas-core/src/index.js";
+import type { ProjectRepository, RouteProject } from "../../atlas-core/src/index.js";
 
 export const approvalArtifactMap: Record<string, string[]> = {
   gpx_summary_approval: ["route_summary.json", "route_segments.json", "route_segments.geojson", "route_warnings.json"],
@@ -12,11 +12,13 @@ export const approvalArtifactMap: Record<string, string[]> = {
   guide_final_approval: ["guide.md"]
 };
 
-export async function hashProjectArtifacts(project: RouteProject, files: string[]): Promise<Record<string, string>> {
+export async function hashProjectArtifacts(project: RouteProject, files: string[], repository?: ProjectRepository): Promise<Record<string, string>> {
   const hashes: Record<string, string> = {};
   for (const file of files) {
     try {
-      const content = await readFile(join(project.folderPath, file), "utf8");
+      const content = repository
+        ? await repository.readProjectFile(project.id, file)
+        : await readFile(join(project.folderPath, file), "utf8");
       hashes[file] = createHash("sha256").update(canonicalContent(file, content)).digest("hex");
     } catch {
       hashes[file] = "missing";
@@ -38,9 +40,9 @@ function canonicalContent(file: string, content: string): string {
   }
 }
 
-export async function hashImportantArtifacts(project: RouteProject): Promise<Record<string, string>> {
+export async function hashImportantArtifacts(project: RouteProject, repository?: ProjectRepository): Promise<Record<string, string>> {
   const files = [...new Set(Object.values(approvalArtifactMap).flat())];
-  return hashProjectArtifacts(project, files);
+  return hashProjectArtifacts(project, files, repository);
 }
 
 export function findStaleApprovals(approvals: any, currentHashes: Record<string, string>): Array<{ stage: string; file: string }> {

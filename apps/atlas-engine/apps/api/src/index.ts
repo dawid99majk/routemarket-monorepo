@@ -13,7 +13,7 @@ const jobsDir = process.env.ATLAS_JOBS_DIR;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const repository = (supabaseUrl && supabaseKey)
-  ? new PostgresProjectRepository(supabaseUrl, supabaseKey)
+  ? new PostgresProjectRepository(supabaseUrl, supabaseKey, rootDir)
   : new FileProjectRepository(rootDir);
 
 const server = startAtlasApi({ rootDir, port, corsOrigin, apiToken, logRequests, maxJobs, jobsDir, repository });
@@ -21,7 +21,7 @@ const server = startAtlasApi({ rootDir, port, corsOrigin, apiToken, logRequests,
 const searchStatus = getSearchProviderStatus();
 const configuredSearch = searchStatus.providers.filter((p) => p.configured).map((p) => p.id).join(", ");
 console.log(`Atlas Search Providers: default=${searchStatus.defaultProvider}, configured=[${configuredSearch}]`);
-const deepResearchMode = process.env.GEMINI_API_KEY ? "gemini" : process.env.ANTHROPIC_API_KEY ? "anthropic" : "mock";
+const deepResearchMode = process.env.GEMINI_API_KEY ? "gemini" : "mock";
 console.log(`Atlas Deep Research Provider: ${deepResearchMode}`);
 
 if (process.env.NODE_ENV === "production") {

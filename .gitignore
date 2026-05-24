@@ -28,3 +28,14 @@ apps/atlas-engine/api.log
 
 # Git subdirectories (after migration)
 **/.git
+
+# Package build outputs (compiled JS files next to TS source)
+packages/**/*.js
+
+# Tarballs/archives
+*.tar.gz
+*.tgz
+
+# Data directory and debug scripts
+apps/atlas-engine/data/
+apps/frontend/inspect_*.js

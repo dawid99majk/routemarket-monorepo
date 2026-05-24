@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readFile, stat } from "node:fs/promises";
-import type { RouteProject, Source, Claim, RouteSummary } from "../../atlas-core/src/index.js";
+import type { ProjectRepository, RouteProject, Source, Claim, RouteSummary } from "../../atlas-core/src/index.js";
 import { readJsonFile } from "../../atlas-core/src/index.js";
 import { findStaleApprovals, hashImportantArtifacts } from "./artifact-hashes.js";
 
@@ -16,22 +16,31 @@ export class QualityGateError extends Error {
   }
 }
 
-export async function checkQualityGates(project: RouteProject): Promise<QualityIssue[]> {
+export async function checkQualityGates(project: RouteProject, repository?: ProjectRepository): Promise<QualityIssue[]> {
   const issues: QualityIssue[] = [];
   const pPath = (file: string) => join(project.folderPath, file);
-  
-  const fileExists = async (path: string) => {
+
+  const fileExists = async (file: string) => {
+    if (repository) return repository.exists(project.id, file);
     try {
-      await stat(path);
+      await stat(pPath(file));
       return true;
     } catch {
       return false;
     }
   };
 
+  const readText = async (file: string) => repository
+    ? repository.readProjectFile(project.id, file)
+    : readFile(pPath(file), "utf8");
+
+  const readJson = async <T>(file: string) => repository
+    ? JSON.parse(await repository.readProjectFile(project.id, file)) as T
+    : readJsonFile<T>(pPath(file));
+
   // 1 & 2: Sources
   try {
-    const sources = await readJsonFile<Source[]>(pPath("sources.json"));
+    const sources = await readJson<Source[]>("sources.json");
     if (sources.length < 3) {
       issues.push({ rule: "min_sources", message: `Not enough sources: ${sources.length}/3.` });
     }
@@ -45,8 +54,8 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
 
   // 3: POI 0,0
   try {
-    if (await fileExists(pPath("poi.geojson"))) {
-      const poiContent = await readFile(pPath("poi.geojson"), "utf8");
+    if (await fileExists("poi.geojson")) {
+      const poiContent = await readText("poi.geojson");
       const poiData = JSON.parse(poiContent);
       if (poiData.features) {
         const hasZeroZero = poiData.features.some((f: any) => {
@@ -64,8 +73,8 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
 
   // 4: Guide.md placeholders
   try {
-    if (await fileExists(pPath("guide.md"))) {
-      const guideContent = await readFile(pPath("guide.md"), "utf8");
+    if (await fileExists("guide.md")) {
+      const guideContent = await readText("guide.md");
       const lower = guideContent.toLowerCase();
       const phrases = [
         "needs validation",
@@ -97,13 +106,13 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
   }
 
   // 5: Quality report
-  if (!(await fileExists(pPath("quality_report.md")))) {
+  if (!(await fileExists("quality_report.md"))) {
     issues.push({ rule: "missing_quality_report", message: "quality_report.md is missing." });
   }
 
   // 6 & 7: Claims
   try {
-    const claims = await readJsonFile<Claim[]>(pPath("claims.json"));
+    const claims = await readJson<Claim[]>("claims.json");
     if (claims.length < 3) {
       issues.push({ rule: "min_claims", message: `Not enough claims: ${claims.length}/3.` });
     }
@@ -119,7 +128,7 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
 
   // 8: Route summary
   try {
-    const summary = await readJsonFile<RouteSummary>(pPath("route_summary.json"));
+    const summary = await readJson<RouteSummary>("route_summary.json");
     if (summary.validationStatus === "needs_validation") {
       issues.push({ rule: "summary_needs_validation", message: "route_summary.json status is marked as 'needs_validation'." });
     }
@@ -138,24 +147,24 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
   }
 
   let hasGpxInput = false;
-  if (await fileExists(pPath("route.gpx"))) hasGpxInput = true;
+  if (await fileExists("route.gpx")) hasGpxInput = true;
   try {
-    if (await fileExists(pPath("input/manifest.json"))) {
-      const manifest = await readJsonFile<any>(pPath("input/manifest.json"));
+    if (await fileExists("input_manifest.json")) {
+      const manifest = await readJson<any>("input_manifest.json");
       if (manifest?.items?.some((i: any) => i.type === "gpx")) {
         hasGpxInput = true;
       }
     }
   } catch {}
 
-  if (hasGpxInput && !(await fileExists(pPath("route_segments.geojson")))) {
+  if (hasGpxInput && !(await fileExists("route_segments.geojson"))) {
     issues.push({ rule: "missing_route_segments_geojson", message: "route_segments.geojson is required when GPX exists." });
   }
 
   // 9: Missing Inputs
-  if (await fileExists(pPath("missing_inputs.json"))) {
+  if (await fileExists("missing_inputs.json")) {
     try {
-      const missing = await readJsonFile<any>(pPath("missing_inputs.json"));
+      const missing = await readJson<any>("missing_inputs.json");
       if (missing.blocking && missing.missing.length > 0) {
         issues.push({ rule: "blocking_missing_inputs", message: `Project has ${missing.missing.length} blocking missing inputs.` });
       }
@@ -164,15 +173,15 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
 
   // 10: Approvals
   try {
-    if (await fileExists(pPath("approvals.json"))) {
-      const approvals = await readJsonFile<any>(pPath("approvals.json"));
+    if (await fileExists("approvals.json")) {
+      const approvals = await readJson<any>("approvals.json");
       const required = ["gpx_summary_approval", "claims_approval", "poi_approval", "concept_approval", "guide_outline_approval", "guide_final_approval"];
       for (const r of required) {
         if (!approvals.approvals.some((a: any) => a.stage === r && a.decision === "approved")) {
           issues.push({ rule: `missing_approval_${r}`, message: `Required approval missing: ${r}` });
         }
       }
-      const stale = findStaleApprovals(approvals, await hashImportantArtifacts(project));
+      const stale = findStaleApprovals(approvals, await hashImportantArtifacts(project, repository));
       for (const item of stale) {
         issues.push({ rule: `stale_approval_${item.stage}`, message: `Approval ${item.stage} is stale because ${item.file} changed.` });
       }
@@ -182,7 +191,7 @@ export async function checkQualityGates(project: RouteProject): Promise<QualityI
   } catch {}
 
   try {
-    const description = await readFile(pPath("guide.md"), "utf8");
+    const description = await readText("guide.md");
     if (description.trim().length < 500) {
       issues.push({ rule: "description_too_short", message: "Payload description/guide is too short for RouteMarket publish preparation." });
     }

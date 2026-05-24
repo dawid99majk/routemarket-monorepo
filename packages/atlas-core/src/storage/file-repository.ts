@@ -49,6 +49,7 @@ export class FileProjectRepository implements ProjectRepository {
       language: input.language ?? "en",
       status: "research_needed",
       folderPath,
+      ownerUserId: input.ownerUserId,
       createdAt: now,
       updatedAt: now
     });
@@ -143,7 +144,7 @@ export class FileProjectRepository implements ProjectRepository {
   async loadClaims(slug: string): Promise<Claim[]> {
     const path = join(this.getProjectPath(slug), "claims.json");
     if (!(await exists(path))) return [];
-    return readJsonFileWithSchema<Claim[]>(path, z.array(ClaimSchema));
+    return readJsonFileWithSchema<Claim[]>(path, z.array(ClaimSchema) as any);
   }
 
   async saveClaims(slug: string, claims: Claim[]): Promise<void> {

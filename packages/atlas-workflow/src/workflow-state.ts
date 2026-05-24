@@ -37,7 +37,7 @@ export async function writeWorkflowState(project: RouteProject, patch: Partial<W
     projectId: project.id,
     updatedAt: new Date().toISOString(),
     completedSteps: patch.completedSteps ?? current.completedSteps,
-    artifactHashes: patch.artifactHashes ?? await hashImportantArtifacts(project)
+    artifactHashes: patch.artifactHashes ?? await hashImportantArtifacts(project, repository)
   };
   
   if (repository) {

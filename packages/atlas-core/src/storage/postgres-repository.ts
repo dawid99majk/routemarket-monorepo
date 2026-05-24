@@ -60,6 +60,7 @@ export class PostgresProjectRepository implements ProjectRepository {
       language: input.language ?? "en",
       status: "research_needed",
       folderPath: this.getProjectPath(slug),
+      ownerUserId: input.ownerUserId,
       createdAt: now,
       updatedAt: now
     });
@@ -93,6 +94,7 @@ export class PostgresProjectRepository implements ProjectRepository {
         isLoop: false,
         routeSegments: [],
         warnings: [],
+        dangerSections: [],
         updatedAt: now
       }),
       this.saveArtifact(slug, "media/manifest", { assets: [], updatedAt: now }),
@@ -171,7 +173,7 @@ export class PostgresProjectRepository implements ProjectRepository {
   }
 
   async loadClaims(slug: string): Promise<Claim[]> {
-    return this._loadArtifactInternal(slug, "claims", z.array(ClaimSchema), []);
+    return this._loadArtifactInternal(slug, "claims", z.array(ClaimSchema) as any, []);
   }
 
   async saveClaims(slug: string, claims: Claim[]): Promise<void> {
@@ -224,6 +226,14 @@ export class PostgresProjectRepository implements ProjectRepository {
 
   async saveEvents(slug: string, events: ProjectEvent[]): Promise<void> {
     await this.saveArtifact(slug, "events", events);
+  }
+
+  async loadPois(slug: string): Promise<any[]> {
+    return this._loadArtifactInternal(slug, "poi", z.array(z.any()), []);
+  }
+
+  async savePois(slug: string, pois: any[]): Promise<void> {
+    await this.saveArtifact(slug, "poi", pois);
   }
 
   async loadInputManifest(slug: string): Promise<InputManifest> {
