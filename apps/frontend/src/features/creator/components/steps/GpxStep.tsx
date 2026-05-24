@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,9 +10,11 @@ import {
   RefreshCw, 
   Compass, 
   CloudRain, 
-  Info 
+  Info,
+  AlertTriangle 
 } from 'lucide-react';
 import RouteTerrain3D from '@/components/RouteTerrain3D';
+import { parseGpx } from '@/lib/gpx-parser';
 
 interface GpxStepProps {
   gpxXml: string;
@@ -26,6 +28,30 @@ export function GpxStep({
   isProcessing
 }: GpxStepProps) {
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
+
+  // Parse GPX safely with useMemo
+  const { trackPoints, distance, elevation, error } = useMemo(() => {
+    try {
+      if (!gpxXml) {
+        throw new Error('Pusty plik GPX.');
+      }
+      const parsed = parseGpx(gpxXml);
+      return {
+        trackPoints: parsed.trackPoints,
+        distance: parsed.distance_km,
+        elevation: parsed.elevation_gain_m,
+        error: null
+      };
+    } catch (err) {
+      console.error('Błąd parsowania GPX w GpxStep:', err);
+      return {
+        trackPoints: [] as [number, number][],
+        distance: null,
+        elevation: null,
+        error: err instanceof Error ? err.message : 'Niepoprawny format pliku GPX'
+      };
+    }
+  }, [gpxXml]);
 
   return (
     <div className="space-y-6">
@@ -41,7 +67,7 @@ export function GpxStep({
                 Zweryfikuj przebieg trasy wygenerowany przez AI na podstawie Twoich materiałów.
               </p>
             </div>
-            <Button onClick={onApprove} disabled={isProcessing} className="gap-2">
+            <Button onClick={onApprove} disabled={isProcessing || !!error} className="gap-2">
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Zatwierdź przebieg trasy
             </Button>
@@ -54,6 +80,7 @@ export function GpxStep({
                   size="sm" 
                   variant={viewMode === '3d' ? 'default' : 'secondary'} 
                   onClick={() => setViewMode('3d')}
+                  disabled={!!error}
                 >
                   Widok 3D
                 </Button>
@@ -61,13 +88,20 @@ export function GpxStep({
                   size="sm" 
                   variant={viewMode === '2d' ? 'default' : 'secondary'} 
                   onClick={() => setViewMode('2d')}
+                  disabled={!!error}
                 >
                   Widok 2D
                 </Button>
               </div>
               
-              {viewMode === '3d' ? (
-                <RouteTerrain3D gpxData={gpxXml} />
+              {error ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                  <AlertTriangle className="w-8 h-8 text-amber-500 mb-2 animate-pulse" />
+                  <p className="font-semibold text-foreground text-sm">Nie udało się wyświetlić mapy 3D</p>
+                  <p className="text-xs max-w-md mt-1">{error}</p>
+                </div>
+              ) : viewMode === '3d' ? (
+                <RouteTerrain3D track={trackPoints} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   Widok 2D w przygotowaniu...
@@ -84,11 +118,15 @@ export function GpxStep({
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-2 rounded bg-muted/50 border">
                     <span className="text-muted-foreground block mb-1">Dystans</span>
-                    <span className="font-mono font-bold text-base text-foreground">-- km</span>
+                    <span className="font-mono font-bold text-base text-foreground">
+                      {distance !== null ? `${distance} km` : '--'}
+                    </span>
                   </div>
                   <div className="p-2 rounded bg-muted/50 border">
                     <span className="text-muted-foreground block mb-1">Przewyższenie</span>
-                    <span className="font-mono font-bold text-base text-foreground">-- m</span>
+                    <span className="font-mono font-bold text-base text-foreground">
+                      {elevation !== null ? `${elevation} m` : '--'}
+                    </span>
                   </div>
                 </div>
               </div>
