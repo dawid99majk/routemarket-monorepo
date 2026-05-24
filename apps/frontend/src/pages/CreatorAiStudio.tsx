@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfileBalance } from '@/hooks/use-profile-balance';
 import { TopUpModal } from '@/components/ui/TopUpModal';
-import { Sparkles, Loader2, Files } from 'lucide-react';
+import { Sparkles, Loader2, Files, Map, RefreshCw, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -64,6 +64,22 @@ export default function CreatorAiStudio() {
 
   const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasWorkflow();
   const { uploading, links, addLink, uploadedFiles, uploadFiles, saveNotes, saveNamedNote, saveProjectFile } = useAtlasFiles(activeSlug);
+
+  const gpxFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGpxUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const toastId = toast.loading('Przesyłanie i analizowanie śladu GPX...');
+    try {
+      await uploadFiles(files);
+      await fetchWorkspace();
+      toast.success('Ślad GPX został pomyślnie wgrany i zaimportowany!', { id: toastId });
+    } catch (err) {
+      console.error(err);
+      toast.error('Błąd wgrywania GPX: ' + (err as Error).message, { id: toastId });
+    }
+  };
 
   // Helper to generate GPX XML from coordinate points
   const generateGpxXml = (points: Array<{ lat: number; lng: number; ele?: number }>, title: string): string => {
@@ -414,16 +430,66 @@ ${trkpts}
                           isProcessing={pipelineRunning}
                         />
                       ) : (
-                        <Card className="p-12 text-center flex flex-col items-center justify-center space-y-4">
-                          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
-                          <div className="space-y-1">
-                            <h3 className="font-bold text-lg">Przygotowywanie śladu GPX...</h3>
-                            <p className="text-sm text-muted-foreground">Silnik AI generuje mapę Twojej trasy. Może to potrwać kilkanaście sekund.</p>
-                          </div>
-                          <Button variant="outline" onClick={fetchWorkspace} disabled={loadingDetails}>
-                            Sprawdź ponownie
-                          </Button>
-                        </Card>
+                        pipelineRunning ? (
+                          <Card className="p-12 text-center flex flex-col items-center justify-center space-y-4 border-primary/20 bg-primary/[0.01]">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary opacity-75" />
+                            <div className="space-y-1">
+                              <h3 className="font-bold text-lg">Przygotowywanie śladu GPX...</h3>
+                              <p className="text-sm text-muted-foreground">Silnik AI generuje mapę Twojej trasy. Może to potrwać kilkanaście sekund.</p>
+                            </div>
+                            <Button variant="outline" onClick={fetchWorkspace} disabled={loadingDetails}>
+                              Sprawdź ponownie
+                            </Button>
+                          </Card>
+                        ) : (
+                          <Card className="p-10 border-amber-500/20 bg-amber-500/[0.02] rounded-2xl relative overflow-hidden border">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+                            
+                            <div className="flex flex-col items-center justify-center text-center space-y-5 max-w-lg mx-auto">
+                              <div className="p-4 bg-amber-500/10 rounded-full text-amber-500 border border-amber-500/20 shadow-inner animate-pulse">
+                                <Map className="w-8 h-8" />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <h3 className="font-bold text-xl text-foreground">Brak śladu GPX w projekcie</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                  Wygląda na to, że wgrane materiały źródłowe nie zawierały wystarczająco precyzyjnych danych geograficznych, aby asystent AI mógł automatycznie wygenerować poprawny ślad trasy.
+                                </p>
+                                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                  Aby kontynuować i odblokować kolejne kroki (opisy, punkty POI i przewodnik), wgraj plik .gpx ze swojej trasy.
+                                </p>
+                              </div>
+
+                              <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+                                <input
+                                  type="file"
+                                  ref={gpxFileInputRef}
+                                  onChange={handleGpxUpload}
+                                  accept=".gpx"
+                                  className="hidden"
+                                />
+                                <Button 
+                                  onClick={() => gpxFileInputRef.current?.click()} 
+                                  className="gap-2 bg-gradient-to-r from-primary to-primary-hover shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                  disabled={uploading}
+                                >
+                                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Files className="w-4 h-4" />}
+                                  Wgraj plik GPX (.gpx)
+                                </Button>
+                                
+                                <Button 
+                                  variant="outline" 
+                                  onClick={fetchWorkspace} 
+                                  disabled={loadingDetails}
+                                  className="hover:bg-muted/40 transition-colors"
+                                >
+                                  {loadingDetails ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                  Sprawdź ponownie
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        )
                       )}
                     </div>
                   )}
