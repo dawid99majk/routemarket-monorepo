@@ -14,6 +14,7 @@ import {
   AlertTriangle 
 } from 'lucide-react';
 import RouteTerrain3D from '@/components/RouteTerrain3D';
+import RouteDetailMap from '@/components/RouteDetailMap';
 import { parseGpx } from '@/lib/gpx-parser';
 
 interface GpxStepProps {
@@ -74,13 +75,14 @@ export function GpxStep({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 aspect-video bg-muted rounded-xl overflow-hidden border relative">
+            <div className="lg:col-span-2 aspect-[16/10] min-h-[400px] bg-muted rounded-xl overflow-hidden border relative">
               <div className="absolute top-4 left-4 z-10 flex gap-2">
                 <Button 
                   size="sm" 
                   variant={viewMode === '3d' ? 'default' : 'secondary'} 
                   onClick={() => setViewMode('3d')}
                   disabled={!!error}
+                  className="shadow-md"
                 >
                   Widok 3D
                 </Button>
@@ -89,6 +91,7 @@ export function GpxStep({
                   variant={viewMode === '2d' ? 'default' : 'secondary'} 
                   onClick={() => setViewMode('2d')}
                   disabled={!!error}
+                  className="shadow-md"
                 >
                   Widok 2D
                 </Button>
@@ -103,9 +106,7 @@ export function GpxStep({
               ) : viewMode === '3d' ? (
                 <RouteTerrain3D track={trackPoints} />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                  Widok 2D w przygotowaniu...
-                </div>
+                <RouteDetailMap track={trackPoints} />
               )}
             </div>
 

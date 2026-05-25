@@ -53,10 +53,16 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
     const path = data.paths[0];
     const coordinates = path.points.coordinates as number[][];
     
-    const resultPoints: Waypoint[] = coordinates.map(coord => ({
-      lng: coord[0],
-      lat: coord[1]
-    }));
+    const resultPoints: Waypoint[] = coordinates.map(coord => {
+      const wp: Waypoint & { ele?: number } = {
+        lng: coord[0],
+        lat: coord[1]
+      };
+      if (coord.length > 2) {
+        wp.ele = coord[2];
+      }
+      return wp;
+    });
 
     return {
       points: resultPoints,

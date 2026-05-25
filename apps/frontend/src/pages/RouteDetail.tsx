@@ -1,14 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { useTranslation } from 'react-i18next';
-import SEO, { buildProductSchema, buildReviewSchema, buildBreadcrumbSchema } from '@/components/SEO';
-import { trackEvent } from '@/lib/analytics';
-import { isFeatureEnabled } from '@/lib/feature-flags';
-import { useQuery } from '@tanstack/react-query';
-import Logo from '@/components/Logo';
-import Footer from '@/components/Footer';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import SEO, { buildProductSchema, buildReviewSchema, buildBreadcrumbSchema } from '@/components/SEO';
 import { trackEvent } from '@/lib/analytics';
@@ -47,6 +37,7 @@ import { toast } from 'sonner';
 const RouteTerrain3D = lazy(() => import('@/components/RouteTerrain3D'));
 const RouteGlobe3D = lazy(() => import('@/components/RouteGlobe3D'));
 const RouteExplorerGlobe = lazy(() => import('@/components/RouteExplorerGlobe'));
+const RouteDetailMap = lazy(() => import('@/components/RouteDetailMap'));
 
 function useCreatorReliability(userId: string | undefined) {
   return useQuery({
@@ -220,7 +211,7 @@ export default function RouteDetail() {
   const [consentOpen, setConsentOpen] = useState(false);
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [globeOpen, setGlobeOpen] = useState(false);
-  const [spatialView, setSpatialView] = useState<'terrain' | 'globe'>('terrain');
+  const [spatialView, setSpatialView] = useState<'terrain' | 'globe' | '2d'>('2d');
 
   const routeId = id ? parseInt(id) : undefined;
   const { data: route, isLoading } = useRouteById(routeId);
@@ -475,6 +466,15 @@ export default function RouteDetail() {
     return items;
   })();
 
+  const renderRoute2D = (heightClass: string) => {
+    if (!hasTrackPreview) return null;
+    return (
+      <Suspense fallback={<div className={`w-full ${heightClass} bg-muted animate-pulse`} />}>
+        <RouteDetailMap track={route.preview_track!} className={heightClass} />
+      </Suspense>
+    );
+  };
+
   const renderRouteGlobe = (heightClass: string, badgeLabel: string) => {
     if (!hasMapLocation) return null;
 
@@ -646,56 +646,75 @@ export default function RouteDetail() {
                   <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                     <MapIcon className="w-4 h-4" /> {t('route_detail.location', 'Location')}
                   </h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSpatialView(hasTerrainPreview ? 'terrain' : 'globe');
-                      setGlobeOpen(true);
-                    }}
-                    className="min-h-[36px] gap-2"
-                  >
-                    <Expand className="h-3.5 w-3.5" />
-                    Open 3D
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant={spatialView === '2d' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSpatialView('2d')}
+                      className="h-8 text-[10px] uppercase font-bold tracking-tight px-3"
+                    >
+                      2D
+                    </Button>
+                    <Button
+                      variant={spatialView !== '2d' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSpatialView(hasTerrainPreview ? 'terrain' : 'globe');
+                        setGlobeOpen(true);
+                      }}
+                      className="h-8 text-[10px] uppercase font-bold tracking-tight px-3 gap-1.5"
+                    >
+                      <Expand className="h-3 w-3" />
+                      Open 3D
+                    </Button>
+                  </div>
                 </div>
                 <div className="overflow-hidden rounded-xl border border-border/80 glass-premium shadow-md">
                   <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Box className="h-4 w-4 text-primary" />
-                        Route Terrain 3D
+                        {spatialView === '2d' ? <MapIcon className="h-4 w-4 text-primary" /> : <Box className="h-4 w-4 text-primary" />}
+                        {spatialView === '2d' ? 'Interactive 2D Map' : 'Route Terrain 3D'}
                       </div>
                       <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                        {hasTerrainPreview ? terrainSummary : globeSummary}
+                        {spatialView === '2d' 
+                          ? 'Standard topographic view of the route and its surroundings.'
+                          : hasTerrainPreview ? terrainSummary : globeSummary}
                       </p>
                     </div>
                     <div className="hidden shrink-0 items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground md:inline-flex">
-                      <Box className="h-3.5 w-3.5" /> Preview
+                      {spatialView === '2d' ? <MapIcon className="h-3.5 w-3.5" /> : <Box className="h-3.5 w-3.5" />} Preview
                     </div>
                   </div>
                   <div className="relative">
-                    {hasTerrainPreview
-                      ? renderRouteTerrain('h-[250px] sm:h-[300px]')
-                      : renderRouteGlobe('h-[240px] sm:h-[280px]', 'Preview Globe')}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/55 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-4 py-4">
-                      <p className="max-w-md text-xs text-white/90 sm:text-sm">
-                        {hasTerrainPreview
-                          ? 'Inspect the route corridor in a local 3D view, then switch to the globe for wider context.'
-                          : 'Explore the route in a larger interactive globe view.'}
-                      </p>
-                      <Button
-                        onClick={() => {
-                          setSpatialView(hasTerrainPreview ? 'terrain' : 'globe');
-                          setGlobeOpen(true);
-                        }}
-                        className="shrink-0 gap-2 bg-background/95 text-foreground hover:bg-background"
-                      >
-                        <Expand className="h-4 w-4" />
-                        Open 3D
-                      </Button>
-                    </div>
+                    {spatialView === '2d' 
+                      ? renderRoute2D('h-[400px] sm:h-[500px]')
+                      : hasTerrainPreview
+                        ? renderRouteTerrain('h-[400px] sm:h-[500px]')
+                        : renderRouteGlobe('h-[400px] sm:h-[450px]', 'Preview Globe')}
+                    
+                    {spatialView !== '2d' && (
+                      <>
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-950/55 to-transparent" />
+                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 px-4 py-4">
+                          <p className="max-w-md text-xs text-white/90 sm:text-sm">
+                            {hasTerrainPreview
+                              ? 'Inspect the route corridor in a local 3D view, then switch to the globe for wider context.'
+                              : 'Explore the route in a larger interactive globe view.'}
+                          </p>
+                          <Button
+                            onClick={() => {
+                              setSpatialView(hasTerrainPreview ? 'terrain' : 'globe');
+                              setGlobeOpen(true);
+                            }}
+                            className="shrink-0 gap-2 bg-background/95 text-foreground hover:bg-background"
+                          >
+                            <Expand className="h-4 w-4" />
+                            Open 3D
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 {hasTrackPreview && !purchased && !isOwner && (
@@ -1647,5 +1666,3 @@ export default function RouteDetail() {
     </div>
   );
 }
-
-

@@ -16,7 +16,7 @@ import {
 } from "../../atlas-core/src/index.js";
 import { z } from "zod";
 import { prepareRouteMarketDraft } from "../../atlas-publisher/src/index.js";
-import { collectSources, discoverDemand, extractPois, generateClaims, getSearchProviderStatus, runDeepResearch } from "../../atlas-research/src/index.js";
+import { collectSources, discoverDemand, ensureRouteGpx, extractPois, generateClaims, getSearchProviderStatus, runDeepResearch } from "../../atlas-research/src/index.js";
 import type { SearchProviderMode } from "../../atlas-research/src/index.js";
 import {
   generateGuideDraft,
@@ -38,6 +38,7 @@ import { assessProjectReadiness } from "./readiness.js";
 import { buildImportReadiness } from "./import-readiness.js";
 import { buildProjectReviewBundle, saveProjectReviewDecision, type ReviewDecision } from "./review.js";
 import { readWorkflowState, writeWorkflowState } from "./workflow-state.js";
+import { QualityGateError } from "./quality-gates.js";
 
 export type AtlasWorkflowOptions = {
   rootDir: string;
@@ -78,6 +79,12 @@ export type AddTextInputRequest = {
   fileName: string;
   content: string;
   note?: string;
+};
+
+export type RemoveInputRequest = {
+  id?: string;
+  path?: string;
+  originalName?: string;
 };
 
 export type WorkflowProgress = {
@@ -243,6 +250,47 @@ export class AtlasWorkflowService {
     return { project, item };
   }
 
+  async removeInput(projectSlug: string, input: RemoveInputRequest) {
+    const project = await this.repository.getProject(projectSlug);
+    const manifest = await this.repository.loadInputManifest(project.id);
+    const removed = manifest.items.filter((item) => inputMatches(item, input));
+
+    if (removed.length === 0) {
+      throw new Error("Input not found in this project.");
+    }
+
+    const now = new Date().toISOString();
+    manifest.items = manifest.items.filter((item) => !inputMatches(item, input));
+    manifest.updatedAt = now;
+    await this.repository.saveInputManifest(project.id, manifest);
+
+    if (removed.some((item) => item.type === "gpx")) {
+      try {
+        await this.repository.writeProjectFile(project.id, "route.gpx", "");
+        for (const item of removed.filter((entry) => entry.type === "gpx" && entry.path)) {
+          await this.repository.writeProjectFile(project.id, item.path, "");
+        }
+      } catch {
+        // Removing the manifest entry is the authoritative operation.
+      }
+    }
+
+    await appendProjectEvent(project.id, this.repository, {
+      type: "input.removed",
+      message: `Removed input: ${removed.map((item) => item.originalName).join(", ")}.`,
+      data: {
+        removed: removed.map((item) => ({
+          id: item.id,
+          type: item.type,
+          path: item.path,
+          originalName: item.originalName
+        }))
+      }
+    });
+
+    return { project, removed, manifest };
+  }
+
   async registerExternalInput(projectSlug: string, input: {
     type: InputItemType;
     originalName: string;
@@ -376,13 +424,12 @@ export class AtlasWorkflowService {
   async runMvp2WithProgress(projectSlug: string, onProgress?: WorkflowProgressCallback, startStep?: string, options: { autoApprove?: boolean } = {}) {
     let { project, sources } = await this.loadProjectBundle(projectSlug);
 
-    // Ensure status is 'running' when starting the workflow
-    if (project.status === "research_needed" || project.status === "sources_collected") {
+    // Ensure status is 'running' when starting or resuming the workflow.
+    if (project.status === "research_needed" || project.status === "sources_collected" || project.status === "paused") {
       project = await this.setProjectStatus(projectSlug, "running");
     }
 
     const progress = async (message: string, value: number, currentStep: string, waitContext?: any) => {
-      onProgress?.({ message, progress: value, currentStep, waitContext } as any);
       await appendProjectEvent(project.id, this.repository, {
         type: `workflow.${currentStep}`,
         message,
@@ -393,6 +440,20 @@ export class AtlasWorkflowService {
         waitingApprovalStage: waitContext?.stage,
         nextStep: waitContext?.stage ? nextStepAfterStage(waitContext.stage) : undefined
       }, this.repository);
+      if (waitContext && project.status !== "paused") {
+        project = {
+          ...project,
+          status: "paused" as any,
+          updatedAt: new Date().toISOString()
+        };
+        await this.repository.saveProject(project);
+        await appendProjectEvent(project.id, this.repository, {
+          type: "project.status_changed",
+          message: "Project status changed to paused.",
+          data: { status: "paused", reason: waitContext.stage }
+        });
+      }
+      onProgress?.({ message, progress: value, currentStep, waitContext } as any);
     };
 
     const isApproved = async (stage: string) => {
@@ -414,26 +475,6 @@ export class AtlasWorkflowService {
         }
       },
       {
-        id: "gpx",
-        run: async () => {
-          await progress("Analyzing GPX.", 10, "gpx");
-          const { analyzeGpx } = await import("../../atlas-research/src/index.js");
-          try {
-            await analyzeGpx(project, this.repository);
-          } catch (err) {
-            console.warn("GPX analysis failed or file missing, continuing...");
-          }
-
-          if (!await isApproved("gpx_summary_approval")) {
-            await progress("GPX analyzed. Waiting for summary approval.", 15, "gpx_summary_approval", {
-              type: "approval_needed",
-              stage: "gpx_summary_approval"
-            });
-            return { pause: true, stage: "gpx_summary_approval" };
-          }
-        }
-      },
-      {
         id: "claims",
         run: async () => {
           await progress("Generating claims.", 25, "claims");
@@ -449,25 +490,15 @@ export class AtlasWorkflowService {
         }
       },
       {
-        id: "pois",
-        run: async () => {
-          await progress("Extracting POI.", 40, "pois");
-          await extractPois(project, this.repository);
-
-          if (!await isApproved("poi_approval")) {
-            await progress("POI extracted. Waiting for verification.", 45, "poi_approval", {
-              type: "approval_needed",
-              stage: "poi_approval"
-            });
-            return { pause: true, stage: "poi_approval" };
-          }
-        }
-      },
-      {
         id: "concept",
         run: async () => {
           await progress("Writing route concept.", 55, "concept");
-          await generateRouteConcept({ project, sources, repository: this.repository });
+          const [claims, poisData] = await Promise.all([
+            this.repository.loadClaims(project.id).catch(() => []),
+            this.repository.loadArtifact(project.id, "poi_candidates").catch(() => undefined)
+          ]);
+          const pois = Array.isArray((poisData as any)?.pois) ? (poisData as any).pois : [];
+          await generateRouteConcept({ project, sources, claims, pois, repository: this.repository });
 
           if (!await isApproved("concept_approval")) {
             await progress("Concept generated. Waiting for approval.", 60, "concept_approval", {
@@ -495,11 +526,72 @@ export class AtlasWorkflowService {
         }
       },
       {
+        id: "gpx",
+        run: async () => {
+          await progress("Generating or analyzing GPX.", 76, "gpx");
+          const generated = await ensureRouteGpx(project, this.repository);
+          if (generated.status === "blocked") {
+            await progress(generated.message, 78, "gpx_summary_approval", {
+              type: "approval_needed",
+              stage: "gpx_summary_approval",
+              blocking: true
+            });
+            return { pause: true, stage: "gpx_summary_approval" };
+          }
+
+          const { analyzeGpx } = await import("../../atlas-research/src/index.js");
+          try {
+            await analyzeGpx(project, this.repository);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            await this.repository.saveMissingInputs(project.id, {
+              projectId: project.id,
+              generatedAt: new Date().toISOString(),
+              blocking: true,
+              missing: [{
+                code: "gpx_analysis_failed",
+                message: `GPX exists but analysis failed: ${message}`,
+                requiredFor: "gpx"
+              }]
+            });
+            await progress(`GPX analysis failed: ${message}`, 78, "gpx_summary_approval", {
+              type: "approval_needed",
+              stage: "gpx_summary_approval",
+              blocking: true
+            });
+            return { pause: true, stage: "gpx_summary_approval" };
+          }
+
+          if (!await isApproved("gpx_summary_approval")) {
+            await progress("GPX analyzed. Waiting for summary approval.", 78, "gpx_summary_approval", {
+              type: "approval_needed",
+              stage: "gpx_summary_approval"
+            });
+            return { pause: true, stage: "gpx_summary_approval" };
+          }
+        }
+      },
+      {
+        id: "pois",
+        run: async () => {
+          await progress("Extracting POI.", 79, "pois");
+          await extractPois(project, this.repository);
+        }
+      },
+      {
         id: "guide",
         run: async () => {
           await progress("Writing final guide.", 80, "guide");
           const { generateGuideV2 } = await import("../../atlas-writer/src/index.js");
-          await generateGuideV2(project, this.repository);
+          const guide = await generateGuideV2(project, this.repository);
+          if (!guide) {
+            await progress("Guide cannot be generated until the blocking inputs are fixed.", 85, "guide_final_approval", {
+              type: "approval_needed",
+              stage: "guide_final_approval",
+              blocking: true
+            });
+            return { pause: true, stage: "guide_final_approval" };
+          }
 
           if (!await isApproved("guide_final_approval")) {
             await progress("Guide written. Waiting for final approval.", 85, "guide_final_approval", {
@@ -507,6 +599,18 @@ export class AtlasWorkflowService {
               stage: "guide_final_approval"
             });
             return { pause: true, stage: "guide_final_approval" };
+          }
+        }
+      },
+      {
+        id: "poi_review",
+        run: async () => {
+          if (!await isApproved("poi_approval")) {
+            await progress("POI extracted. Waiting for verification.", 88, "poi_approval", {
+              type: "approval_needed",
+              stage: "poi_approval"
+            });
+            return { pause: true, stage: "poi_approval" };
           }
         }
       },
@@ -519,7 +623,29 @@ export class AtlasWorkflowService {
           await prepareMediaPack(project, this.repository);
           await generateQualityReport({ project, sources, gpxValid: true, geojsonValid: true, repository: this.repository });
           await writeReviewChecklist(project, this.repository);
-          await prepareRouteMarketDraft(project, this.repository);
+          try {
+            await prepareRouteMarketDraft(project, this.repository);
+          } catch (error) {
+            if (error instanceof QualityGateError) {
+              await this.repository.saveMissingInputs(project.id, {
+                projectId: project.id,
+                generatedAt: new Date().toISOString(),
+                blocking: true,
+                missing: error.issues.map((issue) => ({
+                  code: `quality_${issue.rule}`,
+                  message: issue.message,
+                  requiredFor: "publish"
+                }))
+              });
+              await appendProjectEvent(project.id, this.repository, {
+                type: "publish.payload_blocked",
+                message: "RouteMarket payload was not prepared because quality gates need attention.",
+                data: { issues: error.issues }
+              });
+            } else {
+              throw error;
+            }
+          }
 
           project = await updateProjectStatus(project, "draft_generated");
           await appendProjectEvent(project.id, this.repository, {
@@ -538,6 +664,13 @@ export class AtlasWorkflowService {
         if (step.id === "input") {
           if (!await this.repository.exists(project.id, "research_pack.json")) {
             currentStepId = "input";
+            break;
+          }
+          continue;
+        }
+        if (step.id === "pois") {
+          if (!await this.repository.exists(project.id, "poi_candidates.json")) {
+            currentStepId = "pois";
             break;
           }
           continue;
@@ -759,6 +892,17 @@ function externalInputStatus(type: InputItemType, fileName: string, mimeType: st
   return "unsupported" as const;
 }
 
+function inputMatches(item: { id?: string; path?: string; originalName?: string }, input: RemoveInputRequest): boolean {
+  const id = input.id?.trim();
+  const path = input.path?.trim();
+  const originalName = input.originalName?.trim();
+  return Boolean(
+    (id && item.id === id)
+    || (path && item.path === path)
+    || (originalName && item.originalName === originalName)
+  );
+}
+
 const allowedProjectFiles = new Set([
   "project.json",
   "brief.md",
@@ -847,23 +991,22 @@ function getStageForStep(stepId: string): string | undefined {
   const map: Record<string, string> = {
     gpx: "gpx_summary_approval",
     claims: "claims_approval",
-    pois: "poi_approval",
+    poi_review: "poi_approval",
     concept: "concept_approval",
     guide_outline: "guide_outline_approval",
-    guide: "guide_final_approval",
-    finalize: "media_approval"
+    guide: "guide_final_approval"
   };
   return map[stepId];
 }
 
 function nextStepAfterStage(stage: string): string | undefined {
   const nextStepMap: Record<string, string> = {
-    gpx_summary_approval: "claims",
-    claims_approval: "pois",
-    poi_approval: "concept",
+    claims_approval: "concept",
     concept_approval: "guide_outline",
-    guide_outline_approval: "guide",
-    guide_final_approval: "finalize"
+    guide_outline_approval: "gpx",
+    gpx_summary_approval: "pois",
+    guide_final_approval: "poi_review",
+    poi_approval: "finalize"
   };
   return nextStepMap[stage];
 }

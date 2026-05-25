@@ -1,11 +1,11 @@
 services:
   atlas-api:
     build:
-      context: ..
+      context: ../../../
       dockerfile: Dockerfile
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8787/health >/dev/null || exit 1']
+      test: ['CMD', 'node', '/app/healthcheck.js']
       interval: 30s
       timeout: 5s
       retries: 5
@@ -25,6 +25,7 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GRAPHHOPPER_API_KEY: ${GRAPHHOPPER_API_KEY:-}
     volumes:
       - atlas-data:/app/data
       - atlas-routes:/app/routes

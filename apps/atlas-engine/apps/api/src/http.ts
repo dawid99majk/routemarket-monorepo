@@ -13,6 +13,7 @@ import {
   AddGpxBodySchema,
   AddLinkBodySchema,
   AddNoteBodySchema,
+  RemoveInputBodySchema,
   RegisterExternalInputBodySchema,
   ArchiveProjectBodySchema,
   CollectSourcesBodySchema,
@@ -204,6 +205,10 @@ function createRoutes(): Route[] {
         (job.waitingForStage === params.stage || job.currentStep === params.stage || job.pendingApprovalContext?.stage === params.stage)
       );
 
+      if (body.decision === "approved" && waitingJob?.pendingApprovalContext?.blocking) {
+        throw badRequest("This stage is blocked by missing inputs. Add the required route data or rerun the previous step before approval.");
+      }
+
       if (body.decision === "approved" && waitingJob) {
         const nextStep = nextStepAfterApprovalStage(params.stage);
         jobs.resume(waitingJob.id, { stage: params.stage, decision: body.decision }, (update) =>
@@ -246,6 +251,10 @@ function createRoutes(): Route[] {
     route("POST", "/projects/:slug/inputs/links", async ({ req, params, service }) => {
       const body = AddLinkBodySchema.parse(await readJson(req));
       return service.addLink(params.slug, body);
+    }),
+    route("DELETE", "/projects/:slug/inputs", async ({ req, params, service }) => {
+      const body = RemoveInputBodySchema.parse(await readJson(req));
+      return service.removeInput(params.slug, body);
     }),
     route("POST", "/projects/:slug/inputs/external", async ({ req, params, service }) => {
       const body = RegisterExternalInputBodySchema.parse(await readJson(req));
@@ -307,6 +316,9 @@ function createRoutes(): Route[] {
       const job = jobs.get(params.id);
       if (!job) throw notFound("Job not found.");
       if (job.status !== "waiting_for_approval") throw badRequest("Job is not waiting for approval.");
+      if (job.pendingApprovalContext?.blocking) {
+        throw badRequest("This stage is blocked by missing inputs. Add the required route data or rerun the previous step before approval.");
+      }
 
       // Resume logic
       const projectSlug = job.type.split(":")[1];
@@ -314,12 +326,12 @@ function createRoutes(): Route[] {
       validateSlug(projectSlug);
 
       const nextStepMap: Record<string, string> = {
-        "gpx_summary_approval": "claims",
-        "claims_approval": "pois",
-        "poi_approval": "concept",
+        "claims_approval": "concept",
         "concept_approval": "guide_outline",
-        "guide_outline_approval": "guide",
-        "guide_final_approval": "finalize"
+        "guide_outline_approval": "gpx",
+        "gpx_summary_approval": "pois",
+        "guide_final_approval": "poi_review",
+        "poi_approval": "finalize"
       };
       const stage = job.currentStep ?? "";
       await service.approveStage(projectSlug, stage, "approved", "Approved through job resume endpoint.");
@@ -336,6 +348,9 @@ function createRoutes(): Route[] {
       const job = jobs.get(params.id);
       if (!job) throw notFound("Job not found.");
       if (job.status !== "waiting_for_approval") throw badRequest("Job is not waiting for approval.");
+      if (job.pendingApprovalContext?.blocking) {
+        throw badRequest("This stage is blocked by missing inputs. Add the required route data or rerun the previous step before approval.");
+      }
 
       // Resume logic
       const projectSlug = job.type.split(":")[1];
@@ -343,12 +358,12 @@ function createRoutes(): Route[] {
       validateSlug(projectSlug);
 
       const nextStepMap: Record<string, string> = {
-        "gpx_summary_approval": "claims",
-        "claims_approval": "pois",
-        "poi_approval": "concept",
+        "claims_approval": "concept",
         "concept_approval": "guide_outline",
-        "guide_outline_approval": "guide",
-        "guide_final_approval": "finalize"
+        "guide_outline_approval": "gpx",
+        "gpx_summary_approval": "pois",
+        "guide_final_approval": "poi_review",
+        "poi_approval": "finalize"
       };
       const stage = job.currentStep ?? "";
       await service.approveStage(projectSlug, stage, "approved", "Approved through job resume endpoint.");
@@ -432,12 +447,12 @@ function matchRoute(routes: Route[], method: string, pathname: string): (Route &
 
 function nextStepAfterApprovalStage(stage: string): string {
   const map: Record<string, string> = {
-    gpx_summary_approval: "claims",
-    claims_approval: "pois",
-    poi_approval: "concept",
+    claims_approval: "concept",
     concept_approval: "guide_outline",
-    guide_outline_approval: "guide",
-    guide_final_approval: "finalize"
+    guide_outline_approval: "gpx",
+    gpx_summary_approval: "pois",
+    guide_final_approval: "poi_review",
+    poi_approval: "finalize"
   };
   return map[stage] ?? "input";
 }
@@ -470,7 +485,7 @@ function setCorsHeaders(res: ServerResponse, corsOrigin: string, reqOrigin?: str
       res.setHeader("Vary", "Origin");
     }
   }
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Atlas-API-Token");
 }
 
@@ -578,6 +593,7 @@ function apiManifest(authEnabled: boolean) {
       "POST /projects/:slug/inputs/notes",
       "POST /projects/:slug/inputs/gpx",
       "POST /projects/:slug/inputs/links",
+      "DELETE /projects/:slug/inputs",
       "POST /projects/:slug/inputs/external",
       "POST /projects/:slug/research-pack",
       "POST /projects/:slug/analyze-gpx",

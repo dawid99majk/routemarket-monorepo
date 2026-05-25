@@ -9,6 +9,7 @@ export const BalanceWidget: React.FC = () => {
   const { user } = useAuth();
   const { balance, isLoading } = useProfileBalance(user?.id);
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const unlimitedCredits = balance?.unlimited_credits ?? false;
 
   if (!user) return null;
 
@@ -24,7 +25,9 @@ export const BalanceWidget: React.FC = () => {
         {isLoading ? (
           <Loader2 className="w-3 h-3 animate-spin" />
         ) : (
-          <span className="font-mono tabular-nums">{balance?.credit_balance ?? 0}</span>
+          <span className={unlimitedCredits ? 'font-semibold' : 'font-mono tabular-nums'}>
+            {unlimitedCredits ? 'bez limitu' : balance?.credit_balance ?? 0}
+          </span>
         )}
       </div>
 
@@ -43,15 +46,17 @@ export const BalanceWidget: React.FC = () => {
       </div>
 
       {/* Buy More Trigger */}
-      <Button 
-        size="icon" 
-        variant="ghost" 
-        onClick={() => setTopUpOpen(true)}
-        className="w-7 h-7 rounded-full bg-background border border-border hover:bg-accent hover:text-accent-foreground hover:border-accent transition-all duration-300 ml-0.5 shrink-0"
-        title="Doładuj konto"
-      >
-        <Plus className="w-3.5 h-3.5" />
-      </Button>
+      {!unlimitedCredits && (
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          onClick={() => setTopUpOpen(true)}
+          className="w-7 h-7 rounded-full bg-background border border-border hover:bg-accent hover:text-accent-foreground hover:border-accent transition-all duration-300 ml-0.5 shrink-0"
+          title="Doładuj konto"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </Button>
+      )}
 
       {/* TopUp Modal */}
       <TopUpModal open={topUpOpen} onOpenChange={setTopUpOpen} />

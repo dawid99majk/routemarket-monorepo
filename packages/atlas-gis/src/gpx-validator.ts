@@ -23,18 +23,12 @@ export function validateGpxXml(xml: string): GpxValidationResult {
   if (!xml.includes("<gpx")) errors.push("Brak elementu głównego <gpx>.");
   if (!xml.includes("</gpx>")) errors.push("Brak zamknięcia </gpx>.");
   
-  const trkpts = xml.match(/lat="([-0-9.]+)" lon="([-0-9.]+)"/g) ?? [];
-  const trackPointCount = trkpts.length;
+  const coords = extractRouteCoordinates(xml);
+  const trackPointCount = coords.length;
   
   if (trackPointCount < 2) {
     errors.push("Zbyt mało punktów trasy (wymagane min. 2).");
   }
-
-  // Basic jump detection (very simple regex based)
-  const coords = trkpts.map(t => {
-    const m = t.match(/lat="([-0-9.]+)" lon="([-0-9.]+)"/);
-    return m ? [parseFloat(m[1]), parseFloat(m[2])] : [0,0];
-  });
 
   for (let i = 1; i < coords.length; i++) {
     const dist = haversineDistance(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]);
@@ -54,6 +48,34 @@ export function validateGpxXml(xml: string): GpxValidationResult {
     warnings,
     trackPointCount
   };
+}
+
+function extractRouteCoordinates(xml: string): Array<[number, number]> {
+  const coords: Array<[number, number]> = [];
+  const routePointRegex = /<(?:trkpt|rtept)\b([^>]*)>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = routePointRegex.exec(xml)) !== null) {
+    const attrs = match[1] ?? "";
+    const lat = Number(attrs.match(/\blat="([-0-9.]+)"/i)?.[1]);
+    const lon = Number(attrs.match(/\blon="([-0-9.]+)"/i)?.[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      coords.push([lat, lon]);
+    }
+  }
+
+  if (coords.length > 0) return coords;
+
+  const fallbackRegex = /\blat="([-0-9.]+)"\s+\blon="([-0-9.]+)"/gi;
+  while ((match = fallbackRegex.exec(xml)) !== null) {
+    const lat = Number(match[1]);
+    const lon = Number(match[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      coords.push([lat, lon]);
+    }
+  }
+
+  return coords;
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

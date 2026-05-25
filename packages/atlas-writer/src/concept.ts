@@ -37,6 +37,9 @@ async function generateAiConcept(input: GenerateRouteConceptInput, apiKey: strin
   const sourceContext = (input.sources ?? []).map(s => `- ${s.title}: ${s.url}`).join("\n");
   const claimContext = (input.claims ?? []).map(c => `- ${c.claim} (${c.status})`).join("\n");
   const poiContext = (input.pois ?? []).map(p => `- ${p.name} [${p.lat}, ${p.lng}]: ${p.description}`).join("\n");
+  const notesContext = input.repository
+    ? await readProjectNotes(input.project.id, input.repository)
+    : "";
 
   const prompt = `You are RouteMarket Atlas Strategist. Your goal is to create a "Route Master Blueprint" - a detailed concept for a new route.
 
@@ -55,17 +58,21 @@ ${claimContext}
 POI:
 ${poiContext}
 
+CREATOR NOTES AND INTERVIEW:
+${notesContext}
+
 INSTRUCTIONS:
-1. Be precise and factual. Strictly use the provided research data.
-2. Avoid hallucinations. If info is missing, mark it as "to be verified".
+1. Be precise and factual. Use creator notes/interview first, then research data.
+2. Avoid hallucinations. If info is missing, mark it as "do weryfikacji" and state what input is missing.
 3. Language: Polish (professional, technical).
 4. Structure:
 # Route Master Blueprint: ${input.project.title}
 ## 1. Wizja i Charakterystyka Trasy
 ## 2. Dlaczego warto? (USP)
-## 3. Geographic Backbone (Critical POIs and flow)
-## 4. Analiza Trudności i Bezpieczeństwa
-## 5. Logistyka i Sprzęt
+## 3. Przebieg trasy i punkty krytyczne
+## 4. Dane do GPX: start, meta, punkty pośrednie
+## 5. Analiza trudności i bezpieczeństwa
+## 6. Logistyka i sprzęt
 
 Return ONLY Markdown.`;
 
@@ -89,23 +96,42 @@ Return ONLY Markdown.`;
 
 function generateTemplateConcept(input: GenerateRouteConceptInput): string {
   const sourceCount = input.sources?.length ?? 0;
-  return `# Route Concept (Template)
+  const poiList = (input.pois ?? [])
+    .slice(0, 8)
+    .map((poi) => `- ${poi.name}${poi.lat && poi.lng ? ` (${poi.lat}, ${poi.lng})` : ""}`)
+    .join("\n") || "- Brak potwierdzonych punktów POI.";
+  return `# Route Master Blueprint: ${input.project.title}
 
-## Working title
-${input.project.title}
+## 1. Wizja i charakterystyka trasy
+Koncepcja robocza dla kategorii ${input.project.category} w regionie ${input.project.region}. Ten dokument jest bazą do konspektu, GPX i przewodnika.
 
-## Route promise
-A practical ${input.project.category} route in ${input.project.region}.
-
-## Target traveler
+## 2. Dla kogo
 ${targetTraveler(input.project.category)}
 
-## Key research basis
-Current source count: ${sourceCount}
+## 3. Dane wejściowe
+- Liczba źródeł: ${sourceCount}
+- Region: ${input.project.region}
+- Status: wymaga weryfikacji przez twórcę, jeśli brakuje startu/mety.
 
-## Note
-This is a fallback template because GEMINI_API_KEY was not provided.
+## 4. Punkty trasy
+${poiList}
+
+## 5. Braki do uzupełnienia
+- Dokładny punkt startu.
+- Punkt końcowy lub informacja, że trasa ma być pętlą.
+- Preferowany dystans/czas.
+- Ograniczenia nawierzchni i bezpieczeństwa.
 `;
+}
+
+async function readProjectNotes(projectId: string, repository: ProjectRepository): Promise<string> {
+  const files = ["notes.md", "input/notes/interview_answers.md", "route_concept.md"];
+  const chunks: string[] = [];
+  for (const file of files) {
+    const content = await repository.readProjectFile(projectId, file).catch(() => "");
+    if (content.trim()) chunks.push(`## ${file}\n${content}`);
+  }
+  return chunks.join("\n\n").slice(0, 12000);
 }
 
 function targetTraveler(category: string): string {

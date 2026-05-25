@@ -31,7 +31,14 @@ export function buildGpxXml(route: RoutingResult, waypoints?: Poi[]): string {
   lines.push('    <trkseg>');
   
   for (const pt of route.points) {
-    lines.push(`      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}" />`);
+    const hasEle = typeof (pt as any).ele === 'number';
+    if (hasEle) {
+      lines.push(`      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}">`);
+      lines.push(`        <ele>${(pt as any).ele.toFixed(1)}</ele>`);
+      lines.push(`      </trkpt>`);
+    } else {
+      lines.push(`      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}"></trkpt>`);
+    }
   }
 
   lines.push('    </trkseg>');

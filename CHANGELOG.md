@@ -6,9 +6,45 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
 
 ## 📅 Ostatnia aktualizacja: 25 Maja 2026
 
-### 🚀 Najnowsze wdrożenia & Poprawki krytyczne
+### 🚀 Najnowsze wdrożenia & Poprawki krytyczne (25 Maja 2026 - Sesja 2)
 
-#### 11. Naprawa crashu mapy GPX (Maximum call stack size exceeded) [FRONTEND]
+#### 13. Przywrócenie i optymalizacja Map 2D (Leaflet) [FRONTEND]
+* **Problem**: Widok 2D w kreatorze był jedynie zaślepką, a na stronie szczegółów trasy często się nie ładował (pozostawał szary).
+* **Rozwiązanie**: 
+  1. Zaimplementowano pełną mapę Leaflet w krokach `GPX` oraz `Media` kreatora.
+  2. Naprawiono krytyczny błąd brakujących ikon markerów w środowisku `build` poprzez jawne mapowanie do CDN (jsDelivr).
+  3. Wprowadzono mechanizm `invalidateSize()`, który wymusza poprawne renderowanie mapy w dynamicznych kontenerach React.
+  4. Dodano "efekt poświaty" (biały obrys) pod linią trasy, zwiększając jej kontrast na ciemnych podkładach.
+* **Pliki**: `RouteDetailMap.tsx`, `GpxStep.tsx`, `MediaStep.tsx`.
+
+#### 14. Ekstremalna widoczność Trasy 3D (Neon Style) [FRONTEND]
+* **Problem**: Trasa 3D była ledwo widoczna (cienka linia na ciemnym tle), co utrudniało weryfikację przebiegu.
+* **Rozwiązanie**: 
+  1. Zmieniono materiał trasy na **emisyjny (neonowy cyjan #00f2ff)** o wysokiej intensywności światła.
+  2. Dodano drugą warstwę wizualną ("halo") wokół trasy, tworząc efekt szerokiego, świecącego pasma.
+  3. Zwiększono mnożniki wysokości terenu (4.5x), aby rzeźba gór była bardziej plastyczna i czytelna.
+  4. Powiększono kontenery map na stronie szczegółów do 500px wysokości.
+* **Pliki**: `RouteTerrain3D.tsx`, `RouteDetail.tsx`.
+
+#### 15. Poprawa logiki i kontekstowości Agenta AI [AI / EDGE FUNCTION]
+* **Problem**: Agent Atlas pytał użytkownika o fakty (noclegi, dystans), które były już podane w notatkach. Wyniki dla niektórych regionów (Karkonosze) były opisowe, bez konkretnej trasy.
+* **Rozwiązanie**: 
+  1. Zaktualizowano instrukcję systemową (`prompt`) funkcji `atlas-interview`. Wprowadzono **Zasadę Naczelną**: agent musi najpierw przeanalizować notatki i nie ma prawa pytać o dane w nich zawarte.
+  2. Wymuszono priorytetyzację **Punktu Startowego** - jeśli brak go w notatkach, agent musi o niego zapytać, co pozwala silnikowi GPX na wygenerowanie realnej trasy.
+  3. Usprawniono przejście z wywiadu do workflow, eliminując konieczność ponownego zatwierdzania tych samych faktów w sekcji "Claims".
+* **Pliki**: `supabase/functions/atlas-interview/index.ts`, `CreatorAiStudio.tsx`.
+
+#### 16. Reorganizacja UI Panelu AI [FRONTEND]
+* **Problem**: Panel automatycznie wznawiał ostatni projekt bez pytania, a sekcja logów technicznych zajmowała cenne miejsce.
+* **Rozwiązanie**: 
+  1. Wyłączono automatyczne ładowanie ostatniego `activeSlug` - Panel AI otwiera się teraz zawsze na liście projektów.
+  2. Całkowicie usunięto sekcję "Logi AI" z interfejsu kreatora.
+  3. Główny obszar roboczy i mapy zostały rozszerzone na **pełną szerokość strony** (full width), co drastycznie poprawiło komfort pracy i widoczność detali trasy.
+* **Plik**: `CreatorAiStudio.tsx`.
+
+---
+
+## 📅 Poprzednie aktualizacje
 * **Problem**: Wgrywanie śladów GPX o wysokiej rozdzielczości (np. trasy Dolomity mającej ponad 10 000 punktów współrzędnych) powodowało całkowity zawias przeglądarki i błąd "Maximum call stack size exceeded".
 * **Przyczyna**: Trójwymiarowe i dwuwymiarowe komponenty map (`RouteExplorerGlobe.tsx`, `RouteGlobe3D.tsx`, `RouteTerrain3D.tsx` oraz strona edycji `EditRoute.tsx`) używały operatora rozwijania spread (`...`) do wyznaczania minimów i maksimów współrzędnych trasy (np. `Math.min(...lats)`). Przekazywanie tak olbrzymiej liczby argumentów do funkcji przekraczało dopuszczalną wielkość stosu wywołań V8.
 * **Rozwiązanie**: Zastąpiono operator spread we wszystkich czterech komponentach bezpiecznymi, wydajnymi pętlami redukcyjnymi (`.reduce()`), co całkowicie eliminuje ryzyko przepełnienia stosu.

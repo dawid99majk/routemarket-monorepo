@@ -6,6 +6,9 @@ export type ApprovalState = 'pending' | 'approved';
 export interface SourceFile {
   name: string;
   size: number;
+  id?: string;
+  path?: string;
+  type?: string;
 }
 
 export interface Project {

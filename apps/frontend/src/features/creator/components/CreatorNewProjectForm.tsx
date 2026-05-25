@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 interface CreatorNewProjectFormProps {
   balance: number;
+  unlimitedCredits?: boolean;
   onTopUp: () => void;
   onCreate: (params: any) => Promise<void>;
   isCreating: boolean;
@@ -29,6 +30,7 @@ export type MVPCategory =
 
 export function CreatorNewProjectForm({
   balance,
+  unlimitedCredits = false,
   onTopUp,
   onCreate,
   isCreating
@@ -43,7 +45,7 @@ export function CreatorNewProjectForm({
     if (!topic.trim()) return;
 
     const cost = deepResearch ? 50 : 25;
-    if (balance < cost) {
+    if (!unlimitedCredits && balance < cost) {
       toast.error(`Niewystarczająca ilość kredytów! Wymagane: ${cost}, posiadasz: ${balance}.`);
       onTopUp();
       return;
@@ -91,12 +93,14 @@ export function CreatorNewProjectForm({
             <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Twój portfel</span>
             <p className="text-sm font-bold text-foreground flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-primary badge-glow-primary" />
-              {balance} Kredytów
+              {unlimitedCredits ? 'Bez limitu' : `${balance} Kredytów`}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={onTopUp} className="h-8 text-xs font-semibold">
-            Doładuj
-          </Button>
+          {!unlimitedCredits && (
+            <Button variant="outline" size="sm" onClick={onTopUp} className="h-8 text-xs font-semibold">
+              Doładuj
+            </Button>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -156,7 +160,9 @@ export function CreatorNewProjectForm({
                 <Sparkles className={`w-5 h-5 ${deepResearch ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
                 <span className={`text-sm font-bold ${deepResearch ? 'text-primary' : 'text-foreground'}`}>Gemini Deep Research</span>
               </div>
-              <Badge variant={deepResearch ? 'default' : 'outline'}>{deepResearch ? '50 cr' : '25 cr'}</Badge>
+              <Badge variant={deepResearch ? 'default' : 'outline'}>
+                {unlimitedCredits ? 'admin' : deepResearch ? '50 cr' : '25 cr'}
+              </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               Tryb zaawansowany: AI przeszuka internet, blogi i filmy, aby znaleźć ukryte perełki, parkingi i schroniska.
