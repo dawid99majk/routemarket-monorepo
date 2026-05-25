@@ -89,8 +89,14 @@ export function parseGpx(xmlString: string): GpxParseResult {
   const lats = points.map((p) => p.lat);
   const lngs = points.map((p) => p.lon);
 
-  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+  // Safe min/max calculation that avoids exceeding the call stack limit on large arrays
+  const minLat = lats.reduce((min, val) => val < min ? val : min, lats[0]);
+  const maxLat = lats.reduce((max, val) => val > max ? val : max, lats[0]);
+  const minLng = lngs.reduce((min, val) => val < min ? val : min, lngs[0]);
+  const maxLng = lngs.reduce((max, val) => val > max ? val : max, lngs[0]);
+
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLng = (minLng + maxLng) / 2;
 
   const first = points[0];
   const last = points[points.length - 1];
@@ -110,10 +116,10 @@ export function parseGpx(xmlString: string): GpxParseResult {
     start_point: `${first.lat.toFixed(5)}, ${first.lon.toFixed(5)}`,
     end_point: `${last.lat.toFixed(5)}, ${last.lon.toFixed(5)}`,
     bounds: {
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats),
-      minLng: Math.min(...lngs),
-      maxLng: Math.max(...lngs),
+      minLat,
+      maxLat,
+      minLng,
+      maxLng,
     },
     trackPoints,
   };
