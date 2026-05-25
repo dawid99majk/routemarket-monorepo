@@ -81,10 +81,10 @@ function haversineMeters(a: [number, number], b: [number, number]) {
 function computeTrackMetrics(track: [number, number][]) {
   const lats = track.map(([lat]) => lat);
   const lngs = track.map(([, lng]) => lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const minLat = lats.reduce((min, val) => val < min ? val : min, lats[0]);
+  const maxLat = lats.reduce((max, val) => val > max ? val : max, lats[0]);
+  const minLng = lngs.reduce((min, val) => val < min ? val : min, lngs[0]);
+  const maxLng = lngs.reduce((max, val) => val > max ? val : max, lngs[0]);
   const centerLat = (minLat + maxLat) / 2;
   const centerLng = (minLng + maxLng) / 2;
   const diagonalMeters = haversineMeters([minLat, minLng], [maxLat, maxLng]);

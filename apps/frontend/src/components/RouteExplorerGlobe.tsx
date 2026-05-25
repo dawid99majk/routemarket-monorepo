@@ -79,10 +79,10 @@ function computeViewport(routes: ExplorerRoute[]) {
 
   const lats = routes.map((route) => route.latitude);
   const lngs = routes.map((route) => route.longitude);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const minLat = lats.reduce((min, val) => val < min ? val : min, lats[0]);
+  const maxLat = lats.reduce((max, val) => val > max ? val : max, lats[0]);
+  const minLng = lngs.reduce((min, val) => val < min ? val : min, lngs[0]);
+  const maxLng = lngs.reduce((max, val) => val > max ? val : max, lngs[0]);
   const diagonalKm = distanceKm({ lat: minLat, lng: minLng }, { lat: maxLat, lng: maxLng });
 
   let altitude = 0.35;
@@ -104,10 +104,10 @@ function computeRouteAltitude(track: TrackPointTuple[] | null | undefined) {
 
   const lats = track.map(([lat]) => lat);
   const lngs = track.map(([, lng]) => lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const minLat = lats.reduce((min, val) => val < min ? val : min, lats[0]);
+  const maxLat = lats.reduce((max, val) => val > max ? val : max, lats[0]);
+  const minLng = lngs.reduce((min, val) => val < min ? val : min, lngs[0]);
+  const maxLng = lngs.reduce((max, val) => val > max ? val : max, lngs[0]);
   const diagonalKm = distanceKm({ lat: minLat, lng: minLng }, { lat: maxLat, lng: maxLng });
 
   if (diagonalKm <= 10) return 0.18;

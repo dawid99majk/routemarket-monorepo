@@ -96,10 +96,10 @@ function projectTrack(track: [number, number][]) {
   const denseTrack = densifyTrack(track);
   const lats = denseTrack.map(([lat]) => lat);
   const lngs = denseTrack.map(([, lng]) => lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const minLat = lats.reduce((min, val) => val < min ? val : min, lats[0]);
+  const maxLat = lats.reduce((max, val) => val > max ? val : max, lats[0]);
+  const minLng = lngs.reduce((min, val) => val < min ? val : min, lngs[0]);
+  const maxLng = lngs.reduce((max, val) => val > max ? val : max, lngs[0]);
   const centerLat = (minLat + maxLat) / 2;
   const centerLng = (minLng + maxLng) / 2;
   const latScale = 111320;
@@ -112,10 +112,10 @@ function projectTrack(track: [number, number][]) {
 
   const xs = localPoints.map((point) => point.x);
   const zs = localPoints.map((point) => point.z);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minZ = Math.min(...zs);
-  const maxZ = Math.max(...zs);
+  const minX = xs.reduce((min, val) => val < min ? val : min, xs[0]);
+  const maxX = xs.reduce((max, val) => val > max ? val : max, xs[0]);
+  const minZ = zs.reduce((min, val) => val < min ? val : min, zs[0]);
+  const maxZ = zs.reduce((max, val) => val > max ? val : max, zs[0]);
   const widthMeters = Math.max(250, maxX - minX);
   const depthMeters = Math.max(250, maxZ - minZ);
   const scale = 140 / Math.max(widthMeters, depthMeters);

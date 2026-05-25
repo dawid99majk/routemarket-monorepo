@@ -12,6 +12,17 @@ type WorkflowState = {
   completedSteps?: string[];
 };
 
+type InputManifestItem = {
+  id?: string;
+  type?: string;
+  path?: string;
+  originalName?: string;
+};
+
+type InputManifest = {
+  items?: InputManifestItem[];
+};
+
 export function useAtlasProjectWorkspace(slug: string | null) {
   const { invokeAtlas } = useAtlasApi();
   const [project, setProject] = useState<Project | null>(null);
@@ -24,6 +35,7 @@ export function useAtlasProjectWorkspace(slug: string | null) {
   const [notes, setNotes] = useState('');
   const [gpxXml, setGpxXml] = useState('');
   const [outline, setOutline] = useState('');
+  const [concept, setConcept] = useState('');
   const [guide, setGuide] = useState('');
   const [poiGeoJson, setPoiGeoJson] = useState<PoiGeoJson | null>(null);
   const [claims, setClaims] = useState<any[]>([]);
@@ -64,6 +76,7 @@ export function useAtlasProjectWorkspace(slug: string | null) {
       setNotes('');
       setGpxXml('');
       setOutline('');
+      setConcept('');
       setGuide('');
       setPoiGeoJson(null);
       setClaims([]);
@@ -142,21 +155,31 @@ export function useAtlasProjectWorkspace(slug: string | null) {
 
       // 3. Load artifacts based on target step
       const loadAllFiles = async () => {
-        // Special logic for notes: merge ANY .txt/.md file from inputs
+        const manifest = parseInputManifest(await loadFile('input_manifest.json'));
+
+        // Special logic for notes: merge creator notes/documents from the active project manifest only.
         let allNotes = await loadFile('notes.md');
-        if (eventsList.length > 0) {
-          const noteEvents = eventsList.filter(e => e.type === 'input.note_added');
-          for (const e of noteEvents) {
-            const fileName = (e.data as any)?.item?.originalName || (e.data as any)?.item?.name;
-            if (fileName && fileName !== 'notes.md' && fileName !== 'interview_answers.md') {
-              const extraNote = await loadFile(`input/notes/${fileName}`);
-              if (extraNote) allNotes += `\n\n--- ${fileName} ---\n\n${extraNote}`;
-            }
+        const seenInputPaths = new Set<string>();
+        for (const item of manifest.items ?? []) {
+          if (item.type !== 'note' && item.type !== 'document') continue;
+          if (isSystemInput(item)) continue;
+
+          const path = String(item.path || '');
+          if (!path || seenInputPaths.has(path)) continue;
+          seenInputPaths.add(path);
+
+          const extraNote = await loadFile(path);
+          if (extraNote) {
+            const label = item.originalName || path;
+            allNotes += `\n\n--- ${label} ---\n\n${extraNote}`;
           }
         }
         setNotes(allNotes);
 
-        if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('outline') || hasOutline) setOutline(await loadFile('guide_outline.md'));
+        if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('outline') || hasOutline) {
+          setOutline(await loadFile('guide_outline.md'));
+          setConcept(await loadFile('route_concept.md'));
+        }
         if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('gpx') || hasGpx) setGpxXml(await loadFile('route.gpx'));
         if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('guide') || hasGuide) setGuide(await loadFile('guide.md'));
         if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('media')) {
@@ -185,6 +208,7 @@ export function useAtlasProjectWorkspace(slug: string | null) {
       notes, setNotes,
       gpxXml, setGpxXml,
       outline, setOutline,
+      concept, setConcept,
       guide, setGuide,
       poiGeoJson, setPoiGeoJson,
       claims, setClaims
@@ -210,7 +234,8 @@ function pipelineStepFromWorkflowStep(step?: string): PipelineStep | undefined {
     gpx_summary_approval: 'gpx',
     claims: 'interview',
     claims_approval: 'interview',
-    pois: 'media',
+    pois: 'guide',
+    poi_review: 'media',
     poi_approval: 'media',
     concept: 'outline',
     concept_approval: 'outline',
@@ -222,4 +247,23 @@ function pipelineStepFromWorkflowStep(step?: string): PipelineStep | undefined {
     completed: 'publish'
   };
   return step ? map[step] : undefined;
+}
+
+function parseInputManifest(content: string): InputManifest {
+  if (!content) return { items: [] };
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === 'object' ? parsed as InputManifest : { items: [] };
+  } catch {
+    return { items: [] };
+  }
+}
+
+function isSystemInput(item: InputManifestItem): boolean {
+  const name = String(item.originalName || '').toLowerCase();
+  const path = String(item.path || '').toLowerCase();
+  return name === 'notes.md'
+    || name === 'interview_answers.md'
+    || path.endsWith('/notes.md')
+    || path.endsWith('/interview_answers.md');
 }

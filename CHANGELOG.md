@@ -8,6 +8,26 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
 
 ### 🚀 Najnowsze wdrożenia & Poprawki krytyczne
 
+#### 11. Naprawa crashu mapy GPX (Maximum call stack size exceeded) [FRONTEND]
+* **Problem**: Wgrywanie śladów GPX o wysokiej rozdzielczości (np. trasy Dolomity mającej ponad 10 000 punktów współrzędnych) powodowało całkowity zawias przeglądarki i błąd "Maximum call stack size exceeded".
+* **Przyczyna**: Trójwymiarowe i dwuwymiarowe komponenty map (`RouteExplorerGlobe.tsx`, `RouteGlobe3D.tsx`, `RouteTerrain3D.tsx` oraz strona edycji `EditRoute.tsx`) używały operatora rozwijania spread (`...`) do wyznaczania minimów i maksimów współrzędnych trasy (np. `Math.min(...lats)`). Przekazywanie tak olbrzymiej liczby argumentów do funkcji przekraczało dopuszczalną wielkość stosu wywołań V8.
+* **Rozwiązanie**: Zastąpiono operator spread we wszystkich czterech komponentach bezpiecznymi, wydajnymi pętlami redukcyjnymi (`.reduce()`), co całkowicie eliminuje ryzyko przepełnienia stosu.
+* **Pliki**:
+  * [RouteExplorerGlobe.tsx](file:///root/routemarket-workspace/apps/frontend/src/components/RouteExplorerGlobe.tsx)
+  * [RouteGlobe3D.tsx](file:///root/routemarket-workspace/apps/frontend/src/components/RouteGlobe3D.tsx)
+  * [RouteTerrain3D.tsx](file:///root/routemarket-workspace/apps/frontend/src/components/RouteTerrain3D.tsx)
+  * [EditRoute.tsx](file:///root/routemarket-workspace/apps/frontend/src/pages/EditRoute.tsx)
+
+#### 12. Prezentacja pełnej Koncepcji Trasy (Master Blueprint) zamiast staba [FRONTEND]
+* **Problem**: W kroku „Koncepcja Trasy” (zakładka 3. Konspekt) zamiast szczegółowego planu wygenerowanego przez AI wyświetlał się uproszczony, 5-punktowy szablon konspektu (Outline for dolomity, Introduction, Key Highlights, itp.).
+* **Przyczyna**: Generowanie koncepcji przez AI tworzyło bogaty plik `route_concept.md` (mający ponad 13 KB), ale frontend w ogóle go nie pobierał. Zamiast tego ładował plik `guide_outline.md` będący uproszczonym konspektem, a hook `useAtlasProjectWorkspace.ts` nie rozróżniał tych plików.
+* **Rozwiązanie**: 
+  1. Dodano osobny stan `concept` w hooku roboczym kreatora oraz logikę pobierającą `route_concept.md` z API.
+  2. Zaktualizowano komponent `ConceptStep.tsx` w `CreatorAiStudio.tsx`, aby przyjmował rzeczywistą koncepcję jako priorytetowy parametr (`concept={artifacts.concept || artifacts.outline}`), zachowując konspekt jako bezpieczny fallback.
+* **Pliki**:
+  * [useAtlasProjectWorkspace.ts](file:///root/routemarket-workspace/apps/frontend/src/features/creator/hooks/useAtlasProjectWorkspace.ts)
+  * [CreatorAiStudio.tsx](file:///root/routemarket-workspace/apps/frontend/src/pages/CreatorAiStudio.tsx)
+
 #### 1. Naprawa błędu 500 w Wywiadzie AI (Duże pliki opisu trasy) [FUNKCJA BRZEGOWA]
 * **Problem**: Podczas klikania odpowiedzi w wywiadzie frontend wyrzucał błąd `Błąd wywiadu AI: Edge Function returned a non-2xx status code` (HTTP 500).
 * **Przyczyna**: Funkcja brzegowa `atlas-interview` posiadała twardy limit bezpieczeństwa na długość notatek (`context.notes.length > 20000`). Po wgraniu przez użytkownika dużego opisu trasy (np. pliku `Planowanie-Trekingu-Dolomity_-Trasa-Alternatywna.txt` mającego **54 595** znaków), funkcja przy każdym zapytaniu wyrzucała błąd `Notes too long.`, zrywając wywiad.

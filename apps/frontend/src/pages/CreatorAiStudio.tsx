@@ -34,12 +34,13 @@ import { GuideFinalStep } from '@/features/creator/components/steps/GuideFinalSt
 import { MediaStep } from '@/features/creator/components/steps/MediaStep';
 import { PublishStep } from '@/features/creator/components/steps/PublishStep';
 
-import { PipelineStep } from '@/features/creator/types/creator.types';
+import { PipelineStep, SourceFile } from '@/features/creator/types/creator.types';
 
 export default function CreatorAiStudio() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { balance, spendCredits } = useProfileBalance(user?.id);
+  const unlimitedCredits = balance?.unlimited_credits ?? false;
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
 
@@ -63,7 +64,18 @@ export default function CreatorAiStudio() {
   } = useAtlasProjectWorkspace(activeSlug);
 
   const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasWorkflow();
-  const { uploading, links, addLink, uploadedFiles, uploadFiles, saveNotes, saveNamedNote, saveProjectFile } = useAtlasFiles(activeSlug);
+  const {
+    uploading,
+    links,
+    addLink,
+    uploadedFiles,
+    uploadFiles,
+    removeInput,
+    removeLink,
+    saveNotes,
+    saveNamedNote,
+    saveProjectFile
+  } = useAtlasFiles(activeSlug);
 
   const gpxFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,6 +91,29 @@ export default function CreatorAiStudio() {
       console.error(err);
       toast.error('Błąd wgrywania GPX: ' + (err as Error).message, { id: toastId });
     }
+  };
+
+  const handleSourcesUpload = async (files: FileList) => {
+    await uploadFiles(files);
+    await fetchWorkspace();
+  };
+
+  const handleSourcesRemoveFile = async (file: SourceFile) => {
+    await removeInput(file);
+    await fetchWorkspace();
+  };
+
+  const handleSourcesRemoveLink = async (url: string) => {
+    await removeLink(url);
+    await fetchWorkspace();
+  };
+
+  const handleSourcesContinue = async () => {
+    if (artifacts.notes.trim().length > 0) {
+      await saveNotes(artifacts.notes);
+    }
+    await fetchWorkspace();
+    setActiveStep('interview');
   };
 
   // Helper to generate GPX XML from coordinate points
@@ -204,6 +239,7 @@ ${trkpts}
     ].join('\n');
 
     await saveNamedNote('interview_answers.md', markdown);
+    setActiveStep('outline');
     await runPipeline(activeSlug, fetchWorkspace);
   };
 
@@ -285,6 +321,7 @@ ${trkpts}
                 <div className="sticky top-24">
                   <CreatorNewProjectForm
                     balance={balance?.credit_balance ?? 100}
+                    unlimitedCredits={unlimitedCredits}
                     onTopUp={() => setIsTopUpOpen(true)}
                     onCreate={handleCreateProject}
                     isCreating={loadingProjects}
@@ -332,7 +369,7 @@ ${trkpts}
       headerRight={
         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
           <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <span className="text-[11px] font-bold">{balance?.credit_balance ?? 0} Kredytów</span>
+          <span className="text-[11px] font-bold">{unlimitedCredits ? 'Bez limitu' : `${balance?.credit_balance ?? 0} Kredytów`}</span>
         </div>
       }
       exitLabel="Wyjdź"
@@ -390,9 +427,11 @@ ${trkpts}
                       links={links}
                       onAddLink={addLink}
                       uploadedFiles={uploadedFiles}
-                      onUploadFiles={uploadFiles}
+                      onUploadFiles={handleSourcesUpload}
+                      onRemoveFile={handleSourcesRemoveFile}
+                      onRemoveLink={handleSourcesRemoveLink}
                       isUploading={uploading}
-                      onContinue={() => runPipeline(activeSlug, fetchWorkspace)}
+                      onContinue={handleSourcesContinue}
                       onYoutubeImport={handleYoutubeImport}
                       isImporting={isImporting}
                     />
@@ -401,6 +440,7 @@ ${trkpts}
                   {activeStep === 'interview' && (
                     <InterviewStep
                       project={project}
+                      notes={artifacts.notes}
                       onComplete={handleInterviewComplete}
                     />
                   )}
@@ -415,7 +455,7 @@ ${trkpts}
 
                   {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
                     <ConceptStep
-                      concept={artifacts.outline}
+                      concept={artifacts.concept || artifacts.outline}
                       onApprove={() => approveStage(activeSlug, 'concept_approval', fetchWorkspace)}
                       isProcessing={pipelineRunning}
                     />
@@ -453,10 +493,10 @@ ${trkpts}
                               <div className="space-y-2">
                                 <h3 className="font-bold text-xl text-foreground">Brak śladu GPX w projekcie</h3>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
-                                  Wygląda na to, że wgrane materiały źródłowe nie zawierały wystarczająco precyzyjnych danych geograficznych, aby asystent AI mógł automatycznie wygenerować poprawny ślad trasy.
+                                  Atlas nie znalazł jeszcze minimum dwóch konkretnych punktów trasy, z których może uczciwie zbudować ślad po drogach.
                                 </p>
                                 <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                                  Aby kontynuować i odblokować kolejne kroki (opisy, punkty POI i przewodnik), wgraj plik .gpx ze swojej trasy.
+                                  Wgraj plik .gpx albo wróć do materiałów i dopisz start, koniec oraz ważne postoje.
                                 </p>
                               </div>
 
