@@ -51,12 +51,16 @@ RUN for pkg in atlas-core atlas-gis atlas-workflow atlas-writer atlas-publisher 
 
 # Create data directories with correct permissions
 RUN mkdir -p /app/data /app/routes && chown -R nodejs:nodejs /app/data /app/routes
+
+# Copy healthcheck script
+COPY healthcheck.js /app/healthcheck.js
+
 USER nodejs
 
 EXPOSE 8787
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8787/health || exit 1
+# Healthcheck using node
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD node healthcheck.js
 
 CMD ["node", "dist/apps/atlas-engine/apps/api/src/index.js"]

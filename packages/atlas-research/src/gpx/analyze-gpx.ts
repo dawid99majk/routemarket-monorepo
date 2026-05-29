@@ -131,9 +131,9 @@ function parseGpxPoints(xml: string): { points: GpxPoint[]; warnings: RouteWarni
   const points: GpxPoint[] = [];
   const warnings: RouteWarning[] = [];
   let source = "track_points";
-  let pointRegex = /<trkpt\b([^>]*)>(.*?)<\/trkpt>/gis;
+  let pointRegex = /<trkpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/trkpt>)/gis;
   if (!pointRegex.test(xml)) {
-    pointRegex = /<rtept\b([^>]*)>(.*?)<\/rtept>/gis;
+    pointRegex = /<rtept\b([^>]*?)(?:\/>|>([\s\S]*?)<\/rtept>)/gis;
     source = "route_points";
   }
   pointRegex.lastIndex = 0;
@@ -154,7 +154,7 @@ function parseGpxPoints(xml: string): { points: GpxPoint[]; warnings: RouteWarni
       skipped += 1;
       continue;
     }
-    const inner = match[2];
+    const inner = match[2] ?? "";
     
     const eleMatch = eleRegex.exec(inner);
     const timeMatch = timeRegex.exec(inner);

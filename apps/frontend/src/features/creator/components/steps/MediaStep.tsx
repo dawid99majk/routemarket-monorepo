@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,9 +24,12 @@ import {
   Zap
 } from 'lucide-react';
 import { PoiGeoJson } from '@/features/creator/types/creator.types';
+import RouteDetailMap from '@/components/RouteDetailMap';
+import { parseGpx } from '@/lib/gpx-parser';
 
 interface MediaStepProps {
   poiGeoJson: PoiGeoJson | null;
+  gpxXml: string | null;
   onApprove: () => void;
   isProcessing: boolean;
 }
@@ -51,9 +55,20 @@ const getConfidenceColor = (confidence: number = 0) => {
 
 export function MediaStep({
   poiGeoJson,
+  gpxXml,
   onApprove,
   isProcessing
 }: MediaStepProps) {
+  const trackPoints = useMemo(() => {
+    if (!gpxXml) return [];
+    try {
+      return parseGpx(gpxXml).trackPoints;
+    } catch (e) {
+      console.error('Error parsing GPX in MediaStep', e);
+      return [];
+    }
+  }, [gpxXml]);
+
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-none shadow-xl">
@@ -138,14 +153,15 @@ export function MediaStep({
                   <LocateFixed className="w-4 h-4" />
                   Podgląd Lokalizacji
                 </h3>
-                <div className="aspect-video rounded-2xl border-2 border-primary/10 bg-muted/20 flex flex-col items-center justify-center relative group overflow-hidden shadow-inner">
-                  <div className="absolute inset-0 bg-[url('https://www.google.com/maps/vt/pb=!1m4!1m3!1i12!2i2345!3i1234!2m3!1e0!2sm!3i420120488!3m8!2spl!3sUS!5e1105!12m4!1e68!2m2!1sset!2sRoadmap!4e0!5m1!5f2')] opacity-20 grayscale group-hover:opacity-30 transition-opacity" />
-                  <div className="relative z-10 flex flex-col items-center gap-2">
-                    <div className="w-12 h-12 rounded-full bg-background/80 flex items-center justify-center shadow-lg">
-                      <MapPin className="w-6 h-6 text-primary" />
+                <div className="aspect-[16/10] rounded-2xl border bg-muted/20 relative overflow-hidden shadow-inner">
+                  {trackPoints.length > 0 ? (
+                    <RouteDetailMap track={trackPoints} />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                      <MapPin className="w-8 h-8 text-muted-foreground/20 mb-2" />
+                      <p className="text-xs font-bold uppercase tracking-widest">Brak śladu trasy</p>
                     </div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Map View Placeholder</p>
-                  </div>
+                  )}
                 </div>
               </div>
 

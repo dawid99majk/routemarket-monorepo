@@ -11,9 +11,9 @@ type GlobeProvider = 'google-3d' | 'open-globe';
 type GlobeStatus = 'loading' | 'ready' | 'error';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const EARTH_TEXTURE_URL = 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
-const EARTH_BUMP_URL = 'https://unpkg.com/three-globe/example/img/earth-topology.png';
-const NIGHT_TEXTURE_URL = 'https://unpkg.com/three-globe/example/img/night-sky.png';
+const EARTH_TEXTURE_URL = 'https://cdn.jsdelivr.net/gh/vasturiano/three-globe/example/img/earth-blue-marble.jpg';
+const EARTH_BUMP_URL = 'https://cdn.jsdelivr.net/gh/vasturiano/three-globe/example/img/earth-topology.png';
+const NIGHT_TEXTURE_URL = 'https://cdn.jsdelivr.net/gh/vasturiano/three-globe/example/img/night-sky.png';
 
 let maps3dPromise: Promise<{
   Map3DElement: any;

@@ -28,7 +28,11 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    profiles: ["caddy"]
     restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-routemarket.io}
+      SUPABASE_UPSTREAM: ${SUPABASE_UPSTREAM:-host.docker.internal:8000}
     ports:
       - "${APP_HTTP_PORT:-80}:80"
       - "${APP_HTTPS_PORT:-443}:443"

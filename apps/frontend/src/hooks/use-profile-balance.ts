@@ -7,6 +7,7 @@ export interface UserBalance {
   token_balance: number;
   display_name?: string;
   avatar_url?: string;
+  unlimited_credits?: boolean;
 }
 
 export function useProfileBalance(userId: string | undefined) {
@@ -17,24 +18,33 @@ export function useProfileBalance(userId: string | undefined) {
     queryKey: ['profile-balance', userId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('credit_balance, token_balance, display_name, avatar_url')
-        .eq('user_id', userId!)
-        .maybeSingle();
+      const [profileResult, rolesResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('credit_balance, token_balance, display_name, avatar_url')
+          .eq('user_id', userId!)
+          .maybeSingle(),
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId!)
+      ]);
 
-      if (error) {
-        console.warn('Error fetching balance from profiles:', error);
+      const isAdmin = rolesResult.data?.some((row) => row.role === 'admin') ?? false;
+
+      if (profileResult.error) {
+        console.warn('Error fetching balance from profiles:', profileResult.error);
         // Fallback for mock/local testing if migration not fully applied yet
-        return { credit_balance: 100, token_balance: 0 };
+        return { credit_balance: isAdmin ? Number.MAX_SAFE_INTEGER : 100, token_balance: 0, unlimited_credits: isAdmin };
       }
 
       // Default fallbacks if database returns null or columns are empty
       return {
-        credit_balance: data?.credit_balance ?? 100,
-        token_balance: data?.token_balance ?? 0,
-        display_name: data?.display_name,
-        avatar_url: data?.avatar_url,
+        credit_balance: isAdmin ? Number.MAX_SAFE_INTEGER : profileResult.data?.credit_balance ?? 100,
+        token_balance: profileResult.data?.token_balance ?? 0,
+        display_name: profileResult.data?.display_name,
+        avatar_url: profileResult.data?.avatar_url,
+        unlimited_credits: isAdmin,
       };
     },
   });
@@ -121,6 +131,19 @@ export function useProfileBalance(userId: string | undefined) {
   const spendCredits = useMutation({
     mutationFn: async ({ amount, purpose }: { amount: number; purpose: 'route_creation' | 'route_deep_research' }) => {
       if (!userId) throw new Error('User not logged in');
+
+      let unlimitedCredits = balanceQuery.data?.unlimited_credits ?? false;
+      if (!unlimitedCredits) {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId);
+        unlimitedCredits = roles?.some((row) => row.role === 'admin') ?? false;
+      }
+
+      if (unlimitedCredits) {
+        return { amount, newBalance: Number.MAX_SAFE_INTEGER, unlimited: true };
+      }
 
       const currentBalance = balanceQuery.data?.credit_balance ?? 100;
       if (currentBalance < amount) {

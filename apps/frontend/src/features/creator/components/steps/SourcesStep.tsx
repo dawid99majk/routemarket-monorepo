@@ -13,7 +13,8 @@ import {
   Loader2, 
   Route, 
   Shield, 
-  Sparkles 
+  Sparkles,
+  X
 } from 'lucide-react';
 import { SourceFile } from '@/features/creator/types/creator.types';
 
@@ -25,6 +26,8 @@ interface SourcesStepProps {
   onAddLink: (url: string) => void;
   uploadedFiles: SourceFile[];
   onUploadFiles: (files: FileList) => void;
+  onRemoveFile?: (file: SourceFile) => void;
+  onRemoveLink?: (url: string) => void;
   isUploading: boolean;
   onContinue: () => void;
 }
@@ -50,6 +53,8 @@ export function SourcesStep({
   onAddLink,
   uploadedFiles,
   onUploadFiles,
+  onRemoveFile,
+  onRemoveLink,
   isUploading,
   onContinue,
   onYoutubeImport,
@@ -84,9 +89,11 @@ export function SourcesStep({
           ref={fileInputRef} 
           type="file" 
           multiple 
-          accept=".md,.markdown,.txt,.csv,.json,.geojson,.kml,.gpx,.pdf,.doc,.docx" 
           className="hidden" 
-          onChange={(e) => e.target.files && onUploadFiles(e.target.files)} 
+          onChange={(e) => {
+            if (e.target.files) onUploadFiles(e.target.files);
+            e.currentTarget.value = '';
+          }} 
         />
         
         <div className="grid gap-3 sm:grid-cols-3">
@@ -161,6 +168,16 @@ export function SourcesStep({
                   <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-full bg-background px-3 py-1 text-xs text-muted-foreground border">
                     {file.name.endsWith('.gpx') ? <Route className="h-3.5 w-3.5 text-emerald-500" /> : <FileText className="h-3.5 w-3.5 text-primary" />}
                     <span className="max-w-[240px] truncate">{file.name}</span>
+                    {onRemoveFile && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveFile(file)}
+                        className="rounded-full p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label={`Usuń plik ${file.name}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
                   </span>
                 ))}
                 {links.map((link) => {
@@ -170,6 +187,16 @@ export function SourcesStep({
                     <span key={link} className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${brandInfo.color}`}>
                       <Icon className="h-3.5 w-3.5" />
                       <span className="max-w-[280px] truncate">{brandInfo.brand}: {link}</span>
+                      {onRemoveLink && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveLink(link)}
+                          className="rounded-full p-0.5 text-current opacity-70 hover:bg-background/60 hover:opacity-100"
+                          aria-label={`Usuń link ${link}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </span>
                   );
                 })}

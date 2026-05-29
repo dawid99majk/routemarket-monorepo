@@ -87,6 +87,14 @@ export const AddLinkBodySchema = z.object({
   note: z.string().max(500).optional()
 });
 
+export const RemoveInputBodySchema = z.object({
+  id: z.string().min(1).max(200).optional(),
+  path: z.string().min(1).max(1000).optional(),
+  originalName: z.string().min(1).max(500).optional()
+}).refine((value) => Boolean(value.id || value.path || value.originalName), {
+  message: "id, path or originalName is required"
+});
+
 export const RegisterExternalInputBodySchema = z.object({
   type: z.enum(["note", "document", "photo", "gpx", "link"]),
   originalName: SafeFileNameSchema,

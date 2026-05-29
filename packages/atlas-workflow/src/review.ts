@@ -94,7 +94,7 @@ export async function buildProjectReviewBundle(input: {
     approvals,
     workflowState: await readWorkflowState(input.project, input.repository),
     missingInputs,
-    artifactHashes: await hashImportantArtifacts(input.project),
+    artifactHashes: await hashImportantArtifacts(input.project, input.repository),
     qualityIssues,
     nextAction: nextAction(readiness, approvals, missingInputs, qualityIssues),
     importReadiness
@@ -143,7 +143,7 @@ export async function saveProjectApprovalDecision(input: {
 }): Promise<void> {
   let approvals = await input.repository.loadApprovals(input.project.id);
   
-  const artifactHashes = await hashImportantArtifacts(input.project);
+  const artifactHashes = await hashImportantArtifacts(input.project, input.repository);
   const record: any = {
     stage: input.stage,
     decision: input.decision,
@@ -245,7 +245,7 @@ export async function saveProjectApprovalDecision(input: {
     }
   }
 
-  record.artifactHashes = filterHashesForStage(input.stage, await hashImportantArtifacts(input.project));
+  record.artifactHashes = filterHashesForStage(input.stage, await hashImportantArtifacts(input.project, input.repository));
   approvals.updatedAt = new Date().toISOString();
   await input.repository.saveApprovals(input.project.id, approvals);
 

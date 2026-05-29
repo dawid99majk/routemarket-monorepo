@@ -222,22 +222,22 @@ async function renderTerrain(
     const edgeLift = Math.pow(Math.min(1, (Math.abs(x) / (terrainWidth * 0.5) + Math.abs(z) / (terrainDepth * 0.5)) * 0.5), 1.4);
     const valleyFlatten = 1 - Math.pow(1 - normalizedDistance, 2.2);
     const height =
-      (noise * 3.8 + ridges * 2.3 + edgeLift * 5.8) * valleyFlatten +
-      Math.max(0, 1 - normalizedDistance * 1.8) * 0.7;
+      (noise * 4.5 + ridges * 3.2 + edgeLift * 7.5) * valleyFlatten +
+      Math.max(0, 1 - normalizedDistance * 1.8) * 1.2;
 
     position.setY(index, height);
 
-    const low = new THREE.Color('#173326');
-    const mid = new THREE.Color('#395b37');
-    const high = new THREE.Color('#8a7a56');
-    const peak = new THREE.Color('#d2c4a3');
-    const colorMix = Math.min(1, Math.max(0, height / 9));
+    const low = new THREE.Color('#1a4731');
+    const mid = new THREE.Color('#4d7c0f');
+    const high = new THREE.Color('#a16207');
+    const peak = new THREE.Color('#fef3c7');
+    const colorMix = Math.min(1, Math.max(0, height / 12));
     const terrainColor =
-      colorMix < 0.45
-        ? low.clone().lerp(mid, colorMix / 0.45)
-        : colorMix < 0.78
-          ? mid.clone().lerp(high, (colorMix - 0.45) / 0.33)
-          : high.clone().lerp(peak, (colorMix - 0.78) / 0.22);
+      colorMix < 0.4
+        ? low.clone().lerp(mid, colorMix / 0.4)
+        : colorMix < 0.75
+          ? mid.clone().lerp(high, (colorMix - 0.4) / 0.35)
+          : high.clone().lerp(peak, (colorMix - 0.75) / 0.25);
 
     colors[index * 3] = terrainColor.r;
     colors[index * 3 + 1] = terrainColor.g;
@@ -262,45 +262,53 @@ async function renderTerrain(
   gridHelper.position.y = 0.16;
   scene.add(gridHelper);
 
-  const trackVectors = points.map((point) => new THREE.Vector3(point.x, 2.05, point.z));
+  const trackVectors = points.map((point) => new THREE.Vector3(point.x, 2.5, point.z));
   const routeCurve = new THREE.CatmullRomCurve3(trackVectors);
-  const routeGeometry = new THREE.TubeGeometry(routeCurve, Math.max(80, points.length * 2), 0.72, 10, false);
+  const routeGeometry = new THREE.TubeGeometry(routeCurve, Math.max(80, points.length * 2), 1.2, 12, false);
   const routeMaterial = new THREE.MeshStandardMaterial({
-    color: '#7dd3fc',
-    emissive: '#0ea5e9',
-    emissiveIntensity: 0.36,
-    roughness: 0.22,
-    metalness: 0.08,
+    color: '#00f2ff',
+    emissive: '#00f2ff',
+    emissiveIntensity: 2.5,
+    roughness: 0.1,
+    metalness: 0.5,
   });
   const routeMesh = new THREE.Mesh(routeGeometry, routeMaterial);
   routeMesh.castShadow = true;
   scene.add(routeMesh);
 
-  const haloGeometry = new THREE.TubeGeometry(routeCurve, Math.max(80, points.length * 2), 1.45, 10, false);
+  const haloGeometry = new THREE.TubeGeometry(routeCurve, Math.max(80, points.length * 2), 2.8, 12, false);
   const haloMaterial = new THREE.MeshBasicMaterial({
-    color: '#38bdf8',
+    color: '#00f2ff',
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.25,
   });
   const haloMesh = new THREE.Mesh(haloGeometry, haloMaterial);
   scene.add(haloMesh);
 
-  const markerGeometry = new THREE.SphereGeometry(1.8, 20, 20);
+  const markerGeometry = new THREE.SphereGeometry(2.4, 24, 24);
   const startMarker = new THREE.Mesh(
     markerGeometry,
-    new THREE.MeshStandardMaterial({ color: '#22c55e', emissive: '#14532d', emissiveIntensity: 0.55 }),
+    new THREE.MeshStandardMaterial({ 
+      color: '#22c55e', 
+      emissive: '#22c55e', 
+      emissiveIntensity: 1.5 
+    }),
   );
   startMarker.position.copy(trackVectors[0]);
-  startMarker.position.y = 3.2;
+  startMarker.position.y = 4.5;
   startMarker.castShadow = true;
   scene.add(startMarker);
 
   const endMarker = new THREE.Mesh(
     markerGeometry,
-    new THREE.MeshStandardMaterial({ color: '#ef4444', emissive: '#7f1d1d', emissiveIntensity: 0.48 }),
+    new THREE.MeshStandardMaterial({ 
+      color: '#ef4444', 
+      emissive: '#ef4444', 
+      emissiveIntensity: 1.5 
+    }),
   );
   endMarker.position.copy(trackVectors[trackVectors.length - 1]);
-  endMarker.position.y = 3.2;
+  endMarker.position.y = 4.5;
   endMarker.castShadow = true;
   scene.add(endMarker);
 

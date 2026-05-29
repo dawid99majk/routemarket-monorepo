@@ -1,6 +1,7 @@
 export * from "./discovery.js";
 export * from "./research-pack/build-research-pack.js";
 export * from "./gpx/analyze-gpx.js";
+export * from "./gpx/generate-route-gpx.js";
 export * from "./keyword-expansion.js";
 export * from "./providers/interfaces.js";
 export * from "./providers/google-grounded-search-provider.js";
