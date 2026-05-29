@@ -12,18 +12,77 @@ import {
 } from "../../atlas-core/src/index.js";
 
 export async function writeGuideOutline(project: RouteProject, repository?: ProjectRepository): Promise<string> {
-  const outline = `# Outline for ${project.title}
-1. Introduction
-2. Key Highlights
-3. Route Details
-4. Preparation
-5. Conclusion`;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  
+  let outline: string;
+  if (apiKey) {
+    try {
+      outline = await generateAiOutline(project, repository, apiKey);
+    } catch (e) {
+      console.warn("AI Outline generation failed, falling back to template", e);
+      outline = generateFallbackOutline(project);
+    }
+  } else {
+    outline = generateFallbackOutline(project);
+  }
+
   if (repository) {
     await repository.writeProjectFile(project.id, "guide_outline.md", outline);
   } else {
     await writeFile(join(project.folderPath, "guide_outline.md"), outline, "utf8");
   }
   return outline;
+}
+
+async function generateAiOutline(project: RouteProject, repository: ProjectRepository | undefined, apiKey: string): Promise<string> {
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  let context = "";
+  if (repository) {
+    const concept = await repository.readProjectFile(project.id, "route_concept.md").catch(() => "");
+    const notes = await repository.readProjectFile(project.id, "notes.md").catch(() => "");
+    const interview = await repository.readProjectFile(project.id, "input/notes/interview_answers.md").catch(() => "");
+    context = `KONCEPCJA:\n${concept}\n\nNOTATKI:\n${notes}\n\nWYWIAD:\n${interview}`;
+  }
+
+  const prompt = `Jesteś redaktorem RouteMarket. Twoim zadaniem jest stworzenie szczegółowej STRUKTURY (outline) dla przewodnika turystycznego.
+
+PROJEKT: ${project.title} (${project.category})
+REGION: ${project.region}
+
+DANE WEJŚCIOWE:
+${context.slice(0, 10000)}
+
+ZASADY:
+1. Outline musi być konkretny dla TEJ trasy. Nie używaj ogólnych nazw sekcji jak "Introduction" jeśli możesz napisać "Wstęp do panoramy Tatr".
+2. Uwzględnij logistykę, bezpieczeństwo i konkretne punkty trasy.
+3. Język: Polski.
+4. Format: Markdown z numeracją.
+
+Zwróć TYLKO Markdown.`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.4 }
+    })
+  });
+
+  if (!response.ok) throw new Error("Gemini API error");
+  const data = await response.json() as any;
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || generateFallbackOutline(project);
+}
+
+function generateFallbackOutline(project: RouteProject): string {
+  return `# Plan przewodnika: ${project.title}
+1. Wprowadzenie i charakterystyka regionu ${project.region}
+2. Szczegóły techniczne i przygotowanie do wyprawy
+3. Opis przebiegu trasy krok po kroku
+4. Logistyka: start, parking i dostęp do wody
+5. Podsumowanie i rekomendacje dla podróżników`;
 }
 
 export async function generateLegacyGuideDraft(input: { project: RouteProject; sources?: any[]; concept?: string }): Promise<string> {

@@ -1,11 +1,11 @@
 services:
   atlas-api:
     build:
-      context: ..
+      context: ../../../
       dockerfile: Dockerfile
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8787/health >/dev/null || exit 1']
+      test: ['CMD', 'node', '/app/healthcheck.js']
       interval: 30s
       timeout: 5s
       retries: 5
@@ -25,6 +25,7 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GRAPHHOPPER_API_KEY: ${GRAPHHOPPER_API_KEY:-}
     volumes:
       - atlas-data:/app/data
       - atlas-routes:/app/routes
@@ -35,6 +36,31 @@ services:
       supabase_default:
         aliases:
           - atlas-api
+
+  route-builder-api:
+    build:
+      context: ../../../
+      dockerfile: apps/route-builder-api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '8081:8081'
+    environment:
+      PORT: 8081
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GRAPHHOPPER_API_KEY: ${GRAPHHOPPER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    networks:
+      default:
+        aliases:
+          - route-builder-api
+      supabase_default:
+        aliases:
+          - route-builder-api
+      routemarket-network:
+        aliases:
+          - route-builder-api
 volumes:
   atlas-data:
   atlas-routes:
@@ -43,3 +69,6 @@ networks:
   supabase_default:
     external: true
     name: supabase_default
+  routemarket-network:
+    external: true
+    name: routemarket-network

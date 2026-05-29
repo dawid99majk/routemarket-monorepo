@@ -40,6 +40,7 @@ type AtlasAction =
   | "add_notes"
   | "add_gpx"
   | "add_link"
+  | "remove_input"
   | "analyze_gpx"
   | "research_pack"
   | "get_file"
@@ -205,7 +206,7 @@ serve(async (req) => {
         return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}`);
       case "get_workflow_state":
         await checkOwnership(input.slug);
-        return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/files?path=workflow_state.json`);
+        return atlasOptionalFile(input.slug, "workflow_state.json");
       case "list_events":
         await checkOwnership(input.slug);
         return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/events`);
@@ -309,6 +310,13 @@ serve(async (req) => {
           url: input.url,
           note: input.note,
         });
+      case "remove_input":
+        await checkOwnership(input.slug);
+        return atlasRequest("DELETE", `/projects/${encodeURIComponent(input.slug)}/inputs`, {
+          id: input.id,
+          path: input.path,
+          originalName: input.originalName,
+        });
       case "analyze_gpx":
         await checkOwnership(input.slug);
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/analyze-gpx`, {});
@@ -317,7 +325,7 @@ serve(async (req) => {
         return atlasRequest("POST", `/projects/${encodeURIComponent(input.slug)}/research-pack`, {});
       case "get_file":
         await checkOwnership(input.slug);
-        return atlasRequest("GET", `/projects/${encodeURIComponent(input.slug)}/files?path=${encodeURIComponent(input.path)}`);
+        return atlasOptionalFile(input.slug, String(input.path ?? ""));
       case "put_file":
         await checkOwnership(input.slug);
         return atlasRequest("PUT", `/projects/${encodeURIComponent(input.slug)}/files?path=${encodeURIComponent(input.path)}`, {
@@ -727,6 +735,61 @@ async function atlasRequest(method: string, path: string, body?: unknown): Promi
     console.error(`[Atlas Request Exception] Method: ${method}, Path: ${path}, Error: ${errMsg}`);
     return json({ error: errMsg }, 500);
   }
+}
+
+async function atlasOptionalFile(slug: unknown, path: string): Promise<Response> {
+  const projectSlug = String(slug ?? "").trim();
+  const filePath = String(path ?? "").trim();
+  if (!projectSlug) return json({ error: "Project slug is required." }, 400);
+  if (!filePath) return json({ content: "", missing: true });
+
+  const atlasPath = `/projects/${encodeURIComponent(projectSlug)}/files?path=${encodeURIComponent(filePath)}`;
+  try {
+    const response = await atlasFetch("GET", atlasPath);
+    const payloadText = await response.text();
+
+    if (response.ok) {
+      return new Response(payloadText, {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const errorMessage = extractAtlasError(payloadText, atlasPath, response.status);
+    if (response.status === 404 || isMissingProjectFileError(errorMessage)) {
+      return json({ content: "", missing: true, path: filePath });
+    }
+
+    console.warn(`[Atlas Optional File Error] Path: ${atlasPath}, Status: ${response.status}, Error: ${errorMessage}`);
+    return json({ error: errorMessage }, response.status);
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[Atlas Optional File Exception] Path: ${atlasPath}, Error: ${errMsg}`);
+    return json({ error: errMsg }, 500);
+  }
+}
+
+function extractAtlasError(payloadText: string, path: string, status: number): string {
+  let errorMessage = `Atlas request failed for ${path} (status ${status}).`;
+  try {
+    const parsed = JSON.parse(payloadText);
+    if (parsed && typeof parsed === "object") {
+      if ((parsed as { error?: unknown }).error) {
+        errorMessage = String((parsed as { error?: unknown }).error);
+      } else if ((parsed as { message?: unknown }).message) {
+        errorMessage = String((parsed as { message?: unknown }).message);
+      }
+    }
+  } catch {
+    if (payloadText.trim()) {
+      errorMessage = payloadText.trim();
+    }
+  }
+  return errorMessage;
+}
+
+function isMissingProjectFileError(message: string): boolean {
+  return /^File .+ not found in project .+\.$/.test(message.trim());
 }
 
 async function atlasFetch(method: string, path: string, body?: unknown): Promise<Response> {

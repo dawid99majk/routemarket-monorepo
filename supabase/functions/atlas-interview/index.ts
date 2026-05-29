@@ -67,52 +67,56 @@ Deno.serve(async (req) => {
       ...(context || {}),
       notes: [context?.notes, projectNotes].filter(Boolean).join("\n\n").slice(0, 30000)
     };
+    const deterministicQuestion = buildFallbackQuestion(mergedContext, answerHistory, answeredQuestions);
+    if (deterministicQuestion && answerHistory.length < 4) {
+      return new Response(JSON.stringify({
+        status: "interviewing",
+        ...deterministicQuestion,
+        proposals: [],
+        summary: `Pytanie ${answerHistory.length + 1}/4`
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const prompt = `Jesteś Atlas Interviewerem. Twoim celem jest szybki wywiad (decyzje, nie rozmowa).
-Działaj jak kreator: krótkie pytania, konkretne opcje.
+    const prompt = `Jesteś Atlas Interviewerem. Twoim zadaniem jest sfinalizowanie fundamentów nowej trasy.
 
-KONTEKST:
+KONTEKST (PRZECZYTAJ UWAŻNIE):
 - Temat: ${mergedContext?.topic || "Nie określono"}
-- Kategoria: ${mergedContext?.category || "Nie określono"}
 - Region: ${mergedContext?.region || "Nie określono"}
-- Notatki i treść przesłanych plików: ${mergedContext?.notes || "Brak"}
+- Notatki użytkownika: 
+---
+${mergedContext?.notes || "Brak"}
+---
 
 HISTORIA ODPOWIEDZI:
 ${JSON.stringify(answerHistory)}
 
-PYTANIA, KTÓRYCH NIE WOLNO POWTARZAĆ:
-${answeredQuestions.length ? answeredQuestions.map((q) => `- ${q}`).join("\n") : "- Brak"}
+ZASADA ZERO REPLIKACJI:
+1. Przeskanuj notatki pod kątem: dystansu (np. "20km"), noclegu (np. "schroniska"), punktu startu, trudności.
+2. Jeśli fakt jest w notatkach - UZNAJ GO ZA USTALONY. Nie pytaj o niego.
+3. Jeśli użytkownik już odpowiedział na pytanie o dany temat - nie drąż go, przejdź dalej.
 
-ZASADY:
-1. Pytanie: MAKSYMALNIE 120 znaków.
-2. Opis pomocniczy (hint): MAKSYMALNIE 1 krótkie zdanie.
-3. Opcje: MAKSYMALNIE 4, każda MAKSYMALNIE 3-5 słów.
-4. Styl: Zero marketingu, zero "premium", techniczny i konkretny.
-5. Progresja: Najpierw najważniejsze (styl, trudność, tempo, logistyka).
-6. Jeśli masz komplet danych albo użytkownik odpowiedział na 4+ pytań, ustaw status "proposal".
-7. Propozycje: Tytuł, 2 zdania opisu, 3 krótkie wyróżniki (maks 4 słowa każdy).
-8. Jeśli tytuł/temat przeczy plikom, ważniejsze są pliki. Pierwsze pytanie ma krótko wyjaśnić rozbieżność albo przejdź zgodnie z plikami.
-9. Nie pytaj o region z tytułu, jeśli pliki jasno wskazują inny region.
-10. Nigdy nie zadawaj drugi raz tego samego pytania ani pytania o tę samą decyzję.
-11. Jeśli ostatnia odpowiedź zamyka aktualny temat, przejdź do następnej brakującej decyzji albo do propozycji.
+ZADANIE:
+1. Zadaj JEDNO konkretne pytanie o brakujący szczegół techniczny (np. precyzyjne miejsce startu, preferowane nawierzchnie).
+2. Jeśli masz już komplet danych do budowy trasy - przejdź natychmiast do statusu "proposal".
 
-BANK PYTAŃ (Inspiracja):
-- Motocykl: Styl jazdy? Drogi? Czas dziennie? Co omijać?
-- Rower: Nawierzchnia? Tempo? Przewyższenia? Logistyka?
-- Trekking: Dni? Trudność? Nocleg? Waga bagażu?
+ZASADY TECHNICZNE:
+1. Pytanie: MAKS 120 znaków. Styl: konkretny, inżynierski.
+2. Nie powtarzaj pytań z listy: ${answeredQuestions.join(", ")}
+3. PUNKT STARTOWY (miejscowość/parking) jest krytyczny - zapytaj o niego w pierwszej kolejności, jeśli nie ma go w notatkach.
 
 FORMAT JSON:
 {
   "status": "interviewing" | "proposal",
-  "question": "Krótkie pytanie",
-  "hint": "Krótka podpowiedź pomocnicza",
-  "options": [
-    { "label": "Etykieta", "value": "kod", "icon": "LucideIcon" }
-  ],
+  "question": "Pytanie o BRAKUJĄCY fakt",
+  "hint": "Dlaczego to ważne?",
+  "options": [{ "label": "Etykieta", "value": "kod" }],
   "proposals": [
-    { "id": "A", "title": "Tytuł", "description": "Opis 2 zdania", "highlights": ["h1", "h2", "h3"] }
+    { "id": "A", "title": "Konkretny tytuł trasy", "description": "2 zdania konkretów", "highlights": ["h1", "h2", "h3"] }
   ],
-  "summary": "Pytanie X/5"
+  "summary": "Pytanie X/4"
 }`;
 
     const resp = await fetch(URL, {
@@ -241,7 +245,7 @@ function safeAtlasFileName(fileName: string): string | null {
 function buildFallbackProposals(context: any, answers: Array<{ q: string; a: string }>) {
   const topic = context?.topic || "Nowa trasa";
   const region = context?.region || "wybrany region";
-  const highlights = answers.slice(-3).map((item) => String(item.a).slice(0, 32));
+  const highlights = answers.slice(-4).map((item) => String(item.a).slice(0, 42));
   return [
     {
       id: "A",
@@ -307,20 +311,30 @@ function wordOverlap(a: string, b: string): number {
 
 function buildFallbackQuestion(context: any, answers: any[], previousQuestions: string[]) {
   const category = String(context?.category || "").toLowerCase();
-  const questions = category.includes("motor")
+  const facts = `${context?.topic || ""}\n${context?.region || ""}\n${context?.notes || ""}\n${answers.map((a) => `${a.q}: ${a.a}`).join("\n")}`.toLowerCase();
+  const baseQuestions = [
+    question("Podaj dokładny punkt startu.", "Bez tego nie da się uczciwie narysować śladu GPX.", ["Parking / adres", "Centrum miejscowości", "Dworzec / stacja", "Wpiszę własny"]),
+    question("Czy trasa ma być pętlą?", "To decyduje o punkcie końcowym i przebiegu GPX.", ["Tak, pętla", "Nie, z A do B", "Może być półpętla", "Wpiszę własne"]),
+    question("Jaki dystans lub czas ma mieć trasa?", "Atlas użyje tego jako twardej ramy planu.", ["Do 20 km / 1 dzień", "40-80 km", "100-250 km", "Kilka dni"]),
+  ].filter((candidate) => {
+    const normalized = normalizeQuestion(candidate.question);
+    if (normalized.includes("punkt startu") && hasAny(facts, ["start", "parking", "dworzec", "kuźnice", "kuznice", "zakopane", "cortina"])) return false;
+    if (normalized.includes("petla") && hasAny(facts, ["pętla", "petla", "a do b", "tam i z powrotem", "powrot"])) return false;
+    if (normalized.includes("dystans") && /\b\d+\s?(km|kilometr|godzin|dni|h)\b/i.test(facts)) return false;
+    return true;
+  });
+
+  const categoryQuestions = category.includes("motor")
     ? [
-        question("Ile godzin jazdy dziennie?", "Ustawimy realne tempo etapu.", ["3-4 h", "5-6 h", "7+ h", "Elastycznie"]),
         question("Jakie drogi preferujesz?", "Wybierz charakter trasy.", ["Asfalt kręty", "Widokowe", "Szutry", "Mieszane"]),
-        question("Co omijać?", "Atlas potraktuje to jako twarde ograniczenie.", ["Autostrady", "Miasta", "Szutry", "Tłumy"])
+        question("Co omijać?", "Atlas potraktuje to jako twarde ograniczenie.", ["Autostrady", "Centra miast", "Szutry", "Tłumy"])
       ]
     : [
-        question("Ile dni ma zająć trasa?", "To ustawi rytm etapów.", ["1 dzień", "2-3 dni", "4-7 dni", "Elastycznie"]),
         question("Jaki poziom trudności?", "Atlas nie będzie sztucznie podbijał wyzwania.", ["Łatwy", "Średni", "Trudny", "Ekspercki"]),
-        question("Jaki nocleg planujesz?", "To wpływa na logistykę i punkty końcowe.", ["Schronisko", "Hotel", "Namiot", "Bez noclegu"]),
         question("Co musi omijać trasa?", "Podaj najważniejsze ograniczenie.", ["Ekspozycję", "Tłumy", "Długie podejścia", "Drogi asfaltowe"])
       ];
 
-  return questions.find((candidate) => !isRepeatedQuestion(candidate.question, previousQuestions));
+  return [...baseQuestions, ...categoryQuestions].find((candidate) => !isRepeatedQuestion(candidate.question, previousQuestions));
 }
 
 function question(questionText: string, hint: string, labels: string[]) {
@@ -333,4 +347,8 @@ function question(questionText: string, hint: string, labels: string[]) {
       icon: "Circle"
     }))
   };
+}
+
+function hasAny(text: string, needles: string[]): boolean {
+  return needles.some((needle) => text.includes(needle));
 }

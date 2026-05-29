@@ -42,31 +42,24 @@ export function useAtlasProjectWorkspace(slug: string | null) {
 
   const loadFile = useCallback(async (path: string) => {
     if (!slug) return '';
-    try {
-      const data = await invokeAtlas('get_file', { slug, path }) as { content?: string };
-      if (data.content) return data.content;
+    const fallbacks: Record<string, string[]> = {
+      'notes.md': ['input/notes/notes.md', 'input/notes/notes.txt'],
+      'interview_answers.md': ['input/notes/interview_answers.md'],
+      'guide_outline.md': ['output/guide_outline.md', 'route_concept.md'],
+      'route.gpx': ['output/route.gpx', 'input/gpx/route.gpx'],
+      'poi.geojson': ['output/poi.geojson']
+    };
+    const candidates = [path, ...(fallbacks[path] ?? [])];
 
-      // Fallback for common subdirectories if root file is missing/empty
-      const fallbacks: Record<string, string[]> = {
-        'notes.md': ['input/notes/notes.md', 'input/notes/notes.txt'],
-        'interview_answers.md': ['input/notes/interview_answers.md'],
-        'guide_outline.md': ['output/guide_outline.md', 'route_concept.md'],
-        'route.gpx': ['output/route.gpx', 'input/gpx/route.gpx'],
-        'poi.geojson': ['output/poi.geojson']
-      };
-
-      if (fallbacks[path]) {
-        for (const fallbackPath of fallbacks[path]) {
-          const fallbackData = await invokeAtlas('get_file', { slug, path: fallbackPath }) as { content?: string };
-          if (fallbackData.content) return fallbackData.content;
-        }
+    for (const candidate of candidates) {
+      try {
+        const data = await invokeAtlas('get_file', { slug, path: candidate }) as { content?: string };
+        if (data.content) return data.content;
+      } catch {
+        // Missing artifacts are normal between workflow stages.
       }
-
-      return '';
-    } catch (err) {
-      console.warn(`Failed to load project file ${path}:`, err);
-      return '';
     }
+    return '';
   }, [slug, invokeAtlas]);
 
   const fetchWorkspace = useCallback(async () => {
@@ -96,60 +89,44 @@ export function useAtlasProjectWorkspace(slug: string | null) {
       const claimsContent = await loadFile('claims.json');
       try { setClaims(claimsContent ? JSON.parse(claimsContent) : []); } catch { setClaims([]); }
 
-      // 1. Determine Base Step from Status
+      // 1. Determine Base Step from Status & Waiting Stage (Authority)
       const status = proj.status;
       const waitingStage = workflowState?.waitingApprovalStage || proj.waitingApprovalStage;
       let targetStep: PipelineStep = 'sources';
       let currentMaxIdx = 0;
 
-      if (status === 'created' || status === 'research_needed') {
-        targetStep = 'sources';
-        currentMaxIdx = 1;
-      } else if (status === 'sources_collected') {
-        targetStep = 'interview';
-        currentMaxIdx = 1;
-      } else if (status === 'ready_for_review' || status === 'changes_requested' || waitingStage) {
-        currentMaxIdx = 5;
-        if (waitingStage === 'gpx_summary_approval') targetStep = 'gpx';
-        else if (waitingStage === 'guide_outline_approval' || waitingStage === 'concept_approval') targetStep = 'outline';
+      // Map status to max accessible step
+      if (status === 'created' || status === 'research_needed') currentMaxIdx = 0;
+      else if (status === 'sources_collected') currentMaxIdx = 1;
+      else if (status === 'ready_for_review' || status === 'changes_requested') currentMaxIdx = 5;
+      else if (status === 'draft_generated' || status === 'approved_for_publish' || status === 'completed') currentMaxIdx = 6;
+
+      // Determine active step based on what the backend is waiting for
+      if (waitingStage) {
+        if (waitingStage === 'claims_approval') targetStep = 'interview';
+        else if (waitingStage === 'concept_approval') targetStep = 'outline';
+        else if (waitingStage === 'guide_outline_approval') targetStep = 'outline';
+        else if (waitingStage === 'gpx_summary_approval') targetStep = 'gpx';
         else if (waitingStage === 'guide_final_approval') targetStep = 'guide';
-        else if (waitingStage === 'claims_approval') targetStep = 'interview';
         else if (waitingStage === 'poi_approval') targetStep = 'media';
-      } else if (status === 'draft_generated' || status === 'approved_for_publish' || status === 'completed') {
-        targetStep = 'publish';
-        currentMaxIdx = 6;
+      } else {
+        // Fallback to status-based step if not waiting for approval
+        if (status === 'created' || status === 'research_needed') targetStep = 'sources';
+        else if (status === 'sources_collected') targetStep = 'interview';
+        else if (status === 'ready_for_review') targetStep = 'outline';
+        else if (status === 'draft_generated' || status === 'completed') targetStep = 'publish';
       }
 
+      // 2. Completed Steps Sync
       const completedSteps = new Set(workflowState?.completedSteps ?? (Array.isArray((proj as any).completedSteps) ? (proj as any).completedSteps : []));
       for (const completed of completedSteps) {
         const mapped = pipelineStepFromWorkflowStep(completed);
         if (mapped) currentMaxIdx = Math.max(currentMaxIdx, stepOrder.indexOf(mapped) + 1);
       }
 
-      const workflowMappedStep = pipelineStepFromWorkflowStep(workflowState?.currentStep || (proj as any).currentStep);
-      if (workflowMappedStep) {
-        targetStep = workflowMappedStep;
-        currentMaxIdx = Math.max(currentMaxIdx, stepOrder.indexOf(workflowMappedStep));
-      }
-
-      // 2. Event-Driven Overrides (more reliable if status lags)
-      const hasInterview = eventsList.some(e =>
-        (e.type === 'input.note_added' && JSON.stringify(e.data).includes('interview_answers.md')) ||
-        ['workflow.concept_approval', 'workflow.concept_final_approval'].includes(e.type || '')
-      );
-      const hasOutline = eventsList.some(e => (e.type === 'workflow.guide_outline_approval' || JSON.stringify(e.data).includes('guide_outline.md')));
-      const hasGpx = eventsList.some(e => (e.type === 'workflow.gpx_summary_approval' || JSON.stringify(e.data).includes('route.gpx')));
-      const hasGuide = eventsList.some(e => (e.type === 'workflow.guide_final_approval' || JSON.stringify(e.data).includes('guide.md')));
-
-      if (hasGuide) { targetStep = 'guide'; currentMaxIdx = Math.max(currentMaxIdx, 4); }
-      else if (hasGpx) { targetStep = 'gpx'; currentMaxIdx = Math.max(currentMaxIdx, 3); }
-      else if (hasOutline) { targetStep = 'outline'; currentMaxIdx = Math.max(currentMaxIdx, 2); }
-      else if (hasInterview) {
-        if (targetStep === 'sources') targetStep = 'outline';
-        currentMaxIdx = Math.max(currentMaxIdx, 2);
-      }
-
+      // Clamp values
       currentMaxIdx = Math.min(Math.max(currentMaxIdx, stepOrder.indexOf(targetStep)), stepOrder.length - 1);
+      
       setActiveStep(targetStep);
       setMaxAllowedIdx(currentMaxIdx);
 
@@ -176,12 +153,10 @@ export function useAtlasProjectWorkspace(slug: string | null) {
         }
         setNotes(allNotes);
 
-        if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('outline') || hasOutline) {
-          setOutline(await loadFile('guide_outline.md'));
-          setConcept(await loadFile('route_concept.md'));
-        }
-        if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('gpx') || hasGpx) setGpxXml(await loadFile('route.gpx'));
-        if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('guide') || hasGuide) setGuide(await loadFile('guide.md'));
+        setOutline(await loadFile('guide_outline.md'));
+        setConcept(await loadFile('route_concept.md'));
+        setGpxXml(await loadFile('route.gpx'));
+        setGuide(await loadFile('guide.md'));
         if (stepOrder.indexOf(targetStep) >= stepOrder.indexOf('media')) {
           const poiContent = await loadFile('poi.geojson');
           try { setPoiGeoJson(poiContent ? JSON.parse(poiContent) : null); } catch { setPoiGeoJson(null); }

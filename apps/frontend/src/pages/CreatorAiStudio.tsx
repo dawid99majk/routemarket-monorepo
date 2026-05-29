@@ -59,8 +59,7 @@ export default function CreatorAiStudio() {
     setActiveStep,
     maxAllowedStep,
     artifacts,
-    fetchWorkspace,
-    events
+    fetchWorkspace
   } = useAtlasProjectWorkspace(activeSlug);
 
   const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasWorkflow();
@@ -238,9 +237,21 @@ ${trkpts}
       ...answers.map((answer, index) => `${index + 1}. ${answer.q}\n   - ${answer.a}`)
     ].join('\n');
 
-    await saveNamedNote('interview_answers.md', markdown);
-    setActiveStep('outline');
-    await runPipeline(activeSlug, fetchWorkspace);
+    const toastId = toast.loading('Zapisywanie planu i uruchamianie silnika trasy...');
+    try {
+      await saveNamedNote('interview_answers.md', markdown);
+      
+      // Auto-approve claims stage if it appears, because user just confirmed everything in interview
+      // This is a hint for the workflow hook to bypass the next manual stop if possible
+      setActiveStep('outline');
+      
+      await runPipeline(activeSlug, async () => {
+        await fetchWorkspace();
+        toast.success('Silnik Atlas wystartował pomyślnie!', { id: toastId });
+      });
+    } catch (err) {
+      toast.error('Błąd inicjalizacji: ' + (err as Error).message, { id: toastId });
+    }
   };
 
   useEffect(() => {
@@ -408,186 +419,163 @@ ${trkpts}
             onStepClick={(step) => setActiveStep(step)}
           />
 
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-            <div className="xl:col-span-3 space-y-6">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeStep + (project?.waitingApprovalStage || '')}
-                  initial={{ opacity: 0, x: 15 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -15 }}
-                  transition={{ duration: 0.22, ease: "easeOut" }}
-                  className="space-y-6"
-                >
-                  {activeStep === 'sources' && (
-                    <SourcesStep
-                      notes={artifacts.notes}
-                      onNotesChange={artifacts.setNotes}
-                      onSaveNotes={() => saveNotes(artifacts.notes)}
-                      links={links}
-                      onAddLink={addLink}
-                      uploadedFiles={uploadedFiles}
-                      onUploadFiles={handleSourcesUpload}
-                      onRemoveFile={handleSourcesRemoveFile}
-                      onRemoveLink={handleSourcesRemoveLink}
-                      isUploading={uploading}
-                      onContinue={handleSourcesContinue}
-                      onYoutubeImport={handleYoutubeImport}
-                      isImporting={isImporting}
-                    />
-                  )}
+          <div className="w-full space-y-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeStep + (project?.waitingApprovalStage || '')}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className="space-y-6"
+              >
+                {activeStep === 'sources' && (
+                  <SourcesStep
+                    notes={artifacts.notes}
+                    onNotesChange={artifacts.setNotes}
+                    onSaveNotes={() => saveNotes(artifacts.notes)}
+                    links={links}
+                    onAddLink={addLink}
+                    uploadedFiles={uploadedFiles}
+                    onUploadFiles={handleSourcesUpload}
+                    onRemoveFile={handleSourcesRemoveFile}
+                    onRemoveLink={handleSourcesRemoveLink}
+                    isUploading={uploading}
+                    onContinue={handleSourcesContinue}
+                    onYoutubeImport={handleYoutubeImport}
+                    isImporting={isImporting}
+                  />
+                )}
 
-                  {activeStep === 'interview' && (
-                    <InterviewStep
-                      project={project}
-                      notes={artifacts.notes}
-                      onComplete={handleInterviewComplete}
-                    />
-                  )}
+                {activeStep === 'interview' && (
+                  <InterviewStep
+                    project={project}
+                    notes={artifacts.notes}
+                    onComplete={handleInterviewComplete}
+                  />
+                )}
 
-                  {(activeStep === 'interview' || project.waitingApprovalStage === 'claims_approval') && artifacts.claims.length > 0 && (
-                    <ClaimsReviewStep
-                      claims={artifacts.claims}
-                      onApprove={() => approveStage(activeSlug, 'claims_approval', fetchWorkspace)}
-                      isProcessing={pipelineRunning}
-                    />
-                  )}
+                {activeStep !== 'interview' && project.waitingApprovalStage === 'claims_approval' && artifacts.claims.length > 0 && (
+                  <ClaimsReviewStep
+                    claims={artifacts.claims}
+                    onApprove={() => approveStage(activeSlug, 'claims_approval', fetchWorkspace)}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
+                {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
+                  <ConceptStep
+                    concept={artifacts.concept || artifacts.outline}
+                    onApprove={() => approveStage(activeSlug, 'concept_approval', fetchWorkspace)}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
 
-                  {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
-                    <ConceptStep
-                      concept={artifacts.concept || artifacts.outline}
-                      onApprove={() => approveStage(activeSlug, 'concept_approval', fetchWorkspace)}
-                      isProcessing={pipelineRunning}
-                    />
-                  )}
-
-                  {activeStep === 'gpx' && (
-                    <div className="space-y-6">
-                      {artifacts.gpxXml ? (
-                        <GpxStep
-                          gpxXml={artifacts.gpxXml}
-                          onApprove={() => approveStage(activeSlug, 'gpx_summary_approval', fetchWorkspace)}
-                          isProcessing={pipelineRunning}
-                        />
+                {activeStep === 'gpx' && (
+                  <div className="space-y-6">
+                    {artifacts.gpxXml ? (
+                      <GpxStep
+                        gpxXml={artifacts.gpxXml}
+                        onApprove={() => approveStage(activeSlug, 'gpx_summary_approval', fetchWorkspace)}
+                        isProcessing={pipelineRunning}
+                      />
+                    ) : (
+                      pipelineRunning ? (
+                        <Card className="p-12 text-center flex flex-col items-center justify-center space-y-4 border-primary/20 bg-primary/[0.01]">
+                          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-75" />
+                          <div className="space-y-1">
+                            <h3 className="font-bold text-lg">Przygotowywanie śladu GPX...</h3>
+                            <p className="text-sm text-muted-foreground">Silnik AI generuje mapę Twojej trasy. Może to potrwać kilkanaście sekund.</p>
+                          </div>
+                          <Button variant="outline" onClick={fetchWorkspace} disabled={loadingDetails}>
+                            Sprawdź ponownie
+                          </Button>
+                        </Card>
                       ) : (
-                        pipelineRunning ? (
-                          <Card className="p-12 text-center flex flex-col items-center justify-center space-y-4 border-primary/20 bg-primary/[0.01]">
-                            <Loader2 className="h-10 w-10 animate-spin text-primary opacity-75" />
-                            <div className="space-y-1">
-                              <h3 className="font-bold text-lg">Przygotowywanie śladu GPX...</h3>
-                              <p className="text-sm text-muted-foreground">Silnik AI generuje mapę Twojej trasy. Może to potrwać kilkanaście sekund.</p>
+                        <Card className="p-10 border-amber-500/20 bg-amber-500/[0.02] rounded-2xl relative overflow-hidden border">
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+                          
+                          <div className="flex flex-col items-center justify-center text-center space-y-5 max-w-lg mx-auto">
+                            <div className="p-4 bg-amber-500/10 rounded-full text-amber-500 border border-amber-500/20 shadow-inner animate-pulse">
+                              <Map className="w-8 h-8" />
                             </div>
-                            <Button variant="outline" onClick={fetchWorkspace} disabled={loadingDetails}>
-                              Sprawdź ponownie
-                            </Button>
-                          </Card>
-                        ) : (
-                          <Card className="p-10 border-amber-500/20 bg-amber-500/[0.02] rounded-2xl relative overflow-hidden border">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
                             
-                            <div className="flex flex-col items-center justify-center text-center space-y-5 max-w-lg mx-auto">
-                              <div className="p-4 bg-amber-500/10 rounded-full text-amber-500 border border-amber-500/20 shadow-inner animate-pulse">
-                                <Map className="w-8 h-8" />
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <h3 className="font-bold text-xl text-foreground">Brak śladu GPX w projekcie</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                  Atlas nie znalazł jeszcze minimum dwóch konkretnych punktów trasy, z których może uczciwie zbudować ślad po drogach.
-                                </p>
-                                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                                  Wgraj plik .gpx albo wróć do materiałów i dopisz start, koniec oraz ważne postoje.
-                                </p>
-                              </div>
-
-                              <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
-                                <input
-                                  type="file"
-                                  ref={gpxFileInputRef}
-                                  onChange={handleGpxUpload}
-                                  accept=".gpx"
-                                  className="hidden"
-                                />
-                                <Button 
-                                  onClick={() => gpxFileInputRef.current?.click()} 
-                                  className="gap-2 bg-gradient-to-r from-primary to-primary-hover shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                  disabled={uploading}
-                                >
-                                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Files className="w-4 h-4" />}
-                                  Wgraj plik GPX (.gpx)
-                                </Button>
-                                
-                                <Button 
-                                  variant="outline" 
-                                  onClick={fetchWorkspace} 
-                                  disabled={loadingDetails}
-                                  className="hover:bg-muted/40 transition-colors"
-                                >
-                                  {loadingDetails ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                                  Sprawdź ponownie
-                                </Button>
-                              </div>
+                            <div className="space-y-2">
+                              <h3 className="font-bold text-xl text-foreground">Brak śladu GPX w projekcie</h3>
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                Atlas nie znalazł jeszcze minimum dwóch konkretnych punktów trasy, z których może uczciwie zbudować ślad po drogach.
+                              </p>
+                              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                Wgraj plik .gpx albo wróć do materiałów i dopisz start, koniec oraz ważne postoje.
+                              </p>
                             </div>
-                          </Card>
-                        )
-                      )}
-                    </div>
-                  )}
 
-                  {activeStep === 'outline' && project.waitingApprovalStage !== 'concept_approval' && (
-                    <GuideOutlineStep
-                      outline={artifacts.outline}
-                      onApprove={() => approveStage(activeSlug, 'guide_outline_approval', fetchWorkspace)}
-                      isProcessing={pipelineRunning}
-                    />
-                  )}
-
-                  {activeStep === 'guide' && (
-                    <GuideFinalStep
-                      guide={artifacts.guide}
-                      onApprove={() => approveStage(activeSlug, 'guide_final_approval', fetchWorkspace)}
-                      isProcessing={pipelineRunning}
-                    />
-                  )}
-
-                  {activeStep === 'media' && (
-                    <MediaStep
-                      poiGeoJson={artifacts.poiGeoJson}
-                      onApprove={() => setActiveStep('publish')}
-                      isProcessing={pipelineRunning}
-                    />
-                  )}
-
-                  {activeStep === 'publish' && (
-                    <PublishStep
-                      project={project}
-                      onViewPublic={() => navigate(`/route/${project.id}`)}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <Files className="w-4 h-4" /> Logi AI
-                  </h3>
-                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {events.map((event, idx) => (
-                      <div key={idx} className="text-[11px] leading-relaxed p-2 rounded bg-muted/30 border-l-2 border-primary/50">
-                        <span className="text-muted-foreground block mb-0.5">{new Date(event.createdAt as string).toLocaleTimeString()}</span>
-                        <span className="font-medium">{event.message}</span>
-                      </div>
-                    ))}
-                    {events.length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Brak nowych zdarzeń.</p>
+                            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+                              <input
+                                type="file"
+                                ref={gpxFileInputRef}
+                                onChange={handleGpxUpload}
+                                accept=".gpx"
+                                className="hidden"
+                              />
+                              <Button 
+                                onClick={() => gpxFileInputRef.current?.click()} 
+                                className="gap-2 bg-gradient-to-r from-primary to-primary-hover shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                disabled={uploading}
+                              >
+                                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Files className="w-4 h-4" />}
+                                Wgraj plik GPX (.gpx)
+                              </Button>
+                              
+                              <Button 
+                                variant="outline" 
+                                onClick={fetchWorkspace} 
+                                disabled={loadingDetails}
+                                className="hover:bg-muted/40 transition-colors"
+                              >
+                                {loadingDetails ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                Sprawdź ponownie
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      )
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+
+                {activeStep === 'outline' && project.waitingApprovalStage !== 'concept_approval' && (
+                  <GuideOutlineStep
+                    outline={artifacts.outline}
+                    onApprove={() => approveStage(activeSlug, 'guide_outline_approval', fetchWorkspace)}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
+
+                {activeStep === 'guide' && (
+                  <GuideFinalStep
+                    guide={artifacts.guide}
+                    onApprove={() => approveStage(activeSlug, 'guide_final_approval', fetchWorkspace)}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
+
+                {activeStep === 'media' && (
+                  <MediaStep
+                    poiGeoJson={artifacts.poiGeoJson}
+                    gpxXml={artifacts.gpxXml}
+                    onApprove={() => setActiveStep('publish')}
+                    isProcessing={pipelineRunning}
+                  />
+                )}
+
+                {activeStep === 'publish' && (
+                  <PublishStep
+                    project={project}
+                    onViewPublic={() => navigate(`/route/${project.id}`)}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </>
       )}

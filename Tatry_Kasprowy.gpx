@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Antigravity Test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Tatry Kasprowy Loop GPX</name>
+    <trkseg>
+      <trkpt lat="49.2501" lon="19.9802"></trkpt>
+      <trkpt lat="49.2550" lon="19.9820"></trkpt>
+      <trkpt lat="49.2600" lon="19.9850"></trkpt>
+      <trkpt lat="49.2620" lon="19.9870"></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
