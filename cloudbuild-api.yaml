@@ -1,0 +1,7 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  env:
+    - 'DOCKER_BUILDKIT=1'
+  args: ['build', '-t', 'europe-west1-docker.pkg.dev/outemarketplace/routemarket-atlas/atlas-api:latest', '-f', 'apps/atlas-engine/Dockerfile', '.']
+images:
+- 'europe-west1-docker.pkg.dev/outemarketplace/routemarket-atlas/atlas-api:latest'

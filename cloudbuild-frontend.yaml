@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'europe-west1-docker.pkg.dev/outemarketplace/cloud-run-source-deploy/routemarket-frontend:latest', '-f', 'apps/frontend/Dockerfile', '.']
+images:
+- 'europe-west1-docker.pkg.dev/outemarketplace/cloud-run-source-deploy/routemarket-frontend:latest'
