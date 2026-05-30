@@ -63,5 +63,7 @@ export interface ProjectRepository {
   loadArtifact(slug: string, type: string): Promise<any>;
   saveArtifact(slug: string, type: string, data: any): Promise<void>;
 
+  saveToStorage(slug: string, fileName: string, content: string | Buffer, contentType: string): Promise<string>;
+
   getProjectPath(slug: string): string;
 }

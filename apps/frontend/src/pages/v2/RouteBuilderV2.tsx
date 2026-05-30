@@ -1,53 +1,81 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, MapPin, Compass, CheckCircle2, Search, Info } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Compass, CheckCircle2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
-// Mock components for Map - in real app this would be Leaflet/MapLibre
+// Real Leaflet Components
+import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet icon issue
+// @ts-ignore
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+function MapResizer({ geometry }: { geometry: any }) {
+  const map = useMap();
+  useEffect(() => {
+    if (geometry && geometry.coordinates.length > 0) {
+      const bounds = L.geoJSON(geometry).getBounds();
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [geometry, map]);
+  return null;
+}
+
 function UnifiedMap({ geometry, start, end, midpoint }: any) {
+  const center: [number, number] = start ? [start.lat, start.lng] : [46.54, 11.86];
+
   return (
-    <div className="w-full h-full bg-slate-900 rounded-lg relative overflow-hidden flex items-center justify-center border border-slate-800">
-      <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
-      {geometry ? (
-        <div className="relative w-full h-full p-8">
-           {/* Simple SVG Path visualization for route */}
-           <svg viewBox="0 0 100 100" className="w-full h-full preserve-3d">
-             <path 
-                d="M 20 80 Q 50 20 80 80" 
-                fill="none" 
-                stroke="url(#neonGradient)" 
-                strokeWidth="2" 
-                className="animate-pulse shadow-[0_0_15px_rgba(34,197,94,0.5)]"
-             />
-             <defs>
-               <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                 <stop offset="0%" stopColor="#10b981" />
-                 <stop offset="100%" stopColor="#3b82f6" />
-               </linearGradient>
-             </defs>
-           </svg>
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-emerald-500 font-mono text-xs">
-              LIVE GEOMETRY RENDERED
-           </div>
-        </div>
-      ) : (
-        <div className="text-slate-500 flex flex-col items-center gap-3">
-          <Compass className="w-12 h-12 animate-spin-slow" />
-          <p className="font-mono text-sm">Waiting for coordinates...</p>
-        </div>
-      )}
-      
+    <div className="w-full h-full rounded-lg overflow-hidden border border-slate-800 bg-slate-900 relative">
+      <MapContainer 
+        center={center} 
+        zoom={12} 
+        style={{ height: '100%', width: '100%' }}
+        scrollWheelZoom={true}
+        className="z-0"
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        />
+        
+        {geometry && (
+          <Polyline 
+            positions={geometry.coordinates.map((c: any) => [c[1], c[0]])} 
+            pathOptions={{ 
+              color: '#10b981', 
+              weight: 4, 
+              opacity: 0.8,
+              dashArray: '10, 10',
+              lineCap: 'round'
+            }} 
+          />
+        )}
+
+        {start && <Marker position={[start.lat, start.lng]} />}
+        {end && <Marker position={[end.lat, end.lng]} />}
+        {midpoint && <Marker position={[midpoint.lat, midpoint.lng]} />}
+        
+        <MapResizer geometry={geometry} />
+      </MapContainer>
+
       {/* HUD Elements */}
-      <div className="absolute bottom-4 left-4 flex gap-2">
-        <Badge variant="outline" className="bg-slate-950/80 border-emerald-500/50 text-emerald-400">
+      <div className="absolute bottom-4 left-4 flex gap-2 z-[1000]">
+        <Badge variant="outline" className="bg-slate-950/80 border-emerald-500/50 text-emerald-400 backdrop-blur-md">
           GIS Engine: Google Routes v2
         </Badge>
-        <Badge variant="outline" className="bg-slate-950/80 border-blue-500/50 text-blue-400">
+        <Badge variant="outline" className="bg-slate-950/80 border-blue-500/50 text-blue-400 backdrop-blur-md">
           Mode: Heavy Geometry
         </Badge>
       </div>
@@ -55,7 +83,10 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
   );
 }
 
-const ATLAS_API = 'http://localhost:8787'; // New Atlas Engine API
+const ATLAS_API = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8787' 
+  : '/atlas-api';
+const ATLAS_TOKEN = '178913a9cdd9271d077cd37dfded2afb76eaef72b220ec6c911b8509e1dece132712338c88769372979cc45f0ec6c241';
 
 export default function RouteBuilderV2() {
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -69,20 +100,21 @@ export default function RouteBuilderV2() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [guide, setGuide] = useState<string | null>(null);
 
-  // Simplified hardcoded points for the MVP "Live" demo
   const [coords, setCoords] = useState({
-    start: { lat: 46.54, lng: 11.86 }, // Dolomites area
+    start: { lat: 46.54, lng: 11.86 }, 
     end: { lat: 46.50, lng: 11.90 },
     midpoint: { lat: 46.52, lng: 11.88 }
   });
 
-  const updateGeometry = useCallback(async () => {
-    if (!slug) return;
+  const updateGeometry = useCallback(async (currentSlug: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${ATLAS_API}/projects/${slug}/geometry`, {
+      const res = await fetch(`${ATLAS_API}/projects/${currentSlug}/geometry`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-atlas-api-token': ATLAS_TOKEN
+        },
         body: JSON.stringify({
           start: coords.start,
           end: coords.end,
@@ -92,41 +124,53 @@ export default function RouteBuilderV2() {
         })
       });
       const data = await res.json();
-      setGeometry(data.geometry);
+      if (data.geometry) {
+        setGeometry(data.geometry);
+      } else if (data.error) {
+        toast.error(`Engine Error: ${data.error}`);
+      }
     } catch (err) {
       toast.error("Geometry calculation failed");
     } finally {
       setLoading(false);
     }
-  }, [slug, coords, distance, category]);
+  }, [coords, distance, category]);
 
-  // Create project if missing
   useEffect(() => {
     const initProject = async () => {
-      const res = await fetch(`${ATLAS_API}/magic-generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: "New Adventure " + Date.now(),
-          region: "Dolomites, Italy",
-          category: category,
-          notes: intent
-        })
-      });
-      const data = await res.json();
-      setProjectId(data.projectId);
-      setSlug(data.slug);
+      try {
+        const res = await fetch(`${ATLAS_API}/projects`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-atlas-api-token': ATLAS_TOKEN
+          },
+          body: JSON.stringify({
+            topic: "Live Adventure " + new Date().toLocaleTimeString(),
+            region: "Dolomites, Italy",
+            category: category
+          })
+        });
+        const data = await res.json();
+        if (data.slug) {
+          setProjectId(data.id);
+          setSlug(data.slug);
+          // Trigger first geometry calculation
+          updateGeometry(data.slug);
+        }
+      } catch (err) {
+        toast.error("Failed to initialize project");
+      }
     };
     initProject();
   }, []);
 
-  // Debounced geometry updates
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (slug) updateGeometry();
-    }, 800);
+      if (slug) updateGeometry(slug);
+    }, 1000);
     return () => clearTimeout(timer);
-  }, [distance, category, coords]);
+  }, [distance, category, coords, slug]);
 
   const handleApproveAndResearch = async () => {
     if (!slug) return;
@@ -134,33 +178,43 @@ export default function RouteBuilderV2() {
     try {
       const res = await fetch(`${ATLAS_API}/projects/${slug}/approve-and-research`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-atlas-api-token': ATLAS_TOKEN
+        }
       });
       const data = await res.json();
-      setJobId(data.jobId);
-      toast.success("Route approved. Deep Research started!");
+      if (data.jobId?.id) {
+        setJobId(data.jobId.id);
+        toast.success("Route approved. Deep Research started!");
+      }
     } catch (err) {
       toast.error("Research failed to start");
       setIsResearching(false);
     }
   };
 
-  // Poll for research results
   useEffect(() => {
     let timer: any;
-    if (jobId) {
+    if (jobId && slug) {
       timer = setInterval(async () => {
-        const res = await fetch(`${ATLAS_API}/jobs/${jobId}`);
-        const data = await res.json();
-        if (data.job?.status === 'ready' || data.job?.status === 'completed') {
-          clearInterval(timer);
-          setIsResearching(false);
-          toast.success("Research Complete! Guide is ready.");
-          // Fetch the generated guide
-          const projectRes = await fetch(`${ATLAS_API}/projects/${slug}`);
-          const projectData = await projectRes.json();
-          // Assuming the project data now contains the guide or a way to fetch it
-          setGuide("Guide generated successfully. Ready for preview.");
+        try {
+          const res = await fetch(`${ATLAS_API}/jobs/${jobId}`, {
+            headers: { 'x-atlas-api-token': ATLAS_TOKEN }
+          });
+          const data = await res.json();
+          if (data.job?.status === 'completed') {
+            clearInterval(timer);
+            setIsResearching(false);
+            toast.success("Research Complete! Guide is ready.");
+            setGuide("Guide generated successfully.");
+          } else if (data.job?.status === 'failed') {
+            clearInterval(timer);
+            setIsResearching(false);
+            toast.error("Research pipeline failed.");
+          }
+        } catch (e) {
+          console.error("Job polling error", e);
         }
       }, 3000);
     }
@@ -169,8 +223,7 @@ export default function RouteBuilderV2() {
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden">
-      {/* Header */}
-      <header className="h-16 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/50 backdrop-blur-md z-10">
+      <header className="h-16 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/50 backdrop-blur-md z-50">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-emerald-500 rounded-lg">
             <Compass className="w-5 h-5 text-slate-950" />
@@ -196,10 +249,8 @@ export default function RouteBuilderV2() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: Controls */}
-        <aside className="w-96 border-r border-slate-800 p-6 flex flex-col gap-8 bg-slate-900/30 overflow-y-auto">
+        <aside className="w-96 border-r border-slate-800 p-6 flex flex-col gap-8 bg-slate-900/30 overflow-y-auto z-40">
           <section className="space-y-4">
             <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm uppercase tracking-wider">
               <MapPin className="w-4 h-4" />
@@ -210,7 +261,7 @@ export default function RouteBuilderV2() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium text-slate-400">Distance (km)</label>
-                  <span className="text-emerald-500 font-mono font-bold">{distance}km</span>
+                  <span className="text-emerald-500 font-mono font-bold">{distance[0]}km</span>
                 </div>
                 <Slider 
                   value={distance} 
@@ -244,23 +295,18 @@ export default function RouteBuilderV2() {
               Creator Intent
             </div>
             <Textarea 
-              placeholder="Describe the vibe of the route, must-see places, or technical difficulty..."
+              placeholder="Describe the vibe of the route..."
               className="flex-1 bg-slate-950 border-slate-800 focus:border-emerald-500 min-h-[200px] resize-none text-sm leading-relaxed"
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
             />
-            <p className="text-[10px] text-slate-500 font-mono">
-              Research pipeline will ground findings in this text.
-            </p>
           </section>
 
           {isResearching && (
             <Card className="bg-emerald-950/20 border-emerald-500/30 animate-pulse">
-              <CardContent className="p-4 flex items-center gap-3">
+              <CardContent className="p-4 flex items-center gap-3 text-xs text-emerald-300 font-mono">
                 <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                <div className="text-xs text-emerald-300 font-mono">
-                  Grounded Search in progress... Finding POIs and local data.
-                </div>
+                Grounded Search in progress...
               </CardContent>
             </Card>
           )}
@@ -268,24 +314,22 @@ export default function RouteBuilderV2() {
           {guide && (
             <Card className="bg-blue-950/20 border-blue-500/30">
               <CardContent className="p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-blue-400 font-bold text-xs uppercase">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Guide Generated
+                <div className="text-blue-400 font-bold text-xs uppercase flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> Guide Ready
                 </div>
                 <Button variant="link" className="text-blue-300 p-0 h-auto text-xs justify-start">
-                  Download Guide (Markdown)
+                  Download Guide
                 </Button>
               </CardContent>
             </Card>
           )}
         </aside>
 
-        {/* Right Area: Map */}
-        <section className="flex-1 p-6 bg-slate-950 relative">
-          <UnifiedMap geometry={geometry} coords={coords} />
+        <section className="flex-1 p-6 bg-slate-950 relative z-0">
+          <UnifiedMap geometry={geometry} start={coords.start} end={coords.end} midpoint={coords.midpoint} />
           
           {loading && (
-            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-20 pointer-events-none">
+            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-50 pointer-events-none">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-3 shadow-2xl">
                 <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
                 <span className="text-xs font-mono text-emerald-500 uppercase tracking-widest">Calculating Geometry</span>

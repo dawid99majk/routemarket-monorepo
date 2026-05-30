@@ -278,6 +278,13 @@ export class FileProjectRepository implements ProjectRepository {
     await writeJsonFile(join(this.getProjectPath(slug), fileName), data);
   }
 
+  async saveToStorage(slug: string, fileName: string, content: string | Buffer, contentType: string): Promise<string> {
+    const filePath = join(this.getProjectPath(slug), fileName);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, content);
+    return `file://${filePath}`;
+  }
+
   private inferCategory(title: string): string {
     const lowered = title.toLowerCase();
     if (lowered.includes("motorcycle") || lowered.includes("motocykl")) return "motorcycle";

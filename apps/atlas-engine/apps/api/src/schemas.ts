@@ -129,6 +129,13 @@ export const GeometryRouteBodySchema = z.object({
   start: z.object({ lat: z.number(), lng: z.number() }),
   end: z.object({ lat: z.number(), lng: z.number() }),
   midpoint: z.object({ lat: z.number(), lng: z.number() }).optional(),
-  targetDistanceKm: z.number().min(1).max(2000),
-  category: z.enum(["hiking", "bike", "motorcycle", "car", "adventure"])
+  targetDistanceKm: z.number().min(1).max(1000),
+  category: z.string(),
+  slug: z.string().optional()
+});
+
+export const ResearchBodySchema = z.object({
+  slug: z.string(),
+  intent: z.string().optional(),
+  gpxUrl: z.string().url().optional()
 });

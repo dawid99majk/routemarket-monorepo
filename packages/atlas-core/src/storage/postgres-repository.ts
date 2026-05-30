@@ -303,6 +303,26 @@ export class PostgresProjectRepository implements ProjectRepository {
     if (file) await this.mirrorJson(slug, file, data);
   }
 
+  async saveToStorage(slug: string, fileName: string, content: string | Buffer, contentType: string): Promise<string> {
+    const bucket = "route-artifacts";
+    const path = `${slug}/${fileName}`;
+
+    const { error } = await this.client.storage
+      .from(bucket)
+      .upload(path, content, {
+        contentType,
+        upsert: true
+      });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = this.client.storage
+      .from(bucket)
+      .getPublicUrl(path);
+
+    return publicUrl;
+  }
+
   async loadArtifact(slug: string, type: string): Promise<any> {
     return this._loadArtifactInternal(slug, type, z.any(), undefined);
   }

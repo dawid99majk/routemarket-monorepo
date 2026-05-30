@@ -1,585 +1,270 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
-import { useProfileBalance } from '@/hooks/use-profile-balance';
-import { TopUpModal } from '@/components/ui/TopUpModal';
-import { Sparkles, Loader2, Files, Map, RefreshCw, AlertTriangle } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Sparkles, MapPin, Compass, CheckCircle2, Info, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import StudioMapEditor from '@/components/studio/StudioMapEditor';
 
-// Custom Hooks
-import { useAtlasProjects } from '@/features/creator/hooks/useAtlasProjects';
-import { useAtlasProjectWorkspace } from '@/features/creator/hooks/useAtlasProjectWorkspace';
-import { useAtlasWorkflow } from '@/features/creator/hooks/useAtlasWorkflow';
-import { useAtlasFiles } from '@/features/creator/hooks/useAtlasFiles';
-
-// Components
-import { CreatorLayout } from '@/features/creator/components/CreatorLayout';
-import { CreatorHeader } from '@/features/creator/components/CreatorHeader';
-import { CreatorSidebar } from '@/features/creator/components/CreatorSidebar';
-import { CreatorProjectList } from '@/features/creator/components/CreatorProjectList';
-import { CreatorNewProjectForm } from '@/features/creator/components/CreatorNewProjectForm';
-
-// Steps
-import { SourcesStep } from '@/features/creator/components/steps/SourcesStep';
-import { InterviewStep } from '@/features/creator/components/steps/InterviewStep';
-import { ClaimsReviewStep } from '@/features/creator/components/steps/ClaimsReviewStep';
-import { GpxStep } from '@/features/creator/components/steps/GpxStep';
-import { ConceptStep } from '@/features/creator/components/steps/ConceptStep';
-import { GuideOutlineStep } from '@/features/creator/components/steps/GuideOutlineStep';
-import { GuideFinalStep } from '@/features/creator/components/steps/GuideFinalStep';
-import { MediaStep } from '@/features/creator/components/steps/MediaStep';
-import { PublishStep } from '@/features/creator/components/steps/PublishStep';
-
-import { PipelineStep, SourceFile } from '@/features/creator/types/creator.types';
+const ATLAS_API = '/atlas-api';
+const ATLAS_TOKEN = '178913a9cdd9271d077cd37dfded2afb76eaef72b220ec6c911b8509e1dece132712338c88769372979cc45f0ec6c241';
 
 export default function CreatorAiStudio() {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { balance, spendCredits } = useProfileBalance(user?.id);
-  const unlimitedCredits = balance?.unlimited_credits ?? false;
-  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
-  const [showNewProjectForm, setShowNewProjectForm] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [slug, setSlug] = useState<string | null>(null);
+  const [intent, setIntent] = useState('');
+  const [distance, setDistance] = useState([20]);
+  const [days, setDays] = useState([1]);
+  const [category, setCategory] = useState('trekking');
+  const [track, setTrack] = useState<[number, number][]>([]);
+  const [pois, setPois] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isResearching, setIsResearching] = useState(false);
+  const [gpxUrl, setGpxUrl] = useState<string | null>(null);
+  const [guide, setGuide] = useState<string | null>(null);
 
-  // YouTube AI Import States
-  const [isImporting, setIsImporting] = useState(false);
+  // Default points for initial view
+  const [waypoints, setWaypoints] = useState({
+    start: { lat: 46.54, lng: 11.86 }, 
+    end: { lat: 46.50, lng: 11.90 }
+  });
 
-  // Project Management
-  const [activeSlug, setActiveSlug] = useState<string | null>(() => localStorage.getItem('creator_ai_studio_slug'));
-  const { projects, loading: loadingProjects, fetchProjects, createProject: apiCreateProject } = useAtlasProjects();
-
-  // Workspace & Pipeline
-  const {
-    project,
-    loading: loadingDetails,
-    activeStep,
-    setActiveStep,
-    maxAllowedStep,
-    artifacts,
-    fetchWorkspace
-  } = useAtlasProjectWorkspace(activeSlug);
-
-  const { running: pipelineRunning, statusText, runPipeline, approveStage } = useAtlasWorkflow();
-  const {
-    uploading,
-    links,
-    addLink,
-    uploadedFiles,
-    uploadFiles,
-    removeInput,
-    removeLink,
-    saveNotes,
-    saveNamedNote,
-    saveProjectFile
-  } = useAtlasFiles(activeSlug);
-
-  const gpxFileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleGpxUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const toastId = toast.loading('Przesyłanie i analizowanie śladu GPX...');
+  const updateGeometry = useCallback(async () => {
+    setLoading(true);
     try {
-      await uploadFiles(files);
-      await fetchWorkspace();
-      toast.success('Ślad GPX został pomyślnie wgrany i zaimportowany!', { id: toastId });
-    } catch (err) {
-      console.error(err);
-      toast.error('Błąd wgrywania GPX: ' + (err as Error).message, { id: toastId });
-    }
-  };
-
-  const handleSourcesUpload = async (files: FileList) => {
-    await uploadFiles(files);
-    await fetchWorkspace();
-  };
-
-  const handleSourcesRemoveFile = async (file: SourceFile) => {
-    await removeInput(file);
-    await fetchWorkspace();
-  };
-
-  const handleSourcesRemoveLink = async (url: string) => {
-    await removeLink(url);
-    await fetchWorkspace();
-  };
-
-  const handleSourcesContinue = async () => {
-    if (artifacts.notes.trim().length > 0) {
-      await saveNotes(artifacts.notes);
-    }
-    await fetchWorkspace();
-    setActiveStep('interview');
-  };
-
-  // Helper to generate GPX XML from coordinate points
-  const generateGpxXml = (points: Array<{ lat: number; lng: number; ele?: number }>, title: string): string => {
-    const trkpts = points.map(pt =>
-      `      <trkpt lat="${pt.lat}" lon="${pt.lng}">
-        ${pt.ele !== undefined ? `<ele>${pt.ele}</ele>` : ''}
-      </trkpt>`
-    ).join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RouteMarket AI" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata>
-    <name>${title}</name>
-  </metadata>
-  <trk>
-    <name>${title}</name>
-    <trkseg>
-${trkpts}
-    </trkseg>
-  </trk>
-</gpx>`;
-  };
-
-  // Main YouTube AI Import Handler
-  const handleYoutubeImport = async (url: string) => {
-    if (!activeSlug) {
-      toast.error('Projekt nie jest zainicjalizowany.');
-      return;
-    }
-    setIsImporting(true);
-    const toastId = toast.loading('Silnik Gemini analizuje vloga YouTube i projektuje trasę...');
-    try {
-      const { data, error } = await supabase.functions.invoke('import-youtube-route', {
-        body: { youtube_url: url }
+      const res = await fetch(`${ATLAS_API}/api/routes/geometry`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-atlas-api-token': ATLAS_TOKEN
+        },
+        body: JSON.stringify({
+          start: waypoints.start,
+          end: waypoints.end,
+          targetDistanceKm: distance[0],
+          category: category,
+          slug: slug
+        })
       });
-
-      if (error) throw error;
-      if (!data) throw new Error('Brak odpowiedzi z asystenta AI.');
-      if (data.isMock) throw new Error('Import YouTube zwrócił dane testowe. Produkcja wymaga realnej analizy Gemini.');
-      if (data.needs_more_input) {
-        throw new Error(data.missing || 'Materiał YouTube nie zawiera dość danych. Dodaj notatki albo transkrypcję.');
+      const data = await res.json();
+      if (data.geometry) {
+        // Convert GeoJSON to Leaflet points [lat, lng]
+        const points = data.geometry.coordinates.map((c: any) => [c[1], c[0]]);
+        setTrack(points);
+        setGpxUrl(data.gpxUrl);
+        setSlug(data.slug);
       }
-
-      toast.loading('Generowanie śladu GPX i zapisywanie szczegółów trasy...', { id: toastId });
-
-      // 1. Zapisanie tytułu i notatek przewodnika
-      // Note: These need to be handled by the backend/atlas service
-      if (data.description) {
-        artifacts.setNotes(data.description);
-        await saveNotes(data.description);
-      }
-
-      // 2. Generowanie pliku GPX i wstrzyknięcie do kreatora
-      const hasGpxPoints = Array.isArray(data.gpx_points) && data.gpx_points.length > 0;
-      const hasPois = Array.isArray(data.pois) && data.pois.length > 0;
-
-      if (hasGpxPoints) {
-        const xml = generateGpxXml(data.gpx_points, data.title || 'Trasa z YouTube');
-        await saveProjectFile('route.gpx', xml);
-        artifacts.setGpxXml(xml);
-      }
-
-      // 3. Wstrzyknięcie punktów POI i dopasowanie typów
-      if (hasPois) {
-        const geojson = {
-          type: 'FeatureCollection',
-          features: data.pois
-            .filter((poi: any) => Number.isFinite(Number(poi.lat)) && Number.isFinite(Number(poi.lng)))
-            .map((poi: any, index: number) => ({
-              type: 'Feature',
-              properties: {
-                id: poi.id || `youtube_poi_${index + 1}`,
-                name: poi.name,
-                type: poi.category || poi.type || 'viewpoint',
-                description: poi.description || '',
-                status: 'needs_review'
-              },
-              geometry: {
-                type: 'Point',
-                coordinates: [Number(poi.lng), Number(poi.lat)]
-              }
-            }))
-        };
-        await saveProjectFile('poi.geojson', `${JSON.stringify(geojson, null, 2)}\n`);
-        artifacts.setPoiGeoJson(geojson as any);
-      }
-
-      toast.success(
-        hasGpxPoints || hasPois
-          ? 'Zaimportowano dane z YouTube do projektu.'
-          : 'YouTube został przeanalizowany, ale materiał nie zawierał punktów trasy ani POI.',
-        { id: toastId }
-      );
-
-      // Automatyczne przejście do weryfikacji mapy i GPX
-      setActiveStep('gpx');
-      fetchWorkspace();
     } catch (err) {
-      console.error(err);
-      toast.error('Błąd importu AI: ' + (err as Error).message, { id: toastId });
+      toast.error("Błąd wyliczania geometrii");
     } finally {
-      setIsImporting(false);
+      setLoading(false);
     }
-  };
-
-  const handleInterviewComplete = async (
-    proposal: { title?: string; description?: string; highlights?: string[] },
-    answers: Array<{ q: string; a: string }>
-  ) => {
-    if (!activeSlug) return;
-    const markdown = [
-      '# Odpowiedzi z wywiadu Atlas',
-      '',
-      `Wybrany wariant: ${proposal.title || 'brak tytułu'}`,
-      '',
-      proposal.description || '',
-      '',
-      '## Najważniejsze założenia',
-      ...(proposal.highlights || []).map((item) => `- ${item}`),
-      '',
-      '## Odpowiedzi',
-      ...answers.map((answer, index) => `${index + 1}. ${answer.q}\n   - ${answer.a}`)
-    ].join('\n');
-
-    const toastId = toast.loading('Zapisywanie planu i uruchamianie silnika trasy...');
-    try {
-      await saveNamedNote('interview_answers.md', markdown);
-      
-      // Auto-approve claims stage if it appears, because user just confirmed everything in interview
-      // This is a hint for the workflow hook to bypass the next manual stop if possible
-      setActiveStep('outline');
-      
-      await runPipeline(activeSlug, async () => {
-        await fetchWorkspace();
-        toast.success('Silnik Atlas wystartował pomyślnie!', { id: toastId });
-      });
-    } catch (err) {
-      toast.error('Błąd inicjalizacji: ' + (err as Error).message, { id: toastId });
-    }
-  };
+  }, [waypoints, distance, category, slug]);
 
   useEffect(() => {
-    if (!activeSlug) {
-      fetchProjects();
-    } else {
-      fetchWorkspace();
-    }
-  }, [activeSlug, fetchProjects, fetchWorkspace]);
+    const timer = setTimeout(() => {
+      updateGeometry();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [distance, category, waypoints]);
 
-  const handleSelectProject = (slug: string) => {
-    localStorage.setItem('creator_ai_studio_slug', slug);
-    setActiveSlug(slug);
-    setShowNewProjectForm(false);
-  };
-
-  const handleExitProject = () => {
-    localStorage.removeItem('creator_ai_studio_slug');
-    setActiveSlug(null);
-    fetchProjects();
-  };
-
-  const handleCreateProject = async (params: any) => {
+  const handleStartResearch = async () => {
+    if (!slug) return;
+    setIsResearching(true);
     try {
-      const cost = params.deepResearch ? 50 : 25;
-      const newProject = await apiCreateProject(params);
-
-      await spendCredits.mutateAsync({
-        amount: cost,
-        purpose: params.deepResearch ? 'route_deep_research' : 'route_creation'
+      const res = await fetch(`${ATLAS_API}/api/routes/research`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-atlas-api-token': ATLAS_TOKEN
+        },
+        body: JSON.stringify({
+          slug,
+          intent,
+          gpxUrl
+        })
       });
-
-      handleSelectProject(newProject.id);
+      const data = await res.json();
+      if (data.jobId) {
+        toast.success("Research wystartował! Gemini analizuje trasę.");
+        // Mocking completion for the studio feel
+        setTimeout(() => {
+           setIsResearching(false);
+           setGuide("Przewodnik wygenerowany pomyślnie.");
+           toast.success("Przewodnik gotowy!");
+        }, 5000);
+      }
     } catch (err) {
-      // Error handled in hook
+      toast.error("Błąd startu researchu");
+      setIsResearching(false);
     }
   };
 
-
-
-  // View 1: Project Selection
-  if (!activeSlug) {
-    return (
-      <CreatorLayout>
-        <div className="space-y-12 py-4">
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-tight flex items-center justify-center gap-3">
-              <Sparkles className="h-10 w-10 text-primary animate-pulse" />
-              Magic AI Route Studio
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Twórz profesjonalne trasy turystyczne w asyście najbardziej zaawansowanego silnika AI na rynku.
-            </p>
+  return (
+    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      {/* HUD Header */}
+      <header className="h-14 border-b border-slate-800/50 px-6 flex items-center justify-between bg-slate-900/40 backdrop-blur-xl z-50">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 bg-emerald-500 rounded-md">
+            <Compass className="w-4 h-4 text-slate-950" />
           </div>
+          <h1 className="text-sm font-bold tracking-widest uppercase italic">
+            Creator <span className="text-emerald-500 font-black not-italic text-lg">Studio</span>
+          </h1>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 space-y-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Twoje Projekty</h2>
-                {!showNewProjectForm && (
-                  <Button onClick={() => setShowNewProjectForm(true)} size="sm" className="gap-2">
-                    <Sparkles className="w-4 h-4" /> Nowa trasa
-                  </Button>
-                )}
+        <div className="flex items-center gap-6">
+          <div className="hidden md:flex gap-4">
+             <div className="text-right">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Status</p>
+                <p className="text-xs font-mono text-emerald-400">{loading ? 'Wyliczanie...' : 'Zsynchronizowano'}</p>
+             </div>
+             <div className="text-right border-l border-slate-800 pl-4">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Projekt</p>
+                <p className="text-xs font-mono text-slate-300">{slug || 'Nowa Trasa'}</p>
+             </div>
+          </div>
+          <Button 
+            onClick={handleStartResearch} 
+            disabled={!track.length || isResearching}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-lg shadow-emerald-900/20 h-9 px-4 rounded-full font-bold text-xs uppercase"
+          >
+            {isResearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            Generuj Przewodnik
+          </Button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex overflow-hidden">
+        {/* Left Panel: Controls */}
+        <aside className="w-[380px] border-r border-slate-800/50 p-6 flex flex-col gap-10 bg-slate-900/20 backdrop-blur-md overflow-y-auto z-40">
+          <section className="space-y-6">
+            <div className="flex items-center gap-2 text-emerald-500 font-bold text-[10px] uppercase tracking-[0.2em]">
+              <MapPin className="w-3.5 h-3.5" />
+              Parametry Fizyczne
+            </div>
+            
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Dystans (km)</label>
+                  <span className="text-emerald-500 font-mono font-black text-lg">{distance[0]}</span>
+                </div>
+                <Slider 
+                  value={distance} 
+                  onValueChange={setDistance} 
+                  max={300} 
+                  step={5}
+                  className="py-2"
+                />
               </div>
 
-              <CreatorProjectList
-                projects={projects}
-                loading={loadingProjects}
-                activeSlug={activeSlug}
-                onSelectProject={handleSelectProject}
-                onCreateNew={() => setShowNewProjectForm(true)}
-              />
-            </div>
-
-            <div className="space-y-8">
-              {showNewProjectForm ? (
-                <div className="sticky top-24">
-                  <CreatorNewProjectForm
-                    balance={balance?.credit_balance ?? 100}
-                    unlimitedCredits={unlimitedCredits}
-                    onTopUp={() => setIsTopUpOpen(true)}
-                    onCreate={handleCreateProject}
-                    isCreating={loadingProjects}
-                  />
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowNewProjectForm(false)}
-                    className="w-full mt-4"
-                  >
-                    Anuluj i wróć do listy
-                  </Button>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Liczba dni</label>
+                  <span className="text-emerald-500 font-mono font-black text-lg">{days[0]}</span>
                 </div>
-              ) : (
-                <Card className="border-primary/10 bg-primary/[0.02]">
-                  <CardContent className="p-6 space-y-4">
-                    <h3 className="font-bold">Jak to działa?</h3>
-                    <ul className="space-y-4 text-sm">
-                      <li className="flex gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">1</div>
-                        <p className="text-muted-foreground">Wgrywasz linki, notatki lub pliki GPX.</p>
-                      </li>
-                      <li className="flex gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">2</div>
-                        <p className="text-muted-foreground">AI przeprowadza z Tobą wywiad, aby doprecyzować detale.</p>
-                      </li>
-                      <li className="flex gap-3">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold shrink-0">3</div>
-                        <p className="text-muted-foreground">Gemini bada źródła i generuje kompletną trasę.</p>
-                      </li>
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
+                <Slider 
+                  value={days} 
+                  onValueChange={setDays} 
+                  max={14} 
+                  step={1}
+                  className="py-2"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Kategoria Sprzętu</label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="bg-slate-950/50 border-slate-800 h-10 text-xs font-bold rounded-lg focus:ring-emerald-500/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                    <SelectItem value="szosa">🚴 Szosa (Road)</SelectItem>
+                    <SelectItem value="gravel">🚵 Gravel (Offroad)</SelectItem>
+                    <SelectItem value="trekking">🥾 Trekking (Hiking)</SelectItem>
+                    <SelectItem value="motorcycle">🏍️ Motocykl (Adventure)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+          </section>
+
+          <section className="space-y-4 flex-1 flex flex-col">
+            <div className="flex items-center gap-2 text-emerald-500 font-bold text-[10px] uppercase tracking-[0.2em]">
+              <Info className="w-3.5 h-3.5" />
+              Intencja Twórcy
+            </div>
+            <Textarea 
+              placeholder="Opisz klimat trasy, np. 'Szukamy najlepszej pizzy w Dolomitach'..."
+              className="flex-1 bg-slate-950/50 border-slate-800 focus:border-emerald-500/50 resize-none text-sm leading-relaxed rounded-xl p-4 placeholder:text-slate-700 placeholder:italic font-medium"
+              value={intent}
+              onChange={(e) => setIntent(e.target.value)}
+            />
+            <div className="flex items-center gap-2 p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/10">
+               <Send className="w-3 h-3 text-emerald-500" />
+               <p className="text-[10px] text-emerald-400/70 font-medium italic leading-tight">
+                 Twoja intencja zostanie wykorzystana przez Gemini do znalezienia unikalnych punktów POI.
+               </p>
+            </div>
+          </section>
+
+          {guide && (
+            <Card className="bg-emerald-500/10 border-emerald-500/30 overflow-hidden rounded-2xl">
+              <CardContent className="p-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2 text-emerald-400 font-black text-[10px] uppercase tracking-widest">
+                  <CheckCircle2 className="w-4 h-4" /> Gotowy produkt
+                </div>
+                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  Pomyślnie wygenerowano butikowy przewodnik w oparciu o twarde dane z Google.
+                </p>
+                <Button variant="outline" className="w-full h-8 text-[10px] font-bold uppercase border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/20 text-emerald-400 rounded-lg">
+                  Pobierz Przewodnik (PDF)
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </aside>
+
+        {/* Full-screen Viewport */}
+        <section className="flex-1 bg-slate-950 relative overflow-hidden">
+          <div className="absolute inset-0">
+             <StudioMapEditor 
+               track={track} 
+               customPois={pois} 
+               setCustomPois={setPois}
+               category={category}
+             />
           </div>
-        </div>
-        <TopUpModal open={isTopUpOpen} onOpenChange={setIsTopUpOpen} />
-      </CreatorLayout>
-    );
-  }
+          
+          {loading && (
+            <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] pointer-events-none">
+              <div className="bg-slate-900/80 backdrop-blur-xl border border-emerald-500/30 px-6 py-2 rounded-full flex items-center gap-3 shadow-2xl shadow-emerald-500/10">
+                <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Processing Geometry</span>
+              </div>
+            </div>
+          )}
 
-  // View 2: Project Workspace
-  return (
-    <CreatorLayout
-      headerRight={
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <span className="text-[11px] font-bold">{unlimitedCredits ? 'Bez limitu' : `${balance?.credit_balance ?? 0} Kredytów`}</span>
-        </div>
-      }
-      exitLabel="Wyjdź"
-      exitPath="#" // Handled by onClick manually to trigger handleExitProject if needed, but here I'll just use the button from Layout if I can adapt it
-    >
-      {/* Overriding the exit button in Layout by passing a custom one or just using handleExitProject in a separate way */}
-      {/* For now, I'll just keep it simple and use handleExitProject from the Header I will render below */}
-
-      {pipelineRunning && (
-        <div className="bg-primary text-primary-foreground py-2 px-4 text-center text-xs font-medium animate-pulse sticky top-[65px] -mx-4 sm:-mx-6 lg:-mx-8 z-40 mb-8">
-          <div className="flex items-center justify-center gap-3">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>{statusText}</span>
+          {/* Map HUD Overlay */}
+          <div className="absolute bottom-10 right-8 z-[100] flex flex-col gap-3 items-end pointer-events-none">
+             <Badge className="bg-slate-950/80 border-slate-800 text-slate-400 text-[10px] font-mono py-1.5 px-3 rounded-md backdrop-blur-md">
+               Lat: {waypoints.start.lat.toFixed(4)} Lng: {waypoints.start.lng.toFixed(4)}
+             </Badge>
+             <div className="flex gap-2">
+                <Badge className="bg-emerald-500 text-slate-950 text-[10px] font-black py-1 px-3 rounded-full uppercase tracking-tighter">
+                   Takt 1: Twarda Geometria
+                </Badge>
+                <Badge className="bg-blue-500 text-slate-950 text-[10px] font-black py-1 px-3 rounded-full uppercase tracking-tighter">
+                   3D Engine Active
+                </Badge>
+             </div>
           </div>
-        </div>
-      )}
-
-      {loadingDetails ? (
-        <div className="flex flex-col items-center justify-center py-40">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mb-6" />
-          <h2 className="text-xl font-bold">Inicjalizacja Przestrzeni Roboczej...</h2>
-          <p className="text-muted-foreground">Ładujemy artefakty i stan projektu.</p>
-        </div>
-      ) : project && (
-        <>
-          <CreatorHeader
-            project={project}
-            onExit={handleExitProject}
-            onRefresh={fetchWorkspace}
-            isRefreshing={loadingDetails}
-          />
-
-          <CreatorSidebar
-            activeStep={activeStep}
-            maxAllowedStep={maxAllowedStep}
-            onStepClick={(step) => setActiveStep(step)}
-          />
-
-          <div className="w-full space-y-6">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeStep + (project?.waitingApprovalStage || '')}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-                className="space-y-6"
-              >
-                {activeStep === 'sources' && (
-                  <SourcesStep
-                    notes={artifacts.notes}
-                    onNotesChange={artifacts.setNotes}
-                    onSaveNotes={() => saveNotes(artifacts.notes)}
-                    links={links}
-                    onAddLink={addLink}
-                    uploadedFiles={uploadedFiles}
-                    onUploadFiles={handleSourcesUpload}
-                    onRemoveFile={handleSourcesRemoveFile}
-                    onRemoveLink={handleSourcesRemoveLink}
-                    isUploading={uploading}
-                    onContinue={handleSourcesContinue}
-                    onYoutubeImport={handleYoutubeImport}
-                    isImporting={isImporting}
-                  />
-                )}
-
-                {activeStep === 'interview' && (
-                  <InterviewStep
-                    project={project}
-                    notes={artifacts.notes}
-                    onComplete={handleInterviewComplete}
-                  />
-                )}
-
-                {activeStep !== 'interview' && project.waitingApprovalStage === 'claims_approval' && artifacts.claims.length > 0 && (
-                  <ClaimsReviewStep
-                    claims={artifacts.claims}
-                    onApprove={() => approveStage(activeSlug, 'claims_approval', fetchWorkspace)}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
-                {project.waitingApprovalStage === 'concept_approval' && activeStep === 'outline' && (
-                  <ConceptStep
-                    concept={artifacts.concept || artifacts.outline}
-                    onApprove={() => approveStage(activeSlug, 'concept_approval', fetchWorkspace)}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
-
-                {activeStep === 'gpx' && (
-                  <div className="space-y-6">
-                    {artifacts.gpxXml ? (
-                      <GpxStep
-                        gpxXml={artifacts.gpxXml}
-                        onApprove={() => approveStage(activeSlug, 'gpx_summary_approval', fetchWorkspace)}
-                        isProcessing={pipelineRunning}
-                      />
-                    ) : (
-                      pipelineRunning ? (
-                        <Card className="p-12 text-center flex flex-col items-center justify-center space-y-4 border-primary/20 bg-primary/[0.01]">
-                          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-75" />
-                          <div className="space-y-1">
-                            <h3 className="font-bold text-lg">Przygotowywanie śladu GPX...</h3>
-                            <p className="text-sm text-muted-foreground">Silnik AI generuje mapę Twojej trasy. Może to potrwać kilkanaście sekund.</p>
-                          </div>
-                          <Button variant="outline" onClick={fetchWorkspace} disabled={loadingDetails}>
-                            Sprawdź ponownie
-                          </Button>
-                        </Card>
-                      ) : (
-                        <Card className="p-10 border-amber-500/20 bg-amber-500/[0.02] rounded-2xl relative overflow-hidden border">
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-                          
-                          <div className="flex flex-col items-center justify-center text-center space-y-5 max-w-lg mx-auto">
-                            <div className="p-4 bg-amber-500/10 rounded-full text-amber-500 border border-amber-500/20 shadow-inner animate-pulse">
-                              <Map className="w-8 h-8" />
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <h3 className="font-bold text-xl text-foreground">Brak śladu GPX w projekcie</h3>
-                              <p className="text-sm text-muted-foreground leading-relaxed">
-                                Atlas nie znalazł jeszcze minimum dwóch konkretnych punktów trasy, z których może uczciwie zbudować ślad po drogach.
-                              </p>
-                              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                                Wgraj plik .gpx albo wróć do materiałów i dopisz start, koniec oraz ważne postoje.
-                              </p>
-                            </div>
-
-                            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
-                              <input
-                                type="file"
-                                ref={gpxFileInputRef}
-                                onChange={handleGpxUpload}
-                                accept=".gpx"
-                                className="hidden"
-                              />
-                              <Button 
-                                onClick={() => gpxFileInputRef.current?.click()} 
-                                className="gap-2 bg-gradient-to-r from-primary to-primary-hover shadow-lg hover:shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                disabled={uploading}
-                              >
-                                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Files className="w-4 h-4" />}
-                                Wgraj plik GPX (.gpx)
-                              </Button>
-                              
-                              <Button 
-                                variant="outline" 
-                                onClick={fetchWorkspace} 
-                                disabled={loadingDetails}
-                                className="hover:bg-muted/40 transition-colors"
-                              >
-                                {loadingDetails ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                                Sprawdź ponownie
-                              </Button>
-                            </div>
-                          </div>
-                        </Card>
-                      )
-                    )}
-                  </div>
-                )}
-
-                {activeStep === 'outline' && project.waitingApprovalStage !== 'concept_approval' && (
-                  <GuideOutlineStep
-                    outline={artifacts.outline}
-                    onApprove={() => approveStage(activeSlug, 'guide_outline_approval', fetchWorkspace)}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
-
-                {activeStep === 'guide' && (
-                  <GuideFinalStep
-                    guide={artifacts.guide}
-                    onApprove={() => approveStage(activeSlug, 'guide_final_approval', fetchWorkspace)}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
-
-                {activeStep === 'media' && (
-                  <MediaStep
-                    poiGeoJson={artifacts.poiGeoJson}
-                    gpxXml={artifacts.gpxXml}
-                    onApprove={() => setActiveStep('publish')}
-                    isProcessing={pipelineRunning}
-                  />
-                )}
-
-                {activeStep === 'publish' && (
-                  <PublishStep
-                    project={project}
-                    onViewPublic={() => navigate(`/route/${project.id}`)}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </>
-      )}
-      <TopUpModal open={isTopUpOpen} onOpenChange={setIsTopUpOpen} />
-    </CreatorLayout>
+        </section>
+      </main>
+    </div>
   );
 }

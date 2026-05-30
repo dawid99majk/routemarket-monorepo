@@ -26,7 +26,8 @@ import {
   WriteProjectFileBodySchema,
   InterviewBodySchema,
   MagicGenerateBodySchema,
-  GeometryRouteBodySchema
+  GeometryRouteBodySchema,
+  ResearchBodySchema
 } from "./schemas.js";
 
 import type { ProjectRepository } from "@routemarket/atlas-core/src/index.js";
@@ -169,7 +170,32 @@ function createRoutes(): Route[] {
       return undefined;
     }, { public: true }),
     route("GET", "/health", async () => ({ ok: true }), { public: true }),
-    route("GET", "/version", async () => ({ name: "routemarket-atlas-engine", version: "0.1.0" }), { public: true }),
+    
+    // --- NEW CREATOR-GRADE API ---
+    
+    route("POST", "/api/routes/geometry", async ({ req, params, service }) => {
+      const body = GeometryRouteBodySchema.parse(await readJson(req));
+      const result = await service.generateHeavyGeometry(body);
+      return result;
+    }),
+
+    route("POST", "/api/routes/research", async ({ req, params, service, jobs }) => {
+      const body = ResearchBodySchema.parse(await readJson(req));
+      const slug = body.slug;
+      if (!slug) throw badRequest("Slug is required.");
+
+      return {
+        jobId: jobs.start(`research:${slug}`, async (update) => {
+          update({ message: "Reading GPX and intent...", progress: 5 });
+          const result = await service.runDeepResearchPipeline(slug, update);
+          update({ message: "Research complete.", progress: 100 });
+          return result;
+        }, slug)
+      };
+    }),
+
+    // --- LEGACY COMPATIBILITY (Optional, keeping until fully transitioned) ---
+    route("GET", "/version", async () => ({ name: "routemarket-atlas-engine", version: "0.2.0" }), { public: true }),
     route("GET", "/manifest", async ({ apiToken }) => apiManifest(Boolean(apiToken)), { public: true }),
     route("GET", "/reviewer", async ({ res }) => {
       sendHtml(res, 200, reviewerPageHtml());

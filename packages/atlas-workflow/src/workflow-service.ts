@@ -275,6 +275,27 @@ export class AtlasWorkflowService {
     };
   }
 
+  async generateHeavyGeometry(body: any): Promise<any> {
+    const waypoints = [body.start];
+    if (body.midpoint) waypoints.push(body.midpoint);
+    waypoints.push(body.end);
+
+    const provider = new GoogleRoutesRoutingProvider();
+    const result = await provider.getRoute(waypoints, body.category);
+
+    const gpx = buildGpxXml(result);
+    const slug = body.slug || `route-${Date.now()}`;
+    const gpxUrl = await this.repository.saveToStorage(slug, "route.gpx", gpx, "application/gpx+xml");
+
+    return {
+      slug,
+      distanceKm: result.distanceKm,
+      estimatedTimeH: result.estimatedTimeH,
+      geometry: result.geometryGeoJson,
+      gpxUrl
+    };
+  }
+
   async runDeepResearchPipeline(projectSlug: string, update: WorkflowProgressCallback): Promise<any> {
     const project = await this.repository.getProject(projectSlug);
     
