@@ -276,12 +276,11 @@ export class AtlasWorkflowService {
   }
 
   async generateHeavyGeometry(body: any): Promise<any> {
-    const waypoints = [body.start];
-    if (body.midpoint) waypoints.push(body.midpoint);
-    waypoints.push(body.end);
+    const waypoints = body.waypoints;
+    const category = body.category;
 
     const provider = new GoogleRoutesRoutingProvider();
-    const result = await provider.getRoute(waypoints, body.category);
+    const result = await provider.getRoute(waypoints, category);
 
     const gpx = buildGpxXml(result);
     const slug = body.slug || `route-${Date.now()}`;

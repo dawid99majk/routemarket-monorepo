@@ -126,10 +126,8 @@ export const MagicGenerateBodySchema = z.object({
 });
 
 export const GeometryRouteBodySchema = z.object({
-  start: z.object({ lat: z.number(), lng: z.number() }),
-  end: z.object({ lat: z.number(), lng: z.number() }),
-  midpoint: z.object({ lat: z.number(), lng: z.number() }).optional(),
-  targetDistanceKm: z.number().min(1).max(1000),
+  waypoints: z.array(z.object({ lat: z.number(), lng: z.number() })).min(2),
+  targetDistance: z.number().min(1).max(1000).optional(),
   category: z.string(),
   slug: z.string().optional()
 });
