@@ -106,3 +106,29 @@ export const RegisterExternalInputBodySchema = z.object({
 }).refine((value) => Boolean(value.storageUrl || value.storageKey), {
   message: "storageUrl or storageKey is required"
 });
+
+export const InterviewBodySchema = z.object({
+  context: z.record(z.string(), z.any()).optional(),
+  answers: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+    q: z.string().optional()
+  })).optional(),
+  youtube_url: z.string().url().max(1000).optional()
+});
+
+export const MagicGenerateBodySchema = z.object({
+  topic: z.string().min(1).max(200),
+  region: z.string().min(1),
+  category: z.string().min(1).optional(),
+  notes: z.string().max(50000).optional(),
+  preferences: z.record(z.string(), z.any()).optional()
+});
+
+export const GeometryRouteBodySchema = z.object({
+  start: z.object({ lat: z.number(), lng: z.number() }),
+  end: z.object({ lat: z.number(), lng: z.number() }),
+  midpoint: z.object({ lat: z.number(), lng: z.number() }).optional(),
+  targetDistanceKm: z.number().min(1).max(2000),
+  category: z.enum(["hiking", "bike", "motorcycle", "car", "adventure"])
+});

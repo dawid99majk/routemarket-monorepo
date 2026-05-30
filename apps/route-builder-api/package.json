@@ -1,0 +1,24 @@
+{
+  "name": "@routemarket/route-builder-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.4",
+    "@hono/zod-validator": "^0.8.0",
+    "@supabase/supabase-js": "^2.106.1",
+    "@routemarket/google-integrations": "workspace:*",
+    "@routemarket/atlas-gis": "workspace:*",
+    "hono": "^4.12.22",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}

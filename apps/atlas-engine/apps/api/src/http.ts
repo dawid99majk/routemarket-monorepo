@@ -23,7 +23,10 @@ import {
   SubmitReviewDecisionBodySchema,
   SubmitStageApprovalBodySchema,
   UpdateProjectStatusBodySchema,
-  WriteProjectFileBodySchema
+  WriteProjectFileBodySchema,
+  InterviewBodySchema,
+  MagicGenerateBodySchema,
+  GeometryRouteBodySchema
 } from "./schemas.js";
 
 import type { ProjectRepository } from "@routemarket/atlas-core/src/index.js";
@@ -247,6 +250,29 @@ function createRoutes(): Route[] {
     route("POST", "/projects/:slug/inputs/gpx", async ({ req, params, service }) => {
       const body = AddGpxBodySchema.parse(await readJson(req, 11_000_000)); // 11MB raw buffer limit for 10MB content string
       return service.addGpxText(params.slug, body);
+    }),
+    route("POST", "/projects/:slug/interview", async ({ req, params, service }) => {
+      const body = InterviewBodySchema.parse(await readJson(req));
+      return service.interview(params.slug, body);
+    }),
+    route("POST", "/projects/:slug/geometry", async ({ req, params, service }) => {
+      const body = GeometryRouteBodySchema.parse(await readJson(req));
+      return service.calculateGeometry(params.slug, body);
+    }),
+    route("POST", "/projects/:slug/approve-and-research", async ({ params, service, jobs }) => {
+      return {
+        jobId: jobs.start(`deep-research:${params.slug}`, async (update) => {
+          update({ message: "Starting deep research for approved route.", progress: 5, currentStep: "deep_research" });
+          await service.approveStage(params.slug, "gpx", "approved", "Approved by creator.");
+          const result = await service.runDeepResearchPipeline(params.slug, update);
+          update({ message: "Deep research and guide generation complete.", progress: 100, currentStep: "complete" });
+          return result;
+        }, params.slug)
+      };
+    }),
+    route("POST", "/magic-generate", async ({ req, service }) => {
+      const body = MagicGenerateBodySchema.parse(await readJson(req));
+      return service.magicGenerate(body);
     }),
     route("POST", "/projects/:slug/inputs/links", async ({ req, params, service }) => {
       const body = AddLinkBodySchema.parse(await readJson(req));

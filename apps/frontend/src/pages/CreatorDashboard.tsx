@@ -119,8 +119,8 @@ export default function CreatorDashboard() {
         </div>
 
         {/* Magic AI route factory */}
-        <div className="rounded-xl border border-accent/30 bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-accent/30 bg-card p-5 shadow-sm flex flex-col justify-between">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
                 <Sparkles className="h-6 w-6" />
@@ -128,20 +128,35 @@ export default function CreatorDashboard() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-semibold">Magic AI Route Factory</h2>
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Beta</span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Full AI</span>
                 </div>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                  Dodaj PDF-y, dokumenty, pliki MD, zdjecia, linki, filmy z YouTube i notatki z wyprawy. AI zbuduje z nich produkt trasy: przewodnik, opis sprzedazowy, punkty, roboczy GPX i materialy do publikacji.
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Budowa produktu z multimediów: PDF, YouTube, zdjęcia i notatki. Pełen research i przewodnik.
                 </p>
-                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                  <span className="inline-flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-accent" /> dokumenty i notatki</span>
-                  <span className="inline-flex items-center gap-1.5"><Link className="h-3.5 w-3.5 text-accent" /> linki i YouTube</span>
-                  <span className="inline-flex items-center gap-1.5"><Image className="h-3.5 w-3.5 text-accent" /> zdjecia i grafiki</span>
-                </div>
               </div>
             </div>
-            <Button onClick={() => navigate('/creator-ai-studio')} className="min-h-[44px] shrink-0 bg-accent text-accent-foreground hover:bg-accent/90">
-              <Video className="mr-2 h-4 w-4" /> Otworz studio AI
+            <Button onClick={() => navigate('/creator-ai-studio')} className="mt-4 min-h-[44px] w-full bg-accent text-accent-foreground hover:bg-accent/90">
+              <Video className="mr-2 h-4 w-4" /> Otworz studio AI (v1)
+            </Button>
+          </div>
+
+          <div className="rounded-xl border border-primary/30 bg-card p-5 shadow-sm flex flex-col justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Wand2 className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-primary">Szybki Route Builder</h2>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">v2 Beta</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Najszybsza droga do GPX. Podaj start i region, a AI wygeneruje realną trasę na mapie w kilka sekund.
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => navigate('/route-builder-v2')} className="mt-4 min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+              <Sparkles className="mr-2 h-4 w-4" /> Uruchom Builder v2
             </Button>
           </div>
         </div>

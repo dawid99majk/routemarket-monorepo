@@ -26,6 +26,7 @@ const EditRoute = lazy(() => import("./pages/EditRoute"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const CreatorDashboard = lazy(() => import("./pages/CreatorDashboard"));
 const CreatorAiStudio = lazy(() => import("./pages/CreatorAiStudio"));
+const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
 const CreatorRoutes = lazy(() => import("./pages/CreatorRoutes"));
 const CreatorEarnings = lazy(() => import("./pages/CreatorEarnings"));
 const CreatorStats = lazy(() => import("./pages/CreatorStats"));
@@ -114,6 +115,7 @@ const App = () => (
 
                 {/* Creator routes */}
                 <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreateRoute /></ProtectedRoute>} />
+                <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
                 <Route path="/creator-ai-studio" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorAiStudio /></ProtectedRoute>} />
                 <Route path="/edit-route/:id" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><EditRoute /></ProtectedRoute>} />
                 <Route path="/creator-dashboard" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorDashboard /></ProtectedRoute>} />

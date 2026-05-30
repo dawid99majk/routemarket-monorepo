@@ -1,5 +1,13 @@
 import type { RoutingResult } from './routing/types.js';
-import type { Poi } from '../../atlas-core/src/index.js';
+
+export interface Poi {
+  lat: number;
+  lng: number;
+  name: string;
+  description?: string;
+  type: string;
+  [key: string]: any;
+}
 
 export function buildGpxXml(route: RoutingResult, waypoints?: Poi[]): string {
   const lines: string[] = [];

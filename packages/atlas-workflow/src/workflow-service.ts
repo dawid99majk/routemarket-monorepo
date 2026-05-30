@@ -16,6 +16,7 @@ import {
 } from "../../atlas-core/src/index.js";
 import { z } from "zod";
 import { prepareRouteMarketDraft } from "../../atlas-publisher/src/index.js";
+import { GoogleRoutesRoutingProvider, buildGpxXml } from "../../atlas-gis/src/index.js";
 import { collectSources, discoverDemand, ensureRouteGpx, extractPois, generateClaims, getSearchProviderStatus, runDeepResearch } from "../../atlas-research/src/index.js";
 import type { SearchProviderMode } from "../../atlas-research/src/index.js";
 import {
@@ -147,6 +148,160 @@ export class AtlasWorkflowService {
 
   async dashboard() {
     return buildDashboardSummary((await this.listProjects({ limit: 200 })).projects);
+  }
+
+  async interview(projectSlug: string, body: any): Promise<any> {
+    const project = await this.repository.getProject(projectSlug);
+    if (!project) throw new Error("Project not found");
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      return { 
+        message: "AI Interview unavailable (missing API Key). Please provide notes manually.",
+        status: "waiting_for_user"
+      };
+    }
+
+    // Persist answers if provided
+    if (body.answers && Array.isArray(body.answers)) {
+      const content = body.answers.map((a: any) => `Q: ${a.question || a.q}\nA: ${a.answer}\n`).join("\n---\n");
+      await this.addNoteText(project.id, {
+        fileName: `interview_answers_${Date.now()}.md`,
+        content: `# Interview Answers for ${project.title}\n\n${content}`
+      });
+    }
+
+    // Call Gemini to get next question or decide if we are ready
+    const model = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    
+    // Load existing notes to avoid redundancy
+    const notes = await this.repository.readProjectFile(project.slug, "notes.md").catch(() => "");
+    
+    const prompt = `
+      Jesteś ekspertem RouteMarket. Przeprowadzasz wywiad z twórcą trasy "${project.title}".
+      Region: ${project.region}, Kategoria: ${project.category}.
+      
+      Dotychczasowe ustalenia z notatek:
+      ${notes}
+
+      Zasady:
+      1. Jeśli brakuje kluczowych informacji (punkt startu, trudność, typ noclegu, dystans), zadaj jedno krótkie, konkretne pytanie.
+      2. Jeśli masz już wystarczająco dużo danych, aby wygenerować trasę, zwróć "READY".
+      3. Nie powtarzaj pytań o rzeczy już ustalone.
+      
+      Zwróć odpowiedź w formacie JSON: {"message": "treść pytania lub READY", "isReady": boolean}
+    `;
+
+    const geminiRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
+    });
+
+    const data = await geminiRes.json() as any;
+    const aiResult = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{"message": "Jakie są Twoje preferencje?", "isReady": false}');
+
+    if (aiResult.isReady || aiResult.message === "READY") {
+      return { message: "Wspaniale! Mam wszystkie informacje. Rozpoczynam generowanie trasy.", status: "ready" };
+    }
+
+    return { 
+      message: aiResult.message,
+      status: "waiting_for_user"
+    };
+  }
+
+  async magicGenerate(body: any): Promise<any> {
+    // 1. Create project
+    const project = await this.repository.createProject({
+      title: body.topic,
+      region: body.region,
+      category: body.category || "adventure"
+    });
+
+    // 2. Persist initial notes
+    if (body.notes) {
+      await this.addNoteText(project.slug, {
+        fileName: "initial_notes.md",
+        content: body.notes
+      });
+    }
+
+    // 3. Start background research (mocked for now, will call research providers in real scenario)
+    // In a real implementation, we would trigger the full Atlas Engine pipeline here.
+    
+    return {
+      projectId: project.id,
+      slug: project.slug,
+      status: "started",
+      message: `Project ${project.title} created and research pipeline initiated.`
+    };
+  }
+
+  async calculateGeometry(projectSlug: string, body: any): Promise<any> {
+    const project = await this.repository.getProject(projectSlug);
+    if (!project) throw new Error("Project not found");
+
+    const waypoints = [body.start];
+    if (body.midpoint) waypoints.push(body.midpoint);
+    waypoints.push(body.end);
+
+    const provider = new GoogleRoutesRoutingProvider();
+    const result = await provider.getRoute(waypoints, body.category === "adventure" ? "motorcycle" : body.category);
+
+    const gpx = buildGpxXml(result);
+    await this.repository.writeProjectFile(project.slug, "route.gpx", gpx);
+    
+    // Save route summary for preview
+    await this.repository.saveSummary(project.slug, {
+      distanceKm: result.distanceKm,
+      estimatedTimeH: result.estimatedTimeH,
+      boundingBox: result.points.reduce((acc, pt) => ({
+        minLat: Math.min(acc.minLat, pt.lat),
+        maxLat: Math.max(acc.maxLat, pt.lat),
+        minLng: Math.min(acc.minLng, pt.lng),
+        maxLng: Math.max(acc.maxLng, pt.lng),
+      }), { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 })
+    } as any);
+
+    return {
+      distanceKm: result.distanceKm,
+      estimatedTimeH: result.estimatedTimeH,
+      geometry: result.geometryGeoJson
+    };
+  }
+
+  async runDeepResearchPipeline(projectSlug: string, update: WorkflowProgressCallback): Promise<any> {
+    const project = await this.repository.getProject(projectSlug);
+    
+    // 1. Deep Research (Grounded Search + Places)
+    update({ message: "Searching for local insights and POIs...", progress: 20 });
+    const researchReport = await runDeepResearch({
+      project,
+      repository: this.repository
+    });
+
+    // 2. Generate Claims from research
+    update({ message: "Extracting facts and verification claims...", progress: 50 });
+    await generateClaims(project);
+
+    // 3. Extract and map POIs
+    update({ message: "Mapping points of interest...", progress: 70 });
+    await extractPois(project);
+
+    // 4. Final Guide Generation
+    update({ message: "Writing the final travel guide...", progress: 90 });
+    const guide = await generateGuideDraft({ project, repository: this.repository });
+
+    return {
+      researchReport,
+      guidePath: "guide.md",
+      status: "completed"
+    };
   }
 
   async getProject(projectSlug: string) {

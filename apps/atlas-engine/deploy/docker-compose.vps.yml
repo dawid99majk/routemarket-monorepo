@@ -36,6 +36,31 @@ services:
       supabase_default:
         aliases:
           - atlas-api
+
+  route-builder-api:
+    build:
+      context: ../../../
+      dockerfile: apps/route-builder-api/Dockerfile
+    restart: unless-stopped
+    expose:
+      - '8081'
+    environment:
+      PORT: 8081
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GRAPHHOPPER_API_KEY: ${GRAPHHOPPER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    networks:
+      default:
+        aliases:
+          - route-builder-api
+      supabase_default:
+        aliases:
+          - route-builder-api
+      routemarket-network:
+        aliases:
+          - route-builder-api
 volumes:
   atlas-data:
   atlas-routes:
@@ -44,3 +69,6 @@ networks:
   supabase_default:
     external: true
     name: supabase_default
+  routemarket-network:
+    external: true
+    name: routemarket-network

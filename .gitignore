@@ -3,10 +3,18 @@ node_modules
 .pnpm-store
 
 # Build outputs
-dist
-build
-.next
-.vercel
+dist/
+build/
+.next/
+.vercel/
+out/
+*.tsbuildinfo
+
+# Compiled JS and type definitions in packages (TS output)
+packages/**/*.js
+packages/**/*.d.ts
+packages/**/*.d.ts.map
+packages/**/*.js.map
 
 # Environment variables
 .env
@@ -18,24 +26,24 @@ build
 Thumbs.db
 
 # IDE files
-.vscode
-.idea
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # Project specific
-.temp
-supabase/.temp
+.temp/
+supabase/.temp/
 apps/atlas-engine/api.log
+apps/atlas-engine/data/
+apps/frontend/inspect_*.js
+apps/route-builder-api/scripts/smoke-test-results/
 
-# Git subdirectories (after migration)
+# Git subdirectories
 **/.git
-
-# Package build outputs (compiled JS files next to TS source)
-packages/**/*.js
 
 # Tarballs/archives
 *.tar.gz
 *.tgz
-
-# Data directory and debug scripts
-apps/atlas-engine/data/
-apps/frontend/inspect_*.js
+*.zip
+*.patch
