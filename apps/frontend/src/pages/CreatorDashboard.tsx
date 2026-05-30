@@ -135,7 +135,7 @@ export default function CreatorDashboard() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => navigate('/creator-ai-studio')} className="mt-4 min-h-[44px] w-full bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button onClick={() => navigate('/route-builder-v2')} className="mt-4 min-h-[44px] w-full bg-accent text-accent-foreground hover:bg-accent/90">
               <Video className="mr-2 h-4 w-4" /> Otworz studio AI (v1)
             </Button>
           </div>

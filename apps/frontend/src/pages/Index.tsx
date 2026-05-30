@@ -119,7 +119,7 @@ export default function Index() {
               ) : user ? (
                 <>
                   <Button 
-                    onClick={() => navigate('/creator-ai-studio')} 
+                    onClick={() => navigate('/route-builder-v2')} 
                     className="hidden sm:flex gap-1.5 bg-primary hover:bg-primary/95 text-white font-medium shadow-md border-0 hover-lift"
                   >
                     <Sparkles className="w-4 h-4 animate-pulse" /> Magic Studio
@@ -163,7 +163,7 @@ export default function Index() {
                       <DropdownMenuItem className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate('/messages')}>
                         <MessageSquare className="w-4 h-4 mr-2" /> Wiadomości
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="hover:bg-slate-50 cursor-pointer sm:hidden" onClick={() => navigate('/creator-ai-studio')}>
+                      <DropdownMenuItem className="hover:bg-slate-50 cursor-pointer sm:hidden" onClick={() => navigate('/route-builder-v2')}>
                         <Sparkles className="w-4 h-4 mr-2" /> Magic Studio
                       </DropdownMenuItem>
                       {isAdmin && (
@@ -223,7 +223,7 @@ export default function Index() {
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button 
               size="lg" 
-              onClick={() => navigate('/creator-ai-studio')}
+              onClick={() => navigate('/route-builder-v2')}
               className="w-full sm:w-auto h-14 px-8 rounded-xl bg-primary hover:bg-primary/95 text-white font-semibold text-base shadow-[0_4px_20px_rgba(59,102,85,0.25)] hover:shadow-[0_4px_25px_rgba(59,102,85,0.4)] transition-all duration-300 hover:-translate-y-0.5 group border-0"
             >
               Uruchom Kreator Magic AI
@@ -741,7 +741,7 @@ export default function Index() {
                 <h3 className="text-lg font-bold text-slate-600">Brak tras w wybranej lokalizacji</h3>
                 <p className="text-xs text-slate-500 mt-1">Bądź pierwszym, który stworzy trasę w tym regionie przy pomocy AI!</p>
                 <Button 
-                  onClick={() => navigate('/creator-ai-studio')} 
+                  onClick={() => navigate('/route-builder-v2')} 
                   variant="outline" 
                   size="sm" 
                   className="mt-4 border-slate-200 hover:bg-slate-50 text-slate-700"
@@ -775,4 +775,6 @@ export default function Index() {
       <Footer />
     </div>
   );
+}
+
 }
