@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import StudioMapEditor from '@/components/studio/StudioMapEditor';
 
-const ATLAS_API = '/atlas-api';
+const ATLAS_API = window.location.hostname === 'localhost' ? 'http://localhost:8787' : '/atlas-api';
 const ATLAS_TOKEN = '178913a9cdd9271d077cd37dfded2afb76eaef72b220ec6c911b8509e1dece132712338c88769372979cc45f0ec6c241';
 
 export default function CreatorAiStudio() {
@@ -25,14 +25,25 @@ export default function CreatorAiStudio() {
   const [isResearching, setIsResearching] = useState(false);
   const [gpxUrl, setGpxUrl] = useState<string | null>(null);
   const [guide, setGuide] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
 
-  // Default points for initial view
-  const [waypoints, setWaypoints] = useState({
-    start: { lat: 46.54, lng: 11.86 }, 
-    end: { lat: 46.50, lng: 11.90 }
+  // Dynamic pins from map clicks
+  const [waypoints, setWaypoints] = useState<{ start: {lat: number, lng: number} | null, end: {lat: number, lng: number} | null }>({
+    start: null, 
+    end: null
   });
 
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    setWaypoints(prev => {
+      if (!prev.start) return { ...prev, start: { lat, lng } };
+      if (!prev.end) return { ...prev, end: { lat, lng } };
+      // Reset if both exist
+      return { start: { lat, lng }, end: null };
+    });
+  }, []);
+
   const updateGeometry = useCallback(async () => {
+    if (!waypoints.start || !waypoints.end) return;
     setLoading(true);
     try {
       const res = await fetch(`${ATLAS_API}/api/routes/geometry`, {
@@ -42,8 +53,7 @@ export default function CreatorAiStudio() {
           'x-atlas-api-token': ATLAS_TOKEN
         },
         body: JSON.stringify({
-          start: waypoints.start,
-          end: waypoints.end,
+          waypoints: [waypoints.start, waypoints.end],
           targetDistanceKm: distance[0],
           category: category,
           slug: slug
@@ -72,7 +82,7 @@ export default function CreatorAiStudio() {
   }, [distance, category, waypoints]);
 
   const handleStartResearch = async () => {
-    if (!slug) return;
+    if (!slug || !gpxUrl) return;
     setIsResearching(true);
     try {
       const res = await fetch(`${ATLAS_API}/api/routes/research`, {
@@ -88,14 +98,9 @@ export default function CreatorAiStudio() {
         })
       });
       const data = await res.json();
-      if (data.jobId) {
-        toast.success("Research wystartował! Gemini analizuje trasę.");
-        // Mocking completion for the studio feel
-        setTimeout(() => {
-           setIsResearching(false);
-           setGuide("Przewodnik wygenerowany pomyślnie.");
-           toast.success("Przewodnik gotowy!");
-        }, 5000);
+      if (data.jobId?.id || data.jobId) {
+        setJobId(data.jobId.id || data.jobId);
+        toast.success("Research wystartował! Agent tworzy przewodnik...");
       }
     } catch (err) {
       toast.error("Błąd startu researchu");
@@ -103,168 +108,150 @@ export default function CreatorAiStudio() {
     }
   };
 
-  return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
-      {/* HUD Header */}
-      <header className="h-14 border-b border-slate-800/50 px-6 flex items-center justify-between bg-slate-900/40 backdrop-blur-xl z-50">
-        <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-emerald-500 rounded-md">
-            <Compass className="w-4 h-4 text-slate-950" />
-          </div>
-          <h1 className="text-sm font-bold tracking-widest uppercase italic">
-            Creator <span className="text-emerald-500 font-black not-italic text-lg">Studio</span>
-          </h1>
-        </div>
+  useEffect(() => {
+    let timer: any;
+    if (jobId && slug) {
+      timer = setInterval(async () => {
+        try {
+          const res = await fetch(`${ATLAS_API}/jobs/${jobId}`, {
+            headers: { 'x-atlas-api-token': ATLAS_TOKEN }
+          });
+          const data = await res.json();
+          if (data.job?.status === 'completed') {
+            clearInterval(timer);
+            setIsResearching(false);
+            toast.success("Przewodnik gotowy!");
+            setGuide("Przewodnik zapisano w bazie pomyślnie.");
+          } else if (data.job?.status === 'failed') {
+            clearInterval(timer);
+            setIsResearching(false);
+            toast.error("Błąd generowania przewodnika.");
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(timer);
+  }, [jobId, slug]);
 
-        <div className="flex items-center gap-6">
-          <div className="hidden md:flex gap-4">
-             <div className="text-right">
-                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Status</p>
-                <p className="text-xs font-mono text-emerald-400">{loading ? 'Wyliczanie...' : 'Zsynchronizowano'}</p>
-             </div>
-             <div className="text-right border-l border-slate-800 pl-4">
-                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Projekt</p>
-                <p className="text-xs font-mono text-slate-300">{slug || 'Nowa Trasa'}</p>
-             </div>
+  return (
+    <div className="relative w-full h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+      {/* 3D Active Map taking full screen */}
+      <div className="absolute inset-0 z-0">
+         <StudioMapEditor 
+           track={track} 
+           customPois={pois} 
+           setCustomPois={setPois}
+           category={category}
+           onMapClick={handleMapClick}
+           waypoints={waypoints}
+         />
+      </div>
+
+      {/* Floating HUD Header */}
+      <header className="absolute top-0 left-0 right-0 h-16 px-6 flex items-center justify-between bg-gradient-to-b from-slate-950/90 to-transparent pointer-events-none z-50">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 bg-emerald-500 rounded-md shadow-lg shadow-emerald-500/20">
+            <Compass className="w-5 h-5 text-slate-950" />
           </div>
-          <Button 
-            onClick={handleStartResearch} 
-            disabled={!track.length || isResearching}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-lg shadow-emerald-900/20 h-9 px-4 rounded-full font-bold text-xs uppercase"
-          >
-            {isResearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            Generuj Przewodnik
-          </Button>
+          <h1 className="text-lg font-bold tracking-widest uppercase italic drop-shadow-md">
+            Creator <span className="text-emerald-500 font-black not-italic">Studio 3D</span>
+          </h1>
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
-        {/* Left Panel: Controls */}
-        <aside className="w-[380px] border-r border-slate-800/50 p-6 flex flex-col gap-10 bg-slate-900/20 backdrop-blur-md overflow-y-auto z-40">
-          <section className="space-y-6">
-            <div className="flex items-center gap-2 text-emerald-500 font-bold text-[10px] uppercase tracking-[0.2em]">
-              <MapPin className="w-3.5 h-3.5" />
-              Parametry Fizyczne
-            </div>
-            
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Dystans (km)</label>
-                  <span className="text-emerald-500 font-mono font-black text-lg">{distance[0]}</span>
-                </div>
-                <Slider 
-                  value={distance} 
-                  onValueChange={setDistance} 
-                  max={300} 
-                  step={5}
-                  className="py-2"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Liczba dni</label>
-                  <span className="text-emerald-500 font-mono font-black text-lg">{days[0]}</span>
-                </div>
-                <Slider 
-                  value={days} 
-                  onValueChange={setDays} 
-                  max={14} 
-                  step={1}
-                  className="py-2"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Kategoria Sprzętu</label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="bg-slate-950/50 border-slate-800 h-10 text-xs font-bold rounded-lg focus:ring-emerald-500/20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                    <SelectItem value="szosa">🚴 Szosa (Road)</SelectItem>
-                    <SelectItem value="gravel">🚵 Gravel (Offroad)</SelectItem>
-                    <SelectItem value="trekking">🥾 Trekking (Hiking)</SelectItem>
-                    <SelectItem value="motorcycle">🏍️ Motocykl (Adventure)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-4 flex-1 flex flex-col">
-            <div className="flex items-center gap-2 text-emerald-500 font-bold text-[10px] uppercase tracking-[0.2em]">
-              <Info className="w-3.5 h-3.5" />
-              Intencja Twórcy
-            </div>
-            <Textarea 
-              placeholder="Opisz klimat trasy, np. 'Szukamy najlepszej pizzy w Dolomitach'..."
-              className="flex-1 bg-slate-950/50 border-slate-800 focus:border-emerald-500/50 resize-none text-sm leading-relaxed rounded-xl p-4 placeholder:text-slate-700 placeholder:italic font-medium"
-              value={intent}
-              onChange={(e) => setIntent(e.target.value)}
-            />
-            <div className="flex items-center gap-2 p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/10">
-               <Send className="w-3 h-3 text-emerald-500" />
-               <p className="text-[10px] text-emerald-400/70 font-medium italic leading-tight">
-                 Twoja intencja zostanie wykorzystana przez Gemini do znalezienia unikalnych punktów POI.
-               </p>
-            </div>
-          </section>
-
-          {guide && (
-            <Card className="bg-emerald-500/10 border-emerald-500/30 overflow-hidden rounded-2xl">
-              <CardContent className="p-4 flex flex-col gap-3">
-                <div className="flex items-center gap-2 text-emerald-400 font-black text-[10px] uppercase tracking-widest">
-                  <CheckCircle2 className="w-4 h-4" /> Gotowy produkt
-                </div>
-                <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                  Pomyślnie wygenerowano butikowy przewodnik w oparciu o twarde dane z Google.
-                </p>
-                <Button variant="outline" className="w-full h-8 text-[10px] font-bold uppercase border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/20 text-emerald-400 rounded-lg">
-                  Pobierz Przewodnik (PDF)
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </aside>
-
-        {/* Full-screen Viewport */}
-        <section className="flex-1 bg-slate-950 relative overflow-hidden">
-          <div className="absolute inset-0">
-             <StudioMapEditor 
-               track={track} 
-               customPois={pois} 
-               setCustomPois={setPois}
-               category={category}
-             />
+      {/* Floating UI Overlay for Controls */}
+      <div className="absolute top-20 left-6 w-[360px] bg-slate-900/80 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6 shadow-2xl z-40 flex flex-col gap-6">
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 text-emerald-500 font-bold text-xs uppercase tracking-widest">
+            <MapPin className="w-4 h-4" />
+            Parametry Trasy
           </div>
           
-          {loading && (
-            <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] pointer-events-none">
-              <div className="bg-slate-900/80 backdrop-blur-xl border border-emerald-500/30 px-6 py-2 rounded-full flex items-center gap-3 shadow-2xl shadow-emerald-500/10">
-                <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
-                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Processing Geometry</span>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Dystans (km)</label>
+                <span className="text-emerald-500 font-mono font-black">{distance[0]}</span>
               </div>
+              <Slider value={distance} onValueChange={setDistance} max={300} step={5} />
             </div>
-          )}
 
-          {/* Map HUD Overlay */}
-          <div className="absolute bottom-10 right-8 z-[100] flex flex-col gap-3 items-end pointer-events-none">
-             <Badge className="bg-slate-950/80 border-slate-800 text-slate-400 text-[10px] font-mono py-1.5 px-3 rounded-md backdrop-blur-md">
-               Lat: {waypoints.start.lat.toFixed(4)} Lng: {waypoints.start.lng.toFixed(4)}
-             </Badge>
-             <div className="flex gap-2">
-                <Badge className="bg-emerald-500 text-slate-950 text-[10px] font-black py-1 px-3 rounded-full uppercase tracking-tighter">
-                   Takt 1: Twarda Geometria
-                </Badge>
-                <Badge className="bg-blue-500 text-slate-950 text-[10px] font-black py-1 px-3 rounded-full uppercase tracking-tighter">
-                   3D Engine Active
-                </Badge>
-             </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Liczba dni</label>
+                <span className="text-emerald-500 font-mono font-black">{days[0]}</span>
+              </div>
+              <Slider value={days} onValueChange={setDays} max={14} step={1} />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Kategoria</label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="bg-slate-950/50 border-slate-800">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                  <SelectItem value="szosa">Szosa</SelectItem>
+                  <SelectItem value="gravel">Gravel</SelectItem>
+                  <SelectItem value="trekking">Trekking</SelectItem>
+                  <SelectItem value="motorcycle">Motocykl</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </section>
-      </main>
+
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 text-emerald-500 font-bold text-xs uppercase tracking-widest">
+            <Info className="w-4 h-4" />
+            Intencja wyjazdu
+          </div>
+          <Textarea 
+            placeholder="Szukamy dobrej pizzy i fajnych widoków..."
+            className="bg-slate-950/50 border-slate-800 focus:border-emerald-500/50 resize-none rounded-xl p-3 placeholder:text-slate-600"
+            value={intent}
+            onChange={(e) => setIntent(e.target.value)}
+          />
+        </section>
+
+        <Button 
+          onClick={handleStartResearch} 
+          disabled={!track.length || isResearching}
+          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40 font-bold uppercase tracking-wider"
+        >
+          {isResearching ? (
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Badam Trasę...</>
+          ) : (
+            <><Sparkles className="w-4 h-4 mr-2" /> Akceptuj i Wygeneruj</>
+          )}
+        </Button>
+
+        {guide && (
+          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center gap-2 text-blue-400 text-xs font-bold">
+            <CheckCircle2 className="w-4 h-4" /> Przewodnik zapisany (JSON/MD)!
+          </div>
+        )}
+      </div>
+      
+      {/* Loading Indicator for Geometry overlay */}
+      {loading && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50">
+          <div className="bg-slate-900/80 backdrop-blur-xl border border-emerald-500/30 px-6 py-2 rounded-full flex items-center gap-3 shadow-2xl">
+            <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Wyliczanie geometrii...</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Bottom Right Info HUD */}
+      <div className="absolute bottom-10 right-8 z-40 flex flex-col gap-3 items-end pointer-events-none">
+         <Badge className="bg-emerald-500 text-slate-950 text-[10px] font-black py-1 px-3 rounded-full uppercase tracking-tighter">
+            Kliknij na mapie: Start & Meta
+         </Badge>
+         {slug && <Badge className="bg-slate-950/80 border-slate-800 text-slate-400 text-xs font-mono py-1 px-3">Projekt: {slug}</Badge>}
+      </div>
     </div>
   );
 }

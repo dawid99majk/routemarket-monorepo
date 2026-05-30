@@ -104,6 +104,8 @@ export default function StudioMapEditor({
   onReverseTrack,
   onSimplifyTrack,
   onSmoothTrack,
+  onMapClick,
+  waypoints,
 }: StudioMapEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -152,9 +154,14 @@ export default function StudioMapEditor({
     const markersGroup = L.featureGroup().addTo(map);
     markersGroupRef.current = markersGroup;
 
-    // Click handler on map to drop temporary pin for custom POI
+    // Click handler on map to drop temporary pin for custom POI or handle waypoints
     map.on('click', (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
+      if (onMapClick) {
+        onMapClick(lat, lng);
+        return;
+      }
+      
       setClickCoords({ lat, lng });
 
       if (clickMarkerRef.current) {
@@ -187,6 +194,30 @@ export default function StudioMapEditor({
       }
     };
   }, []);
+
+  const waypointsGroupRef = useRef<L.FeatureGroup | null>(null);
+
+  // Render Waypoints
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!waypointsGroupRef.current) {
+      waypointsGroupRef.current = L.featureGroup().addTo(mapRef.current);
+    }
+    
+    waypointsGroupRef.current.clearLayers();
+    
+    if (waypoints?.start) {
+      L.marker([waypoints.start.lat, waypoints.start.lng], {
+        icon: createEndpinIcon('#10b981', 'S')
+      }).addTo(waypointsGroupRef.current);
+    }
+    
+    if (waypoints?.end) {
+      L.marker([waypoints.end.lat, waypoints.end.lng], {
+        icon: createEndpinIcon('#f43f5e', 'M')
+      }).addTo(waypointsGroupRef.current);
+    }
+  }, [waypoints]);
 
   // 2. Change Tile Layer Style
   const handleTileChange = (type: keyof typeof TILE_LAYERS) => {

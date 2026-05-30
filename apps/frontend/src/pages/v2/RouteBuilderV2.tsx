@@ -341,32 +341,3 @@ export default function RouteBuilderV2() {
     </div>
   );
 }
-backdrop-blur-[1px] flex items-center justify-center z-50 pointer-events-none">
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-3 shadow-2xl">
-                <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                <span className="text-xs font-mono text-emerald-500 uppercase tracking-widest">Calculating Geometry</span>
-              </div>
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
-  );
-}
-             </div>
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
-  );
-}
-500 uppercase tracking-widest">Calculating Geometry</span>
-              </div>
-            </div>
-          )}
-        </section>
-      </main>
-    </div>
-  );
-}

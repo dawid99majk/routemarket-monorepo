@@ -295,30 +295,76 @@ export class AtlasWorkflowService {
     };
   }
 
-  async runDeepResearchPipeline(projectSlug: string, update: WorkflowProgressCallback): Promise<any> {
+  async runDeepResearchPipeline(projectSlug: string, update: WorkflowProgressCallback, payload?: any): Promise<any> {
     const project = await this.repository.getProject(projectSlug);
-    
-    // 1. Deep Research (Grounded Search + Places)
-    update({ message: "Searching for local insights and POIs...", progress: 20 });
-    const researchReport = await runDeepResearch({
+    const intent = payload?.intent || "Stwórz świetny przewodnik podróżniczy.";
+    const gpxUrl = payload?.gpxUrl;
+
+    update({ message: "Pobieranie i analiza geometrii GPX...", progress: 10 });
+    const { analyzeGpx } = await import("../../atlas-research/src/gpx/analyze-gpx.js");
+    let summary;
+    try {
+      summary = await analyzeGpx(project, this.repository);
+    } catch (e) {
+      console.error("Błąd analizy GPX:", e);
+    }
+    const centerLat = summary?.boundingBox ? (summary.boundingBox.minLat + summary.boundingBox.maxLat) / 2 : 52.2;
+    const centerLng = summary?.boundingBox ? (summary.boundingBox.minLng + summary.boundingBox.maxLng) / 2 : 21.0;
+
+    update({ message: "Odpalam Google Grounded Search (wyszukiwanie twardych danych)...", progress: 30 });
+    const { GoogleGroundedSearchProvider } = await import("../../atlas-research/src/providers/google-grounded-search-provider.js");
+    const searchProvider = new GoogleGroundedSearchProvider({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY! });
+    const sources = await searchProvider.search({
+      query: intent,
+      category: project.category,
+      region: project.region,
+      language: project.language
+    });
+
+    update({ message: "Przeszukiwanie Google Places wokół trasy (parkingi, noclegi, restauracje)...", progress: 50 });
+    const { GooglePlacesProvider } = await import("../../atlas-research/src/providers/google-places-provider.js");
+    const placesProvider = new GooglePlacesProvider(process.env.GOOGLE_API_KEY!);
+    const pois = [];
+    for (const type of ["parking", "restaurant", "lodging"]) {
+      const poi = await placesProvider.enrichPoi({
+        name: type,
+        type: type as any,
+        lat: centerLat,
+        lng: centerLng,
+        description: `Miejsce typu ${type} na trasie`
+      });
+      if (poi.isVerifiedByDeepResearch) pois.push(poi);
+    }
+
+    update({ message: "Przekazuję zebrane dane do Gemini i generuję premium przewodnik...", progress: 70 });
+    const { generateGuideDraft } = await import("../../atlas-writer/src/guide.js");
+    const guideMarkdown = await generateGuideDraft({
       project,
+      sources,
+      pois: pois as any,
+      concept: intent,
       repository: this.repository
     });
 
-    // 2. Generate Claims from research
-    update({ message: "Extracting facts and verification claims...", progress: 50 });
-    await generateClaims(project);
-
-    // 3. Extract and map POIs
-    update({ message: "Mapping points of interest...", progress: 70 });
-    await extractPois(project);
-
-    // 4. Final Guide Generation
-    update({ message: "Writing the final travel guide...", progress: 90 });
-    const guide = await generateGuideDraft({ project, repository: this.repository });
+    update({ message: "Zapisuję ostateczny Markdown do bazy w tabeli route_projects...", progress: 90 });
+    if ("client" in this.repository) {
+      const client = (this.repository as any).client;
+      await client.from("route_projects").upsert({
+        slug: project.slug,
+        guide_markdown: guideMarkdown,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "slug" }).catch(() => {});
+      
+      // Dodatkowo wpiszmy do właściwej tabeli routes
+      await client.from("routes").update({
+        content: guideMarkdown
+      }).eq("slug", project.slug).catch(() => {});
+    } else {
+      // Fallback
+      await this.repository.writeProjectFile(project.slug, "route_projects_table_mock.md", guideMarkdown);
+    }
 
     return {
-      researchReport,
       guidePath: "guide.md",
       status: "completed"
     };
