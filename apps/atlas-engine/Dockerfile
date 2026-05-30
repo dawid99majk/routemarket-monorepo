@@ -1,25 +1,18 @@
-FROM node:24-slim AS base
+# Dockerfile for Atlas Engine using tsx for robust monorepo path resolution
+FROM node:22-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-FROM base AS build
+FROM base AS runner
 WORKDIR /usr/src/app
+
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store CI=true pnpm install --no-frozen-lockfile --ignore-scripts
-RUN pnpm --filter @routemarket/atlas-engine build
-RUN pnpm deploy --filter=@routemarket/atlas-engine --prod /app --legacy
 
-FROM base AS runtime
-WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=8080
-COPY --from=build /app .
-# Copy built files and assets explicitly as pnpm deploy may skip them due to .gitignore
-COPY --from=build /usr/src/app/apps/atlas-engine/dist ./dist
-COPY --from=build /usr/src/app/apps/atlas-engine/docs ./docs
-
-RUN mkdir -p /app/data /app/routes
+RUN mkdir -p /usr/src/app/apps/atlas-engine/data /usr/src/app/apps/atlas-engine/routes
 
 EXPOSE 8080
-CMD ["node", "dist/apps/atlas-engine/apps/api/src/index.js"]
+WORKDIR /usr/src/app/apps/atlas-engine
+CMD ["npx", "tsx", "apps/api/src/index.ts"]
