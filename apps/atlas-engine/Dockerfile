@@ -22,4 +22,4 @@ COPY --from=build /usr/src/app/apps/atlas-engine/docs ./docs
 RUN mkdir -p /app/data /app/routes
 
 EXPOSE 8080
-CMD ["node", "dist/apps/api/src/index.js"]
+CMD ["node", "dist/apps/atlas-engine/apps/api/src/index.js"]
