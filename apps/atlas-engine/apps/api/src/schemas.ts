@@ -118,3 +118,17 @@ export const RegisterExternalInputBodySchema = z.object({
 }).refine((value) => Boolean(value.storageUrl || value.storageKey), {
   message: "storageUrl or storageKey is required"
 });
+
+export const GeometryBodySchema = z.object({
+  waypoints: z.array(z.object({
+    lat: z.number(),
+    lng: z.number()
+  })).min(2).max(25),
+  targetDistance: z.number().positive(),
+  category: z.string()
+});
+
+export const ResearchBodySchema = z.object({
+  gpxUrl: z.string().url(),
+  userIntent: z.string()
+});

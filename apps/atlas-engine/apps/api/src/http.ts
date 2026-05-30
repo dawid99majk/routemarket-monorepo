@@ -23,8 +23,13 @@ import {
   SubmitReviewDecisionBodySchema,
   SubmitStageApprovalBodySchema,
   UpdateProjectStatusBodySchema,
-  WriteProjectFileBodySchema
+  WriteProjectFileBodySchema,
+  GeometryBodySchema,
+  ResearchBodySchema
 } from "./schemas.js";
+
+import { GoogleRoutesRoutingProvider } from "@routemarket/atlas-gis/src/routing/google-routes-provider.js";
+import { buildGpxXml } from "@routemarket/atlas-gis/src/gpx-builder.js";
 
 import type { ProjectRepository } from "@routemarket/atlas-core/src/index.js";
 
@@ -161,6 +166,54 @@ export function startAtlasApi(options: AtlasApiOptions): Server {
 
 function createRoutes(): Route[] {
   return [
+    route("POST", "/api/routes/geometry", async ({ req }) => {
+      const body = GeometryBodySchema.parse(await readJson(req));
+      const provider = new GoogleRoutesRoutingProvider();
+      const result = await provider.getRoute(body.waypoints as any, body.category as any);
+      const gpx = buildGpxXml(result);
+
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseUrl || !supabaseKey) throw new Error("Missing Supabase credentials");
+
+      const fileName = `generated-${Date.now()}.gpx`;
+      const response = await fetch(`${supabaseUrl}/storage/v1/object/routes-gpx/${fileName}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${supabaseKey}`,
+          "Content-Type": "application/gpx+xml",
+        },
+        body: gpx
+      });
+
+      if (!response.ok) throw new Error("Supabase upload failed: " + await response.text());
+
+      return {
+        url: `${supabaseUrl}/storage/v1/object/public/routes-gpx/${fileName}`,
+        distanceKm: result.distanceKm
+      };
+    }),
+    route("POST", "/api/routes/research", async ({ req, service }) => {
+      const body = ResearchBodySchema.parse(await readJson(req));
+      
+      const project = await service.createProject({
+        topic: body.userIntent.substring(0, 50) || "AI Researched Route",
+        category: "touring"
+      });
+
+      const gpxContent = await fetch(body.gpxUrl).then(r => r.text());
+      await service.addGpxText(project.id, { content: gpxContent, fileName: "route.gpx" });
+      await service.addNoteText(project.id, { content: body.userIntent, fileName: "user_intent.md" });
+
+      await service.runDeepResearch(project.id, { sourceLimit: 3 });
+      await service.runMvp2(project.id);
+      await service.setProjectStatus(project.id, "published");
+
+      return {
+        projectId: project.id,
+        status: "completed"
+      };
+    }),
     route("GET", "/", async ({ res }) => {
       redirect(res, "/reviewer");
       return undefined;

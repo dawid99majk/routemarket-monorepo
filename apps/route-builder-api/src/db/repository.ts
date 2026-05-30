@@ -222,6 +222,57 @@ export class RouteBuilderRepository {
     if (error) throw new Error(error.message);
     return data as RouteArtifact;
   }
+
+  async requeueStaleRunningJobs(staleMinutes: number): Promise<number> {
+    if (isMock) return 0;
+
+    const threshold = new Date(Date.now() - staleMinutes * 60000).toISOString();
+    
+    const { data, error } = await supabase
+      .from('route_builder_jobs')
+      .update({ status: 'queued', locked_by: null, locked_at: null })
+      .eq('status', 'running')
+      .lt('locked_at', threshold)
+      .select('id');
+
+    if (error) {
+      console.error('requeueStaleRunningJobs error:', error);
+      return 0;
+    }
+    return data?.length || 0;
+  }
+
+  async claimNextQueuedJob(workerId: string): Promise<RouteBuilderJob | null> {
+    if (isMock) {
+      const queuedJobId = Object.keys(mockJobs).find(id => mockJobs[id].status === 'queued');
+      if (!queuedJobId) return null;
+      mockJobs[queuedJobId].status = 'running';
+      mockJobs[queuedJobId].locked_by = workerId;
+      mockJobs[queuedJobId].locked_at = new Date().toISOString();
+      return mockJobs[queuedJobId];
+    }
+
+    const { data: jobs, error: findError } = await supabase
+      .from('route_builder_jobs')
+      .select('id')
+      .eq('status', 'queued')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    
+    if (findError || !jobs || jobs.length === 0) return null;
+    
+    const jobId = jobs[0].id;
+    const { data: claimed, error: updateError } = await supabase
+      .from('route_builder_jobs')
+      .update({ status: 'running', locked_by: workerId, locked_at: new Date().toISOString() })
+      .eq('id', jobId)
+      .eq('status', 'queued')
+      .select()
+      .single();
+      
+    if (updateError || !claimed) return null;
+    return claimed as RouteBuilderJob;
+  }
 }
 
 export const repo = new RouteBuilderRepository();
