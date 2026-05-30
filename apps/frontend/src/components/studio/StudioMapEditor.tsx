@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { Loader2, Play } from 'lucide-react';
-import { env } from '@/env';
 
 interface Waypoint {
   lat: number;
@@ -78,7 +77,7 @@ export default function StudioMapEditor() {
     const fetchGeometry = async () => {
       setIsGeneratingGeometry(true);
       try {
-        const res = await fetch(`${env.VITE_API_URL}/api/routes/geometry`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/routes/geometry`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ waypoints, targetDistance, category })
@@ -133,7 +132,7 @@ export default function StudioMapEditor() {
     setIsResearching(true);
     const tId = toast.loading("AI Gemini analizuje trasę i wyszukuje atrakcje...");
     try {
-      const res = await fetch(`${env.VITE_API_URL}/api/routes/research`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/routes/research`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gpxUrl, userIntent })
