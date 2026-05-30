@@ -50,7 +50,7 @@ export default function AlternativesViewStep({
                 <Sparkles className="text-cyan-400 animate-pulse h-5 w-5" /> Wybierz wariant trasy
               </CardTitle>
               <Badge className="bg-cyan-950 text-cyan-400 border border-cyan-800/40 text-[10px] flex items-center gap-1 font-mono">
-                <BadgeAlert className="h-3 w-3" /> Warianty Demo AI
+                <BadgeAlert className="h-3 w-3" /> Warianty trasy
               </Badge>
             </div>
             <CardDescription className="text-zinc-400">

@@ -10,7 +10,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # In MVP v2 we might need packages, so copy all workspace for now
 COPY . .
 RUN CI=true pnpm install --frozen-lockfile --ignore-scripts
-RUN pnpm -C apps/route-builder-api run build
+RUN pnpm --filter @routemarket/route-builder-api... build
 
 FROM base AS runner
 WORKDIR /app

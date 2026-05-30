@@ -2,15 +2,6 @@ import { useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix for Leaflet default icons in React/Vite/Build environments
-// @ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
-
 interface RouteDetailMapProps {
   track: [number, number][];
   places?: { name: string, lat: number, lng: number }[] | null;
@@ -68,6 +59,9 @@ function createPoiIcon(name: string, color: string = '#6366f1') {
   });
 }
 
+const startIcon = createCircleIcon('#10b981', 'S');
+const endIcon = createCircleIcon('#ef4444', 'E');
+
 function RouteDetailMapInner({ 
   track, 
   places = [], 
@@ -80,21 +74,25 @@ function RouteDetailMapInner({
   const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!containerRef.current) return;
     if (track.length < 2 && (!alternatives || alternatives.length === 0)) return;
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
 
-    // Initialize map with a higher maxZoom and better defaults
     const map = L.map(containerRef.current, {
       zoomControl: true,
       scrollWheelZoom: false,
       dragging: true,
-      maxZoom: 18,
+      maxZoom: 15,
     });
 
-    // Standard OpenStreetMap tiles - most reliable
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
+    // Outdoor/terrain style tile layer
+    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+      maxZoom: 17,
+      noWrap: true,
     }).addTo(map);
 
     let bounds = L.latLngBounds([]);
@@ -134,18 +132,10 @@ function RouteDetailMapInner({
     } else {
       // Standardowy rysunek pojedynczej trasy
       const latLngs = track.map(([lat, lng]) => L.latLng(lat, lng));
-      
-      // Draw outer white glow/border for high contrast on any terrain
       L.polyline(latLngs, {
-        color: '#ffffff',
-        weight: 8,
-        opacity: 0.5,
-      }).addTo(map);
-
-      L.polyline(latLngs, {
-        color: '#16a34a',
-        weight: 5,
-        opacity: 1.0,
+        color: '#6366f1', // standardowy fiolet
+        weight: 4,
+        opacity: 0.9,
         lineCap: 'round',
         lineJoin: 'round',
       }).addTo(map);
@@ -155,7 +145,7 @@ function RouteDetailMapInner({
 
     // Wyznaczenie punktów startowych i końcowych na podstawie aktywnej trasy
     let activeTrack = track;
-    let activeColor = '#16a34a';
+    let activeColor = '#6366f1';
     if (alternatives && alternatives.length > 0) {
       const selected = alternatives.find(a => a.id === selectedAlternativeId) || alternatives[0];
       activeTrack = selected.track;
@@ -184,27 +174,24 @@ function RouteDetailMapInner({
     }
 
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
     }
-
-    // Crucial for React: ensure map is fully rendered and sized
-    const timer = setTimeout(() => {
-      map.invalidateSize();
-    }, 300);
+    setTimeout(() => map.invalidateSize(false), 50);
 
     // Wyłączenie prawego kliku
-    containerRef.current.addEventListener('contextmenu', (e) => e.preventDefault());
+    const preventContextMenu = (e: MouseEvent) => e.preventDefault();
+    containerRef.current.addEventListener('contextmenu', preventContextMenu);
 
     mapRef.current = map;
 
     return () => {
-      clearTimeout(timer);
+      containerRef.current?.removeEventListener('contextmenu', preventContextMenu);
       map.remove();
       mapRef.current = null;
     };
   }, [track, places, alternatives, selectedAlternativeId]);
 
-  return <div ref={containerRef} className={`w-full h-full min-h-[350px] bg-muted/20 ${className}`} />;
+  return <div ref={containerRef} className={`w-full h-full ${className}`} />;
 }
 
 const RouteDetailMap = memo(RouteDetailMapInner);

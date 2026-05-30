@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, Sparkles, Map as MapIcon, Loader2, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Download, Sparkles, Map as MapIcon, Loader2, ExternalLink, PackagePlus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const RouteDetailMap = lazy(() => import('@/components/RouteDetailMap'));
@@ -17,6 +17,10 @@ interface FinalReportStepProps {
   reportText: string | null;
   sources: { title: string; url: string }[] | null;
   onDownloadGpx: () => void;
+  onImportDraft: () => void;
+  onEnrichPois?: () => void;
+  importLoading: boolean;
+  importedRoute: any;
   onReset: () => void;
 }
 
@@ -28,6 +32,10 @@ export default function FinalReportStep({
   reportText,
   sources,
   onDownloadGpx,
+  onImportDraft,
+  onEnrichPois,
+  importLoading,
+  importedRoute,
   onReset
 }: FinalReportStepProps) {
 
@@ -68,6 +76,29 @@ export default function FinalReportStep({
               >
                 <Download className="h-5 w-5" /> Pobierz plik GPX
               </Button>
+              <Button
+                onClick={onEnrichPois}
+                variant="outline"
+                className="w-full border-zinc-800 text-zinc-300 font-semibold py-6 text-base flex items-center justify-center gap-2"
+              >
+                <MapIcon className="h-5 w-5 text-amber-500" /> Wzbogać POI (Google)
+              </Button>
+              <Button
+                onClick={onImportDraft}
+                disabled={importLoading}
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-6 text-base shadow-lg shadow-cyan-950/20 flex items-center justify-center gap-2"
+              >
+                {importLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <PackagePlus className="h-5 w-5" />}
+                Utwórz szkic w RouteMarket
+              </Button>
+              {importedRoute?.id && (
+                <a
+                  href={`/creator/routes/${importedRoute.id}/edit`}
+                  className="block w-full rounded-lg border border-cyan-900/60 bg-cyan-950/20 px-3 py-2 text-center text-sm text-cyan-300 hover:bg-cyan-950/40"
+                >
+                  Otwórz szkic #{importedRoute.id}
+                </a>
+              )}
               <Button 
                 onClick={onReset} 
                 variant="secondary" 

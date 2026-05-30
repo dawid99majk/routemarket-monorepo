@@ -18,29 +18,37 @@ export class GeocodingService {
     const places: GeocodedPlace[] = [];
     
     if (startPoint) {
-      const startPlace = await this.geocodeSinglePoint(startPoint, 49.2701, 19.9802);
+      const startPlace = await this.geocodeSinglePoint(startPoint);
       places.push(startPlace);
       
       if (endPoint) {
-        const endPlace = await this.geocodeSinglePoint(endPoint, 49.3000, 19.9900);
+        const endPlace = await this.geocodeSinglePoint(endPoint);
         places.push(endPlace);
       } else if (options.loop) {
         // Generujemy dynamiczny punkt kontrolny pętli w pobliżu punktu startowego
+        // Aby uzyskać pętlę o dystansie X, potrzebujemy segmentu X/2.
+        // Przesunięcie o D stopni w lat i lng daje segment D * 1.41 * 111 km.
+        // D = (X/2) / (1.41 * 111) = X / 314.
+        const targetOffset = options.distanceTargetKm ? options.distanceTargetKm / 314 : 0.015;
+        
         places.push({
-          name: `${startPlace.name} - punkt kontrolny pętli`,
-          lat: startPlace.lat + 0.015,
-          lng: startPlace.lng + 0.015,
+          name: `${startPlace.name} - punkt kontrolny pętli (${options.distanceTargetKm || '?'} km)`,
+          lat: startPlace.lat + targetOffset,
+          lng: startPlace.lng + targetOffset,
           confidence: 0.85,
           source: 'ai_suggested_loop',
           provider: startPlace.provider
         });
+
+        // Powrót do startu dla pętli
+        places.push(startPlace);
       }
     }
     
     return places;
   }
 
-  private async geocodeSinglePoint(query: string, defaultLat: number, defaultLng: number): Promise<GeocodedPlace> {
+  private async geocodeSinglePoint(query: string): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
     
     // 1. Próba GraphHopper Geocoding
@@ -94,16 +102,7 @@ export class GeocodingService {
       console.warn(`[Geocoding] OSM Nominatim geocoding failed: ${err.message}`);
     }
 
-    // 3. Ostateczny fallback do Zakopanego w przypadku braku połączenia
-    console.log(`[Geocoding] Falling back to default coordinates for: "${query}"`);
-    return {
-      name: `${query} (Skalibrowane Zakopane)`,
-      lat: defaultLat,
-      lng: defaultLng,
-      confidence: 0.50,
-      source: 'fallback_mock',
-      provider: 'mock_google'
-    };
+    throw new Error(`Nie udało się odnaleźć punktu "${query}". Doprecyzuj nazwę miejsca, dodaj kraj/region albo użyj dokładniejszych danych wejściowych.`);
   }
 }
 

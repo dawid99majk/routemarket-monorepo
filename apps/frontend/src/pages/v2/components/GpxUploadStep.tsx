@@ -110,7 +110,6 @@ export default function GpxUploadStep({
             type="file" 
             id="gpx-upload" 
             className="hidden" 
-            accept=".gpx"
             disabled={loading}
             onChange={(e) => {
               if (e.target.files && e.target.files[0]) {

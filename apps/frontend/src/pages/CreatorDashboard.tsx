@@ -155,7 +155,7 @@ export default function CreatorDashboard() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => navigate('/route-builder-v2')} className="mt-4 min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+            <Button onClick={() => navigate('/creator-ai-studio')} className="mt-4 min-h-[44px] w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
               <Sparkles className="mr-2 h-4 w-4" /> Uruchom Builder v2
             </Button>
           </div>
