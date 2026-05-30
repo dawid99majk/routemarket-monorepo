@@ -15,7 +15,7 @@ import {
   type InputItemType
 } from "../../atlas-core/src/index.js";
 import { z } from "zod";
-import { prepareRouteMarketDraft } from "../../atlas-publisher/src/index.js";
+import { prepareRouteMarketDraft } from "./payload-builder.js";
 import { collectSources, discoverDemand, ensureRouteGpx, extractPois, generateClaims, getSearchProviderStatus, runDeepResearch } from "../../atlas-research/src/index.js";
 import type { SearchProviderMode } from "../../atlas-research/src/index.js";
 import {

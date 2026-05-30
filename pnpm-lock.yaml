@@ -17,6 +17,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.21.0
         version: 1.29.0(zod@4.4.3)
+      '@routemarket/atlas-client':
+        specifier: workspace:*
+        version: link:../../packages/atlas-client
       '@routemarket/atlas-core':
         specifier: workspace:*
         version: link:../../packages/atlas-core
@@ -386,9 +389,6 @@ importers:
       '@routemarket/atlas-core':
         specifier: workspace:*
         version: link:../atlas-core
-      '@routemarket/atlas-workflow':
-        specifier: workspace:*
-        version: link:../atlas-workflow
 
   packages/atlas-research:
     dependencies:

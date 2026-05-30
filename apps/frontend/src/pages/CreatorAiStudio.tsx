@@ -48,7 +48,7 @@ export default function CreatorAiStudio() {
   const [isImporting, setIsImporting] = useState(false);
 
   // Project Management
-  const [activeSlug, setActiveSlug] = useState<string | null>(() => localStorage.getItem('creator_ai_studio_slug'));
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const { projects, loading: loadingProjects, fetchProjects, createProject: apiCreateProject } = useAtlasProjects();
 
   // Workspace & Pipeline

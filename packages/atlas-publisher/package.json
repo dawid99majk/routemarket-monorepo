@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@routemarket/atlas-core": "workspace:*",
-    "@routemarket/atlas-workflow": "workspace:*"
+    "@routemarket/atlas-core": "workspace:*"
   }
 }

@@ -36,7 +36,19 @@ export const DeepResearchBodySchema = z.object({
 });
 
 export const UpdateProjectStatusBodySchema = z.object({
-  status: ProjectStatusSchema
+  status: z.enum([
+    "research_needed",
+    "sources_collected",
+    "running",
+    "paused",
+    "draft_generated",
+    "ready_for_review",
+    "changes_requested",
+    "blocked",
+    "approved_for_publish",
+    "published",
+    "archived"
+  ])
 });
 
 export const SubmitReviewDecisionBodySchema = z.object({

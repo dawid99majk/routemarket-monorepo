@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { prepareRouteMarketDraft, publishLiveDraft } from "@routemarket/atlas-publisher/src/index.js";
+import { prepareRouteMarketDraft, publishLiveDraft } from "@routemarket/atlas-workflow/src/index.js";
 import { loadProject } from "./load-project.js";
 import { AtlasWorkflowService } from "@routemarket/atlas-workflow/src/index.js";
 
