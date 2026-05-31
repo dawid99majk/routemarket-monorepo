@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, MapPin, Compass, CheckCircle2 } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Map, FileUp, Send, Bot, User, Compass, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 
 // Real Leaflet Components
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
@@ -34,10 +32,10 @@ function MapResizer({ geometry }: { geometry: any }) {
 }
 
 function UnifiedMap({ geometry, start, end, midpoint }: any) {
-  const center: [number, number] = start ? [start.lat, start.lng] : [46.54, 11.86];
+  const center: [number, number] = start ? [start.lat, start.lng] : [49.299, 19.949];
 
   return (
-    <div className="w-full h-full rounded-lg overflow-hidden border border-slate-800 bg-slate-900 relative">
+    <div className="w-full h-full rounded-2xl overflow-hidden border border-slate-800/60 shadow-2xl relative bg-slate-950">
       <MapContainer 
         center={center} 
         zoom={12} 
@@ -46,8 +44,8 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
         className="z-0"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
         
         {geometry && geometry.coordinates && (
@@ -55,10 +53,10 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
             positions={geometry.coordinates.map((c: any) => [c[1], c[0]])} 
             pathOptions={{ 
               color: '#10b981', 
-              weight: 4, 
-              opacity: 0.8,
-              dashArray: '10, 10',
-              lineCap: 'round'
+              weight: 5, 
+              opacity: 0.9,
+              lineCap: 'round',
+              lineJoin: 'round'
             }} 
           />
         )}
@@ -70,13 +68,13 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
         <MapResizer geometry={geometry} />
       </MapContainer>
 
-      {/* HUD Elements */}
-      <div className="absolute bottom-4 left-4 flex gap-2 z-[1000]">
-        <Badge variant="outline" className="bg-slate-950/80 border-emerald-500/50 text-emerald-400 backdrop-blur-md">
-          GIS Engine: Google Routes v4
+      {/* Premium HUD Elements */}
+      <div className="absolute bottom-6 left-6 flex gap-3 z-[1000]">
+        <Badge variant="outline" className="bg-slate-950/60 border-emerald-500/30 text-emerald-400 backdrop-blur-xl py-1.5 px-4 rounded-full shadow-lg shadow-emerald-500/10">
+          <MapPin className="w-3 h-3 mr-2" /> Google Routes
         </Badge>
-        <Badge variant="outline" className="bg-slate-950/80 border-blue-500/50 text-blue-400 backdrop-blur-md">
-          Mode: Heavy Geometry
+        <Badge variant="outline" className="bg-slate-950/60 border-purple-500/30 text-purple-400 backdrop-blur-xl py-1.5 px-4 rounded-full shadow-lg shadow-purple-500/10">
+          <Sparkles className="w-3 h-3 mr-2" /> Deep Research AI
         </Badge>
       </div>
     </div>
@@ -84,258 +82,280 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
 }
 
 export default function RouteBuilderV2() {
-  const [step, setStep] = useState(1);
+  const [mode, setMode] = useState<'initial' | 'interview' | 'generating' | 'done'>('initial');
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [intent, setIntent] = useState('');
-  const [category, setCategory] = useState('motorcycle');
-  const [distance, setDistance] = useState([50]);
-  const [startPoint, setStartPoint] = useState('');
   
+  // Parametry trasy zebrane z wywiadu
+  const [category, setCategory] = useState<string>('');
+  const [distance, setDistance] = useState<string>('');
+  const [intent, setIntent] = useState<string>('');
   const [geometry, setGeometry] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [guideUrl, setGuideUrl] = useState<string | null>(null);
 
-  // 1. Inicjalizacja projektu
-  const handleCreateProject = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/route-builder-api/route-projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
-        },
-        body: JSON.stringify({
-          start_point: startPoint || 'Unknown',
-          region: 'Global',
-          route_type: category,
-          distance_target_km: distance[0],
-          difficulty: 'medium',
-          input_notes: intent
-        })
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setProjectId(data.id);
-      setStep(2);
-    } catch (err: any) {
-      toast.error('Błąd: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
+  // Chat state
+  const [chatStep, setChatStep] = useState(0);
+  const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([
+    { role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Na czym będziesz jechać? (np. Motocykl, Rower Szosowy, Samochód)' }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+
+    const userText = inputValue;
+    setInputValue('');
+    setChatMessages(prev => [...prev, { role: 'user', text: userText }]);
+
+    setTimeout(() => {
+      if (chatStep === 0) {
+        setCategory(userText);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Super! Jaki dystans (w km) Cię interesuje?' }]);
+        setChatStep(1);
+      } else if (chatStep === 1) {
+        setDistance(userText);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Brzmi dobrze. Masz jakieś specjalne życzenia? (np. dużo zakrętów, wzdłuż rzeki, unikanie miast)' }]);
+        setChatStep(2);
+      } else if (chatStep === 2) {
+        setIntent(userText);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Wszystko jasne! Rozpoczynam generowanie Twardej Geometrii i Deep Research. Zapnij pasy!' }]);
+        setTimeout(() => startGeneration(userText), 1500);
+      }
+    }, 600);
   };
 
-  // 2. Generowanie geometrii (Takt 1) - proxy przez API
-  const handleGenerateGeometry = async () => {
-    if (!projectId) return;
-    setLoading(true);
+  const startGeneration = async (finalIntent: string) => {
+    setMode('generating');
     try {
-      const res = await fetch('/route-builder-api/route-projects/atlas/geometry', {
+      // 1. Create Project
+      const resProj = await fetch('/route-builder-api/route-projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
         },
         body: JSON.stringify({
-          category,
-          targetDistance: distance[0],
+          start_point: 'Zakopane', // Przykładowo, docelowo z mapy
+          region: 'Global',
+          route_type: category || 'motorcycle',
+          distance_target_km: parseInt(distance) || 50,
+          difficulty: 'medium',
+          input_notes: finalIntent
+        })
+      });
+      if (!resProj.ok) throw new Error(await resProj.text());
+      const projData = await resProj.json();
+      setProjectId(projData.id);
+
+      // 2. Geometry
+      const resGeom = await fetch('/route-builder-api/route-projects/atlas/geometry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
+        },
+        body: JSON.stringify({
+          category: category || 'motorcycle',
+          targetDistance: parseInt(distance) || 50,
           waypoints: [
-            { lat: 49.299, lng: 19.949 }, // Przykład dla testów, w prod tu idą punkty z mapy
+            { lat: 49.299, lng: 19.949 },
             { lat: 49.3, lng: 20.0 }
           ]
         })
       });
-      if (!res.ok) throw new Error('Geometry failed');
-      const data = await res.json();
-      setGeometry(data.geometry);
-      
-      // Teraz odpalamy Research (Takt 2)
-      setStep(3);
-      await handleRunResearch(data.url);
-    } catch (err: any) {
-      toast.error(err.message);
-      setLoading(false);
-    }
-  };
+      if (!resGeom.ok) throw new Error('Geometry failed');
+      const geomData = await resGeom.json();
+      setGeometry(geomData.geometry);
 
-  // 3. Deep Research (Takt 2)
-  const handleRunResearch = async (gpxUrl: string) => {
-    try {
-      const res = await fetch('/route-builder-api/route-projects/atlas/research', {
+      // 3. Research
+      const resRes = await fetch('/route-builder-api/route-projects/atlas/research', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
         },
         body: JSON.stringify({
-          gpxUrl,
-          userIntent: intent
+          gpxUrl: geomData.url,
+          userIntent: finalIntent
         })
       });
-      if (!res.ok) throw new Error('Research failed');
-      const data = await res.json();
-      setProjectId(data.projectId);
-      setStep(4);
-      setGuideUrl(`/route-projects/${data.projectId}`);
-      toast.success('Przewodnik wygenerowany!');
+      if (!resRes.ok) throw new Error('Research failed');
+      
+      setGuideUrl(`/route-projects/${projData.id}`);
+      setMode('done');
+      toast.success('Trasa i przewodnik gotowe!');
     } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
+      toast.error('Wystąpił błąd: ' + err.message);
+      setMode('initial');
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-slate-200 p-8 pt-24 font-sans">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#020617] text-slate-200 p-4 md:p-8 pt-24 font-sans selection:bg-emerald-500/30">
+      <div className="max-w-7xl mx-auto h-[80vh] flex flex-col lg:flex-row gap-6">
         
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-black bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
-              Route Builder V2
+        {/* Left Panel - Wizard / Chat */}
+        <div className="w-full lg:w-1/3 flex flex-col relative z-10 h-full">
+          <div className="mb-8">
+            <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-3 px-3 py-1">AI Studio V2</Badge>
+            <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 tracking-tight">
+              Route Builder
             </h1>
-            <p className="text-slate-400 mt-2 text-lg">Kreator tras oparty na Atlas GIS i Deep Research</p>
+            <p className="text-slate-400 mt-2 text-sm leading-relaxed">
+              Zaprojektuj idealną trasę z pomocą Agenta AI i potężnego silnika Atlas GIS.
+            </p>
           </div>
-          
-          <div className="flex gap-2">
-            {[1, 2, 3, 4].map(s => (
-              <div key={s} className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${step === s ? 'bg-emerald-500 text-black' : step > s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
-                {s}
-              </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          
-          {/* Panel roboczy */}
-          <Card className="lg:col-span-1 bg-slate-900 border-slate-800 shadow-2xl">
-            <CardContent className="p-6 space-y-6">
-              
-              {step === 1 && (
-                <div className="space-y-4 animate-in fade-in">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-white mb-6">
-                    <Compass className="text-blue-400" /> Krok 1: Wymagania
-                  </h2>
-                  <div>
-                    <label className="text-sm text-slate-400 font-medium">Punkt startowy</label>
-                    <input 
-                      type="text" 
-                      value={startPoint} 
-                      onChange={e => setStartPoint(e.target.value)} 
-                      placeholder="np. Zakopane"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-3 text-white mt-1"
-                    />
+          <Card className="flex-1 bg-slate-900/50 backdrop-blur-2xl border-slate-800/60 shadow-2xl overflow-hidden flex flex-col rounded-2xl">
+            {mode === 'initial' && (
+              <div className="p-6 space-y-4 flex flex-col h-full justify-center animate-in fade-in zoom-in-95 duration-500">
+                <Button 
+                  onClick={() => setMode('interview')}
+                  className="h-20 w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl border border-emerald-400/20 shadow-xl shadow-emerald-900/20 flex flex-col items-start p-4 transition-all hover:scale-[1.02]"
+                >
+                  <div className="flex items-center gap-2 font-bold text-lg">
+                    <Sparkles className="w-5 h-5 text-emerald-100" /> Mam Pomysł
                   </div>
-                  <div>
-                    <label className="text-sm text-slate-400 font-medium">Kategoria pojazdu</label>
-                    <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger className="w-full bg-slate-950 border-slate-800 mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="motorcycle">Motocykl</SelectItem>
-                        <SelectItem value="bicycle">Rower szosowy</SelectItem>
-                        <SelectItem value="mtb">MTB</SelectItem>
-                        <SelectItem value="car">Samochód</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="pt-2">
-                    <label className="text-sm text-slate-400 font-medium flex justify-between">
-                      Dystans docelowy <span className="font-bold text-emerald-400">{distance[0]} km</span>
-                    </label>
-                    <Slider 
-                      value={distance} 
-                      onValueChange={setDistance} 
-                      min={10} max={500} step={10} 
-                      className="mt-4"
-                    />
-                  </div>
-                  <div className="pt-2">
-                    <label className="text-sm text-slate-400 font-medium">Intencja (Notatki dla AI)</label>
-                    <Textarea 
-                      value={intent}
-                      onChange={e => setIntent(e.target.value)}
-                      placeholder="Opisz czego szukasz: dużo zakrętów, widoki na jeziora..."
-                      className="bg-slate-950 border-slate-800 mt-1 h-32"
-                    />
-                  </div>
-                  <Button 
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 mt-4"
-                    onClick={handleCreateProject}
-                    disabled={loading || !startPoint}
-                  >
-                    {loading ? <Loader2 className="animate-spin mr-2" /> : 'Zainicjuj Projekt'}
-                  </Button>
-                </div>
-              )}
+                  <span className="text-emerald-100/80 font-normal text-sm">Zbudujmy to razem z Agentem AI</span>
+                </Button>
 
-              {step === 2 && (
-                <div className="space-y-4 animate-in fade-in">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                    <MapPin className="text-emerald-400" /> Krok 2: Geometria
-                  </h2>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Projekt zainicjowany. Silnik zbuduje teraz geometrię używając modulu atlas-gis (Zero LLM).
-                  </p>
-                  <Button 
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12"
-                    onClick={handleGenerateGeometry}
-                    disabled={loading}
-                  >
-                    {loading ? <Loader2 className="animate-spin mr-2" /> : 'Generuj matematyczny GPX'}
-                  </Button>
-                </div>
-              )}
-
-              {step === 3 && (
-                <div className="space-y-4 animate-in fade-in">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                    <Sparkles className="text-purple-400" /> Krok 3: Badanie
-                  </h2>
-                  <div className="bg-slate-950 border border-purple-500/30 rounded-lg p-6 flex flex-col items-center justify-center text-center space-y-4 mt-8">
-                    <Loader2 className="animate-spin w-12 h-12 text-purple-400" />
-                    <p className="text-purple-300 font-medium">Deep Research w toku...</p>
-                    <p className="text-slate-500 text-sm">Gemini analizuje GPX i pobiera informacje krajoznawcze z Grounded Search.</p>
+                <Button 
+                  variant="outline"
+                  className="h-20 w-full bg-slate-800/40 hover:bg-slate-800/80 text-white rounded-xl border border-slate-700/50 flex flex-col items-start p-4 transition-all hover:border-blue-500/30 group"
+                  onClick={() => {
+                    setDistance("100");
+                    setCategory("motorcycle");
+                    setIntent("Zaskocz mnie czymś pięknym.");
+                    startGeneration("Zaskocz mnie czymś pięknym.");
+                  }}
+                >
+                  <div className="flex items-center gap-2 font-bold text-lg group-hover:text-blue-400 transition-colors">
+                    <Compass className="w-5 h-5 text-blue-400" /> Zaskocz mnie
                   </div>
-                </div>
-              )}
+                  <span className="text-slate-400 font-normal text-sm">Wygeneruj najlepszą trasę w okolicy</span>
+                </Button>
 
-              {step === 4 && (
-                <div className="space-y-4 animate-in fade-in">
-                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                    <CheckCircle2 className="text-emerald-400" /> Krok 4: Gotowe
-                  </h2>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Projekt zakończony. GPX został wygenerowany, a AI napisało kompletny przewodnik turystyczny do tej trasy.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-slate-700 text-slate-300 h-12"
-                    onClick={() => window.location.href = guideUrl || '#'}
-                  >
-                    Otwórz podgląd przewodnika
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Podgląd Mapy 3D */}
-          <Card className="lg:col-span-3 bg-slate-900 border-slate-800 shadow-2xl h-[700px] p-2 relative overflow-hidden">
-            {!geometry && step < 4 && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm text-center p-8">
-                <MapPin className="w-16 h-16 text-slate-700 mb-4" />
-                <h3 className="text-2xl font-bold text-slate-300">Mapa oczekuje na koordynaty</h3>
-                <p className="text-slate-500 mt-2">Przejdź przez proces po lewej, aby wygenerować i wyświetlić trasę.</p>
+                <Button 
+                  variant="outline"
+                  className="h-20 w-full bg-slate-800/40 hover:bg-slate-800/80 text-white rounded-xl border border-slate-700/50 flex flex-col items-start p-4 transition-all hover:border-purple-500/30 group"
+                >
+                  <div className="flex items-center gap-2 font-bold text-lg group-hover:text-purple-400 transition-colors">
+                    <FileUp className="w-5 h-5 text-purple-400" /> Mam GPX
+                  </div>
+                  <span className="text-slate-400 font-normal text-sm">Wgraj plik i pozwól nam stworzyć przewodnik</span>
+                </Button>
               </div>
             )}
-            <UnifiedMap geometry={geometry} start={null} end={null} midpoint={null} />
-          </Card>
 
+            {mode === 'interview' && (
+              <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-500">
+                <div className="p-4 border-b border-slate-800/60 bg-slate-900/80 backdrop-blur-md flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                    <Bot className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white text-sm">Atlas Agent</p>
+                    <p className="text-xs text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Online</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed ${
+                        msg.role === 'user' 
+                          ? 'bg-blue-600 text-white rounded-br-sm' 
+                          : 'bg-slate-800 text-slate-200 rounded-bl-sm border border-slate-700/50'
+                      }`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <div className="p-4 bg-slate-900/80 border-t border-slate-800/60">
+                  <form onSubmit={handleChatSubmit} className="relative flex items-center">
+                    <Input 
+                      autoFocus
+                      value={inputValue}
+                      onChange={e => setInputValue(e.target.value)}
+                      placeholder="Napisz..."
+                      className="w-full bg-slate-950 border-slate-700 rounded-full pl-4 pr-12 py-6 text-base shadow-inner focus-visible:ring-emerald-500/50 focus-visible:border-emerald-500/50"
+                    />
+                    <Button type="submit" size="icon" className="absolute right-2 rounded-full bg-emerald-600 hover:bg-emerald-500 w-10 h-10 text-white">
+                      <Send className="w-4 h-4 ml-1" />
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {mode === 'generating' && (
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6 animate-in fade-in duration-700">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full animate-pulse"></div>
+                  <Loader2 className="w-16 h-16 text-emerald-400 animate-spin relative z-10" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Buduję Trasę</h3>
+                  <p className="text-slate-400 text-sm">Wyznaczamy geometrię, badamy teren i piszemy przewodnik turystyczny za pomocą Gemini 2.5.</p>
+                </div>
+                <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                  <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 w-1/2 h-full rounded-full animate-pulse"></div>
+                </div>
+              </div>
+            )}
+
+            {mode === 'done' && (
+              <div className="flex flex-col h-full p-6 space-y-6 justify-center animate-in zoom-in-95 duration-500">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-2">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-white">Gotowe!</h3>
+                  <p className="text-slate-400 text-sm mt-2">Geometria wyliczona, a przewodnik wygenerowany. Zobacz podgląd trasy na mapie obok.</p>
+                </div>
+                <Button 
+                  className="w-full h-14 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 group"
+                  onClick={() => window.location.href = guideUrl || '#'}
+                >
+                  Przejdź do Artykułu <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full text-slate-400 hover:text-white"
+                  onClick={() => {
+                    setMode('initial');
+                    setGeometry(null);
+                    setChatMessages([{ role: 'agent', text: 'Cześć ponownie! Jaki mamy nowy cel podróży?' }]);
+                    setChatStep(0);
+                  }}
+                >
+                  Stwórz kolejną trasę
+                </Button>
+              </div>
+            )}
+          </Card>
         </div>
+
+        {/* Right Panel - 3D Map */}
+        <div className="w-full lg:w-2/3 h-full relative z-0 animate-in fade-in duration-1000">
+          {(!geometry || mode !== 'done') && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/40 backdrop-blur-[2px] text-center p-8 rounded-2xl transition-all duration-700">
+              <Map className="w-20 h-20 text-slate-700/50 mb-6 drop-shadow-xl" strokeWidth={1} />
+              <h3 className="text-2xl font-bold text-slate-300">Mapa Oczekuje</h3>
+              <p className="text-slate-500 mt-2 max-w-sm">Przejdź przez wywiad z Agentem, aby wygenerować profesjonalną ścieżkę z Twardą Geometrią.</p>
+            </div>
+          )}
+          <UnifiedMap geometry={geometry} start={null} end={null} midpoint={null} />
+        </div>
+
       </div>
     </div>
   );
