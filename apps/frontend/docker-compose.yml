@@ -7,8 +7,8 @@
 services:
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../../
+      dockerfile: apps/frontend/Dockerfile
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
