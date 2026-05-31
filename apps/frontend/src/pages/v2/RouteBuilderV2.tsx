@@ -73,7 +73,7 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
       {/* HUD Elements */}
       <div className="absolute bottom-4 left-4 flex gap-2 z-[1000]">
         <Badge variant="outline" className="bg-slate-950/80 border-emerald-500/50 text-emerald-400 backdrop-blur-md">
-          GIS Engine: Google Routes v2
+          GIS Engine: Google Routes v4
         </Badge>
         <Badge variant="outline" className="bg-slate-950/80 border-blue-500/50 text-blue-400 backdrop-blur-md">
           Mode: Heavy Geometry
@@ -109,17 +109,15 @@ export default function RouteBuilderV2() {
   const updateGeometry = useCallback(async (currentSlug: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`${ATLAS_API}/projects/${currentSlug}/geometry`, {
+      const res = await fetch(`${ATLAS_API}/api/routes/geometry`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'x-atlas-api-token': ATLAS_TOKEN
         },
         body: JSON.stringify({
-          start: coords.start,
-          end: coords.end,
-          midpoint: coords.midpoint,
-          targetDistanceKm: distance[0],
+          waypoints: [coords.start, coords.midpoint, coords.end].filter(Boolean),
+          targetDistance: distance[0],
           category: category
         })
       });
@@ -229,7 +227,7 @@ export default function RouteBuilderV2() {
             <Compass className="w-5 h-5 text-slate-950" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">RouteBuilder <span className="text-emerald-500">V2</span></h1>
+            <h1 className="text-lg font-bold tracking-tight">RouteBuilder <span className="text-emerald-500">V4</span></h1>
             <p className="text-xs text-slate-500 font-mono">Status: {loading ? 'Recalculating...' : 'Synced'}</p>
           </div>
         </div>
