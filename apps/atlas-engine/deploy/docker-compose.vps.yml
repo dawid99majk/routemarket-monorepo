@@ -2,7 +2,7 @@ services:
   atlas-api:
     build:
       context: ../../../
-      dockerfile: Dockerfile
+      dockerfile: apps/atlas-engine/Dockerfile
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'node', '/app/healthcheck.js']
