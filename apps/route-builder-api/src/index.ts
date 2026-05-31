@@ -9,17 +9,32 @@ import { gpxService } from './services/gpx.js';
 import { reportService } from './services/report.js';
 import { gpxParserService } from './services/gpx-parser.js';
 
-const app = new Hono();
+import { authMiddleware } from './middleware/auth.js';
+
+const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
 // Healthcheck
 app.get('/health', (c) => {
   return c.json({ status: 'ok', version: '2.0.0', service: 'route-builder-api' });
 });
 
+app.use('/route-projects/*', authMiddleware);
+
+// Listowanie projektów
+app.get('/route-projects', async (c) => {
+  const user = c.get('user');
+  try {
+    const projects = await repo.listProjects(user);
+    return c.json(projects);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Tworzenie projektu
 app.post('/route-projects', zValidator('json', RouteRequirementsSchema), async (c) => {
   const reqs = c.req.valid('json');
-  const userId = c.req.header('x-user-id');
+  const userId = c.get('userId');
   try {
     let start_point = reqs.start_point;
     let region = reqs.region;
@@ -402,6 +417,54 @@ app.get('/route-projects/:id/jobs/:jobId', async (c) => {
   const job = await repo.getJob(jobId);
   if (!job) return c.json({ error: 'Not found' }, 404);
   return c.json(job);
+});
+
+// Proxy do twardej geometrii Atlasa
+app.post('/route-projects/atlas/geometry', async (c) => {
+  try {
+    const body = await c.req.json();
+    const ATLAS_API = process.env.ATLAS_API_URL || 'http://localhost:8787';
+    const ATLAS_TOKEN = process.env.ATLAS_API_TOKEN || '';
+    
+    const response = await fetch(`${ATLAS_API}/api/routes/geometry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ATLAS_TOKEN}`
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    return c.json(data);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Proxy do Deep Research Atlasa
+app.post('/route-projects/atlas/research', async (c) => {
+  try {
+    const body = await c.req.json();
+    const ATLAS_API = process.env.ATLAS_API_URL || 'http://localhost:8787';
+    const ATLAS_TOKEN = process.env.ATLAS_API_TOKEN || '';
+    
+    const response = await fetch(`${ATLAS_API}/api/routes/research`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ATLAS_TOKEN}`
+      },
+      body: JSON.stringify(body)
+    });
+    
+    if (!response.ok) throw new Error(await response.text());
+    const data = await response.json();
+    return c.json(data);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 8081;

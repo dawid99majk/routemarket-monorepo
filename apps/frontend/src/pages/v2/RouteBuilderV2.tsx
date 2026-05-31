@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Sparkles, MapPin, Compass, CheckCircle2, Info } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Compass, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 
@@ -25,7 +25,7 @@ L.Icon.Default.mergeOptions({
 function MapResizer({ geometry }: { geometry: any }) {
   const map = useMap();
   useEffect(() => {
-    if (geometry && geometry.coordinates.length > 0) {
+    if (geometry && geometry.coordinates && geometry.coordinates.length > 0) {
       const bounds = L.geoJSON(geometry).getBounds();
       map.fitBounds(bounds, { padding: [50, 50] });
     }
@@ -50,7 +50,7 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
         
-        {geometry && (
+        {geometry && geometry.coordinates && (
           <Polyline 
             positions={geometry.coordinates.map((c: any) => [c[1], c[0]])} 
             pathOptions={{ 
@@ -83,259 +83,260 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
   );
 }
 
-const ATLAS_API = window.location.hostname === 'localhost' 
-  ? 'http://localhost:8787' 
-  : '/atlas-api';
-const ATLAS_TOKEN = '178913a9cdd9271d077cd37dfded2afb76eaef72b220ec6c911b8509e1dece132712338c88769372979cc45f0ec6c241';
-
 export default function RouteBuilderV2() {
+  const [step, setStep] = useState(1);
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [slug, setSlug] = useState<string | null>(null);
   const [intent, setIntent] = useState('');
-  const [distance, setDistance] = useState([20]);
   const [category, setCategory] = useState('motorcycle');
+  const [distance, setDistance] = useState([50]);
+  const [startPoint, setStartPoint] = useState('');
+  
   const [geometry, setGeometry] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [isResearching, setIsResearching] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [guide, setGuide] = useState<string | null>(null);
+  const [guideUrl, setGuideUrl] = useState<string | null>(null);
 
-  const [coords, setCoords] = useState({
-    start: { lat: 46.54, lng: 11.86 }, 
-    end: { lat: 46.50, lng: 11.90 },
-    midpoint: { lat: 46.52, lng: 11.88 }
-  });
-
-  const updateGeometry = useCallback(async (currentSlug: string) => {
+  // 1. Inicjalizacja projektu
+  const handleCreateProject = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${ATLAS_API}/api/routes/geometry`, {
+      const res = await fetch('/route-builder-api/route-projects', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'x-atlas-api-token': ATLAS_TOKEN
+          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
         },
         body: JSON.stringify({
-          waypoints: [coords.start, coords.midpoint, coords.end].filter(Boolean),
-          targetDistance: distance[0],
-          category: category
+          start_point: startPoint || 'Unknown',
+          region: 'Global',
+          route_type: category,
+          distance_target_km: distance[0],
+          difficulty: 'medium',
+          input_notes: intent
         })
       });
+      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      if (data.geometry) {
-        setGeometry(data.geometry);
-      } else if (data.error) {
-        toast.error(`Engine Error: ${data.error}`);
-      }
-    } catch (err) {
-      toast.error("Geometry calculation failed");
+      setProjectId(data.id);
+      setStep(2);
+    } catch (err: any) {
+      toast.error('Błąd: ' + err.message);
     } finally {
       setLoading(false);
     }
-  }, [coords, distance, category]);
+  };
 
-  useEffect(() => {
-    const initProject = async () => {
-      try {
-        const res = await fetch(`${ATLAS_API}/projects`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-atlas-api-token': ATLAS_TOKEN
-          },
-          body: JSON.stringify({
-            topic: "Live Adventure " + new Date().toLocaleTimeString(),
-            region: "Dolomites, Italy",
-            category: category
-          })
-        });
-        const data = await res.json();
-        if (data.slug) {
-          setProjectId(data.id);
-          setSlug(data.slug);
-          // Trigger first geometry calculation
-          updateGeometry(data.slug);
-        }
-      } catch (err) {
-        toast.error("Failed to initialize project");
-      }
-    };
-    initProject();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (slug) updateGeometry(slug);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [distance, category, coords, slug]);
-
-  const handleApproveAndResearch = async () => {
-    if (!slug) return;
-    setIsResearching(true);
+  // 2. Generowanie geometrii (Takt 1) - proxy przez API
+  const handleGenerateGeometry = async () => {
+    if (!projectId) return;
+    setLoading(true);
     try {
-      const res = await fetch(`${ATLAS_API}/projects/${slug}/approve-and-research`, {
+      const res = await fetch('/route-builder-api/route-projects/atlas/geometry', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'x-atlas-api-token': ATLAS_TOKEN
-        }
+          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
+        },
+        body: JSON.stringify({
+          category,
+          targetDistance: distance[0],
+          waypoints: [
+            { lat: 49.299, lng: 19.949 }, // Przykład dla testów, w prod tu idą punkty z mapy
+            { lat: 49.3, lng: 20.0 }
+          ]
+        })
       });
+      if (!res.ok) throw new Error('Geometry failed');
       const data = await res.json();
-      if (data.jobId?.id) {
-        setJobId(data.jobId.id);
-        toast.success("Route approved. Deep Research started!");
-      }
-    } catch (err) {
-      toast.error("Research failed to start");
-      setIsResearching(false);
+      setGeometry(data.geometry);
+      
+      // Teraz odpalamy Research (Takt 2)
+      setStep(3);
+      await handleRunResearch(data.url);
+    } catch (err: any) {
+      toast.error(err.message);
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    let timer: any;
-    if (jobId && slug) {
-      timer = setInterval(async () => {
-        try {
-          const res = await fetch(`${ATLAS_API}/jobs/${jobId}`, {
-            headers: { 'x-atlas-api-token': ATLAS_TOKEN }
-          });
-          const data = await res.json();
-          if (data.job?.status === 'completed') {
-            clearInterval(timer);
-            setIsResearching(false);
-            toast.success("Research Complete! Guide is ready.");
-            setGuide("Guide generated successfully.");
-          } else if (data.job?.status === 'failed') {
-            clearInterval(timer);
-            setIsResearching(false);
-            toast.error("Research pipeline failed.");
-          }
-        } catch (e) {
-          console.error("Job polling error", e);
-        }
-      }, 3000);
+  // 3. Deep Research (Takt 2)
+  const handleRunResearch = async (gpxUrl: string) => {
+    try {
+      const res = await fetch('/route-builder-api/route-projects/atlas/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
+        },
+        body: JSON.stringify({
+          gpxUrl,
+          userIntent: intent
+        })
+      });
+      if (!res.ok) throw new Error('Research failed');
+      const data = await res.json();
+      setProjectId(data.projectId);
+      setStep(4);
+      setGuideUrl(`/route-projects/${data.projectId}`);
+      toast.success('Przewodnik wygenerowany!');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
     }
-    return () => clearInterval(timer);
-  }, [jobId, slug]);
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 overflow-hidden">
-      <header className="h-16 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/50 backdrop-blur-md z-50">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500 rounded-lg">
-            <Compass className="w-5 h-5 text-slate-950" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">RouteBuilder <span className="text-emerald-500">V4</span></h1>
-            <p className="text-xs text-slate-500 font-mono">Status: {loading ? 'Recalculating...' : 'Synced'}</p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-black text-slate-200 p-8 pt-24 font-sans">
+      <div className="max-w-7xl mx-auto">
         
-        <div className="flex items-center gap-4">
-          <Badge variant="secondary" className="bg-slate-800 text-slate-400 border-none">
-            Project: {slug || 'Initializing...'}
-          </Badge>
-          <Button 
-            onClick={handleApproveAndResearch} 
-            disabled={!geometry || isResearching}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-lg shadow-emerald-900/20"
-          >
-            {isResearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            Approve & Deep Research
-          </Button>
-        </div>
-      </header>
-
-      <main className="flex-1 flex overflow-hidden">
-        <aside className="w-96 border-r border-slate-800 p-6 flex flex-col gap-8 bg-slate-900/30 overflow-y-auto z-40">
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm uppercase tracking-wider">
-              <MapPin className="w-4 h-4" />
-              Route Parameters
-            </div>
-            
-            <div className="space-y-6 pt-2">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium text-slate-400">Distance (km)</label>
-                  <span className="text-emerald-500 font-mono font-bold">{distance[0]}km</span>
-                </div>
-                <Slider 
-                  value={distance} 
-                  onValueChange={setDistance} 
-                  max={200} 
-                  step={5}
-                  className="py-4"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-slate-400">Vehicle Category</label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="bg-slate-950 border-slate-800">
-                    <SelectValue placeholder="Select vehicle" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
-                    <SelectItem value="hiking">Hiking (Walk)</SelectItem>
-                    <SelectItem value="bike">Cycling (Bicycle)</SelectItem>
-                    <SelectItem value="motorcycle">Motorcycle (Adventure)</SelectItem>
-                    <SelectItem value="car">Car (Drive)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-4 flex-1">
-            <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm uppercase tracking-wider">
-              <Info className="w-4 h-4" />
-              Creator Intent
-            </div>
-            <Textarea 
-              placeholder="Describe the vibe of the route..."
-              className="flex-1 bg-slate-950 border-slate-800 focus:border-emerald-500 min-h-[200px] resize-none text-sm leading-relaxed"
-              value={intent}
-              onChange={(e) => setIntent(e.target.value)}
-            />
-          </section>
-
-          {isResearching && (
-            <Card className="bg-emerald-950/20 border-emerald-500/30 animate-pulse">
-              <CardContent className="p-4 flex items-center gap-3 text-xs text-emerald-300 font-mono">
-                <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                Grounded Search in progress...
-              </CardContent>
-            </Card>
-          )}
-
-          {guide && (
-            <Card className="bg-blue-950/20 border-blue-500/30">
-              <CardContent className="p-4 flex flex-col gap-2">
-                <div className="text-blue-400 font-bold text-xs uppercase flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" /> Guide Ready
-                </div>
-                <Button variant="link" className="text-blue-300 p-0 h-auto text-xs justify-start">
-                  Download Guide
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </aside>
-
-        <section className="flex-1 p-6 bg-slate-950 relative z-0">
-          <UnifiedMap geometry={geometry} start={coords.start} end={coords.end} midpoint={coords.midpoint} />
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-black bg-gradient-to-r from-emerald-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
+              Route Builder V2
+            </h1>
+            <p className="text-slate-400 mt-2 text-lg">Kreator tras oparty na Atlas GIS i Deep Research</p>
+          </div>
           
-          {loading && (
-            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-50 pointer-events-none">
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex items-center gap-3 shadow-2xl">
-                <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-                <span className="text-xs font-mono text-emerald-500 uppercase tracking-widest">Calculating Geometry</span>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4].map(s => (
+              <div key={s} className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${step === s ? 'bg-emerald-500 text-black' : step > s ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-slate-800 text-slate-500 border border-slate-700'}`}>
+                {s}
               </div>
-            </div>
-          )}
-        </section>
-      </main>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          
+          {/* Panel roboczy */}
+          <Card className="lg:col-span-1 bg-slate-900 border-slate-800 shadow-2xl">
+            <CardContent className="p-6 space-y-6">
+              
+              {step === 1 && (
+                <div className="space-y-4 animate-in fade-in">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-white mb-6">
+                    <Compass className="text-blue-400" /> Krok 1: Wymagania
+                  </h2>
+                  <div>
+                    <label className="text-sm text-slate-400 font-medium">Punkt startowy</label>
+                    <input 
+                      type="text" 
+                      value={startPoint} 
+                      onChange={e => setStartPoint(e.target.value)} 
+                      placeholder="np. Zakopane"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-3 text-white mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-400 font-medium">Kategoria pojazdu</label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="w-full bg-slate-950 border-slate-800 mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="motorcycle">Motocykl</SelectItem>
+                        <SelectItem value="bicycle">Rower szosowy</SelectItem>
+                        <SelectItem value="mtb">MTB</SelectItem>
+                        <SelectItem value="car">Samochód</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="pt-2">
+                    <label className="text-sm text-slate-400 font-medium flex justify-between">
+                      Dystans docelowy <span className="font-bold text-emerald-400">{distance[0]} km</span>
+                    </label>
+                    <Slider 
+                      value={distance} 
+                      onValueChange={setDistance} 
+                      min={10} max={500} step={10} 
+                      className="mt-4"
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <label className="text-sm text-slate-400 font-medium">Intencja (Notatki dla AI)</label>
+                    <Textarea 
+                      value={intent}
+                      onChange={e => setIntent(e.target.value)}
+                      placeholder="Opisz czego szukasz: dużo zakrętów, widoki na jeziora..."
+                      className="bg-slate-950 border-slate-800 mt-1 h-32"
+                    />
+                  </div>
+                  <Button 
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12 mt-4"
+                    onClick={handleCreateProject}
+                    disabled={loading || !startPoint}
+                  >
+                    {loading ? <Loader2 className="animate-spin mr-2" /> : 'Zainicjuj Projekt'}
+                  </Button>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-4 animate-in fade-in">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                    <MapPin className="text-emerald-400" /> Krok 2: Geometria
+                  </h2>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Projekt zainicjowany. Silnik zbuduje teraz geometrię używając modulu atlas-gis (Zero LLM).
+                  </p>
+                  <Button 
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-12"
+                    onClick={handleGenerateGeometry}
+                    disabled={loading}
+                  >
+                    {loading ? <Loader2 className="animate-spin mr-2" /> : 'Generuj matematyczny GPX'}
+                  </Button>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-4 animate-in fade-in">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                    <Sparkles className="text-purple-400" /> Krok 3: Badanie
+                  </h2>
+                  <div className="bg-slate-950 border border-purple-500/30 rounded-lg p-6 flex flex-col items-center justify-center text-center space-y-4 mt-8">
+                    <Loader2 className="animate-spin w-12 h-12 text-purple-400" />
+                    <p className="text-purple-300 font-medium">Deep Research w toku...</p>
+                    <p className="text-slate-500 text-sm">Gemini analizuje GPX i pobiera informacje krajoznawcze z Grounded Search.</p>
+                  </div>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="space-y-4 animate-in fade-in">
+                  <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                    <CheckCircle2 className="text-emerald-400" /> Krok 4: Gotowe
+                  </h2>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Projekt zakończony. GPX został wygenerowany, a AI napisało kompletny przewodnik turystyczny do tej trasy.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-slate-700 text-slate-300 h-12"
+                    onClick={() => window.location.href = guideUrl || '#'}
+                  >
+                    Otwórz podgląd przewodnika
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Podgląd Mapy 3D */}
+          <Card className="lg:col-span-3 bg-slate-900 border-slate-800 shadow-2xl h-[700px] p-2 relative overflow-hidden">
+            {!geometry && step < 4 && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm text-center p-8">
+                <MapPin className="w-16 h-16 text-slate-700 mb-4" />
+                <h3 className="text-2xl font-bold text-slate-300">Mapa oczekuje na koordynaty</h3>
+                <p className="text-slate-500 mt-2">Przejdź przez proces po lewej, aby wygenerować i wyświetlić trasę.</p>
+              </div>
+            )}
+            <UnifiedMap geometry={geometry} start={null} end={null} midpoint={null} />
+          </Card>
+
+        </div>
+      </div>
     </div>
   );
 }

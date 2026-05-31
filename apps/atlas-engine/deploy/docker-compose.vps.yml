@@ -5,7 +5,7 @@ services:
       dockerfile: apps/atlas-engine/Dockerfile
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'node', '/app/healthcheck.js']
+      test: ['CMD-SHELL', 'curl -f http://localhost:8787/health || exit 1']
       interval: 30s
       timeout: 5s
       retries: 5
