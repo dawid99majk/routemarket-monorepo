@@ -324,7 +324,7 @@ export default function RouteBuilderV2() {
         </aside>
 
         <section className="flex-1 p-6 bg-slate-950 relative z-0">
-          <UnifiedMap geometry={geometry} start={coords.start} end={coords.end} midpoint={coords.midpoint} onMapClick={handleMapClick} />
+          <UnifiedMap geometry={geometry} start={coords.start} end={coords.end} midpoint={coords.midpoint} />
           
           {loading && (
             <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center z-50 pointer-events-none">
