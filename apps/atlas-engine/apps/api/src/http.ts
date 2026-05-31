@@ -223,7 +223,7 @@ function createRoutes(): Route[] {
       if (!supabaseUrl || !supabaseKey) throw new Error("Missing Supabase credentials");
 
       const fileName = `generated-${Date.now()}.gpx`;
-      const response = await fetch(`${supabaseUrl}/storage/v1/object/routes-gpx/${fileName}`, {
+      let response = await fetch(`${supabaseUrl}/storage/v1/object/routes-gpx/${fileName}`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${supabaseKey}`,
@@ -231,6 +231,28 @@ function createRoutes(): Route[] {
         },
         body: gpx
       });
+
+      if (response.status === 404) {
+        // Create bucket if it doesn't exist
+        await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${supabaseKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ id: "routes-gpx", name: "routes-gpx", public: true })
+        });
+        
+        // Retry upload
+        response = await fetch(`${supabaseUrl}/storage/v1/object/routes-gpx/${fileName}`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${supabaseKey}`,
+            "Content-Type": "application/gpx+xml",
+          },
+          body: gpx
+        });
+      }
 
       if (!response.ok) throw new Error("Supabase upload failed: " + await response.text());
 
