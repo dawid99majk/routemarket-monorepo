@@ -8,8 +8,8 @@ export interface ReportOutput {
 
 export class ReportService {
   async extractStartPointAndRegion(userNotes: string): Promise<{ 
-    start_point: string; 
-    region: string;
+    start_point: string | null; 
+    region: string | null;
     distance_target_km?: number | null;
     difficulty?: 'easy' | 'moderate' | 'hard' | 'expert' | null;
     duration_pref?: 'short' | 'long' | null;
@@ -20,21 +20,22 @@ export class ReportService {
     if (GEMINI_API_KEY && userNotes && userNotes.trim().length > 5) {
       try {
         const prompt = `Przeanalizuj poniższe notatki/opis trasy i wyodrębnij z nich szczegóły planowanej wycieczki:
-1. Konkretne miasto lub miejsce startowe (np. Zakopane, Krynica-Zdrój, Gdańsk, Ustrzyki Górne).
-2. Ogólny region geograficzny (np. Tatry, Beskidy, Pomorze, Bieszczady).
+1. Konkretne miasto lub miejsce startowe. Jeśli nie ma wyraźnie podanego miejsca, MUSISZ zwrócić null.
+2. Ogólny region geograficzny. Jeśli nie podano, zwróć null.
 3. Oczekiwany dystans w kilometrach (sama liczba, np. 30). Jeśli nie podano, zwróć null.
 4. Poziom trudności (jeden z: "easy", "moderate", "hard", "expert"). Jeśli nie da się określić, zwróć "moderate".
 5. Preferencję czasu trwania ("short" dla wycieczek rekreacyjnych do 3h, "long" dla wycieczek całodniowych lub powyżej 3h).
 
 Opis trasy: "${userNotes}"
 
-Odpowiedz WYŁĄCZNIE prawidłowym obiektem JSON, bez żadnego formatowania markdown ani dodatkowych słów:
+Odpowiedz WYŁĄCZNIE prawidłowym obiektem JSON, bez żadnego formatowania markdown ani dodatkowych słów.
+Przykład, gdy nie podano lokalizacji:
 {
-  "start_point": "nazwa_miejsca_startu",
-  "region": "nazwa_regionu",
+  "start_point": null,
+  "region": null,
   "distance_target_km": 30,
-  "difficulty": "hard",
-  "duration_pref": "long"
+  "difficulty": "moderate",
+  "duration_pref": "short"
 }`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -78,8 +79,8 @@ Odpowiedz WYŁĄCZNIE prawidłowym obiektem JSON, bez żadnego formatowania mark
 
     // Default Fallback
     return {
-      start_point: 'Zakopane',
-      region: 'Tatry i Podhale',
+      start_point: null,
+      region: null,
       distance_target_km: null,
       difficulty: null,
       duration_pref: null
