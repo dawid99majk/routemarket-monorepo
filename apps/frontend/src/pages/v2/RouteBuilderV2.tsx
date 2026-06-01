@@ -148,7 +148,7 @@ export default function RouteBuilderV2() {
           region: 'Global',
           route_type: category || 'motorcycle',
           distance_target_km: parseInt(distance) || 50,
-          difficulty: 'medium',
+          difficulty: 'moderate',
           input_notes: finalIntent
         })
       });
