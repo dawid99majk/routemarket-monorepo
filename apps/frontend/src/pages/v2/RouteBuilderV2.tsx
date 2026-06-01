@@ -5,7 +5,7 @@ import { Loader2, Sparkles, MapPin, Map, FileUp, Send, Bot, User, Compass, Chevr
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 // Real Leaflet Components
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
