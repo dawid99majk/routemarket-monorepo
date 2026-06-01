@@ -96,16 +96,26 @@ export default function RouteBuilderV2() {
   const [loadingMessage, setLoadingMessage] = useState<string>('Inicjalizacja...');
 
   // Chat state
+  const [chatScenario, setChatScenario] = useState<'custom' | 'surprise'>('custom');
   const [chatStep, setChatStep] = useState(0);
-  const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([
-    { role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Skąd wyruszamy? (np. Kraków, Bieszczady, Gdańsk)' }
-  ]);
+  const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([]);
   const [inputValue, setInputValue] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  const startInterview = (scenario: 'custom' | 'surprise') => {
+    setChatScenario(scenario);
+    setChatStep(0);
+    setMode('interview');
+    if (scenario === 'custom') {
+      setChatMessages([{ role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Skąd wyruszamy? (np. Kraków, Bieszczady, Gdańsk)' }]);
+    } else {
+      setChatMessages([{ role: 'agent', text: 'Zaskoczę Cię wspaniałą pętlą! Powiedz mi tylko, skąd wyruszasz i na czym będziesz jechać? (np. Warszawa, Motocykl)' }]);
+    }
+  };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,22 +126,35 @@ export default function RouteBuilderV2() {
     setChatMessages(prev => [...prev, { role: 'user', text: userText }]);
 
     setTimeout(() => {
-      if (chatStep === 0) {
-        setStartPoint(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Super. Na czym będziesz jechać? (np. Motocykl, Rower Szosowy, Samochód)' }]);
-        setChatStep(1);
-      } else if (chatStep === 1) {
-        setCategory(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Jasne. Jaki dystans (w km) Cię interesuje?' }]);
-        setChatStep(2);
-      } else if (chatStep === 2) {
-        setDistance(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Zrozumiałem. Masz jakieś specjalne życzenia? (np. dużo zakrętów, wzdłuż rzeki, unikanie głównych dróg)' }]);
-        setChatStep(3);
-      } else if (chatStep === 3) {
-        setIntent(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Wszystko jasne! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
-        setTimeout(() => startGeneration(startPoint, category, distance, userText), 1500);
+      if (chatScenario === 'surprise') {
+        if (chatStep === 0) {
+          // One-shot for surprise
+          setStartPoint(userText); // It will have both location and vehicle in one string
+          setCategory('auto'); // Let backend AI extract from input_notes
+          setDistance('100'); // default 100km for surprise
+          setIntent('Zaskocz mnie czymś pięknym i spektakularnym w tej okolicy.');
+          setChatMessages(prev => [...prev, { role: 'agent', text: 'Będzie rewelacyjnie! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
+          setTimeout(() => startGeneration(userText, 'auto', '100', 'Zaskocz mnie czymś pięknym i spektakularnym w tej okolicy.'), 1500);
+        }
+      } else {
+        // Custom scenario steps
+        if (chatStep === 0) {
+          setStartPoint(userText);
+          setChatMessages(prev => [...prev, { role: 'agent', text: 'Super. Na czym będziesz jechać? (np. Motocykl, Rower Szosowy, Samochód)' }]);
+          setChatStep(1);
+        } else if (chatStep === 1) {
+          setCategory(userText);
+          setChatMessages(prev => [...prev, { role: 'agent', text: 'Jasne. Jaki dystans (w km) Cię interesuje?' }]);
+          setChatStep(2);
+        } else if (chatStep === 2) {
+          setDistance(userText);
+          setChatMessages(prev => [...prev, { role: 'agent', text: 'Zrozumiałem. Masz jakieś specjalne życzenia? (np. dużo zakrętów, wzdłuż rzeki, unikanie głównych dróg)' }]);
+          setChatStep(3);
+        } else if (chatStep === 3) {
+          setIntent(userText);
+          setChatMessages(prev => [...prev, { role: 'agent', text: 'Wszystko jasne! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
+          setTimeout(() => startGeneration(startPoint, category, distance, userText), 1500);
+        }
       }
     }, 600);
   };
@@ -241,7 +264,7 @@ export default function RouteBuilderV2() {
             {mode === 'initial' && (
               <div className="p-6 space-y-4 flex flex-col h-full justify-center animate-in fade-in zoom-in-95 duration-500">
                 <Button 
-                  onClick={() => setMode('interview')}
+                  onClick={() => startInterview('custom')}
                   className="h-20 w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl border border-emerald-400/20 shadow-xl shadow-emerald-900/20 flex flex-col items-start p-4 transition-all hover:scale-[1.02]"
                 >
                   <div className="flex items-center gap-2 font-bold text-lg">
@@ -253,9 +276,7 @@ export default function RouteBuilderV2() {
                 <Button 
                   variant="outline"
                   className="h-20 w-full bg-slate-800/40 hover:bg-slate-800/80 text-white rounded-xl border border-slate-700/50 flex flex-col items-start p-4 transition-all hover:border-blue-500/30 group"
-                  onClick={() => {
-                    startGeneration("Tatry", "motorcycle", "100", "Zaskocz mnie czymś pięknym.");
-                  }}
+                  onClick={() => startInterview('surprise')}
                 >
                   <div className="flex items-center gap-2 font-bold text-lg group-hover:text-blue-400 transition-colors">
                     <Compass className="w-5 h-5 text-blue-400" /> Zaskocz mnie
@@ -356,7 +377,7 @@ export default function RouteBuilderV2() {
                   onClick={() => {
                     setMode('initial');
                     setGeometry(null);
-                    setChatMessages([{ role: 'agent', text: 'Cześć ponownie! Jaki mamy nowy cel podróży?' }]);
+                    setChatMessages([]);
                     setChatStep(0);
                   }}
                 >
