@@ -156,7 +156,8 @@ export default function RouteBuilderV2() {
           route_type: finalCat || 'motorcycle',
           distance_target_km: parseInt(finalDist) || 50,
           difficulty: 'moderate',
-          input_notes: finalIntent
+          input_notes: finalIntent,
+          loop: true
         })
       });
       if (!resProj.ok) throw new Error(await resProj.text());
@@ -190,6 +191,8 @@ export default function RouteBuilderV2() {
             isDone = true;
           } else if (statusData.status === 'failed') {
             throw new Error(statusData.error_message || 'Błąd podczas generowania trasy');
+          } else if (statusData.status === 'waiting_for_user') {
+            throw new Error(statusData.human_message || 'Brakuje danych do wygenerowania trasy.');
           }
         }
       }
