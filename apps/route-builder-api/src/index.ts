@@ -423,7 +423,7 @@ app.get('/route-projects/:id/jobs/:jobId', async (c) => {
 app.post('/route-projects/atlas/geometry', async (c) => {
   try {
     const body = await c.req.json();
-    const ATLAS_API = process.env.ATLAS_API_URL || 'http://localhost:8787';
+    const ATLAS_API = process.env.ATLAS_API_URL || 'http://atlas-api:8787';
     const ATLAS_TOKEN = process.env.ATLAS_API_TOKEN || '';
     
     const response = await fetch(`${ATLAS_API}/api/routes/geometry`, {
@@ -447,7 +447,7 @@ app.post('/route-projects/atlas/geometry', async (c) => {
 app.post('/route-projects/atlas/research', async (c) => {
   try {
     const body = await c.req.json();
-    const ATLAS_API = process.env.ATLAS_API_URL || 'http://localhost:8787';
+    const ATLAS_API = process.env.ATLAS_API_URL || 'http://atlas-api:8787';
     const ATLAS_TOKEN = process.env.ATLAS_API_TOKEN || '';
     
     const response = await fetch(`${ATLAS_API}/api/routes/research`, {
