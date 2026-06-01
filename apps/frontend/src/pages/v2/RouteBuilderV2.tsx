@@ -5,6 +5,7 @@ import { Loader2, Sparkles, MapPin, Map, FileUp, Send, Bot, User, Compass, Chevr
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/lib/supabase';
 
 // Real Leaflet Components
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet';
@@ -132,12 +133,15 @@ export default function RouteBuilderV2() {
   const startGeneration = async (finalIntent: string) => {
     setMode('generating');
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       // 1. Create Project
       const resProj = await fetch('/route-builder-api/route-projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           start_point: 'Zakopane', // Przykładowo, docelowo z mapy
@@ -157,7 +161,7 @@ export default function RouteBuilderV2() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           category: category || 'motorcycle',
@@ -177,7 +181,7 @@ export default function RouteBuilderV2() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token') || ''}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           gpxUrl: geomData.url,
