@@ -51,6 +51,7 @@ services:
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       GRAPHHOPPER_API_KEY: ${GRAPHHOPPER_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ATLAS_API_TOKEN: ${ATLAS_API_TOKEN:-}
     networks:
       default:
         aliases:
