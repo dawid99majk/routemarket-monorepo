@@ -87,16 +87,18 @@ export default function RouteBuilderV2() {
   const [projectId, setProjectId] = useState<string | null>(null);
   
   // Parametry trasy zebrane z wywiadu
+  const [startPoint, setStartPoint] = useState<string>('');
   const [category, setCategory] = useState<string>('');
   const [distance, setDistance] = useState<string>('');
   const [intent, setIntent] = useState<string>('');
   const [geometry, setGeometry] = useState<any>(null);
   const [guideUrl, setGuideUrl] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>('Inicjalizacja...');
 
   // Chat state
   const [chatStep, setChatStep] = useState(0);
   const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([
-    { role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Na czym będziesz jechać? (np. Motocykl, Rower Szosowy, Samochód)' }
+    { role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Skąd wyruszamy? (np. Kraków, Bieszczady, Gdańsk)' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -115,23 +117,28 @@ export default function RouteBuilderV2() {
 
     setTimeout(() => {
       if (chatStep === 0) {
-        setCategory(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Super! Jaki dystans (w km) Cię interesuje?' }]);
+        setStartPoint(userText);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Super. Na czym będziesz jechać? (np. Motocykl, Rower Szosowy, Samochód)' }]);
         setChatStep(1);
       } else if (chatStep === 1) {
-        setDistance(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Brzmi dobrze. Masz jakieś specjalne życzenia? (np. dużo zakrętów, wzdłuż rzeki, unikanie miast)' }]);
+        setCategory(userText);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Jasne. Jaki dystans (w km) Cię interesuje?' }]);
         setChatStep(2);
       } else if (chatStep === 2) {
+        setDistance(userText);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Zrozumiałem. Masz jakieś specjalne życzenia? (np. dużo zakrętów, wzdłuż rzeki, unikanie głównych dróg)' }]);
+        setChatStep(3);
+      } else if (chatStep === 3) {
         setIntent(userText);
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Wszystko jasne! Rozpoczynam generowanie Twardej Geometrii i Deep Research. Zapnij pasy!' }]);
-        setTimeout(() => startGeneration(userText), 1500);
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Wszystko jasne! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
+        setTimeout(() => startGeneration(startPoint, category, distance, userText), 1500);
       }
     }, 600);
   };
 
-  const startGeneration = async (finalIntent: string) => {
+  const startGeneration = async (finalStart: string, finalCat: string, finalDist: string, finalIntent: string) => {
     setMode('generating');
+    setLoadingMessage('Tworzenie projektu...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token || '';
@@ -144,10 +151,10 @@ export default function RouteBuilderV2() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          start_point: 'Zakopane', // Przykładowo, docelowo z mapy
+          start_point: finalStart || 'Polska',
           region: 'Global',
-          route_type: category || 'motorcycle',
-          distance_target_km: parseInt(distance) || 50,
+          route_type: finalCat || 'motorcycle',
+          distance_target_km: parseInt(finalDist) || 50,
           difficulty: 'moderate',
           input_notes: finalIntent
         })
@@ -156,39 +163,51 @@ export default function RouteBuilderV2() {
       const projData = await resProj.json();
       setProjectId(projData.id);
 
-      // 2. Geometry
-      const resGeom = await fetch('/route-builder-api/route-projects/atlas/geometry', {
+      // 2. Start Job
+      setLoadingMessage('Uruchamianie Atlas AI...');
+      const resJob = await fetch(`/route-builder-api/route-projects/${projData.id}/jobs`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          category: category || 'motorcycle',
-          targetDistance: parseInt(distance) || 50,
-          waypoints: [
-            { lat: 49.299, lng: 19.949 },
-            { lat: 49.3, lng: 20.0 }
-          ]
-        })
+        }
       });
-      if (!resGeom.ok) throw new Error('Geometry failed');
-      const geomData = await resGeom.json();
-      setGeometry(geomData.geometry);
+      if (!resJob.ok) throw new Error('Nie udało się uruchomić zadania');
+      const jobData = await resJob.json();
+      
+      // 3. Poll Job Status
+      let isDone = false;
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 2000));
+        const pollRes = await fetch(`/route-builder-api/route-projects/${projData.id}/jobs/${jobData.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (pollRes.ok) {
+          const statusData = await pollRes.json();
+          if (statusData.human_message) {
+            setLoadingMessage(statusData.human_message);
+          }
+          if (statusData.status === 'ready' || statusData.status === 'completed') {
+            isDone = true;
+          } else if (statusData.status === 'failed') {
+            throw new Error(statusData.error_message || 'Błąd podczas generowania trasy');
+          }
+        }
+      }
 
-      // 3. Research
-      const resRes = await fetch('/route-builder-api/route-projects/atlas/research', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          gpxUrl: geomData.url,
-          userIntent: finalIntent
-        })
+      // 4. Fetch Geometry (Summary Artifact)
+      setLoadingMessage('Pobieranie geometrii mapy...');
+      const resSum = await fetch(`/route-builder-api/route-projects/${projData.id}/artifacts/summary`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!resRes.ok) throw new Error('Research failed');
+      if (resSum.ok) {
+        const summary = await resSum.json();
+        if (summary.content && summary.content.track) {
+          setGeometry({
+            type: 'LineString',
+            coordinates: summary.content.track.map((p: number[]) => [p[1], p[0]]) // leaflet expects [lng, lat] for geojson? Actually GeoJSON is [lng, lat]
+          });
+        }
+      }
       
       setGuideUrl(`/route-projects/${projData.id}`);
       setMode('done');
@@ -232,10 +251,7 @@ export default function RouteBuilderV2() {
                   variant="outline"
                   className="h-20 w-full bg-slate-800/40 hover:bg-slate-800/80 text-white rounded-xl border border-slate-700/50 flex flex-col items-start p-4 transition-all hover:border-blue-500/30 group"
                   onClick={() => {
-                    setDistance("100");
-                    setCategory("motorcycle");
-                    setIntent("Zaskocz mnie czymś pięknym.");
-                    startGeneration("Zaskocz mnie czymś pięknym.");
+                    startGeneration("Tatry", "motorcycle", "100", "Zaskocz mnie czymś pięknym.");
                   }}
                 >
                   <div className="flex items-center gap-2 font-bold text-lg group-hover:text-blue-400 transition-colors">
@@ -308,7 +324,7 @@ export default function RouteBuilderV2() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">Buduję Trasę</h3>
-                  <p className="text-slate-400 text-sm">Wyznaczamy geometrię, badamy teren i piszemy przewodnik turystyczny za pomocą Gemini 2.5.</p>
+                  <p className="text-emerald-300 text-sm font-medium animate-pulse">{loadingMessage}</p>
                 </div>
                 <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
                   <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 w-1/2 h-full rounded-full animate-pulse"></div>
