@@ -97,21 +97,20 @@ export default function RouteBuilderV2() {
 
   // Chat state
   const [chatScenario, setChatScenario] = useState<'custom' | 'surprise'>('custom');
-  const [chatStep, setChatStep] = useState(0);
   const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  }, [chatMessages, isTyping]);
 
   const startInterview = (scenario: 'custom' | 'surprise') => {
     setChatScenario(scenario);
-    setChatStep(0);
     setMode('interview');
     if (scenario === 'custom') {
-      setChatMessages([{ role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Skąd wyruszamy? (np. Kraków, Bieszczady, Gdańsk)' }]);
+      setChatMessages([{ role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Gdzie jedziemy i jakim pojazdem? (np. Tatry, rower gravelowy)' }]);
     } else {
       setChatMessages([{ role: 'agent', text: 'Zaskoczę Cię wspaniałą pętlą! Powiedz mi tylko, skąd wyruszasz i na czym będziesz jechać? (np. Warszawa, Motocykl)' }]);
     }
@@ -119,44 +118,51 @@ export default function RouteBuilderV2() {
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isTyping) return;
 
     const userText = inputValue;
     setInputValue('');
-    setChatMessages(prev => [...prev, { role: 'user', text: userText }]);
+    const newMessages: {role: 'agent'|'user', text: string}[] = [...chatMessages, { role: 'user', text: userText }];
+    setChatMessages(newMessages);
 
-    setTimeout(() => {
-      if (chatScenario === 'surprise') {
-        if (chatStep === 0) {
-          // One-shot for surprise
-          setStartPoint(userText); // It will have both location and vehicle in one string
-          setCategory('auto'); // Let backend AI extract from input_notes
-          setDistance('100'); // default 100km for surprise
-          setIntent('Zaskocz mnie czymś pięknym i spektakularnym w tej okolicy.');
-          setChatMessages(prev => [...prev, { role: 'agent', text: 'Będzie rewelacyjnie! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
-          setTimeout(() => startGeneration(userText, 'auto', '100', 'Zaskocz mnie czymś pięknym i spektakularnym w tej okolicy.'), 1500);
-        }
-      } else {
-        // Custom scenario steps
-        if (chatStep === 0) {
-          setStartPoint(userText);
-          setChatMessages(prev => [...prev, { role: 'agent', text: 'Super. Na czym będziesz jechać? (np. Motocykl, Rower Szosowy, Samochód)' }]);
-          setChatStep(1);
-        } else if (chatStep === 1) {
-          setCategory(userText);
-          setChatMessages(prev => [...prev, { role: 'agent', text: 'Jasne. Jaki dystans (w km) Cię interesuje?' }]);
-          setChatStep(2);
-        } else if (chatStep === 2) {
-          setDistance(userText);
-          setChatMessages(prev => [...prev, { role: 'agent', text: 'Zrozumiałem. Masz jakieś specjalne życzenia? (np. dużo zakrętów, wzdłuż rzeki, unikanie głównych dróg)' }]);
-          setChatStep(3);
-        } else if (chatStep === 3) {
-          setIntent(userText);
-          setChatMessages(prev => [...prev, { role: 'agent', text: 'Wszystko jasne! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
-          setTimeout(() => startGeneration(startPoint, category, distance, userText), 1500);
-        }
+    if (chatScenario === 'surprise') {
+      // One-shot for surprise
+      setIsTyping(true);
+      setTimeout(() => {
+        setChatMessages(prev => [...prev, { role: 'agent', text: 'Będzie rewelacyjnie! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
+        setIsTyping(false);
+        setTimeout(() => startGeneration(userText, 'motorcycle', '100', 'Zaskocz mnie czymś pięknym i spektakularnym w tej okolicy.'), 1500);
+      }, 1000);
+      return;
+    }
+
+    setIsTyping(true);
+    try {
+      const response = await fetch('/route-builder-api/chat-interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMessages })
+      });
+      const data = await response.json();
+      
+      setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
+      
+      if (data.done && data.extracted) {
+        setTimeout(() => {
+          startGeneration(
+            data.extracted.start_point || '',
+            data.extracted.route_type || 'motorcycle',
+            data.extracted.distance || '50',
+            data.extracted.intent || ''
+          );
+        }, 1500);
       }
-    }, 600);
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { role: 'agent', text: 'Ups, wystąpił problem z Agentem. Spróbujmy jeszcze raz.' }]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const startGeneration = async (finalStart: string, finalCat: string, finalDist: string, finalIntent: string) => {
@@ -326,6 +332,15 @@ export default function RouteBuilderV2() {
                       </div>
                     </div>
                   ))}
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className="bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-200 p-4 shadow-sm flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                      </div>
+                    </div>
+                  )}
                   <div ref={chatEndRef} />
                 </div>
 

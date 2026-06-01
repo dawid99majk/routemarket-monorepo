@@ -56,7 +56,8 @@ Odpowiedz WYŁĄCZNIE prawidłowym obiektem JSON, bez żadnego formatowania mark
           const data = (await response.json()) as any;
           const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (generatedText) {
-            const parsed = JSON.parse(generatedText.trim());
+            const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanText);
             if (parsed.start_point && parsed.region) {
               return {
                 start_point: parsed.start_point,

@@ -31,6 +31,71 @@ app.get('/route-projects', async (c) => {
   }
 });
 
+// Chat AI Interview
+app.post('/chat-interview', async (c) => {
+  try {
+    const { messages } = await c.req.json() as { messages: {role: string, text: string}[] };
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      throw new Error("Missing GEMINI_API_KEY");
+    }
+
+    const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
+    const prompt = `Jesteś ekspertem podróżniczym Atlas Agent. Twoim celem jest zebranie informacji o planowanej trasie (start_point, route_type, distance, intent).
+Jeśli masz za mało informacji, zadaj KRÓTKIE, jedno zdanie pytanie, o to, czego brakuje (np. skąd wyruszasz, czym jedziesz, jak długo).
+Jeśli masz już wszystkie podstawowe informacje (minimum: skąd wyrusza i czym jedzie), i uważasz, że możesz wygenerować trasę, zwróć JSON z wyciągniętymi danymi i ustaw "done": true.
+
+Kategorie route_type to: motorcycle, cycling, gravel, hiking, city_walk. Dopasuj pojazd do jednej z nich.
+
+Oto historia czatu:
+${conversationText}
+
+Odpowiedz ZAWSZE W FORMACIE JSON (bez znaczników markdown, czysty json):
+Przykład, gdy wciąż pytasz:
+{
+  "done": false,
+  "reply": "Super, Karkonosze! A czy idziesz pieszo, czy jedziesz na rowerze?"
+}
+
+Przykład, gdy masz wystarczająco dużo danych:
+{
+  "done": true,
+  "reply": "Wszystko jasne! Rozpoczynam planowanie trasy w Karkonoszach.",
+  "extracted": {
+    "start_point": "Karkonosze",
+    "route_type": "hiking",
+    "distance": "15",
+    "intent": "Unikanie asfaltów, piękne widoki"
+  }
+}`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("Gemini API error " + await response.text());
+    }
+
+    const data = await response.json() as any;
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (generatedText) {
+      const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return c.json(JSON.parse(cleanText));
+    }
+    throw new Error("No text from Gemini");
+  } catch (err: any) {
+    console.error("Chat interview error:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Tworzenie projektu
 app.post('/route-projects', zValidator('json', RouteRequirementsSchema), async (c) => {
   const reqs = c.req.valid('json');
