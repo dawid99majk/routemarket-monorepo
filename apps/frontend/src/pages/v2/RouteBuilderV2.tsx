@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, MapPin, Map, FileUp, Send, Bot, User, Compass, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Map, FileUp, Send, Bot, Compass, ChevronRight, CheckCircle2, Link as LinkIcon, Trash2, X, FileText, UploadCloud, FileType } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 
 // Real Leaflet Components
@@ -69,7 +70,6 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
         <MapResizer geometry={geometry} />
       </MapContainer>
 
-      {/* Premium HUD Elements */}
       <div className="absolute bottom-6 left-6 flex gap-3 z-[1000]">
         <Badge variant="outline" className="bg-white/80 border-emerald-500/30 text-emerald-600 backdrop-blur-xl py-1.5 px-4 rounded-full shadow-lg">
           <MapPin className="w-3 h-3 mr-2" /> Google Routes
@@ -83,20 +83,20 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
 }
 
 export default function RouteBuilderV2() {
-  const [mode, setMode] = useState<'initial' | 'interview' | 'generating' | 'done'>('initial');
+  const [mode, setMode] = useState<'sources' | 'processing' | 'interview' | 'generating' | 'done'>('sources');
   const [projectId, setProjectId] = useState<string | null>(null);
   
-  // Parametry trasy zebrane z wywiadu
-  const [startPoint, setStartPoint] = useState<string>('');
-  const [category, setCategory] = useState<string>('');
-  const [distance, setDistance] = useState<string>('');
-  const [intent, setIntent] = useState<string>('');
+  // Sources State
+  const [sourceLinks, setSourceLinks] = useState<string[]>([]);
+  const [newLink, setNewLink] = useState('');
+  const [inputNotes, setInputNotes] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Chat/Generation State
   const [geometry, setGeometry] = useState<any>(null);
   const [guideUrl, setGuideUrl] = useState<string | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState<string>('Inicjalizacja...');
-
-  // Chat state
-  const [chatScenario, setChatScenario] = useState<'custom' | 'surprise'>('custom');
+  const [loadingMessage, setLoadingMessage] = useState<string>('Analizuję twoje materiały...');
   const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -106,13 +106,92 @@ export default function RouteBuilderV2() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
 
-  const startInterview = (scenario: 'custom' | 'surprise') => {
-    setChatScenario(scenario);
-    setMode('interview');
-    if (scenario === 'custom') {
-      setChatMessages([{ role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Gdzie jedziemy i jakim pojazdem? (np. Tatry, rower gravelowy)' }]);
-    } else {
-      setChatMessages([{ role: 'agent', text: 'Zaskoczę Cię wspaniałą pętlą! Powiedz mi tylko, skąd wyruszasz i na czym będziesz jechać? (np. Warszawa, Motocykl)' }]);
+  const addLink = () => {
+    if (newLink && !sourceLinks.includes(newLink)) {
+      setSourceLinks([...sourceLinks, newLink]);
+      setNewLink('');
+    }
+  };
+
+  const removeLink = (url: string) => {
+    setSourceLinks(sourceLinks.filter(l => l !== url));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles([...files, ...Array.from(e.target.files)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = [...files];
+    newFiles.splice(index, 1);
+    setFiles(newFiles);
+  };
+
+  const handleStartProcessing = async () => {
+    const hasContent = files.length > 0 || sourceLinks.length > 0 || inputNotes.trim();
+    if (!hasContent) {
+      // If nothing provided, we can just start empty interview
+      setMode('interview');
+      setChatMessages([{ role: 'agent', text: 'Cześć! Zbuduję dla Ciebie idealną trasę. Nie dodałeś żadnych źródeł, więc zacznijmy od podstaw: Gdzie jedziemy i na czym (np. rower, motor)?' }]);
+      return;
+    }
+    
+    setMode('processing');
+    setUploadingFiles(true);
+    setLoadingMessage('Wgrywam pliki i zapisuję materiały...');
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token;
+      if (!token) throw new Error('Brak sesji uzytkownika');
+
+      // 1. Upload files
+      const uploadedFilePaths: string[] = [];
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(7)}_${Date.now()}.${fileExt}`;
+        const { data, error } = await supabase.storage.from('route_builder_sources').upload(fileName, file);
+        if (error) throw error;
+        if (data) uploadedFilePaths.push(data.path);
+      }
+
+      setLoadingMessage('Atlas AI analizuje twoje materiały...');
+      setUploadingFiles(false);
+
+      // 2. Create Project
+      const res = await fetch('/route-builder-api/route-projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          route_type: 'motorcycle', // default
+          difficulty: 'moderate',
+          input_notes: inputNotes,
+          source_links: sourceLinks,
+          source_files: uploadedFilePaths,
+          language: 'pl'
+        })
+      });
+
+      if (!res.ok) throw new Error('Błąd tworzenia projektu');
+      const projectData = await res.json();
+      setProjectId(projectData.id);
+
+      // 3. Inform Agent about the analysis
+      setMode('interview');
+      setChatMessages([
+        { role: 'agent', text: 'Przeanalizowałem twoje notatki i źródła! ' + 
+          (projectData.ai_extracted_meta?.distance_target_km ? `Znalazłem dystans ok. ${projectData.ai_extracted_meta.distance_target_km}km. ` : '') +
+          'Zanim zacznę budować geometrię, powiedz mi, jaki dokładnie środek transportu wybierasz (np. rower MTB, motocykl szosowy) i czy mam jeszcze uwzględnić jakieś specjalne punkty po drodze?' }
+      ]);
+    } catch (err: any) {
+      toast.error(err.message);
+      setMode('sources');
+      setUploadingFiles(false);
     }
   };
 
@@ -124,187 +203,256 @@ export default function RouteBuilderV2() {
     setInputValue('');
     const newMessages: {role: 'agent'|'user', text: string}[] = [...chatMessages, { role: 'user', text: userText }];
     setChatMessages(newMessages);
-
-    if (chatScenario === 'surprise') {
-      // One-shot for surprise
-      setIsTyping(true);
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, { role: 'agent', text: 'Będzie rewelacyjnie! Rozpoczynam planowanie trasy z wykorzystaniem Atlas AI. Zapnij pasy!' }]);
-        setIsTyping(false);
-        setTimeout(() => startGeneration(userText, 'motorcycle', '100', 'Zaskocz mnie czymś pięknym i spektakularnym w tej okolicy.'), 1500);
-      }, 1000);
-      return;
-    }
-
     setIsTyping(true);
+
     try {
       const response = await fetch('/route-builder-api/chat-interview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages })
+        body: JSON.stringify({ messages: newMessages, project_id: projectId })
       });
       const data = await response.json();
       
       setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
       
-      if (data.done && data.extracted) {
+      if (data.done) {
         setTimeout(() => {
-          startGeneration(
-            data.extracted.start_point || '',
-            data.extracted.route_type || 'motorcycle',
-            data.extracted.distance || '50',
-            data.extracted.intent || ''
-          );
+          if (projectId) {
+            startGeneration(projectId);
+          } else {
+            // fallback if no project id
+            startGenerationFallback(data.extracted);
+          }
         }, 1500);
       }
-    } catch (err) {
-      console.error(err);
-      setChatMessages(prev => [...prev, { role: 'agent', text: 'Ups, wystąpił problem z Agentem. Spróbujmy jeszcze raz.' }]);
+    } catch (err: any) {
+      toast.error(err.message);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const startGeneration = async (finalStart: string, finalCat: string, finalDist: string, finalIntent: string) => {
+  const startGenerationFallback = async (extracted: any) => {
     setMode('generating');
-    setLoadingMessage('Tworzenie projektu...');
+    setLoadingMessage('Budowanie geometrii...');
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
 
-      const lowerCat = finalCat.toLowerCase();
-      let routeType = 'motorcycle';
-      if (lowerCat.includes('rower') || lowerCat.includes('szos')) routeType = 'cycling';
-      if (lowerCat.includes('gravel')) routeType = 'gravel';
-      if (lowerCat.includes('pieszo') || lowerCat.includes('chodz') || lowerCat.includes('spacer')) routeType = 'hiking';
-      
-      // 1. Create Project
-      const resProj = await fetch('/route-builder-api/route-projects', {
+      const res = await fetch('/route-builder-api/route-projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          start_point: finalStart || 'Polska',
-          region: 'Global',
-          route_type: routeType,
-          distance_target_km: parseInt(finalDist) || 50,
-          difficulty: 'moderate',
-          input_notes: finalIntent,
-          loop: true
+          route_type: extracted?.category || 'motorcycle',
+          start_point: extracted?.startPoint || 'Warszawa',
+          distance_target_km: parseInt(extracted?.distance || '100', 10),
+          difficulty: 'moderate'
         })
       });
-      if (!resProj.ok) throw new Error(await resProj.text());
-      const projData = await resProj.json();
-      setProjectId(projData.id);
 
-      // 2. Start Job
-      setLoadingMessage('Uruchamianie Atlas AI...');
-      const resJob = await fetch(`/route-builder-api/route-projects/${projData.id}/jobs`, {
+      const pData = await res.json();
+      setProjectId(pData.id);
+      startGeneration(pData.id, token);
+    } catch (e: any) {
+      toast.error(e.message);
+      setMode('interview');
+    }
+  };
+
+  const startGeneration = async (id: string, existingToken?: string) => {
+    setMode('generating');
+    setLoadingMessage('Inicjowanie zadania na serwerze...');
+    try {
+      let token = existingToken;
+      if (!token) {
+        const { data: session } = await supabase.auth.getSession();
+        token = session.session?.access_token || '';
+      }
+
+      const res = await fetch(`/route-builder-api/route-projects/${id}/jobs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      if (!resJob.ok) throw new Error('Nie udało się uruchomić zadania');
-      const jobData = await resJob.json();
-      
-      // 3. Poll Job Status
-      let isDone = false;
-      while (!isDone) {
-        await new Promise(r => setTimeout(r, 2000));
-        const pollRes = await fetch(`/route-builder-api/route-projects/${projData.id}/jobs/${jobData.id}`, {
+      if (!res.ok) throw new Error('Błąd startu zadania');
+      pollJobStatus(id, token);
+    } catch (err: any) {
+      toast.error(err.message);
+      setMode('interview');
+    }
+  };
+
+  const pollJobStatus = (id: string, token: string) => {
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts++;
+      if (attempts > 30) {
+        clearInterval(interval);
+        setMode('interview');
+        toast.error('Przekroczono czas oczekiwania na trasę.');
+        return;
+      }
+      try {
+        const res = await fetch(`/route-builder-api/route-projects/${id}/jobs`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (pollRes.ok) {
-          const statusData = await pollRes.json();
-          if (statusData.human_message) {
-            setLoadingMessage(statusData.human_message);
-          }
-          if (statusData.status === 'ready' || statusData.status === 'completed') {
-            isDone = true;
-          } else if (statusData.status === 'failed') {
-            throw new Error(statusData.error_message || 'Błąd podczas generowania trasy');
-          } else if (statusData.status === 'waiting_for_user') {
-            throw new Error(statusData.human_message || 'Brakuje danych do wygenerowania trasy.');
+        const jobs = await res.json();
+        const activeJob = jobs.find((j: any) => j.status === 'running' || j.status === 'ready' || j.status === 'queued');
+        
+        if (activeJob) {
+          if (activeJob.current_step) setLoadingMessage(activeJob.current_step);
+          if (activeJob.status === 'ready') {
+            clearInterval(interval);
+            loadArtifacts(id, token);
           }
         }
+      } catch (err) {
+        console.error(err);
       }
+    }, 3000);
+  };
 
-      // 4. Fetch Geometry (Summary Artifact)
-      setLoadingMessage('Pobieranie geometrii mapy...');
-      const resSum = await fetch(`/route-builder-api/route-projects/${projData.id}/artifacts/summary`, {
+  const loadArtifacts = async (id: string, token: string) => {
+    try {
+      const res = await fetch(`/route-builder-api/route-projects/${id}/artifacts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (resSum.ok) {
-        const summary = await resSum.json();
-        if (summary.content && summary.content.track) {
-          setGeometry({
-            type: 'LineString',
-            coordinates: summary.content.track.map((p: number[]) => [p[1], p[0]]) // leaflet expects [lng, lat] for geojson? Actually GeoJSON is [lng, lat]
-          });
-        }
+      const artifacts = await res.json();
+      
+      const gpxArtifact = artifacts.find((a: any) => a.artifact_type === 'gpx');
+      if (gpxArtifact && gpxArtifact.content?.geometry) {
+        setGeometry(gpxArtifact.content.geometry);
       }
       
-      setGuideUrl(`/route-projects/${projData.id}`);
+      const reportArtifact = artifacts.find((a: any) => a.artifact_type === 'report');
+      if (reportArtifact) {
+        setGuideUrl(`/routes/${id}`);
+      }
+
       setMode('done');
-      toast.success('Trasa i przewodnik gotowe!');
+      toast.success('Twoja trasa jest gotowa!');
     } catch (err: any) {
-      toast.error('Wystąpił błąd: ' + err.message);
-      setMode('initial');
+      toast.error('Błąd pobierania artefaktów');
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8 pt-24 font-sans selection:bg-emerald-500/30">
-      <div className="max-w-7xl mx-auto h-[80vh] flex flex-col lg:flex-row gap-6">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
+      <div className="max-w-[1400px] mx-auto h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-6">
         
-        {/* Left Panel - Wizard / Chat */}
-        <div className="w-full lg:w-1/3 flex flex-col relative z-10 h-full">
-          <div className="mb-8">
-            <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 mb-3 px-3 py-1">AI Studio V2</Badge>
-            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-              Route Builder
-            </h1>
-            <p className="text-slate-500 mt-2 text-sm leading-relaxed">
-              Zaprojektuj idealną trasę z pomocą Agenta AI i potężnego silnika Atlas GIS.
-            </p>
-          </div>
+        {/* Left Panel - Wizard */}
+        <div className="w-full lg:w-1/3 flex flex-col z-10">
+          <Card className="flex-1 bg-white border-0 shadow-2xl shadow-slate-200/50 rounded-2xl overflow-hidden flex flex-col">
+            
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                  <Sparkles className="w-6 h-6 text-emerald-500" />
+                  Atlas Builder
+                </h2>
+                <p className="text-sm text-slate-500 font-medium mt-1">Zaprojektuj idealną trasę</p>
+              </div>
+            </div>
 
-          <Card className="flex-1 bg-white border-slate-200 shadow-xl overflow-hidden flex flex-col rounded-2xl">
-            {mode === 'initial' && (
-              <div className="p-6 space-y-4 flex flex-col h-full justify-center animate-in fade-in zoom-in-95 duration-500">
-                <Button 
-                  onClick={() => startInterview('custom')}
-                  className="h-20 w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl shadow-xl shadow-emerald-500/20 flex flex-col items-start p-4 transition-all hover:scale-[1.02] border-0"
-                >
-                  <div className="flex items-center gap-2 font-bold text-lg">
-                    <Sparkles className="w-5 h-5 text-emerald-50" /> Mam Pomysł
+            {mode === 'sources' && (
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 animate-in slide-in-from-left-4 duration-500 bg-slate-50">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-slate-800">Krok 1: Twoje źródła (Opcjonalne)</h3>
+                  <p className="text-sm text-slate-500">Wgraj zrzuty ekranu, PDFy z blogów, wklej linki do relacji z YouTube lub własne notatki, a Atlas Agent je przeanalizuje i stworzy na ich podstawie plan wycieczki.</p>
+                </div>
+
+                {/* File Upload */}
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-slate-700">Wgraj pliki (PDF, Obrazki, Dokumenty)</label>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-white hover:bg-slate-50 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
+                      <p className="mb-2 text-sm text-slate-500"><span className="font-semibold">Kliknij</span> lub przeciągnij i upuść</p>
+                    </div>
+                    <input type="file" className="hidden" multiple onChange={handleFileChange} />
+                  </label>
+                  {files.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {files.map((f, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
+                          <div className="flex items-center gap-2 text-sm text-slate-600 truncate max-w-[200px]">
+                            <FileType className="w-4 h-4 text-emerald-500" />
+                            <span className="truncate">{f.name}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-700" onClick={() => removeFile(idx)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Links */}
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-slate-700">Linki i inspiracje (YouTube, blogi)</label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="https://..." 
+                      value={newLink} 
+                      onChange={e => setNewLink(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addLink()}
+                      className="bg-white"
+                    />
+                    <Button onClick={addLink} variant="secondary">Dodaj</Button>
                   </div>
-                  <span className="text-emerald-50 font-normal text-sm">Zbudujmy to razem z Agentem AI</span>
-                </Button>
+                  {sourceLinks.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {sourceLinks.map((link, idx) => (
+                        <Badge key={idx} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1 bg-white border border-slate-200">
+                          <LinkIcon className="w-3 h-3 text-slate-400" />
+                          <span className="truncate max-w-[150px]">{link}</span>
+                          <button onClick={() => removeLink(link)} className="ml-1 hover:bg-slate-200 rounded-full p-0.5">
+                            <X className="w-3 h-3 text-slate-500" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-slate-700">Własne notatki i pomysły</label>
+                  <Textarea 
+                    placeholder="Wklej luźne myśli, opisy tras znalezione w internecie, preferencje..." 
+                    className="min-h-[100px] bg-white resize-none"
+                    value={inputNotes}
+                    onChange={e => setInputNotes(e.target.value)}
+                  />
+                </div>
 
                 <Button 
-                  variant="outline"
-                  className="h-20 w-full bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-xl border border-slate-200 flex flex-col items-start p-4 transition-all hover:border-blue-500/30 group"
-                  onClick={() => startInterview('surprise')}
+                  className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 group"
+                  onClick={handleStartProcessing}
                 >
-                  <div className="flex items-center gap-2 font-bold text-lg group-hover:text-blue-500 transition-colors">
-                    <Compass className="w-5 h-5 text-blue-500" /> Zaskocz mnie
-                  </div>
-                  <span className="text-slate-500 font-normal text-sm">Wygeneruj najlepszą trasę w okolicy</span>
+                  <Bot className="w-5 h-5 mr-2" />
+                  Przejdź do Agenta
+                  <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
+              </div>
+            )}
 
-                <Button 
-                  variant="outline"
-                  className="h-20 w-full bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-xl border border-slate-200 flex flex-col items-start p-4 transition-all hover:border-purple-500/30 group"
-                >
-                  <div className="flex items-center gap-2 font-bold text-lg group-hover:text-purple-500 transition-colors">
-                    <FileUp className="w-5 h-5 text-purple-500" /> Mam GPX
-                  </div>
-                  <span className="text-slate-500 font-normal text-sm">Wgraj plik i pozwól nam stworzyć przewodnik</span>
-                </Button>
+            {mode === 'processing' && (
+              <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6 animate-in fade-in duration-700 bg-white">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-emerald-500/10 blur-xl rounded-full animate-pulse"></div>
+                  <Loader2 className="w-16 h-16 text-emerald-500 animate-spin relative z-10" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-2">Przetwarzanie Źródeł</h3>
+                  <p className="text-emerald-600 text-sm font-medium animate-pulse">{loadingMessage}</p>
+                </div>
               </div>
             )}
 
@@ -316,7 +464,7 @@ export default function RouteBuilderV2() {
                   </div>
                   <div>
                     <p className="font-bold text-slate-800 text-sm">Atlas Agent</p>
-                    <p className="text-xs text-emerald-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online</p>
+                    <p className="text-xs text-emerald-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Analiza zakończona</p>
                   </div>
                 </div>
 
@@ -396,10 +544,12 @@ export default function RouteBuilderV2() {
                   variant="ghost" 
                   className="w-full text-slate-500 hover:text-slate-800"
                   onClick={() => {
-                    setMode('initial');
+                    setMode('sources');
                     setGeometry(null);
                     setChatMessages([]);
-                    setChatStep(0);
+                    setFiles([]);
+                    setSourceLinks([]);
+                    setInputNotes('');
                   }}
                 >
                   Stwórz kolejną trasę

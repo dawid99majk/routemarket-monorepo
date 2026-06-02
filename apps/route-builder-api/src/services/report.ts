@@ -7,26 +7,30 @@ export interface ReportOutput {
 }
 
 export class ReportService {
-  async extractStartPointAndRegion(userNotes: string): Promise<{ 
+  async extractStartPointAndRegion(userNotes: string, sourceLinks: string[] = [], sourceFiles: string[] = []): Promise<{ 
     start_point: string | null; 
     region: string | null;
     distance_target_km?: number | null;
     difficulty?: 'easy' | 'moderate' | 'hard' | 'expert' | null;
     duration_pref?: 'short' | 'long' | null;
   }> {
-    console.log(`[ReportService] extractStartPointAndRegion: Extracting requirements from user notes...`);
+    console.log(`[ReportService] extractStartPointAndRegion: Extracting requirements from user notes and sources...`);
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-    if (GEMINI_API_KEY && userNotes && userNotes.trim().length > 5) {
+    const hasContent = (userNotes && userNotes.trim().length > 5) || sourceLinks.length > 0 || sourceFiles.length > 0;
+
+    if (GEMINI_API_KEY && hasContent) {
       try {
-        const prompt = `Przeanalizuj poniższe notatki/opis trasy i wyodrębnij z nich szczegóły planowanej wycieczki:
+        const prompt = `Przeanalizuj poniższe notatki/opis trasy, a także wylistowane pliki i linki źródłowe. Wyodrębnij z nich szczegóły planowanej wycieczki:
 1. Konkretne miasto lub miejsce startowe. Jeśli nie ma wyraźnie podanego miejsca, MUSISZ zwrócić null.
 2. Ogólny region geograficzny. Jeśli nie podano, zwróć null.
 3. Oczekiwany dystans w kilometrach (sama liczba, np. 30). Jeśli nie podano, zwróć null.
 4. Poziom trudności (jeden z: "easy", "moderate", "hard", "expert"). Jeśli nie da się określić, zwróć "moderate".
 5. Preferencję czasu trwania ("short" dla wycieczek rekreacyjnych do 3h, "long" dla wycieczek całodniowych lub powyżej 3h).
 
-Opis trasy: "${userNotes}"
+Opis trasy / Notatki użytkownika: "${userNotes || 'brak'}"
+Linki do stron / filmów: ${sourceLinks.join(', ') || 'brak'}
+Wgrane pliki: ${sourceFiles.join(', ') || 'brak'}
 
 Odpowiedz WYŁĄCZNIE prawidłowym obiektem JSON, bez żadnego formatowania markdown ani dodatkowych słów.
 Przykład, gdy nie podano lokalizacji:

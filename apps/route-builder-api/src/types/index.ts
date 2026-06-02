@@ -11,6 +11,8 @@ export const RouteRequirementsSchema = z.object({
   difficulty: z.enum(['easy', 'moderate', 'hard', 'expert']),
   surface_preferences: z.array(z.string()).default([]),
   input_notes: z.string().nullable().optional(),
+  source_links: z.array(z.string()).default([]),
+  source_files: z.array(z.string()).default([]),
   avoid: z.array(z.string()).default([]),
   ai_can_suggest_missing_points: z.boolean().default(false),
   language: z.string().default('pl')

@@ -115,10 +115,11 @@ app.post('/route-projects', zValidator('json', RouteRequirementsSchema), async (
     let difficulty = reqs.difficulty;
     let duration_pref: 'short' | 'long' | null = null;
 
-    // Jeżeli mamy notatki użytkownika, zawsze wyciągamy z nich szczegóły AI:
-    if (reqs.input_notes) {
-      console.log(`[API] Extracting AI details from user notes...`);
-      const extracted = await reportService.extractStartPointAndRegion(reqs.input_notes);
+    // Jeżeli mamy notatki użytkownika lub źródła, wyciągamy z nich szczegóły AI:
+    const hasSources = reqs.input_notes || (reqs.source_links && reqs.source_links.length > 0) || (reqs.source_files && reqs.source_files.length > 0);
+    if (hasSources) {
+      console.log(`[API] Extracting AI details from user notes and sources...`);
+      const extracted = await reportService.extractStartPointAndRegion(reqs.input_notes || '', reqs.source_links || [], reqs.source_files || []);
       
       start_point = extracted.start_point || start_point;
       region = extracted.region || region;
