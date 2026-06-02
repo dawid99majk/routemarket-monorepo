@@ -69,9 +69,10 @@ export const geometryHandler = async ({ req }: any) => {
     body: gpx
   });
 
-  if (response.status === 404) {
+  const responseText = await response.text();
+  if (!response.ok && (response.status === 404 || responseText.includes('Bucket not found') || response.status === 400)) {
     // Create bucket if it doesn't exist
-    await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+    const bucketRes = await fetch(`${supabaseUrl}/storage/v1/bucket`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${supabaseKey}`,
@@ -80,6 +81,10 @@ export const geometryHandler = async ({ req }: any) => {
       body: JSON.stringify({ id: "routes-gpx", name: "routes-gpx", public: true })
     });
     
+    if (!bucketRes.ok) {
+       console.error("Bucket creation failed:", await bucketRes.text());
+    }
+
     // Retry upload
     response = await fetch(`${supabaseUrl}/storage/v1/object/routes-gpx/${fileName}`, {
       method: "POST",
@@ -89,9 +94,11 @@ export const geometryHandler = async ({ req }: any) => {
       },
       body: gpx
     });
+    
+    if (!response.ok) throw new Error("Supabase retry upload failed: " + await response.text());
+  } else if (!response.ok) {
+    throw new Error(`Supabase upload failed (${response.status}): ${responseText}`);
   }
-
-  if (!response.ok) throw new Error("Supabase upload failed: " + await response.text());
 
   return {
     url: `${supabaseUrl}/storage/v1/object/public/routes-gpx/${fileName}`,

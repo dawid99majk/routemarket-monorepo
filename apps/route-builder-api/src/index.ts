@@ -156,18 +156,22 @@ app.post('/route-projects', zValidator('json', RouteRequirementsSchema), async (
 // Pobieranie projektu
 app.get('/route-projects/:id', async (c) => {
   const id = c.req.param('id');
+  const user = c.get('user');
   const project = await repo.getProject(id);
   if (!project) return c.json({ error: 'Not found' }, 404);
+  if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
   return c.json(project);
 });
 
 // Aktualizacja projektu
 app.patch('/route-projects/:id', zValidator('json', RouteRequirementsSchema.partial()), async (c) => {
   const id = c.req.param('id');
+  const user = c.get('user');
   const updates = c.req.valid('json');
   try {
     const project = await repo.getProject(id);
     if (!project) return c.json({ error: 'Not found' }, 404);
+    if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
     
     const updated = await repo.updateProject(id, {
       ...project.requirements,
@@ -182,7 +186,12 @@ app.patch('/route-projects/:id', zValidator('json', RouteRequirementsSchema.part
 // Pobieranie artefaktów projektu
 app.get('/route-projects/:id/artifacts', async (c) => {
   const id = c.req.param('id');
+  const user = c.get('user');
   try {
+    const project = await repo.getProject(id);
+    if (!project) return c.json({ error: 'Not found' }, 404);
+    if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
+
     const artifacts = await repo.getArtifacts(id);
     return c.json(artifacts);
   } catch (err: any) {
@@ -194,7 +203,12 @@ app.get('/route-projects/:id/artifacts', async (c) => {
 app.get('/route-projects/:id/artifacts/:type', async (c) => {
   const id = c.req.param('id');
   const type = c.req.param('type');
+  const user = c.get('user');
   try {
+    const project = await repo.getProject(id);
+    if (!project) return c.json({ error: 'Not found' }, 404);
+    if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
+
     const artifact = await repo.getArtifactByType(id, type);
     if (!artifact) return c.json({ error: 'Artifact not found' }, 404);
     return c.json(artifact);
@@ -206,7 +220,12 @@ app.get('/route-projects/:id/artifacts/:type', async (c) => {
 // Pobieranie pliku GPX
 app.get('/route-projects/:id/gpx', async (c) => {
   const id = c.req.param('id');
+  const user = c.get('user');
   try {
+    const project = await repo.getProject(id);
+    if (!project) return c.json({ error: 'Not found' }, 404);
+    if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
+
     const artifact = await repo.getArtifactByType(id, 'gpx');
     if (!artifact || !artifact.raw_data) return c.json({ error: 'GPX not found' }, 404);
     
@@ -221,8 +240,10 @@ app.get('/route-projects/:id/gpx', async (c) => {
 // Wgrywanie pliku GPX
 app.post('/route-projects/:id/gpx', async (c) => {
   const projectId = c.req.param('id');
+  const user = c.get('user');
   const project = await repo.getProject(projectId);
   if (!project) return c.json({ error: 'Project not found' }, 404);
+  if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
 
   const gpxText = await c.req.text();
   
@@ -258,11 +279,13 @@ app.post('/route-projects/:id/gpx', async (c) => {
 // Wybór alternatywnego wariantu trasy
 app.post('/route-projects/:id/select-alternative', async (c) => {
   const projectId = c.req.param('id');
+  const user = c.get('user');
   const { variantId } = await c.req.json() as { variantId: string };
 
   try {
     const project = await repo.getProject(projectId);
     if (!project) return c.json({ error: 'Project not found' }, 404);
+    if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
 
     const altsArtifact = await repo.getArtifactByType(projectId, 'alternatives');
     if (!altsArtifact || !altsArtifact.content) {
@@ -324,8 +347,10 @@ app.post('/route-projects/:id/select-alternative', async (c) => {
 // Tworzenie joba
 app.post('/route-projects/:id/jobs', async (c) => {
   const projectId = c.req.param('id');
+  const user = c.get('user');
   const project = await repo.getProject(projectId);
   if (!project) return c.json({ error: 'Project not found' }, 404);
+  if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
   
   try {
     let job = await repo.createJob(projectId);
@@ -486,7 +511,14 @@ app.post('/route-projects/:id/jobs', async (c) => {
 });
 
 app.get('/route-projects/:id/jobs/:jobId', async (c) => {
+  const projectId = c.req.param('id');
   const jobId = c.req.param('jobId');
+  const user = c.get('user');
+
+  const project = await repo.getProject(projectId);
+  if (!project) return c.json({ error: 'Project not found' }, 404);
+  if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
+
   const job = await repo.getJob(jobId);
   if (!job) return c.json({ error: 'Not found' }, 404);
   return c.json(job);
