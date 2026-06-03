@@ -79,7 +79,11 @@ export default function RouteBuilderV2() {
   // Recalculate route whenever waypoints or vehicle type changes
   useEffect(() => {
     if (waypoints.length >= 2) {
-      calculateLiveRoute();
+      // Use a small delay to avoid calling while state is still being set
+      const timer = setTimeout(() => {
+        doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype);
+      }, 100);
+      return () => clearTimeout(timer);
     } else {
       setGeometry(null);
     }
@@ -129,13 +133,14 @@ export default function RouteBuilderV2() {
     });
   };
 
-  const calculateLiveRoute = async () => {
+  const doCalculateLiveRoute = async (wps: typeof waypoints, vType: typeof vehicleType, bType: typeof bikeSubtype) => {
+    if (wps.length < 2) return;
     setIsRouting(true);
     try {
       const { data: session } = await supabase.auth.getSession();
       const token = session.session?.access_token || '';
 
-      const routeType = vehicleType === 'bicycle' ? bikeSubtype : vehicleType;
+      const routeType = vType === 'bicycle' ? bType : vType;
 
       const res = await fetch('/route-builder-api/live-route', {
         method: 'POST',
@@ -144,22 +149,23 @@ export default function RouteBuilderV2() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          points: waypoints,
+          points: wps,
           route_type: routeType,
-          surface_preferences: [], // can be derived from bikeSubtype later
+          surface_preferences: [],
           intent: inputNotes
         })
       });
 
-      if (!res.ok) throw new Error('Live routing failed');
+      if (!res.ok) throw new Error('Live routing failed: ' + res.status);
       const route = await res.json();
+      if (route.error) throw new Error(route.error);
+      
       if (route.geometry) {
         setGeometry(route.geometry);
-      } else if (route.trackPoints) {
-        // Build mock geometry from trackpoints if geometry is not standard
+      } else if (route.trackPoints && route.trackPoints.length > 0) {
         setGeometry({
-          type: "LineString",
-          coordinates: route.trackPoints.map((p: number[]) => [p[1], p[0]])
+          type: 'LineString',
+          coordinates: route.trackPoints.map((p: number[]) => [p[1], p[0]]) // [lat,lng] -> [lng,lat] for GeoJSON
         });
       }
     } catch (err: any) {
@@ -167,6 +173,10 @@ export default function RouteBuilderV2() {
     } finally {
       setIsRouting(false);
     }
+  };
+
+  const calculateLiveRoute = async () => {
+    doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype);
   };
 
   const clearRoute = () => {

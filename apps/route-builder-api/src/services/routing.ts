@@ -258,21 +258,21 @@ export class RoutingService {
       elevation: true
     };
 
-    if (routeType === 'hiking' && options?.intent) {
+    if ((routeType === 'hiking' || routeType === 'gravel') && options?.intent) {
       const wantsTrails = /grzbiet|szlak|trail|ridge|górsk|mountain/i.test(options.intent);
       const avoidsAsphalt = /asfalt|asphalt|droga|road/i.test(options.intent);
       
-      if (wantsTrails || avoidsAsphalt) {
+      if (wantsTrails || avoidsAsphalt || routeType === 'gravel') {
         body.custom_model = {
           priority: [
             { if: "road_class == TRACK", multiply_by: 3.0 },
-            { if: "road_class == PATH", multiply_by: 5.0 },
-            { if: "surface == ASPHALT", multiply_by: 0.1 },
-            { if: "surface == PAVED", multiply_by: 0.2 },
-            { if: "surface == GRAVEL || surface == DIRT || surface == GROUND", multiply_by: 2.0 }
+            { if: "road_class == PATH", multiply_by: 4.0 },
+            { if: "surface == ASPHALT", multiply_by: 0.2 },
+            { if: "surface == PAVED", multiply_by: 0.3 },
+            { if: "surface == GRAVEL || surface == DIRT || surface == GROUND || surface == COMPACTED", multiply_by: 2.5 }
           ]
         };
-        body.profile = 'hike';
+        if (routeType === 'hiking') body.profile = 'hike';
       }
     }
 
@@ -300,7 +300,11 @@ export class RoutingService {
     return {
       distance_km: parseFloat((path.distance / 1000).toFixed(2)),
       duration_h: parseFloat((path.time / 3600000).toFixed(2)),
-      trackPoints
+      trackPoints,
+      geometry: {
+        type: 'LineString',
+        coordinates: coordinates // already [lng, lat] from GraphHopper
+      }
     };
   }
 
