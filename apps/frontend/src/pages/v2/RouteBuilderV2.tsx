@@ -193,7 +193,9 @@ export default function RouteBuilderV2() {
           messages: newMessages, 
           project_id: projectId,
           input_notes: inputNotes,
-          current_waypoints: waypoints
+          current_waypoints: waypoints,
+          vehicle_type: vehicleType,
+          bike_subtype: vehicleType === 'bicycle' ? bikeSubtype : undefined
         }) 
       });
       const data = await response.json();
@@ -201,22 +203,34 @@ export default function RouteBuilderV2() {
       setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
       
       if (data.suggested_waypoints && data.suggested_waypoints.length > 0) {
-        setWaypoints(prev => {
-          const newWps = [...prev];
-          data.suggested_waypoints.forEach((swp: any) => {
-            if (newWps.length === 0) {
-              newWps.push({ lat: swp.lat, lng: swp.lng, type: 'start' });
-            } else if (newWps.length === 1) {
-              newWps.push({ lat: swp.lat, lng: swp.lng, type: 'end' });
-            } else {
-              const endWp = newWps.pop()!;
-              newWps.push({ lat: swp.lat, lng: swp.lng, type: 'waypoint' });
-              newWps.push(endWp);
-            }
+        if (data.done) {
+          // Gdy Agent wygenerował całą gotową trasę (done: true), nadpisujemy mapę
+          const newWps = data.suggested_waypoints.map((swp: any, index: number) => ({
+            lat: swp.lat,
+            lng: swp.lng,
+            type: index === 0 ? 'start' : (index === data.suggested_waypoints.length - 1 ? 'end' : 'waypoint')
+          }));
+          setWaypoints(newWps);
+          toast.success("Agent przygotował i naniósł całą trasę na mapę!");
+        } else {
+          // W trakcie rozmowy Agent sugeruje i "dokleja" punkty do istniejących
+          setWaypoints(prev => {
+            const newWps = [...prev];
+            data.suggested_waypoints.forEach((swp: any) => {
+              if (newWps.length === 0) {
+                newWps.push({ lat: swp.lat, lng: swp.lng, type: 'start' });
+              } else if (newWps.length === 1) {
+                newWps.push({ lat: swp.lat, lng: swp.lng, type: 'end' });
+              } else {
+                const endWp = newWps.pop()!;
+                newWps.push({ lat: swp.lat, lng: swp.lng, type: 'waypoint' });
+                newWps.push(endWp);
+              }
+            });
+            return newWps;
           });
-          return newWps;
-        });
-        toast.success("Agent dodał punkty na mapę!");
+          toast.success("Agent dodał punkty na mapę!");
+        }
       }
       
     } catch (err: any) {

@@ -34,11 +34,13 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages, project_id, input_notes, current_waypoints } = await c.req.json() as { 
+    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype } = await c.req.json() as { 
       messages: {role: string, text: string}[], 
       project_id?: string, 
       input_notes?: string,
-      current_waypoints?: {lat: number, lng: number}[] 
+      current_waypoints?: {lat: number, lng: number}[],
+      vehicle_type?: string,
+      bike_subtype?: string
     };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
@@ -66,6 +68,10 @@ Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
 
     if (current_waypoints && current_waypoints.length > 0) {
       projectContext += `\n\nUWAGA: Użytkownik postawił już na mapie ${current_waypoints.length} punktów.`;
+    }
+    
+    if (vehicle_type) {
+      projectContext += `\n\nUWAGA: Użytkownik ma wybrany pojazd: ${vehicle_type}${bike_subtype ? ` (typ: ${bike_subtype})` : ''}. Dopasuj do tego punkty!`;
     }
 
     const systemPrompt = `Jesteś ekspertem-przewodnikiem o nazwie Atlas Agent. 
@@ -99,8 +105,12 @@ ZASADY:
 - Gdy zdobędziesz WSZYSTKIE wymagane elementy, dopiero wtedy zwróć "done": true i sformatuj JSON.
 - Domyślny \`distance\` ustawiaj w km jako liczbę (np. "30").
 - Kategorie \`route_type\` do wyboru to wyłącznie: motorcycle, cycling, gravel, hiking, city_walk.
-- **DODAWANIE PUNKTÓW DO MAPY:** Jeśli z kontekstu rozmowy uważasz, że warto zasugerować/wstawić użytkownikowi na mapę jakiś konkretny punkt (np. miejscowość z której ma startować lub szczyt/przełęcz po drodze) i on jeszcze NIE został wstawiony, ZAWSZE dodaj do JSON-a tablicę "add_waypoints": ["Karpacz", "Śnieżka"]. Ja sam zamienię to na współrzędne i wstawię użytkownikowi.
-
+- **DODAWANIE PUNKTÓW DO MAPY:** Jeśli z kontekstu rozmowy w trakcie (done: false) uważasz, że warto zasugerować użytkownikowi jakiś punkt, dodaj do JSON-a "add_waypoints": ["Karpacz"].
+- **AUTONOMICZNE TWORZENIE TRASY (GDY DONE: TRUE):** To najważniejsza zasada. Kiedy kończysz wywiad (done: true), MUSISZ wygenerować w polu "add_waypoints" tablicę zawierającą **CAŁĄ PROPONOWANĄ TRASĘ**. Nie zwracaj tylko startu i końca!
+  - Dla PĘTLI: wymyśl logiczne 4-6 punktów przez które prowadzi pętla, kończąc tam gdzie start, np. \`"add_waypoints": ["Karpacz", "Schronisko nad Łomniczką", "Śnieżka", "Kopa", "Karpacz"]\`.
+  - Dla TRASY LINIOWEJ: podaj start, ciekawe punkty po drodze i metę.
+  - Wykaż się wiedzą przewodnika – dobierz punkty, które pasują do pojazdu użytkownika (np. na szosę nie dawaj schronisk w górach, na gravel dawaj szutry).
+  
 Oto historia czatu:
 ${conversationText}
 
@@ -112,20 +122,19 @@ Przykład, gdy dopytujesz i chcesz wstawić punkt by mu pomóc:
   "add_waypoints": ["Szklarska Poręba"]
 }
 
-Przykład, gdy masz KOMPLET danych:
+Przykład, gdy masz KOMPLET danych i ZWRACASZ PEŁNĄ TRASĘ (done: true):
 {
   "done": true,
-  "reply": "Wszystko jasne! Rozpoczynam planowanie trasy z Szklarskiej Poręby do Karpacza, ok. 50km, szlakami turystycznymi.",
+  "reply": "Wszystko jasne! Wytyczyłem rewelacyjną pętlę rowerową przez Karkonosze (ok. 50km). Dodałem na mapie kluczowe punkty, w tym Przełęcz Okraj. Zobacz, jak to wygląda!",
+  "add_waypoints": ["Karpacz", "Kowary", "Przełęcz Okraj", "Mala Upa", "Karpacz"],
   "extracted": {
-    "start_point": "Szklarska Poręba",
+    "start_point": "Karpacz",
     "end_point": "Karpacz",
-    "route_type": "hiking",
+    "route_type": "gravel",
     "distance": "50",
-    "intent": "trasa grzbietem Karkonoszy, szlakami turystycznymi, unikanie dróg asfaltowych",
-    "loop": false,
-    "key_waypoints": ["Szrenica", "Łabski Szczyt", "Wielki Szyszak", "Śnieżka"],
-    "surface_preferences": ["trail", "mountain_path"],
-    "difficulty": "moderate"
+    "intent": "pętla szutrowa 50km",
+    "loop": true,
+    "key_waypoints": ["Kowary", "Przełęcz Okraj", "Mala Upa"]
   }
 }`;
 
