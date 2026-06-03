@@ -90,7 +90,7 @@ ZASADY:
 - Gdy zdobędziesz WSZYSTKIE wymagane elementy, dopiero wtedy zwróć "done": true i sformatuj JSON.
 - Domyślny \`distance\` ustawiaj w km jako liczbę (np. "30").
 - Kategorie \`route_type\` do wyboru to wyłącznie: motorcycle, cycling, gravel, hiking, city_walk.
-${inputNotesContext}
+
 Oto historia czatu:
 ${conversationText}
 
