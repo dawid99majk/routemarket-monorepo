@@ -132,7 +132,7 @@ export default function RouteBuilderV2() {
         // Build mock geometry from trackpoints if geometry is not standard
         setGeometry({
           type: "LineString",
-          coordinates: route.trackPoints.map((p: any) => [p.lng, p.lat])
+          coordinates: route.trackPoints.map((p: number[]) => [p[1], p[0]])
         });
       }
     } catch (err: any) {

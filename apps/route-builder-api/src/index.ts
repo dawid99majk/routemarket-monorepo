@@ -34,23 +34,43 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages, project_id } = await c.req.json() as { messages: {role: string, text: string}[], project_id: string };
+    const { messages, project_id, input_notes } = await c.req.json() as { messages: {role: string, text: string}[], project_id: string, input_notes: string };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY");
     }
 
-    let inputNotesContext = '';
+    let projectContext = '';
     if (project_id) {
       try {
         const project = await repo.getProject(project_id);
-        if (project && project.requirements.input_notes) {
-          inputNotesContext = `\nPoczątkowe notatki użytkownika: "${project.requirements.input_notes}"\nUwzględnij te notatki w swoich decyzjach, NIE pytaj ponownie o informacje, które użytkownik już tam podał.\n`;
+        if (project) {
+          projectContext = `\nAktualny stan projektu:
+Trasa: z ${project.requirements.start_point || '?'} do ${project.requirements.end_point || '?'}
+Typ: ${project.requirements.route_type || '?'}
+Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
         }
       } catch (err) {
         console.warn('Could not fetch project for chat notes context', err);
       }
     }
+
+    if (input_notes) {
+      projectContext += `\n\nDodatkowe notatki wpisane obok mapy przez użytkownika:\n"${input_notes}"\nUwzględnij je podczas planowania trasy!\n`;
+    }
+
+    const systemPrompt = `Jesteś ekspertem-przewodnikiem o nazwie Atlas Agent. 
+Twoim celem jest ustalenie z użytkownikiem parametrów trasy. Rozmawiacie na ekranie kreatora trasy obok mapy.
+Odpowiadaj ZWIĘŹLE, maksymalnie 1-2 krótkie zdania. Bądź energiczny.${projectContext}
+
+Jeśli z zebranych informacji (rozmowa + notatki) jesteś w stanie ustalić:
+1. start_point (np. miasto)
+2. end_point (lub informację, że to pętla z powrotem)
+3. route_type (bicycling, motorcycling, hiking)
+4. distance_target_km (dystans)
+oraz key_waypoints (np. szczyty, przełęcze, wsie po drodze).
+
+...to zakończ rozmowę mówiąc, że masz wszystkie dane i zaraz zaczniesz budować trasę! Wypluj JSON-a.`;
 
     const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
     const prompt = `Jesteś dociekliwym i profesjonalnym ekspertem podróżniczym Atlas Agent. Twoim zadaniem jest zebranie informacji o planowanej trasie.
