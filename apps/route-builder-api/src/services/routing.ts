@@ -4,6 +4,10 @@ export interface RouteResult {
   distance_km: number;
   duration_h: number;
   trackPoints: [number, number][]; // [lat, lng]
+  geometry?: {
+    type: 'LineString';
+    coordinates: number[][];
+  };
 }
 
 export class RoutingService {
