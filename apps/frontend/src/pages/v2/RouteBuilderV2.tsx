@@ -216,9 +216,34 @@ export default function RouteBuilderV2() {
       setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
       
       if (data.done) {
-        setTimeout(() => {
+        setTimeout(async () => {
           if (projectId) {
-            startGeneration(projectId);
+            try {
+              const { data: session } = await supabase.auth.getSession();
+              const token = session.session?.access_token || '';
+              await fetch(`/route-builder-api/route-projects/${projectId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  route_type: data.extracted?.route_type || data.extracted?.category,
+                  start_point: data.extracted?.start_point || data.extracted?.startPoint,
+                  end_point: data.extracted?.end_point,
+                  distance_target_km: data.extracted?.distance ? parseInt(data.extracted.distance, 10) : undefined,
+                  difficulty: data.extracted?.difficulty,
+                  loop: data.extracted?.loop ?? (!data.extracted?.end_point),
+                  input_notes: data.extracted?.intent,
+                  surface_preferences: data.extracted?.surface_preferences,
+                  key_waypoints: data.extracted?.key_waypoints
+                })
+              });
+              startGeneration(projectId, token);
+            } catch (err) {
+              console.error('Failed to update project before generation', err);
+              startGeneration(projectId); // proceed anyway
+            }
           } else {
             // fallback if no project id
             startGenerationFallback(data.extracted);
