@@ -34,10 +34,22 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages } = await c.req.json() as { messages: {role: string, text: string}[] };
+    const { messages, project_id } = await c.req.json() as { messages: {role: string, text: string}[], project_id: string };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY");
+    }
+
+    let inputNotesContext = '';
+    if (project_id) {
+      try {
+        const project = await repo.getProject(project_id);
+        if (project && project.requirements.input_notes) {
+          inputNotesContext = `\nPoczątkowe notatki użytkownika: "${project.requirements.input_notes}"\nUwzględnij te notatki w swoich decyzjach, NIE pytaj ponownie o informacje, które użytkownik już tam podał.\n`;
+        }
+      } catch (err) {
+        console.warn('Could not fetch project for chat notes context', err);
+      }
     }
 
     const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
@@ -58,7 +70,7 @@ ZASADY:
 - Gdy zdobędziesz WSZYSTKIE wymagane elementy, dopiero wtedy zwróć "done": true i sformatuj JSON.
 - Domyślny \`distance\` ustawiaj w km jako liczbę (np. "30").
 - Kategorie \`route_type\` do wyboru to wyłącznie: motorcycle, cycling, gravel, hiking, city_walk.
-
+${inputNotesContext}
 Oto historia czatu:
 ${conversationText}
 
