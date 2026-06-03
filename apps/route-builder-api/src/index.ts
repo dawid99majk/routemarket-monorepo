@@ -97,7 +97,7 @@ Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
     const knowVehicle = !!vehicle_type;
     const knownCount = [knowStart, knowVehicle].filter(Boolean).length;
 
-    const prompt = `Jesteś ekspertem podróżniczym Atlas Agent. Twoje zadanie: zebrać dane o trasie i SZYBKO JĄ WYGENEROWAĆ.
+    const prompt = `Jesteś ekspertem podróżniczym i licencjonowanym przewodnikiem Atlas Agent. Twoje zadanie: zebrać dane o trasie, zaplanować PRZEMYŚLANĄ, CIEKAWĄ i spójną geograficznie trasę, a następnie SZYBKO JĄ WYGENEROWAĆ.
 
 ${projectContext}
 
@@ -117,19 +117,43 @@ MUSISZ JESZCZE ZEBRAĆ (jeśli nie padło w rozmowie):
 3. Pytaj tylko o JEDNO brakujące pole naraz.
 4. Bądź energiczny i konkretny, maksymalnie 2 zdania w odpowiedzi.
 
-=== ZASADY TWORZENIA TRASY (DONE: TRUE) ===
-Kategorie route_type: motorcycle, cycling, gravel, hiking, city_walk
+=== ZASADY SELEKCJI PUNKTÓW (JAKOŚĆ I LOGIKA) ===
+Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez znaczenia turystycznego! Zamiast tego dobieraj punkty reprezentujące rzeczywiste atrakcje, walory przyrodnicze lub znane szlaki dla danego pojazdu:
 
-Dla PĘTLI (najważniejsza zasada, OBOWIĄZKOWA!):
+1. pieszo (hiking / route_type = hiking):
+   - Szukaj: szczytów, przełęczy, schronisk turystycznych, wodospadów, formacji skalnych, polan leśnych, rezerwatów przyrody.
+   - BEZWZGLĘDNY zakaz prowadzenia tras po miastach i drogach asfaltowych (poza punktem startu/mety).
+   - PRZYKŁAD (Karkonosze z Karpacza): ["Karpacz, Świątynia Wang", "Schronisko Samotnia, Karpacz", "Schronisko Strzecha Akademicka, Karpacz", "Śnieżka, Karkonosze", "Schronisko nad Łomniczką, Karpacz", "Karpacz"]
+
+2. rower szutrowy/MTB (gravel/mtb / route_type = gravel):
+   - Szukaj: dróg pożarowych/leśnych, dróg szutrowych, grobli między stawami (np. Stawy Milickie), punktów widokowych, wiat turystycznych, jezior, rzek.
+   - Unikaj ruchliwych dróg krajowych (np. DK15, DK5 itp.) oraz bardzo trudnych technicznie szlaków pieszych (gdzie rower trzeba nieść).
+   - PRZYKŁAD (Stawy Milickie z Milicza): ["Milicz", "Stawy Milickie (Dyminy), Milicz", "Sułów (ścieżka rowerowa), Milicz", "Jaz Grabownica, Milicz", "Ostoja Konika Polskiego, Grabownica", "Milicz"]
+   
+3. rower szosowy (road / route_type = cycling):
+   - Szukaj: bocznych, mało ruchliwych dróg asfaltowych o dobrej nawierzchni, przełęczy drogowych, urokliwych małych miasteczek.
+   - BEZWZGLĘDNY zakaz wprowadzania dróg szutrowych/piaskowych.
+   
+4. motocykl (motorcycle / route_type = motorcycle):
+   - Szukaj: krętych, malowniczych szos (np. "Droga Stu Zakrętów", przełęcze górskie, serpentyny), zamków, zapór wodnych, jezior.
+   - BEZWZGLĘDNY zakaz dróg gruntowych i piaszczystych.
+   
+5. spacer miejski (city_walk / route_type = city_walk):
+   - Szukaj: rynków, zabytków architektonicznych, parków miejskich, tarasów widokowych, bulwarów, znanych kawiarni.
+   
+=== WAŻNE: FORMATOWANIE PUNKTÓW DLA GEOKODERA ===
+Aby geokoder bezbłędnie zlokalizował punkty pośrednie, każdy punkt w tablicy "add_waypoints" MUSI być podany w formacie:
+"NAZWA ATRAKCJI/PUNKTU, NAJBLIŻSZA MIEJSCOWOŚĆ lub REGION" (np. "Schronisko Odrodzenie, Karkonosze", "Wodospad Szklarki, Szklarska Poręba", "Zamek Chojnik, Jelenia Góra", "Postolin (wieża widokowa), Milicz").
+Unikaj podawania samych gołych, pospolitych nazw typu "Stawno" czy "Laskowa", bo geokoder znajdzie je w innej części Polski! Zawsze dodawaj kontekst geograficzny (np. "Stawno, Milicz" lub "Laskowa, Milicz").
+
+=== ZASADY TWORZENIA PĘTLI ===
+Dla PĘTLI (loop: true):
 - Pętla MUSI być OKRĘGIEM na mapie, nie linią tam i z powrotem!
-- Strategia: wyjeżdżamy z punktu A na PÓŁNOC lub WSCHÓD, okrążamy teren i wracamy z ZACHODU lub POŁUDNIA.
-- Minimum 8-12 punktów tworząc wyraźne koło.
-- PRZYKŁAD DOBREJ PĘTLI ~25km dla Milicza na gravelu:
-  ["Milicz", "Sułów", "Wziąchowo", "Laskowa", "Żmigród", "Postolin", "Stawno", "Milicz"]
-  (idzie na zachód, potem na południe przez rzekę Barycz, wraca z południa)
-- PRZYKŁAD ZŁY (TAM I Z POWROTEM): ["Milicz", "Sułów", "Cieszków", "Sułów", "Milicz"]
+- Strategia: wyjeżdżamy z punktu A w jednym kierunku (np. na północ), okrążamy teren przez ciekawe atrakcje i wracamy z przeciwnej strony (np. od południa).
+- Minimum 6-10 bogatych w atrakcje punktów pośrednich, aby ORS (routing) mógł wytyczyć idealny krąg. Pierwszy i ostatni element w "add_waypoints" muszą być takie same.
 
-Dla TRASY LINIOWEJ: start → gęste punkty po drodze → meta. Minimum 5 punktów na 20km.
+Dla TRASY LINIOWEJ (loop: false):
+- Start → ciekawe punkty po drodze → meta. Minimum 5 punktów na 20km.
 
 Oto historia czatu:
 ${conversationText}
@@ -142,11 +166,11 @@ Przykład gdy pytasz o brakujący dystans:
   "reply": "Świetnie! Widzę pinezkę w okolicach Milicza i wybrany Gravel. Jaki dystans planujesz — 25km, 40km, dłużej?"
 }
 
-Przykład gdy generujesz gotową pętle (done: true) — WŁAŚCIWY OKRĄG:
+Przykład gdy generujesz gotową pętlę (done: true) — WŁAŚCIWY OKRĄG:
 {
   "done": true,
   "reply": "Wytyczyłem rewelacyjną pętlę gravelową ~25km wokół Milicza! Trasa okrąża Stawy Milickie i wiedzie wzdłuż rzeki Barycz — mnóstwo szutru i brak asfaltu. Sprawdź mapę!",
-  "add_waypoints": ["Milicz", "Sułów", "Wziąchowo Wielkie", "Laskowa", "Żmigród", "Postolin", "Stawno", "Milicz"],
+  "add_waypoints": ["Milicz", "Stawno (stawy), Milicz", "Jaz Grabownica, Milicz", "Postolin, Milicz", "Sułów, Milicz", "Milicz"],
   "extracted": {
     "start_point": "Milicz",
     "end_point": "Milicz",
@@ -154,7 +178,7 @@ Przykład gdy generujesz gotową pętle (done: true) — WŁAŚCIWY OKRĄG:
     "distance": "25",
     "intent": "pętla gravelowa 25km Milicz Stawy Milickie Barycz",
     "loop": true,
-    "key_waypoints": ["Sułów", "Żmigród", "Stawy Milickie"]
+    "key_waypoints": ["Stawno, Milicz", "Jaz Grabownica, Milicz", "Sułów, Milicz"]
   }
 }`;
 
@@ -181,15 +205,37 @@ Przykład gdy generujesz gotową pętle (done: true) — WŁAŚCIWY OKRĄG:
       // Jeśli agent zasugerował dodanie waypointów, geokodujemy je przed zwróceniem na frontend
       if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
         const suggested_waypoints = [];
+        let biasPoint: {lat: number, lng: number} | undefined = undefined;
+        
+        if (current_waypoints && current_waypoints.length > 0) {
+          biasPoint = { lat: current_waypoints[0].lat, lng: current_waypoints[0].lng };
+        }
+        
+        // Jeśli nie mamy biasPoint z UI, spróbujmy geokodować pierwszy sugerowany punkt bez biasu i użyć go jako bias
+        if (!biasPoint && resultObj.add_waypoints.length > 0) {
+          try {
+            const firstPlace = await geocodingService.geocodeSinglePoint(resultObj.add_waypoints[0]);
+            if (firstPlace) {
+              biasPoint = { lat: firstPlace.lat, lng: firstPlace.lng };
+            }
+          } catch (e) {
+            console.error("Geocoding failed for initial bias point:", resultObj.add_waypoints[0], e);
+          }
+        }
+
         for (const placeName of resultObj.add_waypoints) {
           try {
-            const place = await geocodingService.geocodeSinglePoint(placeName);
+            const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint);
             if (place) {
               suggested_waypoints.push({
                 lat: place.lat,
                 lng: place.lng,
                 name: placeName
               });
+              // Aktualizujemy biasPoint na ostatnio znaleziony punkt, by kolejne punkty pętli były blisko siebie
+              if (!biasPoint) {
+                biasPoint = { lat: place.lat, lng: place.lng };
+              }
             }
           } catch (e) {
             console.error("Geocoding failed for place:", placeName, e);

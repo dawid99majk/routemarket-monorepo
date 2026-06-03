@@ -9,6 +9,18 @@ export interface GeocodedPlace {
   provider: string;
 }
 
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 export class GeocodingService {
   async geocodePoints(
     startPoint: string,
@@ -74,7 +86,15 @@ export class GeocodingService {
         if (res.ok) {
           const data = await res.json() as any;
           if (data.hits && data.hits.length > 0) {
-            const hit = data.hits[0];
+            let hits = data.hits;
+            if (biasPoint) {
+              hits = [...hits].sort((a, b) => {
+                const distA = getDistance(a.point.lat, a.point.lng, biasPoint.lat, biasPoint.lng);
+                const distB = getDistance(b.point.lat, b.point.lng, biasPoint.lat, biasPoint.lng);
+                return distA - distB;
+              });
+            }
+            const hit = hits[0];
             const displayName = [hit.name, hit.city, hit.country].filter(Boolean).join(', ');
             return {
               name: displayName || query,
@@ -93,15 +113,24 @@ export class GeocodingService {
 
     // 2. Fallback do OpenStreetMap Nominatim (darmowy i niezawodny)
     try {
-      console.log(`[Geocoding] Trying OSM Nominatim Geocoding for: "${query}"`);
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+      console.log(`[Geocoding] Trying OSM Nominatim Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
+      const limit = biasPoint ? 10 : 1;
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=${limit}`;
       const res = await fetch(url, {
         headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0' }
       });
       if (res.ok) {
         const data = await res.json() as any;
         if (data && data.length > 0) {
-          const item = data[0];
+          let item = data[0];
+          if (biasPoint && data.length > 1) {
+            const sorted = [...data].sort((a, b) => {
+              const distA = getDistance(parseFloat(a.lat), parseFloat(a.lon), biasPoint.lat, biasPoint.lng);
+              const distB = getDistance(parseFloat(b.lat), parseFloat(b.lon), biasPoint.lat, biasPoint.lng);
+              return distA - distB;
+            });
+            item = sorted[0];
+          }
           return {
             name: item.display_name || query,
             lat: parseFloat(item.lat),

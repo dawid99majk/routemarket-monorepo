@@ -13,8 +13,8 @@ export class WaypointEnrichmentService {
     
     // 1. Jeśli AI interview dostarczył key_waypoints → geokoduj je
     if (keyWaypoints && keyWaypoints.length > 0) {
-      // Ogranicz do 3 punktów ze względu na limit 5 punktów w GraphHopper API dla darmowych kont (Start + End + 3 punkty pośrednie = 5)
-      const limitedWaypoints = keyWaypoints.slice(0, 3);
+      // Ogranicz do 15 punktów ze względu na rozsądny limit zapytań do geokodera (ORS pozwala na 50 punktów)
+      const limitedWaypoints = keyWaypoints.slice(0, 15);
       console.log(`[WaypointEnrichment] Geocoding ${limitedWaypoints.length} key waypoints from AI...`);
       const geocoded = await Promise.all(
         limitedWaypoints.map(wp => geocodingService.geocodeSinglePoint(wp, { lat: startPoint.lat, lng: startPoint.lng }).catch(err => {
