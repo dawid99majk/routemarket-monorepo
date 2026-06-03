@@ -154,11 +154,11 @@ Przykład, gdy masz KOMPLET danych:
         const suggested_waypoints = [];
         for (const placeName of resultObj.add_waypoints) {
           try {
-            const places = await geocodingService.searchPlace(placeName);
-            if (places && places.length > 0) {
+            const place = await geocodingService.geocodeSinglePoint(placeName);
+            if (place) {
               suggested_waypoints.push({
-                lat: places[0].lat,
-                lng: places[0].lng,
+                lat: place.lat,
+                lng: place.lng,
                 name: placeName
               });
             }
