@@ -559,6 +559,19 @@ export default function RouteBuilderV2() {
                 >
                   Stwórz kolejną trasę
                 </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full text-slate-700 hover:text-slate-900"
+                  onClick={() => {
+                    setMode('interview');
+                    setChatMessages(prev => [
+                      ...prev, 
+                      { role: 'agent', text: 'Jasne, patrzę na Twoją wygenerowaną trasę. Co byś chciał(a) w niej zmienić?' }
+                    ]);
+                  }}
+                >
+                  Oceń i popraw z Agentem
+                </Button>
               </div>
             )}
           </Card>
@@ -566,7 +579,7 @@ export default function RouteBuilderV2() {
 
         {/* Right Panel - Map */}
         <div className="w-full lg:w-2/3 h-full relative z-0 animate-in fade-in duration-1000">
-          {(!geometry || mode !== 'done') && (
+          {(!geometry) && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] text-center p-8 rounded-2xl transition-all duration-700">
               <Map className="w-20 h-20 text-slate-400 mb-6 drop-shadow-md" strokeWidth={1} />
               <h3 className="text-2xl font-bold text-slate-800">Mapa Oczekuje</h3>
