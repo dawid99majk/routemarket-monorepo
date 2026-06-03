@@ -33,7 +33,21 @@ export class RoutingService {
     // Jeśli posiadamy klucz GraphHopper, odpytujemy prawdziwe API
     if (this.apiKey) {
       try {
-        return await this.fetchRealGraphHopperRoute(places, routeType, options);
+        // GraphHopper free tier: max 5 waypoints. Trim if needed while preserving start/end.
+        const MAX_GH_POINTS = 5;
+        let routePlaces = places;
+        if (places.length > MAX_GH_POINTS) {
+          const start = places[0];
+          const end = places[places.length - 1];
+          const middle = places.slice(1, -1);
+          const step = middle.length / (MAX_GH_POINTS - 2);
+          const sampled = Array.from({ length: MAX_GH_POINTS - 2 }, (_, i) => 
+            middle[Math.round(i * step)]
+          );
+          routePlaces = [start, ...sampled, end];
+          console.log(`[Routing] Trimmed ${places.length} waypoints to ${routePlaces.length} for GraphHopper free tier.`);
+        }
+        return await this.fetchRealGraphHopperRoute(routePlaces, routeType, options);
       } catch (err: any) {
         console.warn(`[Routing] GraphHopper request failed, falling back to mock: ${err.message}`);
       }
@@ -53,12 +67,16 @@ export class RoutingService {
       points.push([lat, lng]);
     }
 
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 200));
 
     return {
       distance_km: 12.5,
       duration_h: 3.5,
-      trackPoints: points
+      trackPoints: points,
+      geometry: {
+        type: 'LineString',
+        coordinates: points.map(p => [p[1], p[0]]) // [lat,lng] -> [lng,lat] GeoJSON
+      }
     };
   }
 
