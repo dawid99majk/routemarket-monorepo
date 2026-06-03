@@ -107,9 +107,9 @@ ZASADY:
 - Kategorie \`route_type\` do wyboru to wyłącznie: motorcycle, cycling, gravel, hiking, city_walk.
 - **DODAWANIE PUNKTÓW DO MAPY:** Jeśli z kontekstu rozmowy w trakcie (done: false) uważasz, że warto zasugerować użytkownikowi jakiś punkt, dodaj do JSON-a "add_waypoints": ["Karpacz"].
 - **AUTONOMICZNE TWORZENIE TRASY (GDY DONE: TRUE):** To najważniejsza zasada. Kiedy kończysz wywiad (done: true), MUSISZ wygenerować w polu "add_waypoints" tablicę zawierającą **CAŁĄ PROPONOWANĄ TRASĘ**. Nie zwracaj tylko startu i końca!
-  - Dla PĘTLI: wymyśl logiczne 4-6 punktów przez które prowadzi pętla, kończąc tam gdzie start, np. \`"add_waypoints": ["Karpacz", "Schronisko nad Łomniczką", "Śnieżka", "Kopa", "Karpacz"]\`.
-  - Dla TRASY LINIOWEJ: podaj start, ciekawe punkty po drodze i metę.
-  - Wykaż się wiedzą przewodnika – dobierz punkty, które pasują do pojazdu użytkownika (np. na szosę nie dawaj schronisk w górach, na gravel dawaj szutry).
+  - Dla PĘTLI: wymyśl od 8 do 15 logicznych punktów przez które prowadzi pętla, kończąc tam gdzie start. **ABY UNIKNĄĆ TRASY "TAM I Z POWROTEM"**, punkty muszą tworzyć szeroki, wyraźny okrąg na mapie (np. wyjazd jedną doliną, powrót inną). Wstawiaj gęsto punkty: nazwy wsi, przełęczy, szczytów, skrzyżowań szlaków. Np. \`["Karpacz", "Borowice", "Przesieka", "Przełęcz Karkonoska", "Śnieżne Kotły", "Śląski Dom", "Śnieżka", "Sowia Przełęcz", "Karpacz"]\`.
+  - Dla TRASY LINIOWEJ: podaj start, gęsto rozsiane ciekawe punkty po drodze i metę.
+  - Wykaż się wiedzą przewodnika – dobierz punkty, które pasują do pojazdu użytkownika.
   
 Oto historia czatu:
 ${conversationText}
