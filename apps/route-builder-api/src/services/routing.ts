@@ -10,7 +10,16 @@ export class RoutingService {
   private readonly apiKey = process.env.GRAPHHOPPER_API_KEY || '';
   private readonly baseUrl = 'https://graphhopper.com/api/1/route';
 
-  async getRoute(places: GeocodedPlace[], routeType: string): Promise<RouteResult> {
+  async getRoute(
+    places: GeocodedPlace[], 
+    routeType: string,
+    options?: {
+      intent?: string;
+      surfacePreferences?: string[];
+      distanceTargetKm?: number;
+      difficulty?: string;
+    }
+  ): Promise<RouteResult> {
     console.log(`[Routing] getRoute: Generating ${routeType} route for ${places.length} waypoints...`);
     
     if (places.length < 2) {
@@ -20,7 +29,7 @@ export class RoutingService {
     // Jeśli posiadamy klucz GraphHopper, odpytujemy prawdziwe API
     if (this.apiKey) {
       try {
-        return await this.fetchRealGraphHopperRoute(places, routeType);
+        return await this.fetchRealGraphHopperRoute(places, routeType, options);
       } catch (err: any) {
         console.warn(`[Routing] GraphHopper request failed, falling back to mock: ${err.message}`);
       }
@@ -231,16 +240,41 @@ export class RoutingService {
     ];
   }
 
-  private async fetchRealGraphHopperRoute(places: GeocodedPlace[], routeType: string): Promise<RouteResult> {
+  private async fetchRealGraphHopperRoute(
+    places: GeocodedPlace[], 
+    routeType: string,
+    options?: {
+      intent?: string;
+      surfacePreferences?: string[];
+    }
+  ): Promise<RouteResult> {
     const profile = this.mapProfile(routeType);
-    const body = {
+    const body: any = {
       points: places.map(p => [p.lng, p.lat]),
       profile: profile,
       locale: 'pl',
       points_encoded: false,
       instructions: false,
-      elevation: false
+      elevation: true
     };
+
+    if (routeType === 'hiking' && options?.intent) {
+      const wantsTrails = /grzbiet|szlak|trail|ridge|górsk|mountain/i.test(options.intent);
+      const avoidsAsphalt = /asfalt|asphalt|droga|road/i.test(options.intent);
+      
+      if (wantsTrails || avoidsAsphalt) {
+        body.custom_model = {
+          priority: [
+            { if: "road_class == TRACK", multiply_by: 3.0 },
+            { if: "road_class == PATH", multiply_by: 5.0 },
+            { if: "surface == ASPHALT", multiply_by: 0.1 },
+            { if: "surface == PAVED", multiply_by: 0.2 },
+            { if: "surface == GRAVEL || surface == DIRT || surface == GROUND", multiply_by: 2.0 }
+          ]
+        };
+        body.profile = 'hike';
+      }
+    }
 
     const url = `${this.baseUrl}?key=${this.apiKey}`;
     const res = await fetch(url, {
@@ -274,6 +308,7 @@ export class RoutingService {
     switch (routeType) {
       case 'motorcycle': return 'car';
       case 'cycling': return 'bike';
+      case 'gravel': return 'bike';
       case 'hiking':
       case 'city_walk':
       default:

@@ -42,16 +42,20 @@ app.post('/chat-interview', async (c) => {
 
     const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
     const prompt = `Jesteś dociekliwym i profesjonalnym ekspertem podróżniczym Atlas Agent. Twoim zadaniem jest zebranie informacji o planowanej trasie.
-ABY ZAKOŃCZYĆ WYWIAD, MUSISZ ZEBRAĆ DOKŁADNIE 4 INFORMACJE:
-1. Lokalizacja (skąd użytkownik wyrusza lub po jakim regionie chce podróżować).
+ABY ZAKOŃCZYĆ WYWIAD, MUSISZ ZEBRAĆ DOKŁADNIE 5 INFORMACJI:
+1. PRECYZYJNY punkt startowy (konkretna miejscowość, parking, schronisko — NIE region). Jeśli użytkownik podaje region (np. "Karkonosze"), zapytaj skąd dokładnie startujemy.
 2. Środek transportu / Typ trasy (np. rower szosowy, motocykl, auto, pieszo).
 3. Oczekiwany dystans (w kilometrach) lub czas trwania (np. "20km", "na cały dzień").
-4. Specjalne preferencje / trudność (np. poziom trudności, co chce zobaczyć, czy chce pętlę, z dziećmi, strome podjazdy).
+4. Punkt końcowy LUB zgoda na pętlę. Jeśli to trasa liniowa (np. "grzbietem"), spytaj o punkt końcowy.
+5. Specjalne preferencje / charakter terenu (np. "grzbietem", "leśnymi drogami", "unikaj asfaltu", "szlaki turystyczne"). To KLUCZOWE.
 
 ZASADY:
 - Nie kończ wywiadu, dopóki użytkownik nie określi dystansu/czasu oraz specjalnych preferencji!
+- Gdy użytkownik mówi o KONKRETNYM szlaku (np. "grzbiet Karkonoszy", "Główny Szlak Sudecki"), zaproponuj znane punkty pośrednie (np. Szrenica, Śnieżka, Karpacz).
+- Wyodrębnij PUNKT STARTOWY i PUNKT KOŃCOWY jako osobne pola.
+- Jeśli użytkownik chce trasę "grzbietem" lub "wzdłuż czegoś", to NIE jest pętla — to trasa liniowa.
 - Zadawaj tylko JEDNO, maksymalnie DWA krótkie pytania naraz.
-- Gdy zdobędziesz WSZYSTKIE 4 elementy, dopiero wtedy zwróć "done": true i sformatuj JSON.
+- Gdy zdobędziesz WSZYSTKIE wymagane elementy, dopiero wtedy zwróć "done": true i sformatuj JSON.
 - Domyślny \`distance\` ustawiaj w km jako liczbę (np. "30").
 - Kategorie \`route_type\` do wyboru to wyłącznie: motorcycle, cycling, gravel, hiking, city_walk.
 
@@ -59,21 +63,26 @@ Oto historia czatu:
 ${conversationText}
 
 Odpowiedz ZAWSZE W FORMACIE JSON (bez znaczników markdown, czysty json):
-Przykład, gdy brakuje dystansu:
+Przykład, gdy brakuje dystansu i startu:
 {
   "done": false,
-  "reply": "Super, Karkonosze pieszo to wspaniały wybór! Jaki dystans w kilometrach planujesz przejść i czy masz jakieś życzenia (np. trudniejsze szlaki czy spacerowo)?"
+  "reply": "Super, Karkonosze pieszo to wspaniały wybór! Z jakiej miejscowości chciałbyś wystartować i na jaki dystans (w km) się nastawiasz?"
 }
 
-Przykład, gdy masz KOMPLET 4 danych:
+Przykład, gdy masz KOMPLET danych:
 {
   "done": true,
-  "reply": "Wszystko jasne! Rozpoczynam planowanie trasy: Karkonosze pieszo, ok. 15km, z ominięciem stromych podejść.",
+  "reply": "Wszystko jasne! Rozpoczynam planowanie trasy z Szklarskiej Poręby do Karpacza, ok. 50km, szlakami turystycznymi.",
   "extracted": {
-    "start_point": "Karkonosze",
+    "start_point": "Szklarska Poręba",
+    "end_point": "Karpacz",
     "route_type": "hiking",
-    "distance": "15",
-    "intent": "omijanie stromych podejść, spacerowo"
+    "distance": "50",
+    "intent": "trasa grzbietem Karkonoszy, szlakami turystycznymi, unikanie dróg asfaltowych",
+    "loop": false,
+    "key_waypoints": ["Szrenica", "Łabski Szczyt", "Wielki Szyszak", "Śnieżka"],
+    "surface_preferences": ["trail", "mountain_path"],
+    "difficulty": "moderate"
   }
 }`;
 
@@ -454,7 +463,10 @@ app.post('/route-projects/:id/jobs', async (c) => {
       try {
         const places = await geocodingService.geocodePoints(reqs.start_point || '', reqs.end_point, { 
           loop: reqs.loop,
-          distanceTargetKm: reqs.distance_target_km 
+          distanceTargetKm: reqs.distance_target_km,
+          intent: reqs.input_notes || '',
+          routeType: reqs.route_type,
+          keyWaypoints: reqs.key_waypoints || []
         });
         await repo.updateJobState(job.id, { 
           progress: 30, 
@@ -462,7 +474,12 @@ app.post('/route-projects/:id/jobs', async (c) => {
           human_message: 'Wyznaczanie trasy...' 
         });
 
-        const route = await routingService.getRoute(places, reqs.route_type);
+        const route = await routingService.getRoute(places, reqs.route_type, {
+          intent: reqs.input_notes || '',
+          surfacePreferences: reqs.surface_preferences || [],
+          distanceTargetKm: reqs.distance_target_km || undefined,
+          difficulty: reqs.difficulty
+        });
         await repo.updateJobState(job.id, { 
           progress: 60, 
           current_step: 'building_artifacts', 

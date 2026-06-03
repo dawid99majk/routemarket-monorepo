@@ -72,7 +72,7 @@ function UnifiedMap({ geometry, start, end, midpoint }: any) {
 
       <div className="absolute bottom-6 left-6 flex gap-3 z-[1000]">
         <Badge variant="outline" className="bg-white/80 border-emerald-500/30 text-emerald-600 backdrop-blur-xl py-1.5 px-4 rounded-full shadow-lg">
-          <MapPin className="w-3 h-3 mr-2" /> Google Routes
+          <MapPin className="w-3 h-3 mr-2" /> GraphHopper
         </Badge>
         <Badge variant="outline" className="bg-white/80 border-purple-500/30 text-purple-600 backdrop-blur-xl py-1.5 px-4 rounded-full shadow-lg">
           <Sparkles className="w-3 h-3 mr-2" /> Deep Research AI
@@ -168,7 +168,7 @@ export default function RouteBuilderV2() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          route_type: 'motorcycle', // default
+          route_type: 'hiking', // default zmieniony na bezpieczniejszy
           difficulty: 'moderate',
           input_notes: inputNotes,
           source_links: sourceLinks,
@@ -246,10 +246,15 @@ export default function RouteBuilderV2() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          route_type: extracted?.category || 'motorcycle',
-          start_point: extracted?.startPoint || 'Warszawa',
-          distance_target_km: parseInt(extracted?.distance || '100', 10),
-          difficulty: 'moderate'
+          route_type: extracted?.route_type || extracted?.category || 'hiking',
+          start_point: extracted?.start_point || extracted?.startPoint || null,
+          end_point: extracted?.end_point || null,
+          distance_target_km: parseInt(extracted?.distance || '30', 10),
+          difficulty: extracted?.difficulty || 'moderate',
+          loop: extracted?.loop ?? (!extracted?.end_point),
+          input_notes: extracted?.intent || '',
+          surface_preferences: extracted?.surface_preferences || [],
+          key_waypoints: extracted?.key_waypoints || []
         })
       });
 

@@ -1,3 +1,5 @@
+import { waypointEnrichmentService } from './waypoint-enrichment.js';
+
 export interface GeocodedPlace {
   name: string;
   lat: number;
@@ -11,7 +13,7 @@ export class GeocodingService {
   async geocodePoints(
     startPoint: string,
     endPoint?: string | null,
-    options: { loop?: boolean; distanceTargetKm?: number | null } = {}
+    options: { loop?: boolean; distanceTargetKm?: number | null; intent?: string; routeType?: string; keyWaypoints?: string[] } = {}
   ): Promise<GeocodedPlace[]> {
     console.log(`[Geocoding] Geocoding startPoint: "${startPoint}", endPoint: "${endPoint || 'None'}"...`);
     
@@ -23,32 +25,41 @@ export class GeocodingService {
       
       if (endPoint) {
         const endPlace = await this.geocodeSinglePoint(endPoint);
-        places.push(endPlace);
-      } else if (options.loop) {
-        // Generujemy dynamiczny punkt kontrolny pętli w pobliżu punktu startowego
-        // Aby uzyskać pętlę o dystansie X, potrzebujemy segmentu X/2.
-        // Przesunięcie o D stopni w lat i lng daje segment D * 1.41 * 111 km.
-        // D = (X/2) / (1.41 * 111) = X / 314.
-        const targetOffset = options.distanceTargetKm ? options.distanceTargetKm / 314 : 0.015;
         
-        places.push({
-          name: `${startPlace.name} - punkt kontrolny pętli (${options.distanceTargetKm || '?'} km)`,
-          lat: startPlace.lat + targetOffset,
-          lng: startPlace.lng + targetOffset,
-          confidence: 0.85,
-          source: 'ai_suggested_loop',
-          provider: startPlace.provider
-        });
-
-        // Powrót do startu dla pętli
-        places.push(startPlace);
+        if (options.intent || (options.keyWaypoints && options.keyWaypoints.length > 0)) {
+          return await waypointEnrichmentService.enrichWaypoints(
+            startPlace, endPlace, 
+            options.intent || '', options.routeType || 'hiking', options.distanceTargetKm || 0, options.keyWaypoints
+          );
+        } else {
+          places.push(endPlace);
+        }
+      } else if (options.loop) {
+        if (options.intent || (options.keyWaypoints && options.keyWaypoints.length > 0)) {
+          const enriched = await waypointEnrichmentService.enrichWaypoints(
+            startPlace, startPlace, 
+            options.intent || '', options.routeType || 'hiking', options.distanceTargetKm || 0, options.keyWaypoints
+          );
+          places.push(...enriched.slice(1)); 
+        } else {
+          const targetOffset = options.distanceTargetKm ? options.distanceTargetKm / 314 : 0.015;
+          places.push({
+            name: `${startPlace.name} - punkt kontrolny pętli (${options.distanceTargetKm || '?'} km)`,
+            lat: startPlace.lat + targetOffset,
+            lng: startPlace.lng + targetOffset,
+            confidence: 0.85,
+            source: 'ai_suggested_loop',
+            provider: startPlace.provider
+          });
+          places.push(startPlace);
+        }
       }
     }
     
     return places;
   }
 
-  private async geocodeSinglePoint(query: string): Promise<GeocodedPlace> {
+  async geocodeSinglePoint(query: string): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
     
     // 1. Próba GraphHopper Geocoding
