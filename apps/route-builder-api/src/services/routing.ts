@@ -217,7 +217,7 @@ export class RoutingService {
   }
 
   async getRouteAlternatives(places: GeocodedPlace[], routeType: string, preferences: string[] = []): Promise<any[]> {
-    console.log(`[Routing] getRouteAlternatives: Generating 3 alternatives for ${routeType} (API key present: ${!!this.apiKey})...`);
+    console.log(`[Routing] getRouteAlternatives: Generating 3 alternatives for ${routeType} (ORS key present: ${!!this.orsApiKey})...`);
     
     if (places.length < 2) {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
