@@ -63,38 +63,44 @@ Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
     }
 
     if (input_notes) {
-      projectContext += `\n\nDodatkowe notatki wpisane obok mapy przez użytkownika:\n"${input_notes}"\nUwzględnij je podczas planowania trasy!\n`;
+      projectContext += `\n\n[KONTEKST UI] Notatki wpisane obok mapy przez użytkownika:\n"${input_notes}"\nUwzględnij je bezwzględnie!`;
     }
 
     if (current_waypoints && current_waypoints.length > 0) {
-      projectContext += `\n\nUWAGA: Użytkownik postawił już na mapie ${current_waypoints.length} punktów.`;
+      projectContext += `\n\n[KONTEKST UI] Użytkownik postawił już na mapie ${current_waypoints.length} punkt(ów).`;
+      
+      try {
+        const startWp = current_waypoints[0];
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${startWp.lat}&lon=${startWp.lng}&format=json`, {
+          headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0' }
+        });
+        if (res.ok) {
+          const geocodeData = await res.json() as any;
+          if (geocodeData && geocodeData.address) {
+            const placeName = geocodeData.address.city || geocodeData.address.town || geocodeData.address.village || geocodeData.name || 'nieznane miejsce';
+            projectContext += ` Zidentyfikowano ten punkt jako okolice: **${placeName}**. Użyj tego jako PUNKT STARTOWY. Nie pytaj już o miejsce startu!`;
+          }
+        }
+      } catch (err) {
+        console.warn("Reverse geocoding failed", err);
+      }
     }
     
     if (vehicle_type) {
-      projectContext += `\n\nUWAGA: Użytkownik ma wybrany pojazd: ${vehicle_type}${bike_subtype ? ` (typ: ${bike_subtype})` : ''}. Dopasuj do tego punkty!`;
+      projectContext += `\n\n[KONTEKST UI] Użytkownik ma zaznaczony typ pojazdu w aplikacji: **${vehicle_type}${bike_subtype ? ` (typ: ${bike_subtype})` : ''}**. Nie pytaj już o środek transportu!`;
     }
-
-    const systemPrompt = `Jesteś ekspertem-przewodnikiem o nazwie Atlas Agent. 
-Twoim celem jest ustalenie z użytkownikiem parametrów trasy. Rozmawiacie na ekranie kreatora trasy obok mapy.
-Odpowiadaj ZWIĘŹLE, maksymalnie 1-2 krótkie zdania. Bądź energiczny.${projectContext}
-
-Jeśli z zebranych informacji (rozmowa + notatki) jesteś w stanie ustalić:
-1. start_point (np. miasto)
-2. end_point (lub informację, że to pętla z powrotem)
-3. route_type (bicycling, motorcycling, hiking)
-4. distance_target_km (dystans)
-oraz key_waypoints (np. szczyty, przełęcze, wsie po drodze).
-
-...to zakończ rozmowę mówiąc, że masz wszystkie dane i zaraz zaczniesz budować trasę! Wypluj JSON-a.`;
 
     const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
     const prompt = `Jesteś dociekliwym i profesjonalnym ekspertem podróżniczym Atlas Agent. Twoim zadaniem jest zebranie informacji o planowanej trasie.
+    
+${projectContext}
+
 ABY ZAKOŃCZYĆ WYWIAD, MUSISZ ZEBRAĆ DOKŁADNIE 5 INFORMACJI:
-1. PRECYZYJNY punkt startowy (konkretna miejscowość, parking, schronisko — NIE region). Jeśli użytkownik podaje region (np. "Karkonosze"), zapytaj skąd dokładnie startujemy.
-2. Środek transportu / Typ trasy (np. rower szosowy, motocykl, auto, pieszo).
-3. Oczekiwany dystans (w kilometrach) lub czas trwania (np. "20km", "na cały dzień").
-4. Punkt końcowy LUB zgoda na pętlę. Jeśli to trasa liniowa (np. "grzbietem"), spytaj o punkt końcowy.
-5. Specjalne preferencje / charakter terenu (np. "grzbietem", "leśnymi drogami", "unikaj asfaltu", "szlaki turystyczne"). To KLUCZOWE.
+1. PRECYZYJNY punkt startowy (konkretna miejscowość). Jeśli użytkownik postawił pinezkę (patrz KONTEKST UI), UZNAJ TO ZA ZAŁATWIONE i nie pytaj o start!
+2. Środek transportu / Typ trasy. Jeśli użytkownik wybrał go w interfejsie (patrz KONTEKST UI), UZNAJ TO ZA ZAŁATWIONE i nie pytaj!
+3. Oczekiwany dystans (w kilometrach) lub czas trwania.
+4. Punkt końcowy LUB zgoda na pętlę. 
+5. Specjalne preferencje / charakter terenu. To KLUCZOWE.
 
 ZASADY:
 - Nie kończ wywiadu, dopóki użytkownik nie określi dystansu/czasu oraz specjalnych preferencji!
