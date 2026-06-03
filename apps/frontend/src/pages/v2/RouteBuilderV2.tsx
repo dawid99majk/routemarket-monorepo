@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 
 // Leaflet Components
-import { MapContainer, TileLayer, Polyline, Marker, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -102,6 +102,33 @@ export default function RouteBuilderV2() {
     });
   };
 
+  const handleMarkerDrag = (index: number, e: any) => {
+    const newPos = e.target.getLatLng();
+    setWaypoints(prev => {
+      const newWps = [...prev];
+      newWps[index] = { ...newWps[index], lat: newPos.lat, lng: newPos.lng };
+      return newWps;
+    });
+  };
+
+  const handleRemoveWaypoint = (index: number) => {
+    setWaypoints(prev => {
+      const newWps = [...prev];
+      newWps.splice(index, 1);
+      // Re-assign types based on length
+      if (newWps.length === 1) {
+        newWps[0].type = 'start';
+      } else if (newWps.length > 1) {
+        newWps[0].type = 'start';
+        newWps[newWps.length - 1].type = 'end';
+        for (let i = 1; i < newWps.length - 1; i++) {
+          newWps[i].type = 'waypoint';
+        }
+      }
+      return newWps;
+    });
+  };
+
   const calculateLiveRoute = async () => {
     setIsRouting(true);
     try {
@@ -165,13 +192,32 @@ export default function RouteBuilderV2() {
         body: JSON.stringify({ 
           messages: newMessages, 
           project_id: projectId,
-          // Dodatkowy fallback: przekazanie notatek bezposrednio w body
-          input_notes: inputNotes
+          input_notes: inputNotes,
+          current_waypoints: waypoints
         }) 
       });
       const data = await response.json();
       
       setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
+      
+      if (data.suggested_waypoints && data.suggested_waypoints.length > 0) {
+        setWaypoints(prev => {
+          const newWps = [...prev];
+          data.suggested_waypoints.forEach((swp: any) => {
+            if (newWps.length === 0) {
+              newWps.push({ lat: swp.lat, lng: swp.lng, type: 'start' });
+            } else if (newWps.length === 1) {
+              newWps.push({ lat: swp.lat, lng: swp.lng, type: 'end' });
+            } else {
+              const endWp = newWps.pop()!;
+              newWps.push({ lat: swp.lat, lng: swp.lng, type: 'waypoint' });
+              newWps.push(endWp);
+            }
+          });
+          return newWps;
+        });
+        toast.success("Agent dodał punkty na mapę!");
+      }
       
     } catch (err: any) {
       toast.error(err.message);
@@ -361,10 +407,28 @@ export default function RouteBuilderV2() {
 
           {waypoints.map((wp, i) => (
             <Marker 
-              key={i} 
+              key={`${i}-${wp.lat}-${wp.lng}`} 
               position={[wp.lat, wp.lng]} 
               icon={wp.type === 'start' ? startIcon : (wp.type === 'end' ? endIcon : wpIcon)}
-            />
+              draggable={true}
+              eventHandlers={{
+                dragend: (e) => handleMarkerDrag(i, e)
+              }}
+            >
+              <Popup>
+                <div className="text-center">
+                  <p className="text-sm font-semibold mb-2">Punkt trasy</p>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={() => handleRemoveWaypoint(i)}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" /> Usuń punkt
+                  </Button>
+                </div>
+              </Popup>
+            </Marker>
           ))}
           
           <MapResizer geometry={geometry} />

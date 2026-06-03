@@ -34,7 +34,12 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages, project_id, input_notes } = await c.req.json() as { messages: {role: string, text: string}[], project_id: string, input_notes: string };
+    const { messages, project_id, input_notes, current_waypoints } = await c.req.json() as { 
+      messages: {role: string, text: string}[], 
+      project_id?: string, 
+      input_notes?: string,
+      current_waypoints?: {lat: number, lng: number}[] 
+    };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY");
@@ -57,6 +62,10 @@ Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
 
     if (input_notes) {
       projectContext += `\n\nDodatkowe notatki wpisane obok mapy przez użytkownika:\n"${input_notes}"\nUwzględnij je podczas planowania trasy!\n`;
+    }
+
+    if (current_waypoints && current_waypoints.length > 0) {
+      projectContext += `\n\nUWAGA: Użytkownik postawił już na mapie ${current_waypoints.length} punktów.`;
     }
 
     const systemPrompt = `Jesteś ekspertem-przewodnikiem o nazwie Atlas Agent. 
@@ -90,15 +99,17 @@ ZASADY:
 - Gdy zdobędziesz WSZYSTKIE wymagane elementy, dopiero wtedy zwróć "done": true i sformatuj JSON.
 - Domyślny \`distance\` ustawiaj w km jako liczbę (np. "30").
 - Kategorie \`route_type\` do wyboru to wyłącznie: motorcycle, cycling, gravel, hiking, city_walk.
+- **DODAWANIE PUNKTÓW DO MAPY:** Jeśli z kontekstu rozmowy uważasz, że warto zasugerować/wstawić użytkownikowi na mapę jakiś konkretny punkt (np. miejscowość z której ma startować lub szczyt/przełęcz po drodze) i on jeszcze NIE został wstawiony, ZAWSZE dodaj do JSON-a tablicę "add_waypoints": ["Karpacz", "Śnieżka"]. Ja sam zamienię to na współrzędne i wstawię użytkownikowi.
 
 Oto historia czatu:
 ${conversationText}
 
 Odpowiedz ZAWSZE W FORMACIE JSON (bez znaczników markdown, czysty json):
-Przykład, gdy brakuje dystansu i startu:
+Przykład, gdy dopytujesz i chcesz wstawić punkt by mu pomóc:
 {
   "done": false,
-  "reply": "Super, Karkonosze pieszo to wspaniały wybór! Z jakiej miejscowości chciałbyś wystartować i na jaki dystans (w km) się nastawiasz?"
+  "reply": "Super, Karkonosze pieszo to wspaniały wybór! Pozwól, że zaznaczę Ci Szklarską Porębę jako punkt startowy na mapie. Jaki dystans planujesz?",
+  "add_waypoints": ["Szklarska Poręba"]
 }
 
 Przykład, gdy masz KOMPLET danych:
@@ -136,7 +147,29 @@ Przykład, gdy masz KOMPLET danych:
     
     if (generatedText) {
       const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
-      return c.json(JSON.parse(cleanText));
+      const resultObj = JSON.parse(cleanText);
+      
+      // Jeśli agent zasugerował dodanie waypointów, geokodujemy je przed zwróceniem na frontend
+      if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
+        const suggested_waypoints = [];
+        for (const placeName of resultObj.add_waypoints) {
+          try {
+            const places = await geocodingService.searchPlace(placeName);
+            if (places && places.length > 0) {
+              suggested_waypoints.push({
+                lat: places[0].lat,
+                lng: places[0].lng,
+                name: placeName
+              });
+            }
+          } catch (e) {
+            console.error("Geocoding failed for place:", placeName, e);
+          }
+        }
+        resultObj.suggested_waypoints = suggested_waypoints;
+      }
+
+      return c.json(resultObj);
     }
     throw new Error("No text from Gemini");
   } catch (err: any) {
