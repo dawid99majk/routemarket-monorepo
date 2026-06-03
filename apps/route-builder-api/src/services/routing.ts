@@ -11,8 +11,11 @@ export interface RouteResult {
 }
 
 export class RoutingService {
-  private readonly apiKey = process.env.GRAPHHOPPER_API_KEY || '';
-  private readonly baseUrl = 'https://graphhopper.com/api/1/route';
+  private readonly orsApiKey = process.env.OPENROUTESERVICE_API_KEY || '';
+  private readonly orsBaseUrl = 'https://api.openrouteservice.org/v2/directions';
+  // GraphHopper kept as fallback
+  private readonly ghApiKey = process.env.GRAPHHOPPER_API_KEY || '';
+  private readonly ghBaseUrl = 'https://graphhopper.com/api/1/route';
 
   async getRoute(
     places: GeocodedPlace[], 
@@ -30,10 +33,18 @@ export class RoutingService {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
     }
 
-    // Jeśli posiadamy klucz GraphHopper, odpytujemy prawdziwe API
-    if (this.apiKey) {
+    // PRIMARY: OpenRouteService (50 waypoints, cycling-mountain profile for gravel)
+    if (this.orsApiKey) {
       try {
-        // GraphHopper free tier: max 5 waypoints. Trim if needed while preserving start/end.
+        return await this.fetchOrsRoute(places, routeType, options);
+      } catch (err: any) {
+        console.warn(`[Routing] ORS request failed, trying GraphHopper: ${err.message}`);
+      }
+    }
+
+    // SECONDARY: GraphHopper (max 5 waypoints on free tier)
+    if (this.ghApiKey) {
+      try {
         const MAX_GH_POINTS = 5;
         let routePlaces = places;
         if (places.length > MAX_GH_POINTS) {
@@ -45,20 +56,20 @@ export class RoutingService {
             middle[Math.round(i * step)]
           );
           routePlaces = [start, ...sampled, end];
-          console.log(`[Routing] Trimmed ${places.length} waypoints to ${routePlaces.length} for GraphHopper free tier.`);
+          console.log(`[Routing] Trimmed to ${routePlaces.length} for GH free tier.`);
         }
-        return await this.fetchRealGraphHopperRoute(routePlaces, routeType, options);
+        return await this.fetchGraphHopperRoute(routePlaces, routeType, options);
       } catch (err: any) {
-        console.warn(`[Routing] GraphHopper request failed, falling back to mock: ${err.message}`);
+        console.warn(`[Routing] GraphHopper also failed, using mock: ${err.message}`);
       }
     }
 
-    // Fallback: Matematycznie generowana trasa demo
+    // FALLBACK: Mathematical mock route
     const start = places[0];
     const end = places[places.length - 1];
     
     const points: [number, number][] = [];
-    const steps = 12;
+    const steps = 20;
     for (let i = 0; i <= steps; i++) {
       const ratio = i / steps;
       const wave = Math.sin(ratio * Math.PI) * 0.004;
@@ -75,8 +86,133 @@ export class RoutingService {
       trackPoints: points,
       geometry: {
         type: 'LineString',
-        coordinates: points.map(p => [p[1], p[0]]) // [lat,lng] -> [lng,lat] GeoJSON
+        coordinates: points.map(p => [p[1], p[0]])
       }
+    };
+  }
+
+  private mapOrsProfile(routeType: string): string {
+    switch (routeType) {
+      case 'motorcycle': return 'driving-car';
+      case 'cycling':    return 'cycling-regular';
+      case 'gravel':     return 'cycling-mountain'; // Best for gravel/MTB!
+      case 'mtb':        return 'cycling-mountain';
+      case 'hiking':     return 'foot-hiking';
+      case 'city_walk':  return 'foot-walking';
+      default:           return 'cycling-mountain';
+    }
+  }
+
+  private async fetchOrsRoute(
+    places: GeocodedPlace[],
+    routeType: string,
+    options?: { intent?: string; surfacePreferences?: string[] }
+  ): Promise<RouteResult> {
+    const profile = this.mapOrsProfile(routeType);
+    
+    // ORS expects [lng, lat] coordinate pairs
+    const coordinates = places.map(p => [p.lng, p.lat]);
+
+    const body: any = {
+      coordinates,
+      instructions: false,
+      elevation: true,
+      units: 'km',
+      language: 'pl'
+    };
+
+    // For gravel/mountain biking: prefer unpaved surfaces
+    if (routeType === 'gravel' || routeType === 'mtb') {
+      body.options = {
+        avoid_features: ['ferries'],
+        profile_params: {
+          weightings: {
+            // steepness_difficulty: { level: 1 } // optional for MTB
+          }
+        }
+      };
+    }
+
+    const url = `${this.orsBaseUrl}/${profile}/geojson`;
+    console.log(`[ORS] Routing via profile=${profile} with ${places.length} waypoints`);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': this.orsApiKey
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`ORS API returned ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json() as any;
+    const feature = data.features?.[0];
+    if (!feature) throw new Error('ORS returned no features.');
+
+    const coordinates_out = feature.geometry.coordinates as number[][];
+    const trackPoints = coordinates_out.map(c => [c[1], c[0]] as [number, number]);
+    const summary = feature.properties?.summary;
+
+    console.log(`[ORS] Route OK: ${summary?.distance?.toFixed(1)}km, ${summary?.duration?.toFixed(0)}s`);
+
+    return {
+      distance_km: parseFloat(((summary?.distance || 0) / 1000).toFixed(2)),
+      duration_h: parseFloat(((summary?.duration || 0) / 3600).toFixed(2)),
+      trackPoints,
+      geometry: feature.geometry // GeoJSON LineString [lng, lat] - correct for GeoJSON
+    };
+  }
+
+  private async fetchGraphHopperRoute(
+    places: GeocodedPlace[], 
+    routeType: string,
+    options?: {
+      intent?: string;
+      surfacePreferences?: string[];
+    }
+  ): Promise<RouteResult> {
+    const profileMap: Record<string, string> = {
+      motorcycle: 'car', cycling: 'bike', gravel: 'bike', hiking: 'hike', city_walk: 'foot'
+    };
+    const profile = profileMap[routeType] || 'bike';
+    const body: any = {
+      points: places.map(p => [p.lng, p.lat]),
+      profile,
+      locale: 'pl',
+      points_encoded: false,
+      instructions: false,
+      elevation: true
+    };
+
+    const url = `${this.ghBaseUrl}?key=${this.ghApiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`GraphHopper API returned ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json() as any;
+    if (!data.paths || data.paths.length === 0) throw new Error('GraphHopper returned empty paths.');
+
+    const path = data.paths[0];
+    const coordinates = path.points.coordinates as number[][];
+    const trackPoints = coordinates.map(c => [c[1], c[0]] as [number, number]);
+
+    return {
+      distance_km: parseFloat((path.distance / 1000).toFixed(2)),
+      duration_h: parseFloat((path.time / 3600000).toFixed(2)),
+      trackPoints,
+      geometry: { type: 'LineString', coordinates }
     };
   }
 
@@ -262,85 +398,6 @@ export class RoutingService {
     ];
   }
 
-  private async fetchRealGraphHopperRoute(
-    places: GeocodedPlace[], 
-    routeType: string,
-    options?: {
-      intent?: string;
-      surfacePreferences?: string[];
-    }
-  ): Promise<RouteResult> {
-    const profile = this.mapProfile(routeType);
-    const body: any = {
-      points: places.map(p => [p.lng, p.lat]),
-      profile: profile,
-      locale: 'pl',
-      points_encoded: false,
-      instructions: false,
-      elevation: true
-    };
-
-    if ((routeType === 'hiking' || routeType === 'gravel') && options?.intent) {
-      const wantsTrails = /grzbiet|szlak|trail|ridge|górsk|mountain/i.test(options.intent);
-      const avoidsAsphalt = /asfalt|asphalt|droga|road/i.test(options.intent);
-      
-      if (wantsTrails || avoidsAsphalt || routeType === 'gravel') {
-        body.custom_model = {
-          priority: [
-            { if: "road_class == TRACK", multiply_by: 3.0 },
-            { if: "road_class == PATH", multiply_by: 4.0 },
-            { if: "surface == ASPHALT", multiply_by: 0.2 },
-            { if: "surface == PAVED", multiply_by: 0.3 },
-            { if: "surface == GRAVEL || surface == DIRT || surface == GROUND || surface == COMPACTED", multiply_by: 2.5 }
-          ]
-        };
-        if (routeType === 'hiking') body.profile = 'hike';
-      }
-    }
-
-    const url = `${this.baseUrl}?key=${this.apiKey}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`GraphHopper API returned ${res.status}: ${errText}`);
-    }
-
-    const data = await res.json() as any;
-    if (!data.paths || data.paths.length === 0) {
-      throw new Error('GraphHopper returned empty paths.');
-    }
-
-    const path = data.paths[0];
-    const coordinates = path.points.coordinates as number[][];
-    const trackPoints = coordinates.map(c => [c[1], c[0]] as [number, number]);
-
-    return {
-      distance_km: parseFloat((path.distance / 1000).toFixed(2)),
-      duration_h: parseFloat((path.time / 3600000).toFixed(2)),
-      trackPoints,
-      geometry: {
-        type: 'LineString',
-        coordinates: coordinates // already [lng, lat] from GraphHopper
-      }
-    };
-  }
-
-  private mapProfile(routeType: string): string {
-    switch (routeType) {
-      case 'motorcycle': return 'car';
-      case 'cycling': return 'bike';
-      case 'gravel': return 'bike';
-      case 'hiking':
-      case 'city_walk':
-      default:
-        return 'foot';
-    }
-  }
 }
 
 export const routingService = new RoutingService();
