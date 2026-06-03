@@ -17,7 +17,7 @@ export class WaypointEnrichmentService {
       const limitedWaypoints = keyWaypoints.slice(0, 3);
       console.log(`[WaypointEnrichment] Geocoding ${limitedWaypoints.length} key waypoints from AI...`);
       const geocoded = await Promise.all(
-        limitedWaypoints.map(wp => geocodingService.geocodeSinglePoint(wp).catch(err => {
+        limitedWaypoints.map(wp => geocodingService.geocodeSinglePoint(wp, { lat: startPoint.lat, lng: startPoint.lng }).catch(err => {
           console.warn(`[WaypointEnrichment] Failed to geocode waypoint "${wp}": ${err.message}`);
           return null;
         }))

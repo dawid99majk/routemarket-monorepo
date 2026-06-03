@@ -59,14 +59,17 @@ export class GeocodingService {
     return places;
   }
 
-  async geocodeSinglePoint(query: string): Promise<GeocodedPlace> {
+  async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
     
     // 1. Próba GraphHopper Geocoding
     if (apiKey) {
       try {
-        console.log(`[Geocoding] Trying GraphHopper Geocoding for: "${query}"`);
-        const url = `https://graphhopper.com/api/1/geocode?q=${encodeURIComponent(query)}&locale=pl&key=${apiKey}`;
+        console.log(`[Geocoding] Trying GraphHopper Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
+        let url = `https://graphhopper.com/api/1/geocode?q=${encodeURIComponent(query)}&locale=pl&key=${apiKey}`;
+        if (biasPoint) {
+          url += `&point=${biasPoint.lat},${biasPoint.lng}`;
+        }
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json() as any;
