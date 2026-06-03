@@ -554,6 +554,34 @@ app.get('/route-projects/:id/jobs/:jobId', async (c) => {
   return c.json(job);
 });
 
+// Fast endpoint for live routing on the interactive map
+app.post('/live-route', async (c) => {
+  try {
+    const { points, route_type, surface_preferences, intent } = await c.req.json();
+    if (!points || points.length < 2) {
+      return c.json({ error: 'At least 2 points required' }, 400);
+    }
+    
+    // Konwersja na GeocodedPlace
+    const places = points.map((p: any, i: number) => ({
+      name: p.name || `Punkt ${i+1}`,
+      lat: p.lat,
+      lng: p.lng,
+      type: i === 0 ? 'start' : (i === points.length - 1 ? 'end' : 'waypoint')
+    }));
+
+    const route = await routingService.getRoute(places, route_type || 'hiking', {
+      intent: intent || '',
+      surfacePreferences: surface_preferences || []
+    });
+
+    return c.json(route);
+  } catch (err: any) {
+    console.error('[LiveRoute] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Proxy do twardej geometrii Atlasa
 app.post('/route-projects/atlas/geometry', async (c) => {
   try {
