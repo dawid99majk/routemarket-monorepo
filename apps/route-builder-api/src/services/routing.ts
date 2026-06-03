@@ -227,10 +227,10 @@ export class RoutingService {
     const end = places[places.length - 1];
     const isLoop = places.length > 2 && start.lat === end.lat && start.lng === end.lng;
 
-    // Jeśli posiadamy klucz GraphHopper, generujemy 3 prawdziwe trasy
-    if (this.apiKey) {
+    // Jeśli posiadamy klucz ORS lub GraphHopper, generujemy 3 prawdziwe trasy
+    if (this.orsApiKey || this.ghApiKey) {
       try {
-        console.log(`[Routing] Generating real road-snapped alternatives via GraphHopper...`);
+        console.log(`[Routing] Generating real road-snapped alternatives...`);
         
         let dLat: number;
         let dLng: number;
@@ -275,17 +275,17 @@ export class RoutingService {
         
         const fastWaypoints: GeocodedPlace[] = isLoop ? [start, places[1], end] : [start, end];
 
-        // Wywołujemy 3 zapytania HTTP do GraphHoppera równolegle
+        // Wywołujemy 3 zapytania HTTP do API równolegle
         const [scenicRoute, challengeRoute, fastRoute] = await Promise.all([
-          this.fetchRealGraphHopperRoute(scenicWaypoints, routeType).catch(err => {
+          this.getRoute(scenicWaypoints, routeType).catch(err => {
             console.error(`[Routing] Scenic route fetch failed, falling back: ${err.message}`);
             return null;
           }),
-          this.fetchRealGraphHopperRoute(challengeWaypoints, routeType).catch(err => {
+          this.getRoute(challengeWaypoints, routeType).catch(err => {
             console.error(`[Routing] Challenge route fetch failed, falling back: ${err.message}`);
             return null;
           }),
-          this.fetchRealGraphHopperRoute(fastWaypoints, routeType).catch(err => {
+          this.getRoute(fastWaypoints, routeType).catch(err => {
             console.error(`[Routing] Fast route fetch failed, falling back: ${err.message}`);
             return null;
           })
