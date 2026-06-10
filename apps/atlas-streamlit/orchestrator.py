@@ -1,39 +1,47 @@
 import logging
-from typing import Optional, Dict, Any
-from ai_agent import analyze_route_request
+from typing import Dict, Any, List
+from ai_agent import deep_researcher, route_planner, guide_writer
 from brouter_client import generate_gpx_from_points
 
 logger = logging.getLogger(__name__)
 
 class Orchestrator:
     @staticmethod
-    def generate_route(user_prompt: str, profile: str = "trekking") -> Dict[str, Any]:
+    def run_generation_pipeline(chat_history: List[Dict[str, str]], profile: str = "trekking") -> Dict[str, Any]:
         """
-        Coordinates the workflow:
-        1. AI Agent: Parse user prompt into POIs
-        2. BRouter Client: Fetch GPX path through POIs
-        
-        Returns a dictionary with the route plan and the raw GPX data.
+        Executes the heavy lifting pipeline once the chat interview is done:
+        1. Deep Research
+        2. Route Planning (POIs extraction)
+        3. GPX Generation
+        4. Guidebook Writing
         """
-        logger.info(f"Starting orchestration for request: '{user_prompt}'")
+        logger.info("Starting generation pipeline...")
         
-        # Step 1: AI Analysis
-        logger.info("Step 1: Extracting waypoints via AI")
-        route_plan = analyze_route_request(user_prompt)
+        # Step 1: Deep Research
+        logger.info("Step 1: Deep Research with Google Search")
+        research_context = deep_researcher(chat_history)
+        
+        # Step 2: Route Planning
+        logger.info("Step 2: Route Planning (POIs extraction)")
+        route_plan = route_planner(research_context)
         
         if len(route_plan.points) < 2:
-            raise ValueError("AI could not extract at least 2 distinct waypoints from the request.")
+            raise ValueError("Route Planner nie mógł wyznaczyć minimum 2 punktów na podstawie researchu.")
             
-        # Extract coordinates as a list of tuples
         coords = [(pt.longitude, pt.latitude) for pt in route_plan.points]
         
-        # Step 2: Routing via BRouter
-        logger.info("Step 2: Requesting GPX from BRouter")
+        # Step 3: GPX Generation
+        logger.info("Step 3: BRouter GPX Generation")
         gpx_data = generate_gpx_from_points(coords, profile=profile)
+        
+        # Step 4: Guidebook Writing
+        logger.info("Step 4: Guidebook Writing")
+        guide_md = guide_writer(research_context, route_plan)
         
         return {
             "title": route_plan.title,
             "description": route_plan.description,
             "points": route_plan.model_dump()["points"],
-            "gpx": gpx_data
+            "gpx": gpx_data,
+            "guide": guide_md
         }
