@@ -1,8 +1,14 @@
 import streamlit as st
 import os
 import re
-from dotenv import load_dotenv
 import logging
+from dotenv import load_dotenv
+
+import gpxpy
+import folium
+from streamlit_folium import st_folium
+import pandas as pd
+import altair as alt
 
 from ai_agent import chat_interviewer
 from orchestrator import Orchestrator
@@ -12,7 +18,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 st.set_page_config(
-    page_title="AI GPX Route Generator v2",
+    page_title="AI GPX Route Generator v3",
     page_icon="🗺️",
     layout="wide"
 )
@@ -56,29 +62,33 @@ with col_chat:
         with st.chat_message("user" if msg["role"] == "user" else "assistant"):
             st.markdown(msg["content"])
 
-    # Chat input
-    if not st.session_state.pipeline_done:
-        user_input = st.chat_input("Napisz tutaj...")
-        if user_input and api_key:
-            # 1. Add user message
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            with st.chat_message("user"):
-                st.markdown(user_input)
+    # Chat input (zawsze dostępne)
+    user_input = st.chat_input("Napisz tutaj (np. poprawkę do trasy)...")
+    if user_input and api_key:
+        # Jeśli użytkownik pisze po wygenerowaniu, resetujemy status
+        if st.session_state.pipeline_done:
+            st.session_state.pipeline_done = False
+            st.session_state.result = None
             
-            # 2. Let the Interviewer analyze
-            with st.chat_message("assistant"):
-                with st.spinner("Zastanawiam się..."):
-                    try:
-                        state = chat_interviewer(st.session_state.messages)
-                        st.markdown(state.reply)
-                        st.session_state.messages.append({"role": "model", "content": state.reply})
-                        
-                        # 3. If ready, move to pipeline
-                        if state.is_ready:
-                            st.session_state.pipeline_done = True
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Błąd komunikacji z AI: {e}")
+        # 1. Add user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        
+        # 2. Let the Interviewer analyze
+        with st.chat_message("assistant"):
+            with st.spinner("Zastanawiam się..."):
+                try:
+                    state = chat_interviewer(st.session_state.messages)
+                    st.markdown(state.reply)
+                    st.session_state.messages.append({"role": "model", "content": state.reply})
+                    
+                    # 3. If ready, move to pipeline
+                    if state.is_ready:
+                        st.session_state.pipeline_done = True
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Błąd komunikacji z AI: {e}")
 
 with col_result:
     if st.session_state.pipeline_done and not st.session_state.result:
@@ -116,6 +126,64 @@ with col_result:
                 mime="text/markdown",
                 use_container_width=True
             )
+            
+        st.divider()
+        st.subheader("🗺️ Podgląd Mapy i Profilu")
+        
+        # Parse GPX
+        try:
+            gpx = gpxpy.parse(res["gpx"])
+            
+            # Extract points
+            points_data = []
+            cumulative_distance = 0.0
+            previous_point = None
+            
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    for point in segment.points:
+                        if previous_point:
+                            cumulative_distance += point.distance_2d(previous_point) / 1000.0 # w kilometrach
+                        points_data.append({
+                            "lat": point.latitude,
+                            "lon": point.longitude,
+                            "ele": point.elevation or 0.0,
+                            "distance_km": cumulative_distance
+                        })
+                        previous_point = point
+
+            if points_data:
+                df = pd.DataFrame(points_data)
+                
+                # Render Map (Folium)
+                # Calculate center
+                center_lat = df['lat'].mean()
+                center_lon = df['lon'].mean()
+                m = folium.Map(location=[center_lat, center_lon], zoom_start=11)
+                
+                # Add route line
+                route_coords = list(zip(df['lat'], df['lon']))
+                folium.PolyLine(route_coords, color="blue", weight=4, opacity=0.8).add_to(m)
+                
+                # Add start/end markers
+                folium.Marker(route_coords[0], popup="Start", icon=folium.Icon(color="green")).add_to(m)
+                folium.Marker(route_coords[-1], popup="Meta", icon=folium.Icon(color="red")).add_to(m)
+                
+                st_folium(m, width=700, height=400)
+                
+                # Render Elevation Chart
+                st.write("**Profil Wysokości (m n.p.m)**")
+                chart = alt.Chart(df).mark_area(opacity=0.5, color='orange').encode(
+                    x=alt.X('distance_km:Q', title='Dystans (km)'),
+                    y=alt.Y('ele:Q', title='Wysokość (m)', scale=alt.Scale(domain=[df['ele'].min()*0.9, df['ele'].max()*1.1])),
+                    tooltip=['distance_km', 'ele']
+                ).properties(height=200)
+                st.altair_chart(chart, use_container_width=True)
+                
+            else:
+                st.warning("Nie znaleziono danych śladu w wygenerowanym GPX.")
+        except Exception as e:
+            st.error(f"Błąd podczas renderowania mapy: {e}")
             
         st.divider()
         st.subheader("📖 Przewodnik Wyprawy")
