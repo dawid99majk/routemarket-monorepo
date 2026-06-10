@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  atlas-streamlit:
+    build: .
+    container_name: atlas-streamlit
+    restart: always
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
