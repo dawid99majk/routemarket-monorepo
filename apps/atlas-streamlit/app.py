@@ -72,23 +72,19 @@ with col_chat:
             
         # 1. Add user message
         st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
         
         # 2. Let the Interviewer analyze
-        with st.chat_message("assistant"):
-            with st.spinner("Zastanawiam się..."):
-                try:
-                    state = chat_interviewer(st.session_state.messages)
-                    st.markdown(state.reply)
-                    st.session_state.messages.append({"role": "model", "content": state.reply})
-                    
-                    # 3. If ready, move to pipeline
-                    if state.is_ready:
-                        st.session_state.pipeline_done = True
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Błąd komunikacji z AI: {e}")
+        with st.spinner("Zastanawiam się..."):
+            try:
+                state = chat_interviewer(st.session_state.messages)
+                st.session_state.messages.append({"role": "model", "content": state.reply})
+                
+                # 3. If ready, move to pipeline
+                if state.is_ready:
+                    st.session_state.pipeline_done = True
+                st.rerun()
+            except Exception as e:
+                st.error(f"Błąd komunikacji z AI: {e}")
 
 with col_result:
     if st.session_state.pipeline_done and not st.session_state.result:
@@ -99,6 +95,11 @@ with col_result:
                 # The orchestrator logs to stdout, but we just call it directly here
                 res = Orchestrator.run_generation_pipeline(st.session_state.messages, profile=profile)
                 st.session_state.result = res
+                
+                # Update agent's memory with the generated route so it has context
+                summary_msg = f"Ukończyłem planowanie! Trasa **{res['title']}** została wygenerowana i naniesiona na mapę po prawej. Zobacz czy Ci odpowiada i napisz tutaj, jeśli mam nanieść jakieś poprawki (np. zmienić przebieg lub zahaczyć o inny punkt)."
+                st.session_state.messages.append({"role": "model", "content": summary_msg})
+                
                 status.update(label="✅ Gotowe!", state="complete", expanded=True)
                 st.rerun()
             except Exception as e:
