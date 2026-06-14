@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any, List
 from ai_agent import deep_researcher, route_planner, guide_writer
-from brouter_client import generate_gpx_from_points
+from brouter_client import optimize_and_generate_gpx
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +30,9 @@ class Orchestrator:
             
         coords = [(pt.longitude, pt.latitude) for pt in route_plan.points]
         
-        # Step 3: GPX Generation
-        logger.info("Step 3: BRouter GPX Generation")
-        gpx_data = generate_gpx_from_points(coords, profile=profile)
+        # Step 3: GPX Generation (with Optimization loop)
+        logger.info("Step 3: BRouter GPX Generation (with Point Optimization)")
+        gpx_data = optimize_and_generate_gpx(coords, profile=profile)
         
         # Step 4: Guidebook Writing
         logger.info("Step 4: Guidebook Writing")
