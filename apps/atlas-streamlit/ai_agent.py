@@ -99,12 +99,10 @@ def route_planner(research_context: str) -> RoutePlan:
     system_instruction = (
         "Jesteś nawigatorem. Na podstawie dostarczonego obszernego researchu z Google, "
         "wyodrębnij konkretne, kluczowe punkty orientacyjne. "
-        "ZIGNORUJ ZASADĘ MINIMUM 4 PUNKTÓW. Zamiast tego stwórz GĘSTĄ SIATKĘ PUNKTÓW POŚREDNICH (od 10 do 20 punktów). "
-        "Wygeneruj bardzo gęste punkty śledzące dokładnie linię szczytów, grzbietów lub specyficznych szlaków. "
-        "Musisz wymusić na silniku BRouter, aby nie uciekał w doliny i nie skracał drogi. Każde ważne skrzyżowanie "
-        "szlaków, szczyt i schronisko musi być uwzględnione jako osobny punkt. "
-        "Dla każdego punktu podaj DOKŁADNE współrzędne geograficzne (longitude i latitude). "
-        "Punkty muszą być ułożone w logicznej kolejności geograficznej od startu do mety."
+        "UWAGA: Wygeneruj maksymalnie 5 do 8 kluczowych punktów węzłowych (np. Start, główne szczyty/atrakcje, schronisko, Meta). "
+        "ABSOLUTNIE KLUCZOWE: Punkty MUSZĄ być ułożone w ścisłej chronologii, w fizycznej i geograficznej kolejności, w jakiej turysta będzie je mijał krok po kroku. "
+        "Błąd w kolejności spowoduje, że nawigacja narysuje pętlę i zniszczy trasę. "
+        "Dla każdego punktu podaj DOKŁADNE współrzędne geograficzne (longitude i latitude)."
     )
     
     logger.info("Calling Route Planner agent...")
