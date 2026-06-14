@@ -90,25 +90,29 @@ def deep_researcher(chat_history: List[Dict[str, str]]) -> str:
     
     return response.text
 
-def route_planner(research_context: str) -> RoutePlan:
+def route_planner(research_context: str, chat_history: List[Dict[str, str]]) -> RoutePlan:
     """
     Extracts the structured JSON POIs from the research.
     """
     client = get_client()
     
     system_instruction = (
-        "Jesteś nawigatorem. Na podstawie dostarczonego obszernego researchu z Google, "
+        "Jesteś nawigatorem. Na podstawie dostarczonego obszernego researchu z Google ORAZ historii rozmowy, "
         "wyodrębnij konkretne, kluczowe punkty orientacyjne. "
         "UWAGA: Wygeneruj maksymalnie 5 do 8 kluczowych punktów węzłowych (np. Start, główne szczyty/atrakcje, schronisko, Meta). "
-        "ABSOLUTNIE KLUCZOWE: Punkty MUSZĄ być ułożone w ścisłej chronologii, w fizycznej i geograficznej kolejności, w jakiej turysta będzie je mijał krok po kroku. "
-        "Błąd w kolejności spowoduje, że nawigacja narysuje pętlę i zniszczy trasę. "
+        "ABSOLUTNIE KLUCZOWE 1: Punkty MUSZĄ być ułożone w ścisłej chronologii, w fizycznej i geograficznej kolejności, w jakiej turysta będzie je mijał krok po kroku. "
+        "ABSOLUTNIE KLUCZOWE 2: Twoim bezwzględnym priorytetem jest umieszczenie w planie wszystkich miejsc, o które wyraźnie prosił użytkownik w historii czatu. "
+        "ABSOLUTNIE KLUCZOWE 3: Jeśli trasa ma charakter wycieczki jednodniowej (pętli), to PIERWSZY i OSTATNI punkt na liście muszą być tym samym miejscem (te same współrzędne), aby pętla się zamknęła. "
         "Dla każdego punktu podaj DOKŁADNE współrzędne geograficzne (longitude i latitude)."
     )
+    
+    history_text = "HISTORIA CZATU Z UŻYTKOWNIKIEM:\n" + "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+    content = f"{history_text}\n\nRESEARCH KONTEKSTOWY:\n{research_context}"
     
     logger.info("Calling Route Planner agent...")
     response = client.models.generate_content(
         model='gemini-2.5-flash',
-        contents=research_context,
+        contents=content,
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
             response_mime_type="application/json",

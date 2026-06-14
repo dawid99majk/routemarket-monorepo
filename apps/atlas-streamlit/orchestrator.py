@@ -23,7 +23,7 @@ class Orchestrator:
         
         # Step 2: Route Planning
         logger.info("Step 2: Route Planning (POIs extraction)")
-        route_plan = route_planner(research_context)
+        route_plan = route_planner(research_context, chat_history)
         
         if len(route_plan.points) < 2:
             raise ValueError("Route Planner nie mógł wyznaczyć minimum 2 punktów na podstawie researchu.")
