@@ -12,6 +12,10 @@ import altair as alt
 
 from ai_agent import chat_interviewer
 from orchestrator import Orchestrator
+from database import init_db, save_route, get_user_routes
+
+# Initialize DB
+init_db()
 
 # Load environment variables
 load_dotenv()
@@ -29,12 +33,33 @@ st.title("🗺️ AI GPX Route Generator (Interactive)")
 with st.sidebar:
     st.header("Ustawienia")
     api_key = st.text_input("Gemini API Key", type="password", value=os.getenv("GEMINI_API_KEY", ""))
+    username = st.text_input("Twoja nazwa (Nick)", value="")
     profile = st.selectbox("Profil trasy", options=["trekking", "hiking-mountain", "fastbike", "car-eco"], index=0)
     if st.button("Zresetuj konwersację"):
         st.session_state.messages = []
         st.session_state.pipeline_done = False
         st.session_state.result = None
         st.rerun()
+        
+    if username:
+        st.divider()
+        st.subheader("Twoje Zapisane Trasy")
+        user_routes = get_user_routes(username)
+        if not user_routes:
+            st.info("Brak zapisanych tras.")
+        else:
+            for r in user_routes:
+                if st.button(f"🗺️ {r['title']} ({r['created_at'][:10]})", key=f"route_{r['id']}"):
+                    from database import get_route_by_id
+                    full_route = get_route_by_id(r['id'])
+                    if full_route:
+                        st.session_state.result = {
+                            "title": full_route["title"],
+                            "gpx": full_route["gpx_data"],
+                            "guide": full_route["guide_data"]
+                        }
+                        st.session_state.pipeline_done = True
+                        st.rerun()
 
 if not api_key:
     st.warning("⚠️ Brak klucza API Gemini w środowisku ani w pasku bocznym.")
@@ -95,6 +120,10 @@ with col_result:
                 # The orchestrator logs to stdout, but we just call it directly here
                 res = Orchestrator.run_generation_pipeline(st.session_state.messages, profile=profile)
                 st.session_state.result = res
+                
+                # Zapis do bazy danych jeśli podano nick
+                if username:
+                    save_route(username, res["title"], profile, res["gpx"], res["guide"])
                 
                 # Update agent's memory with the generated route so it has context
                 summary_msg = f"Ukończyłem planowanie! Trasa **{res['title']}** została wygenerowana i naniesiona na mapę po prawej. Zobacz czy Ci odpowiada i napisz tutaj, jeśli mam nanieść jakieś poprawki (np. zmienić przebieg lub zahaczyć o inny punkt)."
