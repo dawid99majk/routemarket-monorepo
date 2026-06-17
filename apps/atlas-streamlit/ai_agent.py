@@ -9,9 +9,8 @@ from google.genai import types
 logger = logging.getLogger(__name__)
 
 class RoutePoint(BaseModel):
-    name: str = Field(description="Nazwa miejsca lub punktu orientacyjnego")
-    longitude: float = Field(description="Długość geograficzna")
-    latitude: float = Field(description="Szerokość geograficzna")
+    name: str = Field(description="Nazwa miejsca lub punktu orientacyjnego (np. 'Śnieżka', 'Pielgrzymy')")
+    search_query: str = Field(description="Bardzo precyzyjna fraza dla Google Maps/OSM (zawsze dodaj region, np. 'Pielgrzymy, Karkonosze, Polska' albo 'Schronisko Samotnia, Karpacz')")
 
 class RoutePlan(BaseModel):
     title: str = Field(description="Krótki, chwytliwy tytuł trasy")
@@ -102,8 +101,8 @@ def route_planner(research_context: str, chat_history: List[Dict[str, str]]) -> 
         "UWAGA: Wygeneruj maksymalnie 5 do 8 kluczowych punktów węzłowych (np. Start, główne szczyty/atrakcje, schronisko, Meta). "
         "ABSOLUTNIE KLUCZOWE 1: Punkty MUSZĄ być ułożone w ścisłej chronologii, w fizycznej i geograficznej kolejności, w jakiej turysta będzie je mijał krok po kroku. "
         "ABSOLUTNIE KLUCZOWE 2: Twoim bezwzględnym priorytetem jest umieszczenie w planie wszystkich miejsc, o które wyraźnie prosił użytkownik w historii czatu. "
-        "ABSOLUTNIE KLUCZOWE 3: Jeśli trasa ma charakter wycieczki jednodniowej (pętli), to PIERWSZY i OSTATNI punkt na liście muszą być tym samym miejscem (te same współrzędne), aby pętla się zamknęła. "
-        "Dla każdego punktu podaj DOKŁADNE współrzędne geograficzne (longitude i latitude)."
+        "ABSOLUTNIE KLUCZOWE 3: Jeśli trasa ma charakter wycieczki jednodniowej (pętli), to PIERWSZY i OSTATNI punkt na liście muszą być tym samym miejscem (ta sama nazwa), aby pętla się zamknęła. "
+        "Dla każdego punktu podaj precyzyjne `search_query` (np. 'Schronisko Samotnia, Karpacz, Polska'), aby serwer satelitarny mógł bezbłędnie znaleźć ten punkt na mapie."
     )
     
     history_text = "HISTORIA CZATU Z UŻYTKOWNIKIEM:\n" + "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])

@@ -1,9 +1,31 @@
 import logging
-from typing import Dict, Any, List
+import requests
+import urllib.parse
+from typing import Dict, Any, List, Tuple
 from ai_agent import deep_researcher, route_planner, guide_writer
 from brouter_client import optimize_and_generate_gpx
 
 logger = logging.getLogger(__name__)
+
+def geocode_osm(query: str) -> Tuple[float, float]:
+    """
+    Fetches exact longitude and latitude from OpenStreetMap Nominatim.
+    Returns (longitude, latitude) or raises ValueError.
+    """
+    url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(query)}&format=json&limit=1"
+    headers = {"User-Agent": "RouteMarket-AI/1.0"}
+    
+    logger.info(f"Geocoding: {query}")
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if data and len(data) > 0:
+            return float(data[0]['lon']), float(data[0]['lat'])
+    except Exception as e:
+        logger.error(f"Geocoding failed for '{query}': {e}")
+        
+    raise ValueError(f"Nie udało się odnaleźć na mapie punktu: '{query}'.")
 
 class Orchestrator:
     @staticmethod
@@ -28,7 +50,17 @@ class Orchestrator:
         if len(route_plan.points) < 2:
             raise ValueError("Route Planner nie mógł wyznaczyć minimum 2 punktów na podstawie researchu.")
             
-        coords = [(pt.longitude, pt.latitude) for pt in route_plan.points]
+        coords = []
+        for pt in route_plan.points:
+            # Resolving coordinates via Nominatim OSM
+            try:
+                lon, lat = geocode_osm(pt.search_query)
+                coords.append((lon, lat))
+            except ValueError as e:
+                logger.warning(f"Dropping point {pt.name} due to geocoding failure: {e}")
+                
+        if len(coords) < 2:
+            raise ValueError("Po weryfikacji geograficznej zostało za mało punktów by wyznaczyć trasę.")
         
         # Step 3: GPX Generation (with Optimization loop)
         logger.info("Step 3: BRouter GPX Generation (with Point Optimization)")
