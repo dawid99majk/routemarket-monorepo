@@ -139,7 +139,7 @@ def guide_writer(research_context: str, route_plan: RoutePlan) -> str:
         "Pisz językiem angażującym, profesjonalnym i dającym poczucie pewności na szlaku."
     )
     
-    points_info = "\n".join([f"- {p.name} ({p.latitude}, {p.longitude})" for p in route_plan.points])
+    points_info = "\n".join([f"- {p.name} (Wyszukiwanie: {p.search_query})" for p in route_plan.points])
     content = f"RESEARCH:\n{research_context}\n\nZAPLANOWANE PUNKTY:\n{points_info}"
     
     logger.info("Calling Guide Writer agent...")
