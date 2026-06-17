@@ -7,23 +7,36 @@ from brouter_client import optimize_and_generate_gpx
 
 logger = logging.getLogger(__name__)
 
-def geocode_osm(query: str) -> Tuple[float, float]:
+def geocode_osm(query: str, fallback_name: str) -> Tuple[float, float]:
     """
     Fetches exact longitude and latitude from OpenStreetMap Nominatim.
+    If the precise query fails, falls back to the simple name.
     Returns (longitude, latitude) or raises ValueError.
     """
-    url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(query)}&format=json&limit=1"
     headers = {"User-Agent": "RouteMarket-AI/1.0"}
     
-    logger.info(f"Geocoding: {query}")
-    try:
+    def fetch(q: str):
+        url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(q)}&format=json&limit=1"
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
         if data and len(data) > 0:
             return float(data[0]['lon']), float(data[0]['lat'])
+        return None
+
+    logger.info(f"Geocoding: {query}")
+    try:
+        coords = fetch(query)
+        if coords:
+            return coords
+            
+        logger.warning(f"Geocoding failed for '{query}'. Trying fallback: '{fallback_name}'")
+        coords = fetch(fallback_name)
+        if coords:
+            return coords
+            
     except Exception as e:
-        logger.error(f"Geocoding failed for '{query}': {e}")
+        logger.error(f"Geocoding API error for '{query}': {e}")
         
     raise ValueError(f"Nie udało się odnaleźć na mapie punktu: '{query}'.")
 
@@ -52,9 +65,9 @@ class Orchestrator:
             
         coords = []
         for pt in route_plan.points:
-            # Resolving coordinates via Nominatim OSM
+            # Resolving coordinates via Nominatim OSM with fallback
             try:
-                lon, lat = geocode_osm(pt.search_query)
+                lon, lat = geocode_osm(pt.search_query, pt.name)
                 coords.append((lon, lat))
             except ValueError as e:
                 logger.warning(f"Dropping point {pt.name} due to geocoding failure: {e}")

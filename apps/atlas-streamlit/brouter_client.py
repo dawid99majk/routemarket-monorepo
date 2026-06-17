@@ -111,44 +111,10 @@ def optimize_and_generate_gpx(
     profile: str = "trekking"
 ) -> str:
     """
-    Iteratively evaluates the route point-by-point. 
-    Drops points that cause "out-and-back" spurs (U-turns).
-    Returns the final, cleaned GPX by fetching the combined route of valid points.
+    Since we migrated to hard geocoding via Nominatim, we no longer need the U-Turn 
+    detector to drop hallucinated points. Out-and-back spurs to real peaks (like Śnieżka) 
+    are now legitimate and should be kept.
     """
-    if len(points) < 3:
-        # Cannot form a U-turn with less than 3 points (Start -> End)
-        return generate_gpx_from_points(points, profile)
-        
-    valid_points = [points[0]]
-    current_idx = 1
-    
-    # We maintain the GPX of the "last valid segment" to compare with the "next segment"
-    # To start, we generate A -> B
-    last_gpx = generate_gpx_from_points([valid_points[-1], points[current_idx]], profile)
-    
-    while current_idx < len(points) - 1:
-        next_idx = current_idx + 1
-        # Generate B -> C
-        next_gpx = generate_gpx_from_points([points[current_idx], points[next_idx]], profile)
-        
-        if detect_u_turn(last_gpx, next_gpx):
-            # U-turn detected! The current point (B) is a spur.
-            logger.warning(f"Spaghetti routing detected at point {points[current_idx]}. Dropping point.")
-            # We don't add current_idx to valid_points.
-            # Now we must recalculate A -> C to serve as the new "last_gpx" for the next iteration
-            last_gpx = generate_gpx_from_points([valid_points[-1], points[next_idx]], profile)
-        else:
-            # Valid point! Add it to the list.
-            valid_points.append(points[current_idx])
-            last_gpx = next_gpx
-            
-        current_idx += 1
-        
-    # Add the final endpoint
-    valid_points.append(points[-1])
-    
-    logger.info(f"Optimization complete. Route reduced from {len(points)} to {len(valid_points)} points.")
-    
-    # Generate the final continuous GPX from the cleaned valid points
-    return generate_gpx_from_points(valid_points, profile)
+    logger.info(f"Generating route for {len(points)} verified coordinates without U-Turn dropping.")
+    return generate_gpx_from_points(points, profile)
 
