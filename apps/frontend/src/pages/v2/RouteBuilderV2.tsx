@@ -57,10 +57,18 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
   return null;
 }
 
-export default function RouteBuilderV2() {
+export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: string, onBack?: () => void }) {
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'bicycle' | 'hiking'>('motorcycle');
-  const [bikeSubtype, setBikeSubtype] = useState<'gravel' | 'road' | 'mtb'>('gravel');
+  
+  // map initialMode ('fastbike', 'trekking', 'hiking-mountain') to vehicleType/bikeSubtype
+  const getInitialTypes = () => {
+    if (initialMode === 'fastbike') return { v: 'bicycle' as const, b: 'road' as const };
+    if (initialMode === 'hiking-mountain') return { v: 'hiking' as const, b: 'gravel' as const };
+    return { v: 'bicycle' as const, b: 'gravel' as const };
+  };
+  
+  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'bicycle' | 'hiking'>(getInitialTypes().v);
+  const [bikeSubtype, setBikeSubtype] = useState<'gravel' | 'road' | 'mtb'>(getInitialTypes().b);
   
   const [waypoints, setWaypoints] = useState<{lat: number, lng: number, type: string}[]>([]);
   const [geometry, setGeometry] = useState<any>(null);
@@ -133,40 +141,59 @@ export default function RouteBuilderV2() {
     });
   };
 
-  const doCalculateLiveRoute = async (wps: typeof waypoints, vType: typeof vehicleType, bType: typeof bikeSubtype) => {
-    if (wps.length < 2) return;
+  const doCalculateLiveRoute = async (
+    wps: typeof waypoints, 
+    vType: typeof vehicleType, 
+    bType: typeof bikeSubtype,
+    forceMessages?: {role: string, text: string}[]
+  ) => {
     setIsRouting(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const token = session.session?.access_token || '';
-
-      const routeType = vType === 'bicycle' ? bType : vType;
-
-      const res = await fetch('/route-builder-api/live-route', {
+      let messagesToUse = forceMessages || chatMessages;
+      
+      // Fallback if user clicks generate without chatting
+      if (messagesToUse.length === 0) {
+          let fallbackText = "Proszę wyznacz trasę na podstawie moich punktów.";
+          if (inputNotes) fallbackText += ` Moje notatki: ${inputNotes}`;
+          if (wps.length > 0) {
+              // Add rough coordinates to help the agent find the locations
+              fallbackText += ` Wyznaczam przez ${wps.length} punktów: ${wps.map((wp, i) => `Pkt ${i+1} (lat:${wp.lat.toFixed(4)}, lng:${wp.lng.toFixed(4)})`).join(', ')}`;
+          }
+          messagesToUse = [{ role: 'user', text: fallbackText }];
+      }
+      
+      const res = await fetch('/atlas/api/generate', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          points: wps,
-          route_type: routeType,
-          surface_preferences: [],
-          intent: inputNotes
+          messages: messagesToUse.map(m => ({ role: m.role, content: m.text })),
+          profile: vType === 'bicycle' ? bType : vType
         })
       });
 
-      if (!res.ok) throw new Error('Live routing failed: ' + res.status);
-      const route = await res.json();
-      if (route.error) throw new Error(route.error);
+      if (!res.ok) throw new Error('Generation failed: ' + res.status);
+      const data = await res.json();
       
-      if (route.geometry) {
-        setGeometry(route.geometry);
-      } else if (route.trackPoints && route.trackPoints.length > 0) {
+      if (data.trackPoints && data.trackPoints.length > 0) {
         setGeometry({
           type: 'LineString',
-          coordinates: route.trackPoints.map((p: number[]) => [p[1], p[0]]) // [lat,lng] -> [lng,lat] for GeoJSON
+          coordinates: data.trackPoints.map((p: number[]) => [p[1], p[0]]) // [lat,lng] -> [lng,lat] for GeoJSON
         });
+        
+        // Populate waypoints from generated points if available
+        if (data.points && data.points.length > 1) {
+            // we could parse them here, but the map will show the geometry.
+        }
+        
+        toast.success("Trasa wygenerowana pomyślnie!");
+        
+        if (data.guide) {
+            setChatMessages(prev => [...prev, { role: 'agent', text: `**Gotowe! Opracowałem Twój przewodnik:**\n\n${data.guide}` }]);
+        }
+      } else {
+          toast.error("Agent nie zwrócił współrzędnych trasy.");
       }
     } catch (err: any) {
       toast.error('Błąd wyznaczania trasy: ' + err.message);
@@ -188,59 +215,39 @@ export default function RouteBuilderV2() {
     e.preventDefault();
     if (!inputValue.trim() || isTyping) return;
 
-    const userText = inputValue;
+    let userText = inputValue;
     setInputValue('');
-    const newMessages: {role: 'agent'|'user', text: string}[] = [...chatMessages, { role: 'user', text: userText }];
+    
+    // Inject map context into user message if they have waypoints or notes
+    let userContext = '';
+    if (waypoints.length > 0) userContext += ` [Mam na mapie ${waypoints.length} punktów]`;
+    if (inputNotes) userContext += ` [Moje notatki: ${inputNotes}]`;
+    if (vehicleType) userContext += ` [Pojazd: ${vehicleType}]`;
+    
+    const actualTextToSend = userText + userContext;
+    
+    const newMessages: {role: 'agent'|'user', text: string}[] = [...chatMessages, { role: 'user', text: actualTextToSend }];
     setChatMessages(newMessages);
     setIsTyping(true);
 
     try {
-      // Wysłanie notatek dla pełniejszego kontekstu, nawet jeśli nie ma projektu
-      const response = await fetch('/route-builder-api/chat-interview', {
+      const response = await fetch('/atlas/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          messages: newMessages, 
-          project_id: projectId,
-          input_notes: inputNotes,
-          current_waypoints: waypoints,
-          vehicle_type: vehicleType,
-          bike_subtype: vehicleType === 'bicycle' ? bikeSubtype : undefined
+          messages: newMessages.map(m => ({ role: m.role, content: m.text }))
         }) 
       });
       const data = await response.json();
       
-      setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
+      if (data.reply) {
+        setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
+      }
       
-      if (data.suggested_waypoints && data.suggested_waypoints.length > 0) {
-        if (data.done) {
-          // Gdy Agent wygenerował całą gotową trasę (done: true), nadpisujemy mapę
-          const newWps = data.suggested_waypoints.map((swp: any, index: number) => ({
-            lat: swp.lat,
-            lng: swp.lng,
-            type: index === 0 ? 'start' : (index === data.suggested_waypoints.length - 1 ? 'end' : 'waypoint')
-          }));
-          setWaypoints(newWps);
-          toast.success("Agent przygotował i naniósł całą trasę na mapę!");
-        } else {
-          // W trakcie rozmowy Agent sugeruje i "dokleja" punkty do istniejących
-          setWaypoints(prev => {
-            const newWps = [...prev];
-            data.suggested_waypoints.forEach((swp: any) => {
-              if (newWps.length === 0) {
-                newWps.push({ lat: swp.lat, lng: swp.lng, type: 'start' });
-              } else if (newWps.length === 1) {
-                newWps.push({ lat: swp.lat, lng: swp.lng, type: 'end' });
-              } else {
-                const endWp = newWps.pop()!;
-                newWps.push({ lat: swp.lat, lng: swp.lng, type: 'waypoint' });
-                newWps.push(endWp);
-              }
-            });
-            return newWps;
-          });
-          toast.success("Agent dodał punkty na mapę!");
-        }
+      if (data.is_ready) {
+        toast.success("Agent zebrał dane. Rozpoczynam planowanie trasy...");
+        // Auto-trigger generation
+        doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype, newMessages);
       }
       
     } catch (err: any) {
@@ -258,6 +265,11 @@ export default function RouteBuilderV2() {
         
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-white">
+          {onBack && (
+            <button onClick={onBack} className="text-xs text-slate-500 hover:text-slate-700 flex items-center mb-3">
+              ← Zmień tryb
+            </button>
+          )}
           <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-emerald-500" />
             Atlas Builder Live

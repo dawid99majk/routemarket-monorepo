@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, Map as MapIcon, Bike, Mountain, Footprints } from 'lucide-react';
+import RouteBuilderV2 from './v2/RouteBuilderV2';
 
 type RouteMode = 'fastbike' | 'trekking' | 'hiking-mountain' | null;
 
@@ -28,26 +29,10 @@ export default function CreateRoute() {
 
   if (selectedMode) {
     return (
-      <div className="flex flex-col h-screen w-full bg-background">
-        <div className="flex items-center p-4 border-b">
-          <Button variant="ghost" onClick={() => setSelectedMode(null)}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Powrót do wyboru trybu
-          </Button>
-          <div className="ml-auto font-semibold">
-            {selectedMode === 'fastbike' && 'Rower Szosowy'}
-            {selectedMode === 'trekking' && 'Gravel / MTB'}
-            {selectedMode === 'hiking-mountain' && 'Hiking'}
-          </div>
-        </div>
-        <div className="flex-1 w-full h-full">
-          <iframe 
-            src={`/atlas/?embed=true&profile=${selectedMode}`} 
-            className="w-full h-full border-0"
-            title="AI Route Planner"
-            allow="geolocation"
-          />
-        </div>
-      </div>
+      <RouteBuilderV2 
+        initialMode={selectedMode} 
+        onBack={() => setSelectedMode(null)} 
+      />
     );
   }
 
