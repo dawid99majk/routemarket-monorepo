@@ -34,7 +34,10 @@ with st.sidebar:
     st.header("Ustawienia")
     api_key = st.text_input("Gemini API Key", type="password", value=os.getenv("GEMINI_API_KEY", ""))
     username = st.text_input("Twoja nazwa (Nick)", value="")
-    profile = st.selectbox("Profil trasy", options=["trekking", "hiking-mountain", "fastbike", "car-eco"], index=0)
+    query_profile = st.query_params.get("profile", "trekking")
+    options = ["trekking", "hiking-mountain", "fastbike", "car-eco"]
+    default_index = options.index(query_profile) if query_profile in options else 0
+    profile = st.selectbox("Profil trasy", options=options, index=default_index)
     if st.button("Zresetuj konwersację"):
         st.session_state.messages = []
         st.session_state.pipeline_done = False
