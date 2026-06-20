@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -36,11 +36,13 @@ class GenerateRequest(BaseModel):
     messages: List[ChatMessage]
     profile: Optional[str] = "trekking"
 
-@app.get("/health")
+router = APIRouter(prefix="/atlas")
+
+@router.get("/health")
 def health():
     return {"status": "ok", "service": "atlas-fastapi"}
 
-@app.post("/api/chat")
+@router.post("/api/chat")
 def chat(req: ChatRequest):
     if not os.getenv("GEMINI_API_KEY"):
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set")
@@ -56,7 +58,7 @@ def chat(req: ChatRequest):
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/generate")
+@router.post("/api/generate")
 def generate_route(req: GenerateRequest):
     if not os.getenv("GEMINI_API_KEY"):
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set")
@@ -79,3 +81,5 @@ def generate_route(req: GenerateRequest):
     except Exception as e:
         logger.error(f"Generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+app.include_router(router)

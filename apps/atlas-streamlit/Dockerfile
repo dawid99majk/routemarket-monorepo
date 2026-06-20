@@ -17,6 +17,6 @@ COPY . .
 
 EXPOSE 8501
 
-HEALTHCHECK CMD curl --fail http://localhost:8501/health
+HEALTHCHECK CMD curl --fail http://localhost:8501/atlas/health
 
-ENTRYPOINT ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8501", "--proxy-headers", "--root-path", "/atlas"]
+ENTRYPOINT ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8501", "--proxy-headers"]
