@@ -79,9 +79,17 @@ def generate_gpx_from_points(
 
     lonlats_str = "|".join([f"{lon},{lat}" for lon, lat in points])
 
+    # Map frontend profiles to BRouter profiles
+    profile_mapping = {
+        "road": "fastbike",
+        "gravel": "trekking",
+        "hiking": "shortest"
+    }
+    brouter_profile = profile_mapping.get(profile.lower(), "trekking")
+
     params = {
         "lonlats": lonlats_str,
-        "profile": profile,
+        "profile": brouter_profile,
         "alternativeidx": 0,
         "format": "gpx"
     }
