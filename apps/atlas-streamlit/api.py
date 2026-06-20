@@ -51,7 +51,7 @@ def chat(req: ChatRequest):
     try:
         state = chat_interviewer(chat_history)
         return {
-            "reply": state.response_text,
+            "reply": state.reply,
             "is_ready": state.is_ready
         }
     except Exception as e:
