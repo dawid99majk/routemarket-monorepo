@@ -78,6 +78,8 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
   const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [gpxData, setGpxData] = useState<string | null>(null);
+  const [guideText, setGuideText] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -189,8 +191,11 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
         
         toast.success("Trasa wygenerowana pomyślnie!");
         
+        if (data.gpx) {
+            setGpxData(data.gpx);
+        }
         if (data.guide) {
-            setChatMessages(prev => [...prev, { role: 'agent', text: `**Gotowe! Opracowałem Twój przewodnik:**\n\n${data.guide}` }]);
+            setGuideText(data.guide);
         }
       } else {
           toast.error("Agent nie zwrócił współrzędnych trasy.");
@@ -209,6 +214,8 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
   const clearRoute = () => {
     setWaypoints([]);
     setGeometry(null);
+    setGpxData(null);
+    setGuideText(null);
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -470,11 +477,45 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
           <MapResizer geometry={geometry} />
         </MapContainer>
         
-        <div className="absolute bottom-6 right-6 z-[1000]">
+        <div className="absolute bottom-6 left-6 z-[1000]">
           <Badge variant="outline" className="bg-white/90 border-emerald-500/30 text-emerald-600 backdrop-blur-md py-1.5 px-4 rounded-full shadow-lg">
             <MapPin className="w-3 h-3 mr-2" /> Live GraphHopper
           </Badge>
         </div>
+
+        {gpxData && (
+          <div className="absolute top-6 right-6 z-[1000] flex flex-col gap-4 w-96 max-h-[90vh]">
+            <Card className="p-4 bg-white/95 backdrop-blur shadow-xl border-emerald-100 shrink-0">
+              <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-500"/>
+                Twoja Trasa
+              </h3>
+              <Button 
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-md"
+                onClick={() => {
+                  const blob = new Blob([gpxData], { type: 'application/gpx+xml' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'trasa_routemarket.gpx';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Pobierz Plik GPX
+              </Button>
+            </Card>
+
+            {guideText && (
+              <Card className="p-5 bg-white/95 backdrop-blur shadow-xl border-emerald-100 overflow-y-auto flex-1">
+                <h3 className="font-bold text-slate-800 mb-3">Przewodnik po trasie</h3>
+                <div className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                  {guideText}
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
