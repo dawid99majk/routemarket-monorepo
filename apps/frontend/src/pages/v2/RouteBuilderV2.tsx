@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
 // Leaflet Components
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -58,7 +59,9 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 }
 
 export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: string, onBack?: () => void }) {
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [projectId, setProjectId] = useState<string | null>(searchParams.get('projectId'));
   
   // map initialMode ('fastbike', 'trekking', 'hiking-mountain') to vehicleType/bikeSubtype
   const getInitialTypes = () => {
@@ -82,12 +85,39 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
   const [guideText, setGuideText] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Load existing project if projectId is in URL
+  const skipNextCalc = useRef(false);
+  useEffect(() => {
+    if (projectId) {
+      supabase.from('route_builder_projects').select('*').eq('id', projectId).single()
+        .then(({ data }) => {
+           if (data && data.requirements) {
+              const reqs = data.requirements;
+              if (reqs.chatMessages) setChatMessages(reqs.chatMessages);
+              if (reqs.gpxData) setGpxData(reqs.gpxData);
+              if (reqs.guideText) setGuideText(reqs.guideText);
+              if (reqs.vehicleType) setVehicleType(reqs.vehicleType);
+              if (reqs.bikeSubtype) setBikeSubtype(reqs.bikeSubtype);
+              if (reqs.geometry) setGeometry({ type: 'LineString', coordinates: reqs.geometry.map((p: any) => [p[1], p[0]]) });
+              if (reqs.waypoints) {
+                  skipNextCalc.current = true;
+                  setWaypoints(reqs.waypoints);
+              }
+           }
+        });
+    }
+  }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
 
   // Recalculate route whenever waypoints or vehicle type changes
   useEffect(() => {
+    if (skipNextCalc.current) {
+        skipNextCalc.current = false;
+        return;
+    }
     if (waypoints.length >= 2) {
       // Use a small delay to avoid calling while state is still being set
       const timer = setTimeout(() => {
@@ -197,6 +227,57 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
         if (data.guide) {
             setGuideText(data.guide);
         }
+
+        // Save project to supabase
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData.user) {
+            if (!projectId) {
+              const { data: project } = await supabase
+                .from('route_builder_projects')
+                .insert({
+                  user_id: userData.user.id,
+                  requirements: {
+                    title: data.title || 'Nowa Trasa AI',
+                    chatMessages: messagesToUse,
+                    waypoints: wps,
+                    geometry: data.trackPoints,
+                    gpxData: data.gpx,
+                    guideText: data.guide,
+                    vehicleType: vType,
+                    bikeSubtype: bType
+                  }
+                })
+                .select()
+                .single();
+              if (project) {
+                setProjectId(project.id);
+                navigate(`/create?projectId=${project.id}`, { replace: true });
+              }
+            } else {
+              // Update existing
+              await supabase
+                .from('route_builder_projects')
+                .update({
+                  requirements: {
+                    title: data.title || 'Nowa Trasa AI',
+                    chatMessages: messagesToUse,
+                    waypoints: wps,
+                    geometry: data.trackPoints,
+                    gpxData: data.gpx,
+                    guideText: data.guide,
+                    vehicleType: vType,
+                    bikeSubtype: bType
+                  },
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', projectId);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to save project", e);
+        }
+
       } else {
           toast.error("Agent nie zwrócił współrzędnych trasy.");
       }
@@ -216,6 +297,34 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
     setGeometry(null);
     setGpxData(null);
     setGuideText(null);
+    setProjectId(null);
+    navigate('/create', { replace: true });
+  };
+
+  const handleDownloadPdf = () => {
+    if (!guideText) return;
+    const doc = new jsPDF();
+    doc.addFont("Helvetica", "Helvetica", "normal");
+    doc.setFont("Helvetica");
+    
+    // Split text to fit page width
+    const splitText = doc.splitTextToSize(guideText, 180);
+    
+    let y = 20;
+    doc.setFontSize(16);
+    doc.text("Przewodnik po Trasie", 10, y);
+    y += 15;
+    
+    doc.setFontSize(12);
+    for (let i = 0; i < splitText.length; i++) {
+        if (y > 280) {
+            doc.addPage();
+            y = 20;
+        }
+        doc.text(splitText[i], 10, y);
+        y += 7;
+    }
+    doc.save("przewodnik_trasy.pdf");
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -491,7 +600,7 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
                 Twoja Trasa
               </h3>
               <Button 
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-md"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-md mb-2"
                 onClick={() => {
                   const blob = new Blob([gpxData], { type: 'application/gpx+xml' });
                   const url = URL.createObjectURL(blob);
@@ -504,6 +613,14 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
               >
                 Pobierz Plik GPX
               </Button>
+              {guideText && (
+                <Button 
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white shadow-md"
+                  onClick={handleDownloadPdf}
+                >
+                  Pobierz Przewodnik PDF
+                </Button>
+              )}
             </Card>
 
             {guideText && (

@@ -19,6 +19,8 @@ import {
   AlertTriangle, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import { useQuery } from '@tanstack/react-query';
 
 function openDownload(url: string) {
   const link = document.createElement('a');
@@ -28,6 +30,65 @@ function openDownload(url: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+function GeneratedRouteCard({ project }: { project: any }) {
+  const navigate = useNavigate();
+  const reqs = project.requirements || {};
+  const title = reqs.title || 'Moja trasa AI';
+  const updatedDate = new Date(project.updated_at).toLocaleDateString();
+
+  const handleDownloadGpx = () => {
+    if (!reqs.gpxData) return;
+    const blob = new Blob([reqs.gpxData], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'trasa_ai.gpx';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPdf = () => {
+    if (!reqs.guideText) return;
+    const doc = new jsPDF();
+    doc.addFont("Helvetica", "Helvetica", "normal");
+    doc.setFont("Helvetica");
+    const splitText = doc.splitTextToSize(reqs.guideText, 180);
+    let y = 20;
+    doc.setFontSize(16);
+    doc.text("Przewodnik po Trasie", 10, y);
+    y += 15;
+    doc.setFontSize(12);
+    for (let i = 0; i < splitText.length; i++) {
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(splitText[i], 10, y);
+        y += 7;
+    }
+    doc.save("przewodnik_ai.pdf");
+  };
+
+  return (
+    <div className="bg-card rounded-xl border border-border/60 shadow-token-sm p-5">
+       <h3 className="font-bold text-lg mb-1">{title}</h3>
+       <p className="text-sm text-muted-foreground mb-4">Ostatnia edycja: {updatedDate}</p>
+       <div className="flex flex-wrap gap-2">
+         <Button size="sm" onClick={() => navigate(`/create?projectId=${project.id}`)}>
+           <ExternalLink className="w-3.5 h-3.5 mr-1" /> Wznów edycję z AI
+         </Button>
+         {reqs.gpxData && (
+           <Button size="sm" variant="outline" onClick={handleDownloadGpx}>
+             <Download className="w-3.5 h-3.5 mr-1" /> GPX
+           </Button>
+         )}
+         {reqs.guideText && (
+           <Button size="sm" variant="outline" onClick={handleDownloadPdf}>
+             <FileText className="w-3.5 h-3.5 mr-1" /> PDF
+           </Button>
+         )}
+       </div>
+    </div>
+  );
 }
 
 function PurchasedRouteCard({ purchase }: { purchase: any }) {
@@ -177,6 +238,21 @@ export default function MyRoutes() {
   const { user, login, loading: authLoading } = useAuth();
   const { data: purchases, isLoading } = useUserPurchases(user?.id);
 
+  const { data: generatedRoutes, isLoading: genLoading } = useQuery({
+    queryKey: ['generated-routes', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from('route_builder_projects')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id
+  });
+
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -258,6 +334,17 @@ export default function MyRoutes() {
                 <PurchasedRouteCard key={p.id} purchase={p} />
               ))}
             </div>
+
+            {generatedRoutes && generatedRoutes.length > 0 && (
+              <div className="pt-6">
+                <h2 className="text-xl font-bold mb-4">Wygenerowane przez AI</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                  {generatedRoutes.map((proj: any) => (
+                    <GeneratedRouteCard key={proj.id} project={proj} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Support & Help section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
