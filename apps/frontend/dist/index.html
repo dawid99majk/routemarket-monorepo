@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RouteMarket — kupuj i sprzedawaj trasy GPX rowerowe, motocyklowe i turystyczne</title>
+    <meta name="description" content="RouteMarket to marketplace tras GPX: rowerowych, motocyklowych, pieszych i samochodowych. Pobierz pliki GPX, przewodniki PDF i interaktywne mapy z POI od sprawdzonych twórców.">
+    <meta name="keywords" content="trasy GPX, trasy rowerowe, trasy motocyklowe, szlaki turystyczne, przewodniki PDF, mapy GPX, gravel, MTB, bikepacking, road trip, marketplace tras">
+    <meta name="author" content="RouteMarket" />
+    <meta name="geo.region" content="PL" />
+    <meta name="geo.placename" content="Polska" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="google-site-verification" content="7Dm7iGd_9GkDF1JPppPzBS2Rv5_pTv6Km1aQVWJ6RWw" />
+
+    <link rel="preconnect" href="https://yzisjpkesqwwzonvlfzb.supabase.co" crossorigin />
+    <link rel="preconnect" href="https://unpkg.com" crossorigin />
+    <link rel="preconnect" href="https://a.tile.opentopomap.org" crossorigin />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" media="print" onload="this.media='all'" />
+
+    <link rel="canonical" href="https://routemarket.io/" />
+    <link rel="icon" type="image/png" href="/favicon.png">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="RouteMarket" />
+    <meta property="og:locale" content="pl_PL" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:url" content="https://routemarket.io/" />
+    <meta property="og:title" content="RouteMarket — marketplace tras GPX, rowerowych, motocyklowych i turystycznych" />
+    <meta property="og:description" content="Kupuj i sprzedawaj trasy GPX z przewodnikami PDF i interaktywnymi mapami. Rower, motocykl, hiking, samochód — wszystko w jednym miejscu." />
+    <meta property="og:image" content="https://routemarket.io/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RouteMarket — marketplace tras GPX" />
+    <meta name="twitter:description" content="Kupuj i sprzedawaj trasy GPX z przewodnikami PDF i interaktywnymi mapami." />
+    <meta name="twitter:image" content="https://routemarket.io/og-image.png" />
+
+    <!-- Static JSON-LD: Organization + WebSite (fallback for non-JS crawlers) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://routemarket.io/#organization",
+          "name": "RouteMarket",
+          "url": "https://routemarket.io/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://routemarket.io/og-image.png",
+            "width": 1200,
+            "height": 630
+          },
+          "sameAs": [
+            "https://routemarket.io/"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://routemarket.io/#website",
+          "url": "https://routemarket.io/",
+          "name": "RouteMarket",
+          "description": "Marketplace tras GPX: rowerowych, motocyklowych, pieszych i samochodowych.",
+          "publisher": { "@id": "https://routemarket.io/#organization" },
+          "inLanguage": ["pl-PL", "en-US", "de-DE", "fr-FR", "es-ES", "it-IT", "nl-NL", "da-DK"],
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://routemarket.io/explore?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HSM8K88KY0"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-HSM8K88KY0', { send_page_view: false });
+    </script>
+    <script type="module" crossorigin src="/assets/index-5GMi_xEi.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-BBIu9AcQ.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-vendor-Btrk44BY.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-vendor-BC3IF9Zn.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DukxowiT.css">
+  </head>
+
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
