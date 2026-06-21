@@ -1,1 +1,0 @@
-import{ad as t}from"./index-5GMi_xEi.js";async function i(o){const{data:{session:r}}=await t.auth.getSession(),{data:e,error:s}=await t.functions.invoke("verify-payment",{body:{session_id:o.sessionId,route_id:o.routeId},headers:r?.access_token?{Authorization:`Bearer ${r.access_token}`}:void 0});if(s)throw s;if(e?.error)throw new Error(e.error);return e}export{i as f};

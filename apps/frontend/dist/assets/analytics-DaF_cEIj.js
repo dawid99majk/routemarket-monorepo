@@ -1,1 +1,0 @@
-import{ad as i}from"./index-5GMi_xEi.js";function o({event:a,routeId:e,userId:n,metadata:s}){i.from("analytics_events").insert({event_name:a,route_id:e??null,user_id:n??null,metadata:s??{}}).then(({error:t})=>{t&&console.warn("[analytics]",a,t.message)})}export{o as t};

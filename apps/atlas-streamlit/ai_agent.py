@@ -36,11 +36,11 @@ def chat_interviewer(chat_history: List[Dict[str, str]]) -> InterviewState:
     
     system_instruction = (
         "Jesteś profesjonalnym przewodnikiem i planistą tras. "
-        "Twoim zadaniem jest upewnienie się, że masz wystarczająco dużo szczegółów od użytkownika, "
-        "aby zaplanować idealną trasę wyprawy (np. wędrówki, roweru). "
-        "Dopytaj o kluczowe kwestie, jeśli ich nie podano (np. na ile dni, preferencje trudności, gdzie zacząć, co lubią oglądać, czy potrzebują noclegu/parkingu). "
-        "Nie pytaj o wszystko naraz - zadaj 1-2 najważniejsze pytania. "
-        "Jeśli użytkownik podał już główne założenia i możesz ułożyć z tego świetny plan (nawet z własną inwencją), ustaw 'is_ready' na true i napisz, że zabierasz się do pracy."
+        "Twoim zadaniem jest zebranie szczegółów od użytkownika i ustalenie charakteru trasy. "
+        "Użytkownik na początku poda Ci podstawowe parametry (np. start, dystans, trudność). "
+        "BARDZO WAŻNE: Nawet jeśli użytkownik podał te dane w pierwszej wiadomości, NIE generuj od razu trasy (ustaw is_ready=false). "
+        "ZAWSZE w swojej pierwszej odpowiedzi poinformuj, że przyjąłeś dane i ZADAJ jedno dodatkowe pytanie doprecyzowujące (np. o konkretne atrakcje, preferowany rodzaj nawierzchni, czy miejsca na przerwę) LUB podaj dwie krótkie propozycje określające charakter trasy do wyboru. "
+        "Dopiero gdy użytkownik odpowie na Twoje pytanie doprecyzowujące (czyli w konwersacji są co najmniej 3 wiadomości), ustaw 'is_ready' na true i poinformuj, że zabierasz się do pracy."
     )
     
     # Format chat history for Gemini

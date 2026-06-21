@@ -58,15 +58,17 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
   return null;
 }
 
-export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: string, onBack?: () => void }) {
+import { WizardData } from '../CreateRoute';
+
+export default function RouteBuilderV2({ initialData, onBack }: { initialData?: WizardData, onBack?: () => void }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [projectId, setProjectId] = useState<string | null>(searchParams.get('projectId'));
   
-  // map initialMode ('fastbike', 'trekking', 'hiking-mountain') to vehicleType/bikeSubtype
+  // map initialData mode ('fastbike', 'trekking', 'hiking-mountain') to vehicleType/bikeSubtype
   const getInitialTypes = () => {
-    if (initialMode === 'fastbike') return { v: 'bicycle' as const, b: 'road' as const };
-    if (initialMode === 'hiking-mountain') return { v: 'hiking' as const, b: 'gravel' as const };
+    if (initialData?.mode === 'fastbike') return { v: 'bicycle' as const, b: 'road' as const };
+    if (initialData?.mode === 'hiking-mountain') return { v: 'hiking' as const, b: 'gravel' as const };
     return { v: 'bicycle' as const, b: 'gravel' as const };
   };
   
@@ -111,6 +113,40 @@ export default function RouteBuilderV2({ initialMode, onBack }: { initialMode?: 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
+
+  // Handle initialization with wizard data
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (initialData && !projectId && !initialized.current) {
+      initialized.current = true;
+      
+      const promptText = `Chcę zaplanować trasę. Aktywność: ${initialData.mode === 'fastbike' ? 'Rower Szosowy' : initialData.mode === 'trekking' ? 'Gravel / MTB' : 'Hiking'}. Start: ${initialData.startLocation}. Typ trasy: ${initialData.routeType}. ${initialData.destination ? `Meta: ${initialData.destination}. ` : ''}Dystans: ok. ${initialData.distance} km. Poziom trudności: ${initialData.difficulty}.`;
+      
+      const newMessages = [{ role: 'user' as const, text: promptText }];
+      setChatMessages(newMessages);
+      setIsTyping(true);
+      
+      fetch('/atlas/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: newMessages.map(m => ({ role: m.role, content: m.text }))
+        }) 
+      }).then(res => res.json()).then(data => {
+        if (data.reply) {
+          setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
+        }
+        if (data.is_ready) {
+          toast.success("Agent zebrał dane. Rozpoczynam planowanie trasy...");
+          doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype, newMessages);
+        }
+      }).catch(err => {
+        toast.error(err.message);
+      }).finally(() => {
+        setIsTyping(false);
+      });
+    }
+  }, [initialData, projectId]);
 
   // Recalculate route whenever waypoints or vehicle type changes
   useEffect(() => {
