@@ -91,7 +91,7 @@ export default function HeroSection() {
           Każdy nowy użytkownik otrzymuje <strong className="text-foreground">100 kredytów za darmo</strong> (3-4 trasy).
         </div>
         <Button 
-          onClick={() => navigate('/creator-ai-studio')} 
+          onClick={() => navigate('/create')} 
           className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 hover-lift shadow-md font-medium text-sm group/btn px-5 h-11"
         >
           Uruchom Kreator Magic AI
