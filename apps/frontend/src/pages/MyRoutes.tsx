@@ -326,17 +326,19 @@ export default function MyRoutes() {
         {/* Content */}
         {isLoading ? (
           <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
-        ) : hasPurchases ? (
+        ) : (hasPurchases || (generatedRoutes && generatedRoutes.length > 0)) ? (
           <>
             {/* Route cards grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-              {purchases.map((p) => (
-                <PurchasedRouteCard key={p.id} purchase={p} />
-              ))}
-            </div>
+            {hasPurchases && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                {purchases.map((p) => (
+                  <PurchasedRouteCard key={p.id} purchase={p} />
+                ))}
+              </div>
+            )}
 
             {generatedRoutes && generatedRoutes.length > 0 && (
-              <div className="pt-6">
+              <div className={hasPurchases ? "pt-10" : ""}>
                 <h2 className="text-xl font-bold mb-4">Wygenerowane przez AI</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                   {generatedRoutes.map((proj: any) => (

@@ -192,7 +192,7 @@
     "connection_error": "Błąd połączenia ze Stripe"
   },
   "purchases": {
-    "title": "Moje zakupione trasy",
+    "title": "Moje trasy",
     "login_to_view": "Zaloguj się, aby zobaczyć zakupione trasy",
     "no_purchases": "Brak zakupów",
     "no_purchases_hint": "Przeglądaj marketplace, aby znaleźć trasy z plikami GPX i przewodnikami PDF.",

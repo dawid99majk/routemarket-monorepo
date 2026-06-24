@@ -191,7 +191,7 @@
     "connection_error": "Stripe connection error"
   },
   "purchases": {
-    "title": "My Purchased Routes",
+    "title": "My Routes",
     "login_to_view": "Log in to view your purchased routes",
     "no_purchases": "No purchases",
     "no_purchases_hint": "Explore our marketplace to find curated routes with GPX tracks and PDF guides.",
