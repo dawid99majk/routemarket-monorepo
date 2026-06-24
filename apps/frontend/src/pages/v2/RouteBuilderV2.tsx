@@ -15,7 +15,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet icon issue
-// @ts-ignore
+// @ts-expect-error Leaflet internal typings issue
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -65,10 +65,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const navigate = useNavigate();
   const [projectId, setProjectId] = useState<string | null>(searchParams.get('projectId'));
   
-  // map initialData mode ('fastbike', 'trekking', 'hiking-mountain') to vehicleType/bikeSubtype
+  // map initialData mode ('fastbike', 'trekking', 'hiking-mountain', 'city', 'car') to vehicleType/bikeSubtype
   const getInitialTypes = () => {
     if (initialData?.mode === 'fastbike') return { v: 'bicycle' as const, b: 'road' as const };
     if (initialData?.mode === 'hiking-mountain') return { v: 'hiking' as const, b: 'gravel' as const };
+    if (initialData?.mode === 'city') return { v: 'hiking' as const, b: 'gravel' as const };
+    if (initialData?.mode === 'car') return { v: 'motorcycle' as const, b: 'road' as const };
     return { v: 'bicycle' as const, b: 'gravel' as const };
   };
   
@@ -108,6 +110,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
            }
         });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -120,7 +123,13 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     if (initialData && !projectId && !initialized.current) {
       initialized.current = true;
       
-      const promptText = `Chcę zaplanować trasę. Aktywność: ${initialData.mode === 'fastbike' ? 'Rower Szosowy' : initialData.mode === 'trekking' ? 'Gravel / MTB' : 'Hiking'}. Start: ${initialData.startLocation}. Typ trasy: ${initialData.routeType}. ${initialData.destination ? `Meta: ${initialData.destination}. ` : ''}Dystans: ok. ${initialData.distance} km. Poziom trudności: ${initialData.difficulty}.`;
+      const promptText = `Chcę zaplanować trasę. Aktywność: ${
+        initialData.mode === 'fastbike' ? 'Rower Szosowy' : 
+        initialData.mode === 'trekking' ? 'Gravel / MTB' : 
+        initialData.mode === 'hiking-mountain' ? 'Hiking' : 
+        initialData.mode === 'city' ? 'Zwiedzanie miasta' : 
+        initialData.mode === 'car' ? 'Samochód' : 'Inna'
+      }. Start: ${initialData.startLocation}. Typ trasy: ${initialData.routeType}. ${initialData.destination ? `Meta: ${initialData.destination}. ` : ''}Dystans: ok. ${initialData.distance} km. Poziom trudności: ${initialData.difficulty}.`;
       
       const newMessages = [{ role: 'user' as const, text: promptText }];
       setChatMessages(newMessages);
@@ -146,6 +155,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         setIsTyping(false);
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, projectId]);
 
   // Recalculate route whenever waypoints or vehicle type changes
@@ -158,11 +168,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       // Use a small delay to avoid calling while state is still being set
       const timer = setTimeout(() => {
         doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype);
-      }, 100);
+      }, 500);
       return () => clearTimeout(timer);
     } else {
       setGeometry(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, vehicleType, bikeSubtype]);
 
   const handleMapClick = (latlng: L.LatLng) => {
@@ -367,7 +378,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     e.preventDefault();
     if (!inputValue.trim() || isTyping) return;
 
-    let userText = inputValue;
+    const userText = inputValue;
     setInputValue('');
     
     // Inject map context into user message if they have waypoints or notes

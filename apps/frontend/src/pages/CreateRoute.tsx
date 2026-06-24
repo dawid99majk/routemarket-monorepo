@@ -6,10 +6,10 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Map as MapIcon, Bike, Mountain, Footprints } from 'lucide-react';
+import { ArrowLeft, Map as MapIcon, Bike, Mountain, Footprints, Building2, Car } from 'lucide-react';
 import RouteBuilderV2 from './v2/RouteBuilderV2';
 
-type RouteMode = 'fastbike' | 'trekking' | 'hiking-mountain' | null;
+type RouteMode = 'fastbike' | 'trekking' | 'hiking-mountain' | 'city' | 'car' | null;
 
 export interface WizardData {
   mode: string;
@@ -93,37 +93,59 @@ export default function CreateRoute() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
               <Card 
-                className="flex flex-col items-center justify-center p-10 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
+                className="flex flex-col items-center justify-center p-6 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
                 onClick={() => handleModeSelect('fastbike')}
               >
-                <Bike className="w-20 h-20 text-blue-500 mb-6" />
-                <h2 className="text-2xl font-bold mb-2 text-center">Rower Szosowy</h2>
-                <p className="text-muted-foreground text-center">
-                  Asfalt, prędkość i optymalizacja profilu wysokościowego.
+                <Bike className="w-16 h-16 text-blue-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2 text-center">Rower Szosowy</h2>
+                <p className="text-muted-foreground text-sm text-center">
+                  Asfalt, prędkość i profil wysokościowy.
                 </p>
               </Card>
 
               <Card 
-                className="flex flex-col items-center justify-center p-10 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
+                className="flex flex-col items-center justify-center p-6 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
                 onClick={() => handleModeSelect('trekking')}
               >
-                <Mountain className="w-20 h-20 text-orange-500 mb-6" />
-                <h2 className="text-2xl font-bold mb-2 text-center">Gravel / MTB</h2>
-                <p className="text-muted-foreground text-center">
-                  Szutry, ścieżki leśne i eksploracja bezdroży.
+                <Mountain className="w-16 h-16 text-orange-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2 text-center">Gravel / MTB</h2>
+                <p className="text-muted-foreground text-sm text-center">
+                  Szutry, ścieżki leśne i bezdroża.
                 </p>
               </Card>
 
               <Card 
-                className="flex flex-col items-center justify-center p-10 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
+                className="flex flex-col items-center justify-center p-6 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
                 onClick={() => handleModeSelect('hiking-mountain')}
               >
-                <Footprints className="w-20 h-20 text-green-500 mb-6" />
-                <h2 className="text-2xl font-bold mb-2 text-center">Hiking</h2>
-                <p className="text-muted-foreground text-center">
-                  Piesze wędrówki górskie i szlaki turystyczne.
+                <Footprints className="w-16 h-16 text-green-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2 text-center">Hiking</h2>
+                <p className="text-muted-foreground text-sm text-center">
+                  Wędrówki piesze i górskie szlaki.
+                </p>
+              </Card>
+
+              <Card 
+                className="flex flex-col items-center justify-center p-6 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
+                onClick={() => handleModeSelect('city')}
+              >
+                <Building2 className="w-16 h-16 text-yellow-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2 text-center">Zwiedzanie Miasta</h2>
+                <p className="text-muted-foreground text-sm text-center">
+                  Zabytki, gastronomia, kultura i spacery piesze.
+                </p>
+              </Card>
+
+              <Card 
+                className="flex flex-col items-center justify-center p-6 cursor-pointer hover:border-primary hover:shadow-lg transition-all"
+                onClick={() => handleModeSelect('car')}
+              >
+                <Car className="w-16 h-16 text-purple-500 mb-4" />
+                <h2 className="text-xl font-bold mb-2 text-center">Samochód</h2>
+                <p className="text-muted-foreground text-sm text-center">
+                  Trasy objazdowe, road tripy i punkty widokowe.
                 </p>
               </Card>
             </div>
