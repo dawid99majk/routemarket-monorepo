@@ -474,7 +474,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   ? 'bg-emerald-600 text-white rounded-br-sm' 
                   : 'bg-white text-slate-800 rounded-bl-sm border border-slate-200'
               }`}>
-                {msg.text}
+                {msg.text.replace(/\s*\[[^\]]+\]/g, '')}
               </div>
             </div>
           ))}
