@@ -41,7 +41,6 @@ export function ConceptStep({
 
   const handleFeedback = (option: string) => {
     toast.success(`Zgłoszono korektę: ${option}. AI dostosuje koncepcję.`);
-    console.log(`Feedback: ${option}`);
   };
 
   return (

@@ -54,7 +54,7 @@ export default function AdminMessages() {
       if (error) throw error;
 
       const userIds = (convs ?? []).filter(c => c.user_id).map(c => c.user_id!);
-      let profileMap: Record<string, string> = {};
+      const profileMap: Record<string, string> = {};
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
@@ -64,7 +64,7 @@ export default function AdminMessages() {
       }
 
       const convIds = (convs ?? []).map(c => c.id);
-      let unreadMap: Record<string, number> = {};
+      const unreadMap: Record<string, number> = {};
       if (convIds.length > 0) {
         const { data: msgs } = await supabase
           .from('messages')
@@ -107,7 +107,7 @@ export default function AdminMessages() {
       supabase.from('messages').update({ is_read: true }).in('id', unread)
         .then(() => queryClient.invalidateQueries({ queryKey: ['admin-conversations'] }));
     }
-  }, [messages, selectedConvId, user]);
+  }, [messages, selectedConvId, user, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -123,7 +123,7 @@ export default function AdminMessages() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedConvId]);
+  }, [selectedConvId, queryClient]);
 
   const filteredConvs = conversations.filter(c => {
     if (!searchQuery.trim()) return true;

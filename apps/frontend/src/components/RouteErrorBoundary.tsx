@@ -14,7 +14,7 @@ export default class RouteErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: unknown) {
     // Surface to console so it shows up in dev/preview logs.
-    // eslint-disable-next-line no-console
+     
     console.error('[RouteErrorBoundary]', error, info);
   }
 

@@ -155,7 +155,7 @@ export default function Index() {
                         <User className="w-4 h-4 mr-2" /> {t('nav.my_profile')}
                       </DropdownMenuItem>
                       <DropdownMenuItem className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate('/my-routes')}>
-                        <ShoppingBag className="w-4 h-4 mr-2" /> {t('nav.my_purchases')}
+                        <Compass className="w-4 h-4 mr-2" /> {t('nav.my_purchases')}
                       </DropdownMenuItem>
                       <DropdownMenuItem className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate('/creator-dashboard')}>
                         <LayoutDashboard className="w-4 h-4 mr-2" /> {t('nav.creator_dashboard')}

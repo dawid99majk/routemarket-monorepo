@@ -27,8 +27,8 @@
   "nav": {
     "sell_route": "Route verkopen",
     "favorites": "Favorieten",
-    "my_purchases": "Mijn aankopen",
-    "creator_dashboard": "Creator Dashboard",
+    "my_purchases": "Mijn routes",
+    "creator_dashboard": "Creator-dashboard",
     "my_profile": "Mijn profiel",
     "explore_map": "Kaart"
   },

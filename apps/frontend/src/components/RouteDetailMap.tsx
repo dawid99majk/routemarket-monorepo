@@ -95,7 +95,7 @@ function RouteDetailMapInner({
       noWrap: true,
     }).addTo(map);
 
-    let bounds = L.latLngBounds([]);
+    const bounds = L.latLngBounds([]);
 
     // Rysowanie tras alternatywnych, jeśli istnieją
     if (alternatives && alternatives.length > 0) {
