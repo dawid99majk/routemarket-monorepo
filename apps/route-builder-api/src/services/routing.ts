@@ -94,11 +94,13 @@ export class RoutingService {
   private mapOrsProfile(routeType: string): string {
     switch (routeType) {
       case 'motorcycle': return 'driving-car';
+      case 'car':        return 'driving-car';
       case 'cycling':    return 'cycling-regular';
       case 'gravel':     return 'cycling-mountain'; // Best for gravel/MTB!
       case 'mtb':        return 'cycling-mountain';
       case 'hiking':     return 'foot-hiking';
       case 'city_walk':  return 'foot-walking';
+      case 'city':       return 'foot-walking';
       default:           return 'cycling-mountain';
     }
   }
@@ -177,7 +179,7 @@ export class RoutingService {
     }
   ): Promise<RouteResult> {
     const profileMap: Record<string, string> = {
-      motorcycle: 'car', cycling: 'bike', gravel: 'bike', hiking: 'hike', city_walk: 'foot'
+      motorcycle: 'car', car: 'car', cycling: 'bike', gravel: 'bike', hiking: 'foot', city_walk: 'foot', city: 'foot'
     };
     const profile = profileMap[routeType] || 'bike';
     const body: any = {

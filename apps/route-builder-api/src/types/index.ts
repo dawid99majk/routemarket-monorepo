@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const RouteRequirementsSchema = z.object({
-  route_type: z.enum(['motorcycle', 'cycling', 'gravel', 'hiking', 'city_walk']),
+  route_type: z.enum(['motorcycle', 'cycling', 'gravel', 'hiking', 'city_walk', 'city', 'car']),
   region: z.string().nullable().optional(),
   start_point: z.string().nullable().optional(),
   end_point: z.string().nullable().optional(),

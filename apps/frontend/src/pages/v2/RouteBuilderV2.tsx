@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -74,7 +74,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     return { v: 'bicycle' as const, b: 'gravel' as const };
   };
   
-  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'bicycle' | 'hiking'>(getInitialTypes().v);
+  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'bicycle' | 'hiking' | 'city' | 'car'>(getInitialTypes().v);
   const [bikeSubtype, setBikeSubtype] = useState<'gravel' | 'road' | 'mtb'>(getInitialTypes().b);
   
   const [waypoints, setWaypoints] = useState<{lat: number, lng: number, type: string}[]>([]);
@@ -513,27 +513,41 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2">
           
           {/* Main Selector */}
-          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-lg p-1.5 flex gap-1 border border-slate-200/50">
+          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-lg p-1.5 flex gap-1 border border-slate-200/50 max-w-[95vw] overflow-x-auto scrollbar-none">
             <Button 
               variant={vehicleType === 'motorcycle' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 ${vehicleType === 'motorcycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
               onClick={() => setVehicleType('motorcycle')}
             >
               <Navigation className="w-4 h-4 mr-2" /> Motocykl
             </Button>
             <Button 
               variant={vehicleType === 'bicycle' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 ${vehicleType === 'bicycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'bicycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
               onClick={() => setVehicleType('bicycle')}
             >
               <Bike className="w-4 h-4 mr-2" /> Rower
             </Button>
             <Button 
               variant={vehicleType === 'hiking' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 ${vehicleType === 'hiking' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'hiking' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
               onClick={() => setVehicleType('hiking')}
             >
               <RouteIcon className="w-4 h-4 mr-2" /> Pieszo
+            </Button>
+            <Button 
+              variant={vehicleType === 'city' ? 'default' : 'ghost'} 
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'city' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setVehicleType('city')}
+            >
+              <Building2 className="w-4 h-4 mr-2" /> Miasto
+            </Button>
+            <Button 
+              variant={vehicleType === 'car' ? 'default' : 'ghost'} 
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'car' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setVehicleType('car')}
+            >
+              <Car className="w-4 h-4 mr-2" /> Samochód
             </Button>
           </div>
 
@@ -595,7 +609,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             <Polyline 
               positions={geometry.coordinates.map((c: any) => [c[1], c[0]])} 
               pathOptions={{ 
-                color: vehicleType === 'hiking' ? '#f43f5e' : '#10b981', 
+                color: (vehicleType === 'hiking' || vehicleType === 'city') ? '#f43f5e' : '#10b981', 
                 weight: 5, 
                 opacity: 0.9,
                 lineCap: 'round',
