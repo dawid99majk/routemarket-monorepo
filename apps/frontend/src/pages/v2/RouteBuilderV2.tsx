@@ -68,9 +68,10 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   // map initialData mode ('fastbike', 'trekking', 'hiking-mountain', 'city', 'car') to vehicleType/bikeSubtype
   const getInitialTypes = () => {
     if (initialData?.mode === 'fastbike') return { v: 'bicycle' as const, b: 'road' as const };
+    if (initialData?.mode === 'trekking') return { v: 'bicycle' as const, b: 'gravel' as const };
     if (initialData?.mode === 'hiking-mountain') return { v: 'hiking' as const, b: 'gravel' as const };
-    if (initialData?.mode === 'city') return { v: 'hiking' as const, b: 'gravel' as const };
-    if (initialData?.mode === 'car') return { v: 'motorcycle' as const, b: 'road' as const };
+    if (initialData?.mode === 'city') return { v: 'city' as const, b: 'gravel' as const };
+    if (initialData?.mode === 'car') return { v: 'car' as const, b: 'road' as const };
     return { v: 'bicycle' as const, b: 'gravel' as const };
   };
   
