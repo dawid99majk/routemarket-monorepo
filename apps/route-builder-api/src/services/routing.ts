@@ -3,7 +3,7 @@ import { GeocodedPlace } from './geocoding.js';
 export interface RouteResult {
   distance_km: number;
   duration_h: number;
-  trackPoints: [number, number][]; // [lat, lng]
+  trackPoints: [number, number, number?][]; // [lat, lng, ele?]
   geometry?: {
     type: 'LineString';
     coordinates: number[][];
@@ -157,7 +157,7 @@ export class RoutingService {
     if (!feature) throw new Error('ORS returned no features.');
 
     const coordinates_out = feature.geometry.coordinates as number[][];
-    const trackPoints = coordinates_out.map(c => [c[1], c[0]] as [number, number]);
+    const trackPoints = coordinates_out.map(c => [c[1], c[0], c[2] || 0] as [number, number, number]);
     const summary = feature.properties?.summary;
 
     console.log(`[ORS] Route OK: ${summary?.distance?.toFixed(1)}km, ${summary?.duration?.toFixed(0)}s`);
@@ -208,7 +208,7 @@ export class RoutingService {
 
     const path = data.paths[0];
     const coordinates = path.points.coordinates as number[][];
-    const trackPoints = coordinates.map(c => [c[1], c[0]] as [number, number]);
+    const trackPoints = coordinates.map(c => [c[1], c[0], c[2] || 0] as [number, number, number]);
 
     return {
       distance_km: parseFloat((path.distance / 1000).toFixed(2)),

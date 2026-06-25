@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -89,6 +89,36 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [guideText, setGuideText] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const [activeTab, setActiveTab] = useState<'chat' | 'details'>('chat');
+  const [showNotes, setShowNotes] = useState<boolean>(true);
+
+  // Calculate route stats (distance and ascent/descent)
+  const routeStats = useMemo(() => {
+    if (!geometry || !geometry.coordinates || geometry.coordinates.length < 2) {
+      return { distance: 0, ascent: 0, descent: 0 };
+    }
+    let totalDist = 0;
+    let totalAscent = 0;
+    let totalDescent = 0;
+    const coords = geometry.coordinates;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const [lng1, lat1, ele1] = coords[i];
+      const [lng2, lat2, ele2] = coords[i+1];
+      totalDist += getHaversineDistance(lat1, lng1, lat2, lng2);
+      const eleDiff = (ele2 || 0) - (ele1 || 0);
+      if (eleDiff > 0) {
+        totalAscent += eleDiff;
+      } else {
+        totalDescent -= eleDiff;
+      }
+    }
+    return {
+      distance: totalDist,
+      ascent: totalAscent,
+      descent: totalDescent
+    };
+  }, [geometry]);
+
   // Load existing project if projectId is in URL
   const skipNextCalc = useRef(false);
   useEffect(() => {
@@ -102,10 +132,18 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               if (reqs.guideText) setGuideText(reqs.guideText);
               if (reqs.vehicleType) setVehicleType(reqs.vehicleType);
               if (reqs.bikeSubtype) setBikeSubtype(reqs.bikeSubtype);
-              if (reqs.geometry) setGeometry({ type: 'LineString', coordinates: reqs.geometry.map((p: any) => [p[1], p[0]]) });
+              if (reqs.geometry) {
+                setGeometry({ 
+                  type: 'LineString', 
+                  coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) 
+                });
+              }
               if (reqs.waypoints) {
                   skipNextCalc.current = true;
                   setWaypoints(reqs.waypoints);
+              }
+              if (reqs.gpxData || reqs.guideText) {
+                setActiveTab('details');
               }
            }
         });
@@ -221,7 +259,10 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   };
 
   const generateGpxString = (coords: number[][], title: string = 'Trasa RouteMarket') => {
-    const points = coords.map(([lng, lat]) => `      <trkpt lat="${lat}" lon="${lng}" />`).join('\n');
+    const points = coords.map(([lng, lat, ele]) => {
+      const eleTag = ele !== undefined ? `\n        <ele>${ele.toFixed(1)}</ele>` : '';
+      return `      <trkpt lat="${lat}" lon="${lng}">${eleTag}\n      </trkpt>`;
+    }).join('\n');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="RouteMarket" xmlns="http://www.topografix.com/GPX/1/1">
   <trk>
@@ -260,14 +301,15 @@ ${points}
       const data = await res.json();
 
       if (data.trackPoints && data.trackPoints.length > 0) {
+        const mappedCoords = data.trackPoints.map((p: number[]) => [p[1], p[0], p[2] || 0]);
         setGeometry({
           type: 'LineString',
-          coordinates: data.trackPoints.map((p: number[]) => [p[1], p[0]]) // [lat,lng] -> [lng,lat] for GeoJSON
+          coordinates: mappedCoords
         });
 
-        let existingTitle = 'Moja Trasa AI';
-        let existingReqs: any = {};
-        
+        const newGpx = generateGpxString(mappedCoords, 'Moja Trasa AI');
+        setGpxData(newGpx);
+
         if (projectId) {
           try {
             const { data: project } = await supabase
@@ -275,13 +317,15 @@ ${points}
               .select('requirements')
               .eq('id', projectId)
               .single();
+            let existingTitle = 'Moja Trasa AI';
+            let existingReqs: any = {};
             if (project && project.requirements) {
               existingReqs = project.requirements;
               existingTitle = existingReqs.title || 'Moja Trasa AI';
             }
 
-            const newGpx = generateGpxString(data.trackPoints, existingTitle);
-            setGpxData(newGpx);
+            const dbGpx = generateGpxString(mappedCoords, existingTitle);
+            setGpxData(dbGpx);
 
             await supabase
               .from('route_builder_projects')
@@ -290,7 +334,7 @@ ${points}
                   ...existingReqs,
                   waypoints: wps,
                   geometry: data.trackPoints,
-                  gpxData: newGpx,
+                  gpxData: dbGpx,
                   vehicleType: vType,
                   bikeSubtype: bType
                 },
@@ -325,7 +369,6 @@ ${points}
           let fallbackText = "Proszę wyznacz trasę na podstawie moich punktów.";
           if (inputNotes) fallbackText += ` Moje notatki: ${inputNotes}`;
           if (wps.length > 0) {
-              // Add rough coordinates to help the agent find the locations
               fallbackText += ` Wyznaczam przez ${wps.length} punktów: ${wps.map((wp, i) => `Pkt ${i+1} (lat:${wp.lat.toFixed(4)}, lng:${wp.lng.toFixed(4)})`).join(', ')}`;
           }
           messagesToUse = [{ role: 'user', text: fallbackText }];
@@ -346,21 +389,21 @@ ${points}
       const data = await res.json();
       
       if (data.trackPoints && data.trackPoints.length > 0) {
+        const mappedCoords = data.trackPoints.map((p: number[]) => [p[1], p[0], p[2] || 0]);
         setGeometry({
           type: 'LineString',
-          coordinates: data.trackPoints.map((p: number[]) => [p[1], p[0]]) // [lat,lng] -> [lng,lat] for GeoJSON
+          coordinates: mappedCoords
         });
         
-        // Populate waypoints from generated points if available
-        if (data.points && data.points.length > 1) {
-            // we could parse them here, but the map will show the geometry.
-        }
-        
         toast.success("Trasa wygenerowana pomyślnie!");
+        setActiveTab('details');
         
-        if (data.gpx) {
-            setGpxData(data.gpx);
+        let finalGpx = data.gpx;
+        if (!finalGpx) {
+          finalGpx = generateGpxString(mappedCoords, data.title || 'Nowa Trasa AI');
         }
+        setGpxData(finalGpx);
+
         if (data.guide) {
             setGuideText(data.guide);
         }
@@ -379,7 +422,7 @@ ${points}
                     chatMessages: messagesToUse,
                     waypoints: wps,
                     geometry: data.trackPoints,
-                    gpxData: data.gpx,
+                    gpxData: finalGpx,
                     guideText: data.guide,
                     vehicleType: vType,
                     bikeSubtype: bType
@@ -401,7 +444,7 @@ ${points}
                     chatMessages: messagesToUse,
                     waypoints: wps,
                     geometry: data.trackPoints,
-                    gpxData: data.gpx,
+                    gpxData: finalGpx,
                     guideText: data.guide,
                     vehicleType: vType,
                     bikeSubtype: bType
@@ -530,70 +573,191 @@ ${points}
           <p className="text-xs text-slate-500 font-medium mt-1">Dodawaj punkty na mapie lub rozmawiaj z Agentem.</p>
         </div>
 
-        {/* Notes / Settings Area */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50/50">
-          <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2 block">Krótki opis / cel wycieczki</label>
-          <Textarea 
-            placeholder="Napisz gdzie jedziesz i na czym, np. 50km w Karkonoszach pieszo..." 
-            className="min-h-[80px] bg-white resize-none text-sm"
-            value={inputNotes}
-            onChange={e => setInputNotes(e.target.value)}
-          />
-          {waypoints.length > 0 && (
-            <div className="mt-3 flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-sm font-medium">
-              <span>Punktów: {waypoints.length}</span>
-              <button onClick={clearRoute} className="text-red-500 hover:text-red-700 flex items-center gap-1">
-                <Trash2 className="w-4 h-4" /> Wyczyść
+        {/* Tabs Switcher */}
+        <div className="flex border-b border-slate-100 p-2 bg-slate-50/30 gap-1 shrink-0">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-200 ${
+              activeTab === 'chat'
+                ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/50'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
+            }`}
+          >
+            Kreator AI
+          </button>
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5 ${
+              activeTab === 'details'
+                ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/50'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
+            }`}
+          >
+            Szczegóły trasy
+            {geometry && (
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
+                {routeStats.distance.toFixed(1)} km
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeTab === 'chat' ? (
+          <>
+            {/* Notes / Settings Area */}
+            <div className="border-b border-slate-100 bg-slate-50/50">
+              <button 
+                onClick={() => setShowNotes(!showNotes)}
+                className="w-full px-5 py-3 flex items-center justify-between text-xs font-semibold text-slate-700 uppercase tracking-wider hover:bg-slate-100/30 transition-colors"
+              >
+                <span className="flex items-center gap-1.5">Założenia trasy</span>
+                <span className="text-slate-400 font-normal normal-case flex items-center gap-0.5">
+                  {showNotes ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </span>
               </button>
+              
+              {showNotes && (
+                <div className="px-5 pb-4 pt-1 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <Textarea 
+                    placeholder="Napisz gdzie jedziesz i na czym, np. 50km w Karkonoszach pieszo..." 
+                    className="min-h-[70px] bg-white resize-none text-sm border-slate-200 focus-visible:ring-emerald-500/30"
+                    value={inputNotes}
+                    onChange={e => setInputNotes(e.target.value)}
+                  />
+                  {waypoints.length > 0 && (
+                    <div className="flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-xs font-medium">
+                      <span>Punkty na mapie: {waypoints.length}</span>
+                      <button onClick={clearRoute} className="text-red-500 hover:text-red-700 flex items-center gap-1 font-semibold">
+                        <Trash2 className="w-3.5 h-3.5" /> Wyczyść
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-          {chatMessages.length === 0 && (
-            <div className="text-center text-slate-400 text-sm mt-10">
-              <Bot className="w-10 h-10 mx-auto mb-3 opacity-50" />
-              Napisz do mnie, a pomogę Ci dobrać odpowiednią trasę i miejsca na mapie!
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+              {chatMessages.length === 0 && (
+                <div className="text-center text-slate-400 text-sm mt-10 px-4">
+                  <Bot className="w-10 h-10 mx-auto mb-3 opacity-40 text-emerald-600" />
+                  Napisz do mnie, a pomogę Ci dobrać odpowiednią trasę i miejsca na mapie!
+                </div>
+              )}
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed shadow-sm ${
+                    msg.role === 'user' 
+                      ? 'bg-emerald-600 text-white rounded-br-sm' 
+                      : 'bg-white text-slate-800 rounded-bl-sm border border-slate-200/50'
+                  }`}>
+                    {msg.text.replace(/\s*\[[^\]]+\]/g, '')}
+                  </div>
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-200/50 p-4 shadow-sm flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
             </div>
-          )}
-          {chatMessages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed shadow-sm ${
-                msg.role === 'user' 
-                  ? 'bg-emerald-600 text-white rounded-br-sm' 
-                  : 'bg-white text-slate-800 rounded-bl-sm border border-slate-200'
-              }`}>
-                {msg.text.replace(/\s*\[[^\]]+\]/g, '')}
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-200 p-4 shadow-sm flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
-                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
-                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
-              </div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
 
-        {/* Chat Input */}
-        <div className="p-4 bg-white border-t border-slate-200">
-          <form onSubmit={handleChatSubmit} className="relative flex items-center">
-            <Input 
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              placeholder="Zapytaj agenta o poradę..."
-              className="w-full bg-slate-50 border-slate-200 rounded-full pl-4 pr-12 py-5 text-slate-900 focus-visible:ring-emerald-500/50"
-            />
-            <Button type="submit" size="icon" className="absolute right-1 rounded-full bg-emerald-600 hover:bg-emerald-500 w-8 h-8 text-white">
-              <Send className="w-3.5 h-3.5 ml-0.5" />
-            </Button>
-          </form>
-        </div>
+            {/* Chat Input */}
+            <div className="p-4 bg-white border-t border-slate-200">
+              <form onSubmit={handleChatSubmit} className="relative flex items-center">
+                <Input 
+                  value={inputValue}
+                  onChange={e => setInputValue(e.target.value)}
+                  placeholder="Zapytaj agenta o poradę..."
+                  className="w-full bg-slate-50 border-slate-200 rounded-full pl-4 pr-12 py-5 text-slate-900 focus-visible:ring-emerald-500/50"
+                />
+                <Button type="submit" size="icon" className="absolute right-1 rounded-full bg-emerald-600 hover:bg-emerald-500 w-8 h-8 text-white">
+                  <Send className="w-3.5 h-3.5 ml-0.5" />
+                </Button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {!geometry ? (
+              <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 p-6 space-y-3 mt-10">
+                <RouteIcon className="w-12 h-12 text-slate-300 animate-pulse" />
+                <h3 className="font-semibold text-slate-700 text-sm">Brak aktywnej trasy</h3>
+                <p className="text-xs max-w-[250px] leading-relaxed">
+                  Wyznacz trasę, klikając punkty na mapie lub poproś o to Agenta w zakładce Kreator AI.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Dystans</span>
+                    <span className="text-2xl font-black text-slate-800 mt-1">
+                      {routeStats.distance.toFixed(1)} <span className="text-xs font-bold text-slate-500">km</span>
+                    </span>
+                  </div>
+                  
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Suma podejść</span>
+                    <span className="text-2xl font-black text-emerald-600 mt-1">
+                      +{Math.round(routeStats.ascent)} <span className="text-xs font-bold text-emerald-500/80">m</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Elevation Profile */}
+                <ElevationProfile coordinates={geometry.coordinates} />
+
+                {/* Actions Card */}
+                {gpxData && (
+                  <Card className="p-4 border-slate-200/60 bg-white shadow-sm flex flex-col gap-2.5">
+                    <h4 className="font-bold text-slate-400 text-[10px] uppercase tracking-wider">Pobierz trasę</h4>
+                    <div className="flex gap-2">
+                      <Button 
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-2 h-9"
+                        onClick={() => {
+                          const blob = new Blob([gpxData], { type: 'application/gpx+xml' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'trasa_routemarket.gpx';
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        Pobierz GPX
+                      </Button>
+                      {guideText && (
+                        <Button 
+                          className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2 h-9"
+                          onClick={handleDownloadPdf}
+                        >
+                          Przewodnik PDF
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Guide Text */}
+                {guideText && (
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-wider">Przewodnik po trasie</h3>
+                    <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                      {guideText}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right Panel - Map */}
@@ -743,47 +907,7 @@ ${points}
           </Badge>
         </div>
 
-        {gpxData && (
-          <div className="absolute top-6 right-6 z-[1000] flex flex-col gap-4 w-96 max-h-[90vh]">
-            <Card className="p-4 bg-white/95 backdrop-blur shadow-xl border-emerald-100 shrink-0">
-              <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-500"/>
-                Twoja Trasa
-              </h3>
-              <Button 
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-md mb-2"
-                onClick={() => {
-                  const blob = new Blob([gpxData], { type: 'application/gpx+xml' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'trasa_routemarket.gpx';
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Pobierz Plik GPX
-              </Button>
-              {guideText && (
-                <Button 
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-white shadow-md"
-                  onClick={handleDownloadPdf}
-                >
-                  Pobierz Przewodnik PDF
-                </Button>
-              )}
-            </Card>
 
-            {guideText && (
-              <Card className="p-5 bg-white/95 backdrop-blur shadow-xl border-emerald-100 overflow-y-auto flex-1">
-                <h3 className="font-bold text-slate-800 mb-3">Przewodnik po trasie</h3>
-                <div className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
-                  {guideText}
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
 
       </div>
     </div>
