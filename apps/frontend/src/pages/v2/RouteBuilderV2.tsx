@@ -167,7 +167,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     if (waypoints.length >= 2) {
       // Use a small delay to avoid calling while state is still being set
       const timer = setTimeout(() => {
-        doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype);
+        doCalculateFastRoute(waypoints, vehicleType, bikeSubtype);
       }, 500);
       return () => clearTimeout(timer);
     } else {
@@ -218,6 +218,96 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       }
       return newWps;
     });
+  };
+
+  const generateGpxString = (coords: number[][], title: string = 'Trasa RouteMarket') => {
+    const points = coords.map(([lng, lat]) => `      <trkpt lat="${lat}" lon="${lng}" />`).join('\n');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RouteMarket" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${title}</name>
+    <trkseg>
+${points}
+    </trkseg>
+  </trk>
+</gpx>`;
+  };
+
+  const doCalculateFastRoute = async (
+    wps: typeof waypoints, 
+    vType: typeof vehicleType, 
+    bType: typeof bikeSubtype
+  ) => {
+    setIsRouting(true);
+    try {
+      const res = await fetch('/route-builder-api/live-route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          points: wps.map((wp, i) => ({
+            name: wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Punkt ${i}`),
+            lat: wp.lat,
+            lng: wp.lng
+          })),
+          route_type: vType,
+          surface_preferences: bType ? [bType] : []
+        })
+      });
+
+      if (!res.ok) throw new Error('Live route calculation failed');
+      const data = await res.json();
+
+      if (data.trackPoints && data.trackPoints.length > 0) {
+        setGeometry({
+          type: 'LineString',
+          coordinates: data.trackPoints.map((p: number[]) => [p[1], p[0]]) // [lat,lng] -> [lng,lat] for GeoJSON
+        });
+
+        let existingTitle = 'Moja Trasa AI';
+        let existingReqs: any = {};
+        
+        if (projectId) {
+          try {
+            const { data: project } = await supabase
+              .from('route_builder_projects')
+              .select('requirements')
+              .eq('id', projectId)
+              .single();
+            if (project && project.requirements) {
+              existingReqs = project.requirements;
+              existingTitle = existingReqs.title || 'Moja Trasa AI';
+            }
+
+            const newGpx = generateGpxString(data.trackPoints, existingTitle);
+            setGpxData(newGpx);
+
+            await supabase
+              .from('route_builder_projects')
+              .update({
+                requirements: {
+                  ...existingReqs,
+                  waypoints: wps,
+                  geometry: data.trackPoints,
+                  gpxData: newGpx,
+                  vehicleType: vType,
+                  bikeSubtype: bType
+                },
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', projectId);
+          } catch (dbErr) {
+            console.error("DB update error:", dbErr);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("[doCalculateFastRoute] Error:", err);
+      toast.error("Błąd wyznaczania trasy na mapie.");
+    } finally {
+      setIsRouting(false);
+    }
   };
 
   const doCalculateLiveRoute = async (

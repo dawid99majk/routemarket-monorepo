@@ -40,6 +40,19 @@ export default function CreatorDashboard() {
     },
   });
 
+  const { data: generatedRoutes = [] } = useQuery({
+    queryKey: ['my-generated-routes', user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('route_builder_projects')
+        .select('id, requirements, updated_at')
+        .eq('user_id', user!.id)
+        .order('updated_at', { ascending: false });
+      return data ?? [];
+    },
+  });
+
   const { data: sales = [] } = useCreatorSales(user?.id);
 
   if (authLoading) {
@@ -160,6 +173,48 @@ export default function CreatorDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* AI Route Projects Section */}
+        {generatedRoutes.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground">Wygenerowane trasy AI</h2>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/my-routes')} className="text-xs text-muted-foreground h-9 px-3">
+                Zobacz wszystkie ({generatedRoutes.length})
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {generatedRoutes.slice(0, 4).map((proj: any) => {
+                const reqs = proj.requirements || {};
+                const title = reqs.title || 'Moja trasa AI';
+                const updatedDate = new Date(proj.updated_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' });
+                return (
+                  <Card key={proj.id} className="border-border/60 hover:shadow-token-md transition-all duration-200 bg-card">
+                    <CardContent className="p-5 flex flex-col justify-between h-full min-h-[130px]">
+                      <div>
+                        <h3 className="font-bold text-base leading-snug line-clamp-1">{title}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Ostatnia edycja: {updatedDate}</p>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button size="sm" onClick={() => navigate(`/create?projectId=${proj.id}`)} className="bg-primary hover:bg-primary/90 text-primary-foreground min-h-[36px] h-9">
+                          <Wand2 className="w-3.5 h-3.5 mr-1" /> Wznów edycję
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="min-h-[36px] h-9"
+                          onClick={() => navigate('/my-routes')}
+                        >
+                          Szczegóły
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
