@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -129,6 +129,55 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [bikeSubtype, setBikeSubtype] = useState<'gravel' | 'road' | 'mtb'>(getInitialTypes().b);
   
   const [waypoints, setWaypoints] = useState<{lat: number, lng: number, type: string}[]>([]);
+  const [tempMarker, setTempMarker] = useState<L.LatLng | null>(null);
+
+  const handleAddPointFromTemp = (type: 'start' | 'end' | 'waypoint') => {
+    if (!tempMarker) return;
+    setWaypoints(prev => {
+      let currentWps = [...prev];
+      
+      // Auto-populate from geometry if we are starting from scratch but have an AI route
+      if (currentWps.length === 0 && geometry && geometry.coordinates) {
+         const coords = geometry.coordinates;
+         const startC = coords[0];
+         const endC = coords[coords.length - 1];
+         currentWps = [
+            { lat: startC[1], lng: startC[0], type: 'start' },
+            { lat: endC[1], lng: endC[0], type: 'end' }
+         ];
+      }
+
+      if (type === 'start') {
+        const existingStart = currentWps.findIndex(w => w.type === 'start');
+        if (existingStart >= 0) {
+           currentWps[existingStart] = { lat: tempMarker.lat, lng: tempMarker.lng, type: 'start' };
+        } else {
+           currentWps.unshift({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'start' });
+        }
+      } else if (type === 'end') {
+        const existingEnd = currentWps.findIndex(w => w.type === 'end');
+        if (existingEnd >= 0) {
+           currentWps[existingEnd] = { lat: tempMarker.lat, lng: tempMarker.lng, type: 'end' };
+        } else {
+           currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'end' });
+        }
+      } else {
+        // waypoint
+        if (currentWps.length === 0) {
+           currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
+        } else {
+           const endIdx = currentWps.findIndex(w => w.type === 'end');
+           if (endIdx >= 0) {
+               currentWps.splice(endIdx, 0, { lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
+           } else {
+               currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
+           }
+        }
+      }
+      return currentWps;
+    });
+    setTempMarker(null);
+  };
   const [geometry, setGeometry] = useState<any>(null);
   const [isRouting, setIsRouting] = useState(false);
 
@@ -247,39 +296,23 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, projectId]);
 
-  // Recalculate route whenever waypoints or vehicle type changes
+  // Recalculate route whenever vehicle type changes
   useEffect(() => {
     if (skipNextCalc.current) {
         skipNextCalc.current = false;
         return;
     }
     if (waypoints.length >= 2) {
-      // Use a small delay to avoid calling while state is still being set
       const timer = setTimeout(() => {
         doCalculateFastRoute(waypoints, vehicleType, bikeSubtype);
       }, 500);
       return () => clearTimeout(timer);
-    } else {
-      setGeometry(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, vehicleType, bikeSubtype]);
+  }, [vehicleType, bikeSubtype]);
 
   const handleMapClick = (latlng: L.LatLng) => {
-    setWaypoints(prev => {
-      const newWps = [...prev];
-      if (newWps.length === 0) {
-        newWps.push({ lat: latlng.lat, lng: latlng.lng, type: 'start' });
-      } else if (newWps.length === 1) {
-        newWps.push({ lat: latlng.lat, lng: latlng.lng, type: 'end' });
-      } else {
-        // Insert before the last one (end)
-        const endWp = newWps.pop()!;
-        newWps.push({ lat: latlng.lat, lng: latlng.lng, type: 'waypoint' });
-        newWps.push(endWp);
-      }
-      return newWps;
-    });
+    setTempMarker(latlng);
   };
 
   const handleMarkerDrag = (index: number, e: any) => {
@@ -948,13 +981,38 @@ ${points}
               </Popup>
             </Marker>
           ))}
+
+          {tempMarker && (
+            <Popup position={[tempMarker.lat, tempMarker.lng]} onClose={() => setTempMarker(null)}>
+                <div className="flex flex-col gap-2 min-w-[140px] p-1">
+                  <p className="text-xs font-bold text-slate-700 mb-1 text-center">Opcje punktu</p>
+                  <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('start')}>
+                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2" /> Ustaw jako Start
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('end')}>
+                    <div className="w-2 h-2 rounded-full bg-red-500 mr-2" /> Ustaw jako Metę
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('waypoint')}>
+                    <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" /> Dodaj do trasy
+                  </Button>
+                </div>
+            </Popup>
+          )}
           
           <MapResizer geometry={geometry} />
         </MapContainer>
         
-        <div className="absolute bottom-6 left-6 z-[1000]">
-          <Badge variant="outline" className="bg-white/90 border-emerald-500/30 text-emerald-600 backdrop-blur-md py-1.5 px-4 rounded-full shadow-lg">
-            <MapPin className="w-3 h-3 mr-2" /> Live GraphHopper
+        <div className="absolute bottom-6 left-6 z-[1000] flex gap-2">
+          {waypoints.length >= 2 && (
+            <Button 
+              onClick={() => doCalculateFastRoute(waypoints, vehicleType, bikeSubtype)} 
+              className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg rounded-full px-5 h-10 font-bold"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> Przelicz trasę
+            </Button>
+          )}
+          <Badge variant="outline" className="bg-white/90 border-emerald-500/30 text-emerald-600 backdrop-blur-md py-1.5 px-4 rounded-full shadow-lg h-10 flex items-center">
+            <MapPin className="w-3 h-3 mr-2" /> GraphHopper
           </Badge>
         </div>
 
