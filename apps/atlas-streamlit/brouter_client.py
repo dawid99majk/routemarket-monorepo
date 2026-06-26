@@ -8,6 +8,59 @@ logger = logging.getLogger(__name__)
 
 BROUTER_BASE_URL = "https://brouter.de/brouter"
 
+def decode_polyline(polyline_str: str) -> List[Tuple[float, float]]:
+    """Decodes a Google Maps encoded polyline into a list of (lon, lat) tuples."""
+    index, len_str = 0, len(polyline_str)
+    lat, lng = 0, 0
+    coordinates = []
+
+    while index < len_str:
+        # Latitude
+        shift, result = 0, 0
+        while True:
+            char = polyline_str[index]
+            byte = ord(char) - 63
+            index += 1
+            result |= (byte & 0x1f) << shift
+            shift += 5
+            if byte < 0x20:
+                break
+        d_lat = ~(result >> 1) if (result & 1) else (result >> 1)
+        lat += d_lat
+
+        # Longitude
+        shift, result = 0, 0
+        while True:
+            char = polyline_str[index]
+            byte = ord(char) - 63
+            index += 1
+            result |= (byte & 0x1f) << shift
+            shift += 5
+            if byte < 0x20:
+                break
+        d_lng = ~(result >> 1) if (result & 1) else (result >> 1)
+        lng += d_lng
+
+        # Google polyline coordinates are (lat, lng), we return (lon, lat) for GPX
+        coordinates.append((lng / 100000.0, lat / 100000.0))
+
+    return coordinates
+
+def coordinates_to_gpx(coords: List[Tuple[float, float]], title: str = "Trasa Google Maps") -> str:
+    points_xml = []
+    for lon, lat in coords:
+        points_xml.append(f'      <trkpt lat="{lat}" lon="{lon}"></trkpt>')
+    points_str = "\n".join(points_xml)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RouteMarket" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>{title}</name>
+    <trkseg>
+{points_str}
+    </trkseg>
+  </trk>
+</gpx>"""
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate the great circle distance in meters between two points on the earth."""
     R = 6371000  # radius of Earth in meters
@@ -82,7 +135,47 @@ def generate_gpx_from_points(
 
     ors_key = os.getenv("OPENROUTESERVICE_API_KEY")
     gh_key = os.getenv("GRAPHHOPPER_API_KEY")
+    google_key = os.getenv("GOOGLE_MAPS_API_KEY")
     
+    # 0. Try Google Maps Directions API for car/motorcycle routing
+    if (profile.lower() in ["car", "motorcycle"]) and google_key:
+        logger.info(f"Trying Google Maps Directions API for {profile} routing with {len(points)} points...")
+        try:
+            origin = f"{points[0][1]},{points[0][0]}"
+            destination = f"{points[-1][1]},{points[-1][0]}"
+            waypoints_list = []
+            if len(points) > 2:
+                for lon, lat in points[1:-1]:
+                    waypoints_list.append(f"{lat},{lon}")
+            
+            params = {
+                "origin": origin,
+                "destination": destination,
+                "mode": "driving",
+                "key": google_key
+            }
+            if waypoints_list:
+                params["waypoints"] = "|".join(waypoints_list)
+                
+            url = "https://maps.googleapis.com/maps/api/directions/json"
+            res = requests.get(url, params=params, timeout=25)
+            res.raise_for_status()
+            data = res.json()
+            
+            if data.get("status") == "OK" and data.get("routes"):
+                encoded_poly = data["routes"][0]["overview_polyline"]["points"]
+                decoded_coords = decode_polyline(encoded_poly)
+                gpx_data = coordinates_to_gpx(decoded_coords)
+                logger.info("Google Maps routing successful.")
+                if output_file:
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        f.write(gpx_data)
+                return gpx_data
+            else:
+                logger.warning(f"Google Maps Directions API returned status: {data.get('status')}. Trying ORS...")
+        except Exception as e:
+            logger.warning(f"Google Maps routing failed: {e}. Trying ORS...")
+            
     # 1. Try OpenRouteService
     if ors_key:
         # Map profiles to ORS

@@ -13,6 +13,7 @@ export interface RouteResult {
 export class RoutingService {
   private readonly orsApiKey = process.env.OPENROUTESERVICE_API_KEY || '';
   private readonly orsBaseUrl = 'https://api.openrouteservice.org/v2/directions';
+  private readonly googleApiKey = process.env.GOOGLE_MAPS_API_KEY || '';
   // GraphHopper kept as fallback
   private readonly ghApiKey = process.env.GRAPHHOPPER_API_KEY || '';
   private readonly ghBaseUrl = 'https://graphhopper.com/api/1/route';
@@ -33,7 +34,16 @@ export class RoutingService {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
     }
 
-    // PRIMARY: OpenRouteService (50 waypoints, cycling-mountain profile for gravel)
+    // PRIMARY: Google Maps for car and motorcycle
+    if ((routeType === 'car' || routeType === 'motorcycle') && this.googleApiKey) {
+      try {
+        return await this.fetchGoogleRoute(places, routeType, options);
+      } catch (err: any) {
+        console.warn(`[Routing] Google Maps routing failed, trying ORS: ${err.message}`);
+      }
+    }
+
+    // SECONDARY: OpenRouteService (50 waypoints, cycling-mountain profile for gravel)
     if (this.orsApiKey) {
       try {
         return await this.fetchOrsRoute(places, routeType, options);
@@ -216,6 +226,95 @@ export class RoutingService {
       duration_h: parseFloat((path.time / 3600000).toFixed(2)),
       trackPoints,
       geometry: { type: 'LineString', coordinates }
+    };
+  }
+
+  private decodePolyline(encoded: string): [number, number][] {
+    const points: [number, number][] = [];
+    let index = 0, len = encoded.length;
+    let lat = 0, lng = 0;
+
+    while (index < len) {
+      let b, shift = 0, result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.push([lat / 1e5, lng / 1e5]);
+    }
+    return points;
+  }
+
+  private async fetchGoogleRoute(
+    places: GeocodedPlace[],
+    routeType: string,
+    options?: { intent?: string; surfacePreferences?: string[] }
+  ): Promise<RouteResult> {
+    console.log(`[Google Maps] Routing via driving mode with ${places.length} waypoints`);
+
+    const origin = `${places[0].lat},${places[0].lng}`;
+    const destination = `${places[places.length - 1].lat},${places[places.length - 1].lng}`;
+    
+    let waypoints = '';
+    if (places.length > 2) {
+      waypoints = places.slice(1, -1).map(p => `${p.lat},${p.lng}`).join('|');
+    }
+
+    const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
+    url.searchParams.set('origin', origin);
+    url.searchParams.set('destination', destination);
+    if (waypoints) {
+      url.searchParams.set('waypoints', waypoints);
+    }
+    url.searchParams.set('mode', 'driving');
+    url.searchParams.set('key', this.googleApiKey);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      throw new Error(`Google Maps API returned status ${res.status}`);
+    }
+
+    const data = await res.json() as any;
+    if (data.status !== 'OK' || !data.routes || data.routes.length === 0) {
+      throw new Error(`Google Maps Directions API status: ${data.status}`);
+    }
+
+    const route = data.routes[0];
+    const encodedPoly = route.overview_polyline.points;
+    const decoded = this.decodePolyline(encodedPoly); // Returns [lat, lng][]
+
+    // Calculate total distance and duration from legs
+    let distanceMeters = 0;
+    let durationSeconds = 0;
+    for (const leg of route.legs) {
+      distanceMeters += leg.distance?.value || 0;
+      durationSeconds += leg.duration?.value || 0;
+    }
+
+    const trackPoints = decoded.map(([lat, lng]) => [lat, lng, 0] as [number, number, number]);
+
+    return {
+      distance_km: parseFloat((distanceMeters / 1000).toFixed(2)),
+      duration_h: parseFloat((durationSeconds / 3600).toFixed(2)),
+      trackPoints,
+      geometry: {
+        type: 'LineString',
+        coordinates: decoded.map(([lat, lng]) => [lng, lat]) // GeoJSON expects [lng, lat]
+      }
     };
   }
 
