@@ -104,7 +104,8 @@ def generate_gpx_from_points(
         url = f"https://api.openrouteservice.org/v2/directions/{ors_profile}/gpx"
         headers = {
             "Content-Type": "application/json",
-            "Authorization": ors_key
+            "Authorization": ors_key,
+            "Accept": "application/gpx+xml, application/json, application/geo+json"
         }
         body = {
             "coordinates": coords,

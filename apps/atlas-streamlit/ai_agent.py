@@ -104,6 +104,7 @@ def route_planner(research_context: str, chat_history: List[Dict[str, str]]) -> 
         "ABSOLUTNIE KLUCZOWE 1: Punkty MUSZĄ być ułożone w ścisłej chronologii, w fizycznej i geograficznej kolejności, w jakiej turysta będzie je mijał krok po kroku. "
         "ABSOLUTNIE KLUCZOWE 2: Twoim bezwzględnym priorytetem jest umieszczenie w planie wszystkich miejsc, o które wyraźnie prosił użytkownik w historii czatu. "
         "ABSOLUTNIE KLUCZOWE 3: Jeśli trasa ma charakter wycieczki jednodniowej (pętli), to PIERWSZY i OSTATNI punkt na liście muszą być tym samym miejscem (ta sama nazwa), aby pętla się zamknęła. "
+        "ABSOLUTNIE KLUCZOWE 4: Jeśli trasa dotyczy samochodu (car) lub motocykla (motorcycle), punkty startowe i pośrednie MUSZĄ być fizycznie i prawnie dostępne dla pojazdów silnikowych. Zabrania się podawania punktów leżących w strefach pieszych lub bez dróg, np. wewnątrz laguny Wenecji (zamiast 'Wenecja' użyj 'Mestre, Włochy' lub 'Piazzale Roma, Wenecja, Włochy'), czy na pieszych szczytach górskich bez dojazdu asfaltowego. Zawsze dobieraj najbliższy parking lub miejscowość z dojazdem samochodowym. "
         "Dla każdego punktu podaj precyzyjne `search_query` (np. 'Schronisko Samotnia, Karpacz, Polska'). ZABRONIONE jest dopisywanie pasm górskich (Karkonosze, Tatry itp.), gdyż system GPS tego nie rozumie. Używaj wyłącznie najbliższych miast i wsi!"
     )
     
