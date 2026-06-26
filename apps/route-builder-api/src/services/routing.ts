@@ -120,7 +120,8 @@ export class RoutingService {
       instructions: false,
       elevation: true,
       units: 'km',
-      language: 'pl'
+      language: 'pl',
+      radiuses: coordinates.map(() => 3000)
     };
 
     // For gravel/mountain biking: prefer unpaved surfaces

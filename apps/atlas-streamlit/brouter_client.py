@@ -109,7 +109,8 @@ def generate_gpx_from_points(
         }
         body = {
             "coordinates": coords,
-            "elevation": True
+            "elevation": True,
+            "radiuses": [3000] * len(points)
         }
         
         logger.info(f"Trying ORS routing via profile={ors_profile} for {len(points)} points...")
@@ -143,6 +144,16 @@ def generate_gpx_from_points(
         }
         gh_profile = gh_profile_map.get(profile.lower(), "bike")
         
+        # Down-sample points to 5 max points for GraphHopper free tier limit
+        gh_points = points
+        if len(points) > 5:
+            idx_1 = int(round((len(points) - 1) * 0.25))
+            idx_2 = int(round((len(points) - 1) * 0.5))
+            idx_3 = int(round((len(points) - 1) * 0.75))
+            indices = sorted(list(set([0, idx_1, idx_2, idx_3, len(points) - 1])))
+            gh_points = [points[i] for i in indices]
+            logger.info(f"GraphHopper: Down-sampled {len(points)} points to {len(gh_points)}")
+
         # Coordinates in GraphHopper GET requests are point=lat,lon
         params = [
             ("profile", gh_profile),
@@ -153,11 +164,11 @@ def generate_gpx_from_points(
             ("type", "gpx"),
             ("key", gh_key)
         ]
-        for lon, lat in points:
+        for lon, lat in gh_points:
             params.append(("point", f"{lat},{lon}"))
             
         url = "https://graphhopper.com/api/1/route"
-        logger.info(f"Trying GraphHopper routing via profile={gh_profile} for {len(points)} points...")
+        logger.info(f"Trying GraphHopper routing via profile={gh_profile} for {len(gh_points)} points...")
         try:
             res = requests.get(url, params=params, timeout=25)
             res.raise_for_status()
@@ -176,6 +187,8 @@ def generate_gpx_from_points(
     # 3. Fallback to BRouter
     lonlats_str = "|".join([f"{lon},{lat}" for lon, lat in points])
     profile_mapping = {
+        "car": "car-fast",
+        "motorcycle": "car-fast",
         "road": "fastbike",
         "gravel": "trekking",
         "hiking": "shortest",
