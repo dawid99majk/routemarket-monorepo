@@ -72,18 +72,114 @@ def generate_gpx_from_points(
     output_file: Optional[str] = None
 ) -> str:
     """
-    Fetches a GPX route from BRouter API for exactly the given points (1 API call).
+    Fetches a GPX route for exactly the given points.
+    Attempts OpenRouteService first (if key exists), then GraphHopper (if key exists), 
+    and falls back to BRouter.
     """
+    import os
     if len(points) < 2:
         raise ValueError("At least 2 points are required to generate a route.")
 
-    lonlats_str = "|".join([f"{lon},{lat}" for lon, lat in points])
+    ors_key = os.getenv("OPENROUTESERVICE_API_KEY")
+    gh_key = os.getenv("GRAPHHOPPER_API_KEY")
+    
+    # 1. Try OpenRouteService
+    if ors_key:
+        # Map profiles to ORS
+        ors_profile_map = {
+            "car": "driving-car",
+            "motorcycle": "driving-car",
+            "road": "cycling-road",
+            "gravel": "cycling-mountain",
+            "mtb": "cycling-mountain",
+            "hiking": "foot-hiking",
+            "city": "foot-walking",
+            "city_walk": "foot-walking"
+        }
+        ors_profile = ors_profile_map.get(profile.lower(), "cycling-mountain")
+        
+        # Coordinates in ORS are [lng, lat]
+        coords = [[lon, lat] for lon, lat in points]
+        
+        url = f"https://api.openrouteservice.org/v2/directions/{ors_profile}/gpx"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": ors_key
+        }
+        body = {
+            "coordinates": coords,
+            "elevation": True
+        }
+        
+        logger.info(f"Trying ORS routing via profile={ors_profile} for {len(points)} points...")
+        try:
+            res = requests.post(url, json=body, headers=headers, timeout=25)
+            res.raise_for_status()
+            gpx_data = res.text
+            if gpx_data.strip().startswith("<?xml"):
+                logger.info("ORS routing successful.")
+                if output_file:
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        f.write(gpx_data)
+                return gpx_data
+            else:
+                logger.warning("ORS did not return valid XML GPX. Trying GraphHopper...")
+        except Exception as e:
+            logger.warning(f"ORS routing failed: {e}. Trying GraphHopper...")
+            
+    # 2. Try GraphHopper
+    if gh_key:
+        # Map profiles to GraphHopper
+        gh_profile_map = {
+            "car": "car",
+            "motorcycle": "car",
+            "road": "bike",
+            "gravel": "bike",
+            "mtb": "bike",
+            "hiking": "foot",
+            "city": "foot",
+            "city_walk": "foot"
+        }
+        gh_profile = gh_profile_map.get(profile.lower(), "bike")
+        
+        # Coordinates in GraphHopper GET requests are point=lat,lon
+        params = [
+            ("profile", gh_profile),
+            ("locale", "pl"),
+            ("points_encoded", "false"),
+            ("instructions", "false"),
+            ("elevation", "true"),
+            ("type", "gpx"),
+            ("key", gh_key)
+        ]
+        for lon, lat in points:
+            params.append(("point", f"{lat},{lon}"))
+            
+        url = "https://graphhopper.com/api/1/route"
+        logger.info(f"Trying GraphHopper routing via profile={gh_profile} for {len(points)} points...")
+        try:
+            res = requests.get(url, params=params, timeout=25)
+            res.raise_for_status()
+            gpx_data = res.text
+            if gpx_data.strip().startswith("<?xml"):
+                logger.info("GraphHopper routing successful.")
+                if output_file:
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        f.write(gpx_data)
+                return gpx_data
+            else:
+                logger.warning("GraphHopper did not return valid XML GPX. Trying BRouter...")
+        except Exception as e:
+            logger.warning(f"GraphHopper routing failed: {e}. Trying BRouter...")
 
-    # Map frontend profiles to BRouter profiles
+    # 3. Fallback to BRouter
+    lonlats_str = "|".join([f"{lon},{lat}" for lon, lat in points])
     profile_mapping = {
         "road": "fastbike",
         "gravel": "trekking",
-        "hiking": "shortest"
+        "hiking": "shortest",
+        "city": "shortest",
+        "city_walk": "shortest"
     }
     brouter_profile = profile_mapping.get(profile.lower(), "trekking")
 
@@ -94,6 +190,7 @@ def generate_gpx_from_points(
         "format": "gpx"
     }
     
+    logger.info(f"Falling back to BRouter routing via profile={brouter_profile} for {len(points)} points...")
     try:
         response = requests.get(BROUTER_BASE_URL, params=params, timeout=30)
         response.raise_for_status()
@@ -104,7 +201,6 @@ def generate_gpx_from_points(
         raise RuntimeError(f"Failed to fetch route from BRouter API: {e}")
 
     gpx_data = response.text
-    
     if not gpx_data.strip().startswith("<?xml"):
         raise RuntimeError(f"BRouter returned an error instead of GPX: {gpx_data[:200]}")
 

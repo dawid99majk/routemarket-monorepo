@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,6 +22,8 @@ export interface WizardData {
 
 export default function CreateRoute() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId');
   const { user, isCreator } = useAuth();
   
   // Wizard state
@@ -52,12 +54,15 @@ export default function CreateRoute() {
     );
   }
 
-  // If wizard is completed, show the map builder
-  if (wizardData) {
+  // If wizard is completed OR we have a projectId parameter, show the map builder
+  if (projectId || wizardData) {
     return (
       <RouteBuilderV2 
-        initialData={wizardData} 
-        onBack={() => setWizardData(null)} 
+        initialData={wizardData || undefined} 
+        onBack={() => {
+          setWizardData(null);
+          navigate('/create');
+        }} 
       />
     );
   }

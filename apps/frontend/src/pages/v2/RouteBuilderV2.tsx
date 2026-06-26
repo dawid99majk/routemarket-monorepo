@@ -189,7 +189,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [guideText, setGuideText] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'details'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'details' | 'saved'>('chat');
   const [showNotes, setShowNotes] = useState<boolean>(true);
 
   // Calculate route stats (distance and ascent/descent)
@@ -254,6 +254,91 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isTyping]);
+
+  // Saved Projects states and functions
+  const [savedProjects, setSavedProjects] = useState<any[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+
+  const fetchSavedProjects = async () => {
+    setIsLoadingSaved(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+
+      const { data, error } = await supabase
+        .from('route_builder_projects')
+        .select('*')
+        .eq('user_id', userData.user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedProjects(data || []);
+    } catch (e: any) {
+      console.error("Error fetching saved projects:", e);
+      toast.error("Nie udało się pobrać zapisanych tras");
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
+
+  const handleLoadProject = (project: any) => {
+    const reqs = project.requirements || {};
+    setProjectId(project.id);
+    
+    if (reqs.chatMessages) setChatMessages(reqs.chatMessages);
+    if (reqs.gpxData) setGpxData(reqs.gpxData);
+    if (reqs.guideText) setGuideText(reqs.guideText);
+    if (reqs.vehicleType) setVehicleType(reqs.vehicleType);
+    if (reqs.bikeSubtype) setBikeSubtype(reqs.bikeSubtype);
+    
+    if (reqs.geometry) {
+      setGeometry({ 
+        type: 'LineString', 
+        coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) 
+      });
+    } else {
+      setGeometry(null);
+    }
+    
+    if (reqs.waypoints) {
+      skipNextCalc.current = true;
+      setWaypoints(reqs.waypoints);
+    } else {
+      setWaypoints([]);
+    }
+    
+    navigate(`/create?projectId=${project.id}`, { replace: true });
+    setActiveTab('details');
+    toast.success(`Wczytano trasę: ${reqs.title || 'Moja trasa AI'}`);
+  };
+
+  const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Czy na pewno chcesz usunąć tę trasę?")) return;
+    
+    try {
+      const { error } = await supabase
+        .from('route_builder_projects')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+      toast.success("Trasa została usunięta");
+      setSavedProjects(prev => prev.filter(p => p.id !== id));
+      if (projectId === id) {
+        clearRoute();
+      }
+    } catch (e: any) {
+      console.error("Error deleting project:", e);
+      toast.error("Nie udało się usunąć trasy");
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'saved') {
+      fetchSavedProjects();
+    }
+  }, [activeTab]);
 
   // Handle initialization with wizard data
   const initialized = useRef(false);
@@ -677,16 +762,26 @@ ${points}
                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
             }`}
           >
-            Szczegóły trasy
+            Szczegóły
             {geometry && (
-              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-bold ml-1">
                 {routeStats.distance.toFixed(1)} km
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('saved')}
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-200 ${
+              activeTab === 'saved'
+                ? 'bg-white text-emerald-700 shadow-sm border border-slate-200/50'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
+            }`}
+          >
+            Moje trasy
+          </button>
         </div>
 
-        {activeTab === 'chat' ? (
+        {activeTab === 'chat' && (
           <>
             {/* Notes / Settings Area */}
             <div className="border-b border-slate-100 bg-slate-50/50">
@@ -766,7 +861,9 @@ ${points}
               </form>
             </div>
           </>
-        ) : (
+        )}
+
+        {activeTab === 'details' && (
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
             {!geometry ? (
               <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 p-6 space-y-3 mt-10">
@@ -839,6 +936,73 @@ ${points}
                   </div>
                 )}
               </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'saved' && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-wider">Twoje zapisane trasy</h3>
+            {isLoadingSaved ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 text-emerald-600 animate-spin" />
+              </div>
+            ) : savedProjects.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-8">Brak zapisanych tras.</p>
+            ) : (
+              <div className="space-y-3">
+                {savedProjects.map((project) => {
+                  const reqs = project.requirements || {};
+                  const isCurrent = project.id === projectId;
+                  let vehicleIcon = <RouteIcon className="w-4 h-4 text-emerald-500" />;
+                  if (reqs.vehicleType === 'car') vehicleIcon = <Car className="w-4 h-4 text-purple-500" />;
+                  else if (reqs.vehicleType === 'city') vehicleIcon = <Building2 className="w-4 h-4 text-yellow-500" />;
+                  else if (reqs.vehicleType === 'hiking') vehicleIcon = <Navigation className="w-4 h-4 text-rose-500" />;
+                  else if (reqs.vehicleType === 'bicycle') vehicleIcon = <Bike className="w-4 h-4 text-orange-500" />;
+                  else if (reqs.vehicleType === 'motorcycle') vehicleIcon = <Navigation className="w-4 h-4 text-blue-500" />;
+                  
+                  return (
+                    <div 
+                      key={project.id}
+                      onClick={() => handleLoadProject(project)}
+                      className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all duration-200 hover:shadow-md flex items-start justify-between gap-3 ${
+                        isCurrent 
+                          ? 'border-emerald-500 bg-emerald-50/20' 
+                          : 'border-slate-200/60 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="space-y-1.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {vehicleIcon}
+                          <span className="font-bold text-sm text-slate-800 truncate block">
+                            {reqs.title || 'Trasa bez nazwy'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 line-clamp-1">
+                          Start: {reqs.start_point || reqs.startLocation || '?'}
+                        </p>
+                        <div className="flex gap-2">
+                          {reqs.distance_target_km && (
+                            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 font-semibold bg-slate-100 text-slate-600">
+                              {reqs.distance_target_km} km
+                            </Badge>
+                          )}
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(project.updated_at || project.created_at).toLocaleDateString('pl-PL')}
+                          </span>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => handleDeleteProject(project.id, e)}
+                        className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-slate-50 shrink-0 self-center transition-colors"
+                        title="Usuń trasę"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

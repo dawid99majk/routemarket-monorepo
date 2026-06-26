@@ -115,10 +115,11 @@ class Orchestrator:
         if len(coords) < 2:
             raise ValueError("Po weryfikacji geograficznej zostało za mało punktów by wyznaczyć trasę.")
         
-        # Safeguard (Filter out points > 120 km from start)
+        # Safeguard (Filter out points > max_dist from start)
         if len(coords) >= 2:
             start_lon, start_lat = coords[0]
             filtered_coords = [coords[0]]
+            max_dist = 600.0 if profile.lower() in ["car", "motorcycle"] else 120.0
             for lon, lat in coords[1:]:
                 # Calculate distance to start
                 R = 6371.0
@@ -130,8 +131,8 @@ class Orchestrator:
                     math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0)**2
                 c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
                 dist = R * c
-                if dist > 120.0:
-                    logger.warning(f"Dropping coordinate ({lon}, {lat}) because it is too far from start point ({dist:.1f} km > 120 km)")
+                if dist > max_dist:
+                    logger.warning(f"Dropping coordinate ({lon}, {lat}) because it is too far from start point ({dist:.1f} km > {max_dist} km)")
                 else:
                     filtered_coords.append((lon, lat))
             coords = filtered_coords

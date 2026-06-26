@@ -70,6 +70,8 @@ def deep_researcher(chat_history: List[Dict[str, str]]) -> str:
         "Masz dostęp do wyszukiwarki Google. "
         "Na podstawie konwersacji z użytkownikiem, wyszukaj rzetelne i aktualne informacje o szlakach, "
         "rekomendowanych parkingach, miejscach na jedzenie i konkretnych atrakcjach w wybranym regionie. "
+        "Upewnij się, że wyszukujesz KONKRETNE i NAZWANE restauracje, galerie sztuki, parkingi, atrakcje, "
+        "zamiast pisać o ogólnych kawiarniach czy sklepach. Zbieraj nazwy własne i dokładne adresy/lokalizacje. "
         "Twoim zadaniem jest zebranie bazy faktów, z której następnie ułożony zostanie dokładny przewodnik. "
         "Podaj nazwy miejsc, warunki na szlaku, przydatne wskazówki i sugerowane konkretne punkty na mapie."
     )
@@ -136,6 +138,9 @@ def guide_writer(research_context: str, route_plan: RoutePlan) -> str:
         "- Jakim szlakiem się kierować (kolory szlaków, trudności). "
         "- Gdzie zjeść (konkretne restauracje/schroniska zebrane w researchu). "
         "- Ciekawostki o okolicy. "
+        "BEZWZGLĘDNY ZAKAZ podawania ogólnikowych i niekonkretnych porad typu 'rozejrzyjcie się w bocznych uliczkach za galeriami' lub 'w okolicy znajdziecie wiele restauracji'. "
+        "Zamiast tego MUSISZ podawać konkretne, nazwane obiekty (np. nazwa galerii, konkretna restauracja, dokładna nazwa ulicy z adresem). "
+        "Jeśli piszesz o lokalnym rękodziele lub galeriach, podaj ich dokładne nazwy i lokalizacje. Jeśli ich nie znasz z researchu, nie pisz o nich wcale. "
         "Pisz językiem angażującym, profesjonalnym i dającym poczucie pewności na szlaku."
     )
     
