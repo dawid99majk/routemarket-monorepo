@@ -9,6 +9,7 @@ import {
   distanceAlongTrack,
   polylineLength,
   formatDistance,
+  haversine,
   type Polyline,
 } from '@/lib/geo-utils';
 
@@ -214,7 +215,17 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
     traveled = distanceAlongTrack(track, seg.segmentIndex, seg.t);
     remaining = Math.max(0, totalLength - traveled);
   }
-  const offRoute = position && distanceToTrack > OFF_ROUTE_THRESHOLD_M;
+
+  // Calculate distance to start point
+  const startLat = track[0][0];
+  const startLng = track[0][1];
+  let distanceToStart = Infinity;
+  if (position) {
+    distanceToStart = haversine(position.lat, position.lng, startLat, startLng);
+  }
+
+  const farFromStart = position && distanceToStart > 500;
+  const offRoute = position && !farFromStart && distanceToTrack > OFF_ROUTE_THRESHOLD_M;
   const progressPct = totalLength > 0 ? Math.min(100, (traveled / totalLength) * 100) : 0;
 
   // Vibrate when going off-route
@@ -229,6 +240,21 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
     if (mapRef.current && position) {
       mapRef.current.setView([position.lat, position.lng], Math.max(mapRef.current.getZoom(), 16));
     }
+  };
+
+  const openExternalToStart = () => {
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    let url: string;
+    if (isIOS) {
+      url = `maps://?daddr=${startLat},${startLng}&dirflg=d`;
+    } else if (isAndroid) {
+      url = `geo:0,0?q=${startLat},${startLng}(Start trasy)`;
+    } else {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${startLat},${startLng}`;
+    }
+    window.open(url, '_blank');
   };
 
   return (
@@ -358,6 +384,19 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
               onClick={() => setShowSettings(false)}
             >
               Zamknij ustawienia
+            </Button>
+          </div>
+        )}
+
+        {/* Far from start banner */}
+        {farFromStart && (
+          <div className="absolute top-3 left-3 right-3 bg-secondary/95 backdrop-blur-md text-secondary-foreground border border-border rounded-lg shadow-md px-3 py-2 flex items-center justify-between gap-2 animate-in slide-in-from-top">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold">Jesteś daleko od startu trasy</p>
+              <p className="text-[10px] text-muted-foreground">Odległość: {formatDistance(distanceToStart)}</p>
+            </div>
+            <Button size="sm" className="text-xs shrink-0 px-2.5 h-8 gap-1" onClick={openExternalToStart}>
+              Dojazd (Google Maps)
             </Button>
           </div>
         )}
