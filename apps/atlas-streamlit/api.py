@@ -76,6 +76,12 @@ def generate_route(req: GenerateRequest):
                 for point in segment.points:
                     trackPoints.append([point.latitude, point.longitude])
         
+        # Fallback to routes (e.g. OpenRouteService GPX returns <rte> instead of <trk>)
+        if not trackPoints:
+            for route in gpx.routes:
+                for point in route.points:
+                    trackPoints.append([point.latitude, point.longitude])
+        
         result["trackPoints"] = trackPoints
         return result
     except Exception as e:

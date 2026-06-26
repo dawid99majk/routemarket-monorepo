@@ -185,6 +185,20 @@ with col_result:
                         })
                         previous_point = point
 
+            # Fallback to routes (e.g. OpenRouteService GPX returns <rte> instead of <trk>)
+            if not points_data:
+                for route in gpx.routes:
+                    for point in route.points:
+                        if previous_point:
+                            cumulative_distance += point.distance_2d(previous_point) / 1000.0
+                        points_data.append({
+                            "lat": point.latitude,
+                            "lon": point.longitude,
+                            "ele": point.elevation or 0.0,
+                            "distance_km": cumulative_distance
+                        })
+                        previous_point = point
+
             if points_data:
                 df = pd.DataFrame(points_data)
                 
