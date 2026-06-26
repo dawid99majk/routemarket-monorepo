@@ -1,5 +1,5 @@
 export class GpxParserService {
-  parseGpx(gpxXml: string): { trackPoints: [number, number][]; distance_km: number; name: string } {
+  parseGpx(gpxXml: string): { trackPoints: [number, number, number?][]; distance_km: number; name: string } {
     const trackPoints = this.extractPoints(gpxXml);
 
     const nameRegex = /<name[^>]*>([\s\S]*?)<\/name>/i;
@@ -18,22 +18,47 @@ export class GpxParserService {
     };
   }
 
-  private extractPoints(gpxXml: string): [number, number][] {
-    const points: [number, number][] = [];
-    const tagRegex = /<(?:(?:\w+:)?)(trkpt|rtept|wpt)\b([^>]*)>/gi;
+  private extractPoints(gpxXml: string): [number, number, number?][] {
+    const points: [number, number, number?][] = [];
+    const blockRegex = /<(?:(?:\w+:)?)(trkpt|rtept|wpt)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
     let match: RegExpExecArray | null;
 
-    while ((match = tagRegex.exec(gpxXml)) !== null) {
+    while ((match = blockRegex.exec(gpxXml)) !== null) {
       const attrs = match[2] || '';
+      const inner = match[3] || '';
       const lat = this.readNumericAttribute(attrs, 'lat');
       const lon = this.readNumericAttribute(attrs, 'lon') ?? this.readNumericAttribute(attrs, 'lng');
       if (lat === null || lon === null) continue;
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
       if (Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
 
+      const eleMatch = inner.match(/<ele>([\d.-]+)<\/ele>/i);
+      const ele = eleMatch ? parseFloat(eleMatch[1]) : undefined;
+
       const previous = points[points.length - 1];
       if (!previous || previous[0] !== lat || previous[1] !== lon) {
-        points.push([lat, lon]);
+        if (ele !== undefined && !isNaN(ele)) {
+          points.push([lat, lon, ele]);
+        } else {
+          points.push([lat, lon]);
+        }
+      }
+    }
+
+    // Fallback for self-closing tags without inner content
+    if (points.length === 0) {
+      const tagRegex = /<(?:(?:\w+:)?)(trkpt|rtept|wpt)\b([^>]*)\/?>/gi;
+      let tagMatch: RegExpExecArray | null;
+      while ((tagMatch = tagRegex.exec(gpxXml)) !== null) {
+        const attrs = tagMatch[2] || '';
+        const lat = this.readNumericAttribute(attrs, 'lat');
+        const lon = this.readNumericAttribute(attrs, 'lon') ?? this.readNumericAttribute(attrs, 'lng');
+        if (lat === null || lon === null) continue;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const previous = points[points.length - 1];
+        if (!previous || previous[0] !== lat || previous[1] !== lon) {
+          points.push([lat, lon]);
+        }
       }
     }
 
@@ -57,7 +82,7 @@ export class GpxParserService {
       .replace(/&apos;/g, "'");
   }
 
-  private haversine(p1: [number, number], p2: [number, number]): number {
+  private haversine(p1: [number, number, number?], p2: [number, number, number?]): number {
     const R = 6371; // km
     const dLat = this.toRad(p2[0] - p1[0]);
     const dLon = this.toRad(p2[1] - p1[1]);

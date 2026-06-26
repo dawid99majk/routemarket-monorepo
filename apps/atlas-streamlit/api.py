@@ -74,13 +74,15 @@ def generate_route(req: GenerateRequest):
         for track in gpx.tracks:
             for segment in track.segments:
                 for point in segment.points:
-                    trackPoints.append([point.latitude, point.longitude])
+                    ele = point.elevation if point.elevation is not None else 0.0
+                    trackPoints.append([point.latitude, point.longitude, ele])
         
         # Fallback to routes (e.g. OpenRouteService GPX returns <rte> instead of <trk>)
         if not trackPoints:
             for route in gpx.routes:
                 for point in route.points:
-                    trackPoints.append([point.latitude, point.longitude])
+                    ele = point.elevation if point.elevation is not None else 0.0
+                    trackPoints.append([point.latitude, point.longitude, ele])
         
         result["trackPoints"] = trackPoints
         return result
