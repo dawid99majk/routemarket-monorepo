@@ -164,7 +164,7 @@ export class RoutingService {
     console.log(`[ORS] Route OK: ${summary?.distance?.toFixed(1)}km, ${summary?.duration?.toFixed(0)}s`);
 
     return {
-      distance_km: parseFloat(((summary?.distance || 0) / 1000).toFixed(2)),
+      distance_km: parseFloat((summary?.distance || 0).toFixed(2)),
       duration_h: parseFloat(((summary?.duration || 0) / 3600).toFixed(2)),
       trackPoints,
       geometry: feature.geometry // GeoJSON LineString [lng, lat] - correct for GeoJSON
