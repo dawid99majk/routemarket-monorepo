@@ -13,8 +13,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@routemarket/atlas-workflow": "workspace:*",
     "@googlemaps/js-api-loader": "^1.16.10",
     "@hookform/resolvers": "^3.10.0",
+    "@xstate/react": "^4.1.1",
+    "xstate": "^5.13.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",

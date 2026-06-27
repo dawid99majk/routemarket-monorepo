@@ -15,7 +15,7 @@ import { useRoutePdfs } from '@/hooks/use-route-pdfs';
 import { getLanguageFlag, getLanguageName } from '@/lib/languages';
 import { useRouteTranslation, getUserLanguage } from '@/hooks/use-translations';
 import TranslationManager from '@/components/TranslationManager';
-import BuyerConsentModal from '@/components/BuyerConsentModal';
+
 import { TokenPurchaseModal } from '@/components/ui/TokenPurchaseModal';
 import { supabase } from '@/integrations/supabase/client';
 import { openSignedPdf } from '@/lib/open-signed-pdf';
@@ -1538,7 +1538,7 @@ export default function RouteDetail() {
         </div>
       </main>
       <Footer />
-      {complianceGateEnabled && <BuyerConsentModal open={consentOpen} onOpenChange={setConsentOpen} onConfirm={handleConsentConfirm} loading={buying} />}
+
       <TokenPurchaseModal
         open={purchaseModalOpen}
         onOpenChange={setPurchaseModalOpen}

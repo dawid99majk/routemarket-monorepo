@@ -113,11 +113,28 @@ function ElevationProfile({ coordinates }: { coordinates: number[][] }) {
 }
 
 import { WizardData } from '../CreateRoute';
+import { useWizardMachine } from '@/hooks/use-wizard-machine';
 
 export default function RouteBuilderV2({ initialData, onBack }: { initialData?: WizardData, onBack?: () => void }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [projectId, setProjectId] = useState<string | null>(searchParams.get('projectId'));
+
+  const { state, context, send, setField } = useWizardMachine(searchParams.get('projectId'));
+  
+  const projectId = context.projectId;
+  const chatMessages = context.chatMessages;
+  const inputNotes = context.inputNotes;
+  const vehicleType = context.vehicleType;
+  const bikeSubtype = context.bikeSubtype;
+  const waypoints = context.waypoints;
+  const geometry = context.geometry;
+  const gpxData = context.gpxData;
+  const guideText = context.guideText;
+  
+  const isRouting = state.matches('generating_route') || state.matches('saving_project');
+  const isTyping = state.matches('chatting');
+
+  
   
   // map initialData mode ('fastbike', 'trekking', 'hiking-mountain', 'city', 'car') to vehicleType/bikeSubtype
   const getInitialTypes = () => {
@@ -129,78 +146,39 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     return { v: 'bicycle' as const, b: 'gravel' as const };
   };
   
-  const [vehicleType, setVehicleType] = useState<'motorcycle' | 'bicycle' | 'hiking' | 'city' | 'car'>(getInitialTypes().v);
-  const [bikeSubtype, setBikeSubtype] = useState<'gravel' | 'road' | 'mtb'>(getInitialTypes().b);
   
-  const [waypoints, setWaypoints] = useState<{lat: number, lng: number, type: string, name?: string}[]>([]);
+  
+  
+  
   const [tempMarker, setTempMarker] = useState<L.LatLng | null>(null);
 
   const handleAddPointFromTemp = (type: 'start' | 'end' | 'waypoint') => {
     if (!tempMarker) return;
-    setWaypoints(prev => {
-      let currentWps = [...prev];
-      
-      // Auto-populate from geometry if we are starting from scratch but have an AI route
-      if (currentWps.length === 0 && geometry && geometry.coordinates) {
-         const coords = geometry.coordinates;
-         const startC = coords[0];
-         const endC = coords[coords.length - 1];
-         currentWps = [
-            { lat: startC[1], lng: startC[0], type: 'start' },
-            { lat: endC[1], lng: endC[0], type: 'end' }
-         ];
-      }
+    
+    // Dispatch to XState instead of manually manipulating array
+    if (type === 'start' || type === 'end') {
+        const existingIdx = waypoints.findIndex((w: any) => w.type === type);
+        if (existingIdx >= 0) {
+           send({ type: 'UPDATE_WAYPOINT', index: existingIdx, waypoint: { lat: tempMarker.lat, lng: tempMarker.lng, type } });
+        } else {
+           send({ type: 'ADD_WAYPOINT', waypoint: { lat: tempMarker.lat, lng: tempMarker.lng, type }, index: type === 'start' ? 0 : undefined });
+        }
+    } else {
+        // Waypoint insertion logic simplified
+        send({ type: 'ADD_WAYPOINT', waypoint: { lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' } });
+    }
 
-      if (type === 'start') {
-        const existingStart = currentWps.findIndex(w => w.type === 'start');
-        if (existingStart >= 0) {
-           currentWps[existingStart] = { lat: tempMarker.lat, lng: tempMarker.lng, type: 'start' };
-        } else {
-           currentWps.unshift({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'start' });
-        }
-      } else if (type === 'end') {
-        const existingEnd = currentWps.findIndex(w => w.type === 'end');
-        if (existingEnd >= 0) {
-           currentWps[existingEnd] = { lat: tempMarker.lat, lng: tempMarker.lng, type: 'end' };
-        } else {
-           currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'end' });
-        }
-      } else {
-        // waypoint
-        if (currentWps.length < 2) {
-           currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
-        } else {
-           // Znajdź najlepsze miejsce do wstawienia (najkrótszy obwód trójkąta)
-           let bestIdx = 1;
-           let minAddedDist = Infinity;
-           for (let i = 0; i < currentWps.length - 1; i++) {
-               const p1 = currentWps[i];
-               const p2 = currentWps[i+1];
-               const d1 = getHaversineDistance(p1.lat, p1.lng, tempMarker.lat, tempMarker.lng);
-               const d2 = getHaversineDistance(tempMarker.lat, tempMarker.lng, p2.lat, p2.lng);
-               const dOrig = getHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
-               const addedDist = d1 + d2 - dOrig;
-               if (addedDist < minAddedDist) {
-                   minAddedDist = addedDist;
-                   bestIdx = i + 1;
-               }
-           }
-           currentWps.splice(bestIdx, 0, { lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
-        }
-      }
-      return currentWps;
-    });
     setTempMarker(null);
   };
-  const [geometry, setGeometry] = useState<any>(null);
-  const [isRouting, setIsRouting] = useState(false);
+  
+  
 
-  const [inputNotes, setInputNotes] = useState('');
-  const [chatMessages, setChatMessages] = useState<{role: 'agent'|'user', text: string}[]>([]);
+  
+  
   const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [gpxData, setGpxData] = useState<string | null>(null);
-  const [guideText, setGuideText] = useState<string | null>(null);
+  
+  
+  
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [activeTab, setActiveTab] = useState<'chat' | 'details' | 'saved'>('chat');
@@ -244,8 +222,8 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               if (reqs.chatMessages) setChatMessages(reqs.chatMessages);
               if (reqs.gpxData) setGpxData(reqs.gpxData);
               if (reqs.guideText) setGuideText(reqs.guideText);
-              if (reqs.vehicleType) setVehicleType(reqs.vehicleType);
-              if (reqs.bikeSubtype) setBikeSubtype(reqs.bikeSubtype);
+              if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
+              if (reqs.bikeSubtype) setField('bikeSubtype', reqs.bikeSubtype);
               if (reqs.geometry) {
                 setGeometry({ 
                   type: 'LineString', 
@@ -254,7 +232,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               }
               if (reqs.waypoints) {
                   skipNextCalc.current = true;
-                  setWaypoints(reqs.waypoints);
+                  setField('waypoints', reqs.waypoints);
               }
               if (reqs.gpxData || reqs.guideText) {
                 setActiveTab('details');
@@ -297,30 +275,23 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
   const handleLoadProject = (project: any) => {
     const reqs = project.requirements || {};
-    setProjectId(project.id);
-    
-    if (reqs.chatMessages) setChatMessages(reqs.chatMessages);
-    if (reqs.gpxData) setGpxData(reqs.gpxData);
-    if (reqs.guideText) setGuideText(reqs.guideText);
-    if (reqs.vehicleType) setVehicleType(reqs.vehicleType);
-    if (reqs.bikeSubtype) setBikeSubtype(reqs.bikeSubtype);
-    
+    setField('projectId', project.id);
+    if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
+    if (reqs.gpxData) setField('gpxData', reqs.gpxData);
+    if (reqs.guideText) setField('guideText', reqs.guideText);
+    if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
+    if (reqs.bikeSubtype) setField('bikeSubtype', reqs.bikeSubtype);
     if (reqs.geometry) {
-      setGeometry({ 
-        type: 'LineString', 
-        coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) 
-      });
+       setField('geometry', { type: 'LineString', coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) });
     } else {
-      setGeometry(null);
+       setField('geometry', null);
     }
-    
     if (reqs.waypoints) {
-      skipNextCalc.current = true;
-      setWaypoints(reqs.waypoints);
+       skipNextCalc.current = true;
+       setField('waypoints', reqs.waypoints);
     } else {
-      setWaypoints([]);
+       setField('waypoints', []);
     }
-    
     navigate(`/create?projectId=${project.id}`, { replace: true });
     setActiveTab('details');
     toast.success(`Wczytano trasę: ${reqs.title || 'Moja trasa AI'}`);
@@ -410,7 +381,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     }
     if (waypoints.length >= 2) {
       const timer = setTimeout(() => {
-        doCalculateFastRoute(waypoints, vehicleType, bikeSubtype);
+        send({ type: 'CALCULATE_ROUTE' });
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -423,29 +394,11 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
   const handleMarkerDrag = (index: number, e: any) => {
     const newPos = e.target.getLatLng();
-    setWaypoints(prev => {
-      const newWps = [...prev];
-      newWps[index] = { ...newWps[index], lat: newPos.lat, lng: newPos.lng };
-      return newWps;
-    });
+    send({ type: 'UPDATE_WAYPOINT', index, waypoint: { ...waypoints[index], lat: newPos.lat, lng: newPos.lng } });
   };
 
   const handleRemoveWaypoint = (index: number) => {
-    setWaypoints(prev => {
-      const newWps = [...prev];
-      newWps.splice(index, 1);
-      // Re-assign types based on length
-      if (newWps.length === 1) {
-        newWps[0].type = 'start';
-      } else if (newWps.length > 1) {
-        newWps[0].type = 'start';
-        newWps[newWps.length - 1].type = 'end';
-        for (let i = 1; i < newWps.length - 1; i++) {
-          newWps[i].type = 'waypoint';
-        }
-      }
-      return newWps;
-    });
+    send({ type: 'REMOVE_WAYPOINT', index });
   };
 
   const generateGpxString = (coords: number[][], title: string = 'Trasa RouteMarket') => {
@@ -464,218 +417,16 @@ ${points}
 </gpx>`;
   };
 
-  const doCalculateFastRoute = async (
-    wps: typeof waypoints, 
-    vType: typeof vehicleType, 
-    bType: typeof bikeSubtype
-  ) => {
-    setIsRouting(true);
-    try {
-      const res = await fetch('/route-builder-api/live-route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          points: wps.map((wp, i) => ({
-            name: wp.name || (wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Punkt ${i}`)),
-            lat: wp.lat,
-            lng: wp.lng
-          })),
-          route_type: vType,
-          surface_preferences: bType ? [bType] : []
-        })
-      });
+  
 
-      if (!res.ok) throw new Error('Live route calculation failed');
-      const data = await res.json();
-
-      if (data.trackPoints && data.trackPoints.length > 0) {
-        const mappedCoords = data.trackPoints.map((p: number[]) => [p[1], p[0], p[2] || 0]);
-        setGeometry({
-          type: 'LineString',
-          coordinates: mappedCoords
-        });
-
-        const newGpx = generateGpxString(mappedCoords, 'Moja Trasa AI');
-        setGpxData(newGpx);
-
-        if (projectId) {
-          try {
-            const { data: project } = await supabase
-              .from('route_builder_projects')
-              .select('requirements')
-              .eq('id', projectId)
-              .single();
-            let existingTitle = 'Moja Trasa AI';
-            let existingReqs: any = {};
-            if (project && project.requirements) {
-              existingReqs = project.requirements;
-              existingTitle = existingReqs.title || 'Moja Trasa AI';
-            }
-
-            const dbGpx = generateGpxString(mappedCoords, existingTitle);
-            setGpxData(dbGpx);
-
-            await supabase
-              .from('route_builder_projects')
-              .update({
-                requirements: {
-                  ...existingReqs,
-                  waypoints: wps,
-                  geometry: data.trackPoints,
-                  gpxData: dbGpx,
-                  vehicleType: vType,
-                  bikeSubtype: bType
-                },
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', projectId);
-          } catch (dbErr) {
-            console.error("DB update error:", dbErr);
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error("[doCalculateFastRoute] Error:", err);
-      toast.error("Błąd wyznaczania trasy na mapie.");
-    } finally {
-      setIsRouting(false);
-    }
-  };
-
-  const doCalculateLiveRoute = async (
-    wps: typeof waypoints, 
-    vType: typeof vehicleType, 
-    bType: typeof bikeSubtype,
-    forceMessages?: {role: string, text: string}[]
-  ) => {
-    setIsRouting(true);
-    try {
-      let messagesToUse = forceMessages || chatMessages;
-      
-      // Fallback if user clicks generate without chatting
-      if (messagesToUse.length === 0) {
-          let fallbackText = "Proszę wyznacz trasę na podstawie moich punktów.";
-          if (inputNotes) fallbackText += ` Moje notatki: ${inputNotes}`;
-          if (wps.length > 0) {
-              fallbackText += ` Wyznaczam przez ${wps.length} punktów: ${wps.map((wp, i) => `Pkt ${i+1} (lat:${wp.lat.toFixed(4)}, lng:${wp.lng.toFixed(4)})`).join(', ')}`;
-          }
-          messagesToUse = [{ role: 'user', text: fallbackText }];
-      }
-      
-      const res = await fetch('/atlas/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messages: messagesToUse.map(m => ({ role: m.role, content: m.text })),
-          profile: vType === 'bicycle' ? bType : vType
-        })
-      });
-
-      if (!res.ok) throw new Error('Generation failed: ' + res.status);
-      const data = await res.json();
-      
-      if (data.trackPoints && data.trackPoints.length > 0) {
-        const mappedCoords = data.trackPoints.map((p: number[]) => [p[1], p[0], p[2] || 0]);
-        setGeometry({
-          type: 'LineString',
-          coordinates: mappedCoords
-        });
-        
-        toast.success("Trasa wygenerowana pomyślnie!");
-        setActiveTab('details');
-
-        let finalWaypoints = wps;
-        if (data.points && Array.isArray(data.points) && data.points.length >= 2) {
-          finalWaypoints = data.points.map((pt: any, i: number) => ({
-            lat: pt.lat,
-            lng: pt.lng,
-            name: pt.name,
-            type: i === 0 ? 'start' : (i === data.points.length - 1 ? 'end' : 'waypoint')
-          }));
-          skipRecalcRef.current = true;
-          setWaypoints(finalWaypoints);
-        }
-        
-        let finalGpx = data.gpx;
-        if (!finalGpx) {
-          finalGpx = generateGpxString(mappedCoords, data.title || 'Nowa Trasa AI');
-        }
-        setGpxData(finalGpx);
-
-        if (data.guide) {
-            setGuideText(data.guide);
-        }
-
-        // Save project to supabase
-        try {
-          const { data: userData } = await supabase.auth.getUser();
-          if (userData.user) {
-            if (!projectId) {
-              const { data: project } = await supabase
-                .from('route_builder_projects')
-                .insert({
-                  user_id: userData.user.id,
-                  requirements: {
-                    title: data.title || 'Nowa Trasa AI',
-                    chatMessages: messagesToUse,
-                    waypoints: finalWaypoints,
-                    geometry: data.trackPoints,
-                    gpxData: finalGpx,
-                    guideText: data.guide,
-                    vehicleType: vType,
-                    bikeSubtype: bType
-                  }
-                })
-                .select()
-                .single();
-              if (project) {
-                setProjectId(project.id);
-                navigate(`/create?projectId=${project.id}`, { replace: true });
-              }
-            } else {
-              // Update existing
-              await supabase
-                .from('route_builder_projects')
-                .update({
-                  requirements: {
-                    title: data.title || 'Nowa Trasa AI',
-                    chatMessages: messagesToUse,
-                    waypoints: finalWaypoints,
-                    geometry: data.trackPoints,
-                    gpxData: finalGpx,
-                    guideText: data.guide,
-                    vehicleType: vType,
-                    bikeSubtype: bType
-                  },
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', projectId);
-            }
-          }
-        } catch (e) {
-          console.error("Failed to save project", e);
-        }
-
-      } else {
-          toast.error("Agent nie zwrócił współrzędnych trasy.");
-      }
-    } catch (err: any) {
-      toast.error('Błąd wyznaczania trasy: ' + err.message);
-    } finally {
-      setIsRouting(false);
-    }
-  };
+  
 
   const calculateLiveRoute = async () => {
-    doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype);
+    send({ type: 'CALCULATE_ROUTE' });
   };
 
   const clearRoute = () => {
-    setWaypoints([]);
+    setField('waypoints', []);
     setGeometry(null);
     setGpxData(null);
     setGuideText(null);
@@ -715,47 +466,9 @@ ${points}
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isTyping) return;
-
     const userText = inputValue;
     setInputValue('');
-    
-    // Inject map context into user message if they have waypoints or notes
-    let userContext = '';
-    if (waypoints.length > 0) userContext += ` [Mam na mapie ${waypoints.length} punktów]`;
-    if (inputNotes) userContext += ` [Moje notatki: ${inputNotes}]`;
-    if (vehicleType) userContext += ` [Pojazd: ${vehicleType}]`;
-    
-    const actualTextToSend = userText + userContext;
-    
-    const newMessages: {role: 'agent'|'user', text: string}[] = [...chatMessages, { role: 'user', text: actualTextToSend }];
-    setChatMessages(newMessages);
-    setIsTyping(true);
-
-    try {
-      const response = await fetch('/atlas/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: newMessages.map(m => ({ role: m.role, content: m.text }))
-        }) 
-      });
-      const data = await response.json();
-      
-      if (data.reply) {
-        setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
-      }
-      
-      if (data.is_ready) {
-        toast.success("Agent zebrał dane. Rozpoczynam planowanie trasy...");
-        // Auto-trigger generation
-        doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype, newMessages);
-      }
-      
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setIsTyping(false);
-    }
+    send({ type: 'SEND_MESSAGE', text: userText });
   };
 
   return (
@@ -837,7 +550,7 @@ ${points}
                     placeholder="Napisz gdzie jedziesz i na czym, np. 50km w Karkonoszach pieszo..." 
                     className="min-h-[70px] bg-white resize-none text-sm border-slate-200 focus-visible:ring-emerald-500/30"
                     value={inputNotes}
-                    onChange={e => setInputNotes(e.target.value)}
+                    onChange={e => setField('inputNotes', e.target.value)}
                   />
                   {waypoints.length > 0 && (
                     <div className="flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-xs font-medium">
@@ -1057,35 +770,35 @@ ${points}
             <Button 
               variant={vehicleType === 'motorcycle' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setVehicleType('motorcycle')}
+              onClick={() => setField('vehicleType', 'motorcycle')}
             >
               <Navigation className="w-4 h-4 mr-2" /> Motocykl
             </Button>
             <Button 
               variant={vehicleType === 'bicycle' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'bicycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setVehicleType('bicycle')}
+              onClick={() => setField('vehicleType', 'bicycle')}
             >
               <Bike className="w-4 h-4 mr-2" /> Rower
             </Button>
             <Button 
               variant={vehicleType === 'hiking' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'hiking' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setVehicleType('hiking')}
+              onClick={() => setField('vehicleType', 'hiking')}
             >
               <RouteIcon className="w-4 h-4 mr-2" /> Pieszo
             </Button>
             <Button 
               variant={vehicleType === 'city' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'city' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setVehicleType('city')}
+              onClick={() => setField('vehicleType', 'city')}
             >
               <Building2 className="w-4 h-4 mr-2" /> Miasto
             </Button>
             <Button 
               variant={vehicleType === 'car' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'car' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setVehicleType('car')}
+              onClick={() => setField('vehicleType', 'car')}
             >
               <Car className="w-4 h-4 mr-2" /> Samochód
             </Button>
@@ -1098,7 +811,7 @@ ${points}
                 variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} 
                 size="sm"
                 className={`rounded-full px-4 h-8 text-xs ${bikeSubtype === 'road' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500'}`}
-                onClick={() => setBikeSubtype('road')}
+                onClick={() => setField('bikeSubtype', 'road')}
               >
                 Szosa / Asfalt
               </Button>
@@ -1106,7 +819,7 @@ ${points}
                 variant={bikeSubtype === 'gravel' ? 'secondary' : 'ghost'} 
                 size="sm"
                 className={`rounded-full px-4 h-8 text-xs ${bikeSubtype === 'gravel' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500'}`}
-                onClick={() => setBikeSubtype('gravel')}
+                onClick={() => setField('bikeSubtype', 'gravel')}
               >
                 Szuter / Gravel
               </Button>
@@ -1114,7 +827,7 @@ ${points}
                 variant={bikeSubtype === 'mtb' ? 'secondary' : 'ghost'} 
                 size="sm"
                 className={`rounded-full px-4 h-8 text-xs ${bikeSubtype === 'mtb' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500'}`}
-                onClick={() => setBikeSubtype('mtb')}
+                onClick={() => setField('bikeSubtype', 'mtb')}
               >
                 MTB / Góry
               </Button>

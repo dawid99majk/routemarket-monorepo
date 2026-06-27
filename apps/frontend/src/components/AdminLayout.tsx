@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, Map, CreditCard, UserCheck, ShieldCheck, ArrowLeft, MessageSquare, Megaphone, Sparkles, Bot } from 'lucide-react';
+import { LayoutDashboard, Users, Map, ShieldCheck, ArrowLeft, MessageSquare, Megaphone, Sparkles, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAdminUnreadMessages } from '@/hooks/use-unread-messages';
 import { Badge } from '@/components/ui/badge';
@@ -8,15 +8,12 @@ const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/routes', label: 'Routes', icon: Map },
-  { to: '/admin/payments', label: 'Payments', icon: CreditCard },
-  { to: '/admin/creators', label: 'Creators', icon: UserCheck },
   { to: '/admin/moderation', label: 'Moderation', icon: ShieldCheck },
   { to: '/admin/messages', label: 'Messages', icon: MessageSquare },
   { to: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
   { to: '/admin/content-generator', label: 'Content AI', icon: Sparkles },
   { to: '/admin/atlas', label: 'Atlas', icon: Bot },
 ] as const;
-
 export default function AdminLayout() {
   const { data: unreadCount = 0 } = useAdminUnreadMessages();
   return (

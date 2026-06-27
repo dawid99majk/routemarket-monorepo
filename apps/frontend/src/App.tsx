@@ -21,36 +21,25 @@ const GaTracker = () => {
 const MapExplore = lazy(() => import("./pages/MapExplore"));
 const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const RouteDetail = lazy(() => import("./pages/RouteDetail"));
-const CreateRoute = lazy(() => import("./pages/CreateRoute"));
-const EditRoute = lazy(() => import("./pages/EditRoute"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const CreatorDashboard = lazy(() => import("./pages/CreatorDashboard"));
 const CreatorAiStudio = lazy(() => import("./pages/CreatorAiStudio"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
-const CreatorRoutes = lazy(() => import("./pages/CreatorRoutes"));
-const CreatorEarnings = lazy(() => import("./pages/CreatorEarnings"));
-const CreatorStats = lazy(() => import("./pages/CreatorStats"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
-const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const AuthError = lazy(() => import("./pages/AuthError"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Brand = lazy(() => import("./pages/Brand"));
-const Messages = lazy(() => import("./pages/Messages"));
 const AdminLayout = lazy(() => import("./components/AdminLayout"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminRoutes = lazy(() => import("./pages/admin/AdminRoutes"));
-const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
-const AdminCreators = lazy(() => import("./pages/admin/AdminCreators"));
 const AdminModeration = lazy(() => import("./pages/admin/AdminModeration"));
 const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
-const AdminCampaigns = lazy(() => import("./pages/admin/AdminCampaigns"));
 const AdminContentGenerator = lazy(() => import("./pages/admin/AdminContentGenerator"));
 const AdminAtlas = lazy(() => import("./pages/admin/AdminAtlas"));
-const BecomeCreator = lazy(() => import("./pages/BecomeCreator"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const GuideHub = lazy(() => import("./components/GuideHub"));
 const NavigationLauncher = lazy(() => import("./components/NavigationLauncher"));
@@ -105,23 +94,15 @@ const App = () => (
                 <Route path="/brand" element={<Brand />} />
 
                 {/* Authenticated routes */}
-                <Route path="/become-creator" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><BecomeCreator /></ProtectedRoute>} />
                 <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
-                <Route path="/my-purchases" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                 <Route path="/favorites" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><Favorites /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
-                <Route path="/payment-success" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><PaymentSuccess /></ProtectedRoute>} />
-                <Route path="/messages" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><Messages /></ProtectedRoute>} />
 
                 {/* Creator routes */}
-                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreateRoute /></ProtectedRoute>} />
+                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorAiStudio /></ProtectedRoute>} />
                 <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
                 <Route path="/creator-ai-studio" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorAiStudio /></ProtectedRoute>} />
-                <Route path="/edit-route/:id" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><EditRoute /></ProtectedRoute>} />
                 <Route path="/creator-dashboard" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorDashboard /></ProtectedRoute>} />
-                <Route path="/creator-routes" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorRoutes /></ProtectedRoute>} />
-                <Route path="/creator-earnings" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorEarnings /></ProtectedRoute>} />
-                <Route path="/creator-stats" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorStats /></ProtectedRoute>} />
 
                 {/* Admin routes */}
                 <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
@@ -129,11 +110,8 @@ const App = () => (
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="routes" element={<AdminRoutes />} />
-                  <Route path="payments" element={<AdminPayments />} />
-                  <Route path="creators" element={<AdminCreators />} />
                   <Route path="moderation" element={<AdminModeration />} />
                   <Route path="messages" element={<AdminMessages />} />
-                  <Route path="campaigns" element={<AdminCampaigns />} />
                   <Route path="content-generator" element={<AdminContentGenerator />} />
                   <Route path="atlas" element={<AdminAtlas />} />
                 </Route>
