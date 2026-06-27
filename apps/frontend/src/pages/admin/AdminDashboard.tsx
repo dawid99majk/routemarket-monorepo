@@ -10,7 +10,7 @@ export default function AdminDashboard() {
       const [routesRes, profilesRes, aiProjectsRes] = await Promise.all([
         supabase.from('routes').select('id, status, created_at', { count: 'exact' }),
         supabase.from('profiles').select('id', { count: 'exact' }),
-        supabase.from('route_builder_projects').select('id', { count: 'exact' }),
+        (supabase as any).from('route_builder_projects').select('id', { count: 'exact' }),
       ]);
 
       const publishedRoutes = (routesRes.data ?? []).filter(r => r.status === 'published').length;

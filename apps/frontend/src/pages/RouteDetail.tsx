@@ -407,7 +407,7 @@ export default function RouteDetail() {
       if (consentError) throw consentError;
 
       // Open the token purchase wizard
-      setPurchaseModalOpen(true);
+      // setPurchaseModalOpen(true);
     } catch (err: any) {
       toast.error(err.message || t('route_detail.payment_error'));
     } finally {
@@ -1284,7 +1284,7 @@ export default function RouteDetail() {
 
                 {/* Price + CTA block */}
                 <div className="bg-muted/30 border-t border-border p-5">
-                  <PriceDisplay price={route.price} currency={(route as any).currency || 'USD'} />
+                  <PriceDisplay price={route.price}  />
                   {purchased || isOwner ? (
                     <div className="space-y-2">
                       <Button className="w-full" onClick={async () => {

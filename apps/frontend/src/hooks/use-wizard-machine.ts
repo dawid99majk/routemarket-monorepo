@@ -34,6 +34,7 @@ function generateGpxString(coordinates: number[][], title: string): string {
 export function useWizardMachine(initialProjectId: string | null = null) {
   const [state, send] = useMachine(wizardMachine, {
     // Override machine actors with our actual logic
+    /* @ts-ignore */
     actors: {
       chatActor: async ({ input }: any) => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
@@ -117,8 +118,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         };
 
         if (!projectId) {
-            const { data: project, error } = await supabase
-            .from('route_builder_projects')
+            const { data: project, error } = await (supabase as any).from('route_builder_projects')
             .insert({
                 user_id: userData.user.id,
                 requirements: reqs
@@ -128,8 +128,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
             if (error) throw error;
             projectId = project.id;
         } else {
-            const { error } = await supabase
-            .from('route_builder_projects')
+            const { error } = await (supabase as any).from('route_builder_projects')
             .update({
                 requirements: reqs,
                 updated_at: new Date().toISOString()

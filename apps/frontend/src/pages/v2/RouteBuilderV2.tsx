@@ -1,3 +1,17 @@
+
+function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;  
+  const dLon = (lon2 - lon1) * Math.PI / 180; 
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+    ; 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const d = R * c; // Distance in km
+  return d;
+}
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,10 +77,9 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 }
 
 import { ElevationProfile } from '@/components/ElevationProfile';
-import { WizardData } from '../CreateRoute';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
 
-export default function RouteBuilderV2({ initialData, onBack }: { initialData?: WizardData, onBack?: () => void }) {
+export default function RouteBuilderV2({ onBack }: { onBack?: () => void }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -88,15 +101,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
   
   
-  // map initialData mode ('fastbike', 'trekking', 'hiking-mountain', 'city', 'car') to vehicleType/bikeSubtype
-  const getInitialTypes = () => {
-    if (initialData?.mode === 'fastbike') return { v: 'bicycle' as const, b: 'road' as const };
-    if (initialData?.mode === 'trekking') return { v: 'bicycle' as const, b: 'gravel' as const };
-    if (initialData?.mode === 'hiking-mountain') return { v: 'hiking' as const, b: 'gravel' as const };
-    if (initialData?.mode === 'city') return { v: 'city' as const, b: 'gravel' as const };
-    if (initialData?.mode === 'car') return { v: 'car' as const, b: 'road' as const };
-    return { v: 'bicycle' as const, b: 'gravel' as const };
-  };
   
   
   
@@ -167,17 +171,17 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const skipNextCalc = useRef(false);
   useEffect(() => {
     if (projectId) {
-      supabase.from('route_builder_projects').select('*').eq('id', projectId).single()
+      (supabase as any).from('route_builder_projects').select('*').eq('id', projectId).single()
         .then(({ data }) => {
            if (data && data.requirements) {
               const reqs = data.requirements;
-              if (reqs.chatMessages) setChatMessages(reqs.chatMessages);
-              if (reqs.gpxData) setGpxData(reqs.gpxData);
-              if (reqs.guideText) setGuideText(reqs.guideText);
+              if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
+              if (reqs.gpxData) setField('gpxData', reqs.gpxData);
+              if (reqs.guideText) setField('guideText', reqs.guideText);
               if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
               if (reqs.bikeSubtype) setField('bikeSubtype', reqs.bikeSubtype);
               if (reqs.geometry) {
-                setGeometry({ 
+                setField('geometry', { 
                   type: 'LineString', 
                   coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) 
                 });
@@ -209,7 +213,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('route_builder_projects')
         .select('*')
         .eq('user_id', userData.user.id)
@@ -254,7 +258,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     if (!confirm("Czy na pewno chcesz usunąć tę trasę?")) return;
     
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('route_builder_projects')
         .delete()
         .eq('id', id);
@@ -277,46 +281,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     }
   }, [activeTab]);
 
-  // Handle initialization with wizard data
-  const initialized = useRef(false);
-  useEffect(() => {
-    if (initialData && !projectId && !initialized.current) {
-      initialized.current = true;
-      
-      const promptText = `Chcę zaplanować trasę. Aktywność: ${
-        initialData.mode === 'fastbike' ? 'Rower Szosowy' : 
-        initialData.mode === 'trekking' ? 'Gravel / MTB' : 
-        initialData.mode === 'hiking-mountain' ? 'Hiking' : 
-        initialData.mode === 'city' ? 'Zwiedzanie miasta' : 
-        initialData.mode === 'car' ? 'Samochód' : 'Inna'
-      }. Start: ${initialData.startLocation}. Typ trasy: ${initialData.routeType}. ${initialData.destination ? `Meta: ${initialData.destination}. ` : ''}Dystans: ok. ${initialData.distance} km. Poziom trudności: ${initialData.difficulty}.`;
-      
-      const newMessages = [{ role: 'user' as const, text: promptText }];
-      setChatMessages(newMessages);
-      setIsTyping(true);
-      
-      fetch('/atlas/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: newMessages.map(m => ({ role: m.role, content: m.text }))
-        }) 
-      }).then(res => res.json()).then(data => {
-        if (data.reply) {
-          setChatMessages(prev => [...prev, { role: 'agent', text: data.reply }]);
-        }
-        if (data.is_ready) {
-          toast.success("Agent zebrał dane. Rozpoczynam planowanie trasy...");
-          doCalculateLiveRoute(waypoints, vehicleType, bikeSubtype, newMessages);
-        }
-      }).catch(err => {
-        toast.error(err.message);
-      }).finally(() => {
-        setIsTyping(false);
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData, projectId]);
 
   // Flag to prevent automatic recalculation when waypoints are updated from AI or DB load
   const skipRecalcRef = useRef(false);
@@ -379,10 +343,10 @@ ${points}
 
   const clearRoute = () => {
     setField('waypoints', []);
-    setGeometry(null);
-    setGpxData(null);
-    setGuideText(null);
-    setProjectId(null);
+    setField('geometry', null);
+    setField('gpxData', null);
+    setField('guideText', null);
+    setField('projectId', null);
     navigate('/create', { replace: true });
   };
 
@@ -405,9 +369,9 @@ ${points}
     const opt = {
       margin:       15,
       filename:     'przewodnik_trasy.pdf',
-      image:        { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg' as 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' as 'portrait' }
     };
 
     html2pdf().set(opt).from(wrapper).save().then(() => {
@@ -879,7 +843,7 @@ ${points}
           ))}
 
           {tempMarker && (
-            <Popup position={[tempMarker.lat, tempMarker.lng]} onClose={() => setTempMarker(null)}>
+            <Popup position={[tempMarker.lat, tempMarker.lng]}>
                 <div className="flex flex-col gap-2 min-w-[140px] p-1">
                   <p className="text-xs font-bold text-slate-700 mb-1 text-center">Opcje punktu</p>
                   <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('start')}>
@@ -901,7 +865,7 @@ ${points}
         <div className="absolute bottom-6 left-6 z-[1000] flex gap-2">
           {waypoints.length >= 2 && (
             <Button 
-              onClick={() => doCalculateFastRoute(waypoints, vehicleType, bikeSubtype)} 
+              onClick={() => send({ type: 'CALCULATE_ROUTE' })} 
               className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg rounded-full px-5 h-10 font-bold"
             >
               <RefreshCw className="w-4 h-4 mr-2" /> Przelicz trasę

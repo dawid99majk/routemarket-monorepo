@@ -5,7 +5,7 @@ export interface RoutePoi {
   id: number;
   route_id: number;
   name: string;
-  type: string;
+  type: string; id: number;
   description: string | null;
   lat: number;
   lng: number;

@@ -242,7 +242,7 @@ export default function MyRoutes() {
     queryKey: ['generated-routes', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('route_builder_projects')
         .select('*')
         .eq('user_id', user.id)

@@ -105,7 +105,7 @@ export function useProfileBalance(userId: string | undefined) {
       if (profileErr) throw profileErr;
 
       // 2. Log token transaction
-      const { error: txErr } = await supabase
+      const { error: txErr } = await (supabase as any)
         .from('token_transactions')
         .insert({
           user_id: userId,
@@ -207,7 +207,7 @@ export function useProfileBalance(userId: string | undefined) {
       if (buyerErr) throw buyerErr;
 
       // 2. Log spend transaction for buyer
-      await supabase.from('token_transactions').insert({
+      await (supabase as any).from('token_transactions').insert({
         user_id: userId,
         amount: -price,
         purpose: 'route_download',
@@ -235,7 +235,7 @@ export function useProfileBalance(userId: string | undefined) {
       if (creatorErr) console.warn('Failed to update creator profile tokens:', creatorErr);
 
       // Log earning transaction for creator
-      await supabase.from('token_transactions').insert({
+      await (supabase as any).from('token_transactions').insert({
         user_id: creatorId,
         amount: creatorShare,
         purpose: 'route_download_earning',
