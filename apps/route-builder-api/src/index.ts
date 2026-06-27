@@ -53,10 +53,11 @@ app.post('/chat-interview', async (c) => {
       try {
         const project = await repo.getProject(project_id);
         if (project) {
+          const isHikingOrCity = project.requirements.route_type === 'hiking' || project.requirements.route_type === 'city';
           projectContext = `\nAktualny stan projektu:
-Trasa: z ${project.requirements.start_point || '?'} do ${project.requirements.end_point || '?'}
-Typ: ${project.requirements.route_type || '?'}
-Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
+  Trasa: z ${project.requirements.start_point || '?'} do ${project.requirements.end_point || '?'}
+  Typ: ${project.requirements.route_type || '?'}
+  Dystans docelowy: ${isHikingOrCity ? 'NIE DOTYCZY (używamy Dni i Trudności)' : (project.requirements.distance_target_km || '?') + ' km'}`;
         }
       } catch (err) {
         console.warn('Could not fetch project for chat notes context', err);
@@ -110,18 +111,27 @@ ${projectContext}
 === CO JUŻ WIEMY (z interfejsu, NIE pytaj o to!) ===
 ${knowStart ? '✅ PUNKT STARTOWY - znamy z pinezki na mapie' : '❌ Brak punktu startowego - zapytaj!'}
 ${knowVehicle ? `✅ POJAZD - ${vehicle_type}${bike_subtype ? ` (${bike_subtype})` : ''} - wybrane w interfejsie` : '❌ Brak pojazdu - zapytaj!'}
+${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '❌ Brak preferencji popularności - ZAPYTAJ O TO!'}
 
 === CZEGO JESZCZE BRAKUJE ===
-MUSISZ JESZCZE ZEBRAĆ (jeśli nie padło w rozmowie):
-- DYSTANS lub CZAS (np. "25km", "na 3 godziny")
-- PĘTLA czy LINIOWA? Domyślnie zakładaj pętlę.
-- PREFERENCJE terenu (np. gravel, szuter, leśne drogi, itp.) - ale jeśli już znamy pojazd typu gravel, nie pytaj o to!
+MUSISZ ZEBRAĆ te informacje (jeśli nie padły w rozmowie):
+- Zależnie od POJAZDU:
+  a) Dla "hiking" (pieszo) lub "city" (spacer miejski): ZAPYTAJ O ILOŚĆ DNI i POZIOM TRUDNOŚCI (lekki, umiarkowany, wymagający). NIE PYTAJ o kilometry!
+  b) Dla rowerów/motocykli/aut: ZAPYTAJ O DYSTANS lub CZAS (np. "25km", "na 3 godziny").
+- PĘTLA czy LINIOWA? (Domyślnie proponuj pętlę).
+- PREFERENCJE terenu (jeśli to gravel/mtb, nie pytaj o to, bo wiemy).
+- POPULARNOŚĆ (Zawsze daj 2 opcje wyboru: "zaproponuj popularne trasy/klasyki regionu" albo "wybierz małouczęszczane miejsca z dala od tłumów").
 
 === ZASADY DZIAŁANIA ===
-1. Jeśli znamy już START + POJAZD i użytkownik podał DYSTANS → NATYCHMIAST generuj trasę (done: true). Nie pytaj o nic więcej!
-2. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami. NIE PYTAJ O SZCZEGÓŁY!
-3. Pytaj tylko o JEDNO brakujące pole naraz.
-4. Bądź energiczny i konkretny, maksymalnie 2 zdania w odpowiedzi.
+1. Gdy zbierzesz WSZYSTKIE wymagane dane (Start, Pojazd, Dni/Dystans, Trudność, Popularność), NIE GENERUJ TRASY OD RAZU (done: false). Zamiast tego, przedstaw krótkie podsumowanie w jednym zdaniu (np. "Zaplanuję 3-dniową umiarkowaną wędrówkę z Zakopanego, z dala od tłumów.") i ZAPYTAJ: "Czy chcesz dodać coś jeszcze (np. konkretne miejsca), czy mam wygenerować trasę?".
+2. DOPIERO gdy użytkownik potwierdzi generowanie (odpowie "generuj", "nie, to wszystko", "jest ok", itp.), ustaw 'done: true' i wygeneruj JSON trasy.
+3. UKRYTY DYSTANS: Kiedy użytkownik potwierdzi wygenerowanie dla trasy pieszej/miejskiej (hiking/city), i dajesz 'done: true', wylicz sumaryczny dystans w JSON na podstawie liczby dni i trudności. Kalkulacja:
+   - Lekki: 12 km/dzień (np. 3 dni = 36)
+   - Umiarkowany: 16 km/dzień (np. 3 dni = 48)
+   - Wymagający: 22 km/dzień (np. 3 dni = 66)
+   Wyliczoną wartość wpisz jako liczbę w polu "distance". Dobieraj punkty tak, aby pasowały do rejonu, a nie byle nabić kilometry.
+4. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
+5. Pytaj tylko o JEDNO brakujące pole naraz. Bądź konkretny, max 2-3 zdania.
 
 === ZASADY SELEKCJI PUNKTÓW (JAKOŚĆ I LOGIKA) ===
 Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez znaczenia turystycznego! Zamiast tego dobieraj punkty reprezentujące rzeczywiste atrakcje, walory przyrodnicze lub znane szlaki dla danego pojazdu:
@@ -166,25 +176,37 @@ ${conversationText}
 
 Odpowiedz WYŁĄCZNIE W FORMACIE JSON (bez markdown, czysty JSON):
 
-Przykład gdy pytasz o brakujący dystans:
+Przykład 1: Brakuje dni i trudności (tylko hiking/city):
 {
   "done": false,
-  "reply": "Świetnie! Widzę pinezkę w okolicach Milicza i wybrany Gravel. Jaki dystans planujesz — 25km, 40km, dłużej?"
+  "reply": "Widzę start z Zakopanego. Na ile dni planujesz tę wędrówkę i jaki poziom trudności preferujesz (lekki, umiarkowany, wymagający)?"
 }
 
-Przykład gdy generujesz gotową pętlę (done: true) — WŁAŚCIWY OKRĄG:
+Przykład 2: Pytasz o dystans (rower/moto):
+{
+  "done": false,
+  "reply": "Mamy to, Gravel! Jaki dystans planujesz przejechać - 20km, 40km, a może dłużej?"
+}
+
+Przykład 3: Zebrano wszystko, pytasz o zatwierdzenie (done: false!):
+{
+  "done": false,
+  "reply": "Zaplanuję 3-dniową umiarkowaną wędrówkę z Zakopanego, z dala od tłumów. Czy chcesz dodać coś jeszcze, czy mam wygenerować trasę?"
+}
+
+Przykład 4: Użytkownik zatwierdził -> generujesz JSON (done: true):
 {
   "done": true,
-  "reply": "Wytyczyłem rewelacyjną pętlę gravelową ~25km wokół Milicza! Trasa okrąża Stawy Milickie i wiedzie wzdłuż rzeki Barycz — mnóstwo szutru i brak asfaltu. Sprawdź mapę!",
-  "add_waypoints": ["Milicz", "Stawno (stawy), Milicz", "Jaz Grabownica, Milicz", "Postolin, Milicz", "Sułów, Milicz", "Milicz"],
+  "reply": "Proszę bardzo! Wytyczyłem 3-dniową umiarkowaną trasę po Tatrach omijając najbardziej tłoczne miejsca. Sprawdź mapę!",
+  "add_waypoints": ["Karpacz", "Schronisko Samotnia, Karpacz", "Śnieżka, Karkonosze", "Karpacz"],
   "extracted": {
-    "start_point": "Milicz",
-    "end_point": "Milicz",
-    "route_type": "gravel",
-    "distance": "25",
-    "intent": "pętla gravelowa 25km Milicz Stawy Milickie Barycz",
+    "start_point": "Karpacz",
+    "end_point": "Karpacz",
+    "route_type": "hiking",
+    "distance": "48",
+    "intent": "3 dni umiarkowany hiking z dala od tłumów",
     "loop": true,
-    "key_waypoints": ["Stawno, Milicz", "Jaz Grabownica, Milicz", "Sułów, Milicz"]
+    "key_waypoints": ["Schronisko Samotnia, Karpacz", "Śnieżka, Karkonosze"]
   }
 }`;
 

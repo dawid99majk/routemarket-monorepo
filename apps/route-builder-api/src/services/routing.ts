@@ -1,4 +1,5 @@
 import { GeocodedPlace } from './geocoding.js';
+import { GraphHopperRoutingProvider, GoogleRoutesRoutingProvider, RoutingProfile } from '@routemarket/atlas-gis';
 
 export interface RouteResult {
   distance_km: number;
@@ -12,12 +13,8 @@ export interface RouteResult {
 }
 
 export class RoutingService {
-  private readonly orsApiKey = process.env.OPENROUTESERVICE_API_KEY || '';
-  private readonly orsBaseUrl = 'https://api.openrouteservice.org/v2/directions';
-  private readonly googleApiKey = process.env.GOOGLE_MAPS_API_KEY || '';
-  // GraphHopper kept as fallback
-  private readonly ghApiKey = process.env.GRAPHHOPPER_API_KEY || '';
-  private readonly ghBaseUrl = 'https://graphhopper.com/api/1/route';
+  private ghProvider = new GraphHopperRoutingProvider();
+  private googleProvider = new GoogleRoutesRoutingProvider();
 
   async getRoute(
     places: GeocodedPlace[], 
@@ -29,7 +26,7 @@ export class RoutingService {
       difficulty?: string;
     }
   ): Promise<RouteResult> {
-    console.log(`[Routing] getRoute: Generating ${routeType} route for ${places.length} waypoints...`);
+    console.log(`[Routing] getRoute: Generating ${routeType} route for ${places.length} waypoints using Atlas Engine...`);
     
     if (places.length < 2) {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
@@ -38,55 +35,43 @@ export class RoutingService {
     // Sort waypoints to avoid overlapping branches (odnogi)
     const optimizedPlaces = this.optimizeWaypointsLocal(places);
 
+    // Mapped routing profile for internal engines
+    const profileMap: Record<string, RoutingProfile> = {
+      'cycling': 'bike', 'gravel': 'bike', 'mtb': 'bike', 
+      'hiking': 'hiking', 'city_walk': 'hiking', 'city': 'hiking',
+      'car': 'motorcycle', 'motorcycle': 'motorcycle'
+    };
+    const profile = profileMap[routeType] || 'bike';
+
     // PRIMARY: Google Maps for car and motorcycle
-    if ((routeType === 'car' || routeType === 'motorcycle') && this.googleApiKey) {
+    if (routeType === 'car' || routeType === 'motorcycle') {
       try {
-        const result = await this.fetchGoogleRoute(optimizedPlaces, routeType, options);
-        return { ...result, waypoints: optimizedPlaces };
+        const result = await this.googleProvider.getRoute(optimizedPlaces, profile);
+        return {
+          distance_km: result.distanceKm,
+          duration_h: result.estimatedTimeH,
+          trackPoints: result.points.map(p => [p.lat, p.lng, (p as any).ele || 0]),
+          geometry: result.geometryGeoJson,
+          waypoints: optimizedPlaces
+        };
       } catch (err: any) {
-        console.warn(`[Routing] Google Maps routing failed, trying ORS: ${err.message}`);
+        console.warn(`[Routing] Google Maps routing failed, trying GraphHopper: ${err.message}`);
       }
     }
 
-    // SECONDARY: OpenRouteService (50 waypoints, cycling-mountain profile for gravel)
-    if (this.orsApiKey) {
-      try {
-        const result = await this.fetchOrsRoute(optimizedPlaces, routeType, options);
-        return { ...result, waypoints: optimizedPlaces };
-      } catch (err: any) {
-        console.warn(`[Routing] ORS request failed, trying GraphHopper: ${err.message}`);
-      }
-    }
-
-    // SECONDARY: GraphHopper (max 5 waypoints on free tier)
-    if (this.ghApiKey) {
-      try {
-        const MAX_GH_POINTS = 5;
-        let routePlaces = optimizedPlaces;
-        if (optimizedPlaces.length > MAX_GH_POINTS) {
-          const start = optimizedPlaces[0];
-          const end = optimizedPlaces[optimizedPlaces.length - 1];
-          const middle = optimizedPlaces.slice(1, -1);
-          const step = middle.length / (MAX_GH_POINTS - 2);
-          const sampled = Array.from({ length: MAX_GH_POINTS - 2 }, (_, i) => 
-            middle[Math.round(i * step)]
-          );
-          routePlaces = [start, ...sampled, end];
-          console.log(`[Routing] Trimmed to ${routePlaces.length} for GH free tier.`);
-        }
-        const result = await this.fetchGraphHopperRoute(routePlaces, routeType, options);
-        return { ...result, waypoints: optimizedPlaces };
-      } catch (err: any) {
-        console.warn(`[Routing] GraphHopper also failed, trying BRouter: ${err.message}`);
-      }
-    }
-
-    // TERTIARY: BRouter (No API key required)
+    // GraphHopper for all non-motorized (hiking, gravel, cycling) and fallback for motorized
     try {
-      const result = await this.fetchBRouterRoute(optimizedPlaces, routeType, options);
-      return { ...result, waypoints: optimizedPlaces };
+      const result = await this.ghProvider.getRoute(optimizedPlaces, profile);
+      
+      return {
+        distance_km: result.distanceKm,
+        duration_h: result.estimatedTimeH,
+        trackPoints: result.points.map(p => [p.lat, p.lng, (p as any).ele || 0]),
+        geometry: result.geometryGeoJson,
+        waypoints: optimizedPlaces
+      };
     } catch (err: any) {
-      console.warn(`[Routing] BRouter also failed, using mock: ${err.message}`);
+      console.warn(`[Routing] GraphHopper failed: ${err.message}`);
     }
 
     // FALLBACK: Mathematical mock route
@@ -108,292 +93,12 @@ export class RoutingService {
     return {
       distance_km: 12.5,
       duration_h: 3.5,
-      trackPoints: points,
+      trackPoints: points.map(p => [p[0], p[1], 0]),
       geometry: {
         type: 'LineString',
         coordinates: points.map(p => [p[1], p[0]])
       },
       waypoints: optimizedPlaces
-    };
-  }
-
-  private mapOrsProfile(routeType: string): string {
-    switch (routeType) {
-      case 'motorcycle': return 'driving-car';
-      case 'car':        return 'driving-car';
-      case 'cycling':    return 'cycling-regular';
-      case 'gravel':     return 'cycling-mountain'; // Best for gravel/MTB!
-      case 'mtb':        return 'cycling-mountain';
-      case 'hiking':     return 'foot-hiking';
-      case 'city_walk':  return 'foot-walking';
-      case 'city':       return 'foot-walking';
-      default:           return 'cycling-mountain';
-    }
-  }
-
-  private async fetchOrsRoute(
-    places: GeocodedPlace[],
-    routeType: string,
-    options?: { intent?: string; surfacePreferences?: string[] }
-  ): Promise<RouteResult> {
-    const profile = this.mapOrsProfile(routeType);
-    
-    // ORS expects [lng, lat] coordinate pairs
-    const coordinates = places.map(p => [p.lng, p.lat]);
-
-    const body: any = {
-      coordinates,
-      instructions: false,
-      elevation: true,
-      units: 'km',
-      language: 'pl',
-      radiuses: coordinates.map(() => 3000)
-    };
-
-    // For gravel/mountain biking: prefer unpaved surfaces
-    if (routeType === 'gravel' || routeType === 'mtb') {
-      body.options = {
-        avoid_features: ['ferries'],
-        profile_params: {
-          weightings: {
-            // steepness_difficulty: { level: 1 } // optional for MTB
-          }
-        }
-      };
-    }
-    
-    // Apply routing preference (intent)
-    if (options?.intent === 'wild') {
-      body.preference = 'shortest'; // Shortest often chooses smaller, unpaved/wild backroads
-    } else {
-      body.preference = 'recommended'; // Popular/classic routes usually follow the recommended main path
-    }
-
-    const url = `${this.orsBaseUrl}/${profile}/geojson`;
-    console.log(`[ORS] Routing via profile=${profile} with ${places.length} waypoints`);
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': this.orsApiKey
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`ORS API returned ${res.status}: ${errText}`);
-    }
-
-    const data = await res.json() as any;
-    const feature = data.features?.[0];
-    if (!feature) throw new Error('ORS returned no features.');
-
-    const coordinates_out = feature.geometry.coordinates as number[][];
-    const trackPoints = coordinates_out.map(c => [c[1], c[0], c[2] || 0] as [number, number, number]);
-    const summary = feature.properties?.summary;
-
-    console.log(`[ORS] Route OK: ${summary?.distance?.toFixed(1)}km, ${summary?.duration?.toFixed(0)}s`);
-
-    return {
-      distance_km: parseFloat((summary?.distance || 0).toFixed(2)),
-      duration_h: parseFloat(((summary?.duration || 0) / 3600).toFixed(2)),
-      trackPoints,
-      geometry: feature.geometry // GeoJSON LineString [lng, lat] - correct for GeoJSON
-    };
-  }
-
-  private async fetchGraphHopperRoute(
-    places: GeocodedPlace[], 
-    routeType: string,
-    options?: {
-      intent?: string;
-      surfacePreferences?: string[];
-    }
-  ): Promise<RouteResult> {
-    const profileMap: Record<string, string> = {
-      motorcycle: 'car', car: 'car', cycling: 'bike', gravel: 'bike', hiking: 'foot', city_walk: 'foot', city: 'foot'
-    };
-    const profile = profileMap[routeType] || 'bike';
-    const body: any = {
-      points: places.map(p => [p.lng, p.lat]),
-      profile,
-      locale: 'pl',
-      points_encoded: false,
-      instructions: false,
-      elevation: true
-    };
-
-    const url = `${this.ghBaseUrl}?key=${this.ghApiKey}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`GraphHopper API returned ${res.status}: ${errText}`);
-    }
-
-    const data = await res.json() as any;
-    if (!data.paths || data.paths.length === 0) throw new Error('GraphHopper returned empty paths.');
-
-    const path = data.paths[0];
-    const coordinates = path.points.coordinates as number[][];
-    const trackPoints = coordinates.map(c => [c[1], c[0], c[2] || 0] as [number, number, number]);
-
-    return {
-      distance_km: parseFloat((path.distance / 1000).toFixed(2)),
-      duration_h: parseFloat((path.time / 3600000).toFixed(2)),
-      trackPoints,
-      geometry: { type: 'LineString', coordinates }
-    };
-  }
-
-  private async fetchBRouterRoute(
-    places: GeocodedPlace[], 
-    routeType: string,
-    options?: {
-      intent?: string;
-      surfacePreferences?: string[];
-    }
-  ): Promise<RouteResult> {
-    const profileMap: Record<string, string> = {
-      car: 'car-fast',
-      motorcycle: 'car-fast',
-      cycling: 'fastbike',
-      gravel: 'trekking',
-      mtb: 'trekking',
-      hiking: 'shortest',
-      city: 'shortest',
-      city_walk: 'shortest'
-    };
-    const brouterProfile = profileMap[routeType] || 'trekking';
-    
-    const lonlats = places.map(p => `${p.lng},${p.lat}`).join('|');
-    const url = `https://brouter.de/brouter?lonlats=${lonlats}&profile=${brouterProfile}&alternativeidx=0&format=geojson`;
-    
-    console.log(`[BRouter] Routing via profile=${brouterProfile} for ${places.length} waypoints...`);
-    const res = await fetch(url);
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`BRouter returned ${res.status}: ${errText}`);
-    }
-
-    const data = await res.json() as any;
-    if (!data.features || data.features.length === 0) {
-      throw new Error('BRouter returned empty features.');
-    }
-
-    const feature = data.features[0];
-    const coordinates = feature.geometry.coordinates as number[][];
-    // BRouter geojson coordinates are [lng, lat, elevation]
-    const trackPoints = coordinates.map(c => [c[1], c[0], c[2] || 0] as [number, number, number]);
-    
-    const distance_km = parseFloat((feature.properties['track-length'] / 1000).toFixed(2)) || 0;
-    const duration_h = parseFloat((feature.properties['total-time'] / 3600).toFixed(2)) || 0;
-
-    return {
-      distance_km,
-      duration_h,
-      trackPoints,
-      geometry: feature.geometry
-    };
-  }
-
-  private decodePolyline(encoded: string): [number, number][] {
-    const points: [number, number][] = [];
-    let index = 0, len = encoded.length;
-    let lat = 0, lng = 0;
-
-    while (index < len) {
-      let b, shift = 0, result = 0;
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      points.push([lat / 1e5, lng / 1e5]);
-    }
-    return points;
-  }
-
-  private async fetchGoogleRoute(
-    places: GeocodedPlace[],
-    routeType: string,
-    options?: { intent?: string; surfacePreferences?: string[] }
-  ): Promise<RouteResult> {
-    console.log(`[Google Maps] Routing via driving mode with ${places.length} waypoints`);
-
-    const origin = `${places[0].lat},${places[0].lng}`;
-    const destination = `${places[places.length - 1].lat},${places[places.length - 1].lng}`;
-    
-    let waypoints = '';
-    if (places.length > 2) {
-      waypoints = places.slice(1, -1).map(p => `${p.lat},${p.lng}`).join('|');
-    }
-
-    const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
-    url.searchParams.set('origin', origin);
-    url.searchParams.set('destination', destination);
-    if (waypoints) {
-      url.searchParams.set('waypoints', waypoints);
-    }
-    
-    if (options?.intent === 'wild') {
-      url.searchParams.set('avoid', 'highways|tolls|ferries');
-    }
-
-    url.searchParams.set('mode', 'driving');
-    url.searchParams.set('key', this.googleApiKey);
-
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-      throw new Error(`Google Maps API returned status ${res.status}`);
-    }
-
-    const data = await res.json() as any;
-    if (data.status !== 'OK' || !data.routes || data.routes.length === 0) {
-      throw new Error(`Google Maps Directions API status: ${data.status}`);
-    }
-
-    const route = data.routes[0];
-    const encodedPoly = route.overview_polyline.points;
-    const decoded = this.decodePolyline(encodedPoly); // Returns [lat, lng][]
-
-    // Calculate total distance and duration from legs
-    let distanceMeters = 0;
-    let durationSeconds = 0;
-    for (const leg of route.legs) {
-      distanceMeters += leg.distance?.value || 0;
-      durationSeconds += leg.duration?.value || 0;
-    }
-
-    const trackPoints = decoded.map(([lat, lng]) => [lat, lng, 0] as [number, number, number]);
-
-    return {
-      distance_km: parseFloat((distanceMeters / 1000).toFixed(2)),
-      duration_h: parseFloat((durationSeconds / 3600).toFixed(2)),
-      trackPoints,
-      geometry: {
-        type: 'LineString',
-        coordinates: decoded.map(([lat, lng]) => [lng, lat]) // GeoJSON expects [lng, lat]
-      }
     };
   }
 
@@ -442,7 +147,7 @@ export class RoutingService {
   }
 
   async getRouteAlternatives(places: GeocodedPlace[], routeType: string, preferences: string[] = []): Promise<any[]> {
-    console.log(`[Routing] getRouteAlternatives: Generating 3 alternatives for ${routeType} (ORS key present: ${!!this.orsApiKey})...`);
+    console.log(`[Routing] getRouteAlternatives: Generating 3 alternatives for ${routeType} using Atlas Engine...`);
     
     if (places.length < 2) {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
@@ -452,125 +157,117 @@ export class RoutingService {
     const end = places[places.length - 1];
     const isLoop = places.length > 2 && start.lat === end.lat && start.lng === end.lng;
 
-    // Jeśli posiadamy klucz ORS lub GraphHopper, generujemy 3 prawdziwe trasy
-    if (this.orsApiKey || this.ghApiKey) {
-      try {
-        console.log(`[Routing] Generating real road-snapped alternatives...`);
-        
-        let dLat: number;
-        let dLng: number;
-        let midLat: number;
-        let midLng: number;
-        
-        if (isLoop) {
-          // Dla pętli punkt odniesienia (checkpoint) to środkowy punkt trasy
-          const checkpoint = places[1];
-          dLat = checkpoint.lat - start.lat;
-          dLng = checkpoint.lng - start.lng;
-          midLat = checkpoint.lat;
-          midLng = checkpoint.lng;
-        } else {
-          // Dla standardowej trasy punkt odniesienia to środek między startem a końcem
-          dLat = end.lat - start.lat;
-          dLng = end.lng - start.lng;
-          midLat = (start.lat + end.lat) / 2;
-          midLng = (start.lng + end.lng) / 2;
-        }
-        
-        // Wektor prostopadły do przesunięć: (-dLng, dLat)
-        // Przesunięcie o ok. 22% w jedną stronę dla Scenic
-        const shiftScenicLat = midLat - dLng * 0.22;
-        const shiftScenicLng = midLng + dLat * 0.22;
-        
-        // Przesunięcie o ok. 25% w drugą stronę dla Challenge
-        const shiftChallengeLat = midLat + dLng * 0.25;
-        const shiftChallengeLng = midLng - dLat * 0.25;
-
-        const scenicWaypoints: GeocodedPlace[] = [
-          start,
-          { name: 'Obejście widokowe', lat: shiftScenicLat, lng: shiftScenicLng, confidence: 1, source: 'derived', provider: 'derived' },
-          end
-        ];
-        
-        const challengeWaypoints: GeocodedPlace[] = [
-          start,
-          { name: 'Odcinek techniczny', lat: shiftChallengeLat, lng: shiftChallengeLng, confidence: 1, source: 'derived', provider: 'derived' },
-          end
-        ];
-        
-        const fastWaypoints: GeocodedPlace[] = isLoop ? [start, places[1], end] : [start, end];
-
-        // Wywołujemy 3 zapytania HTTP do API równolegle
-        const [scenicRoute, challengeRoute, fastRoute] = await Promise.all([
-          this.getRoute(scenicWaypoints, routeType).catch(err => {
-            console.error(`[Routing] Scenic route fetch failed, falling back: ${err.message}`);
-            return null;
-          }),
-          this.getRoute(challengeWaypoints, routeType).catch(err => {
-            console.error(`[Routing] Challenge route fetch failed, falling back: ${err.message}`);
-            return null;
-          }),
-          this.getRoute(fastWaypoints, routeType).catch(err => {
-            console.error(`[Routing] Fast route fetch failed, falling back: ${err.message}`);
-            return null;
-          })
-        ]);
-
-        const alternatives: any[] = [];
-
-        if (scenicRoute) {
-          alternatives.push({
-            id: 'variant-a',
-            name: 'Trasa Krajobrazowa (Widokowa)',
-            color: '#10b981', // Szmaragdowy
-            distance_km: scenicRoute.distance_km,
-            duration_h: scenicRoute.duration_h,
-            track: scenicRoute.trackPoints,
-            pois: [
-              { name: 'Punkt Widokowy', lat: shiftScenicLat, lng: shiftScenicLng },
-              { name: 'Schronisko i Kawiarnia', lat: scenicRoute.trackPoints[Math.floor(scenicRoute.trackPoints.length * 0.6)][0], lng: scenicRoute.trackPoints[Math.floor(scenicRoute.trackPoints.length * 0.6)][1] }
-            ]
-          });
-        }
-
-        if (challengeRoute) {
-          alternatives.push({
-            id: 'variant-b',
-            name: routeType === 'motorcycle' ? 'Trasa Kręta (Techniczna)' : 'Trasa Wyzwanie (Górska)',
-            color: '#06b6d4', // Błękitny
-            distance_km: challengeRoute.distance_km,
-            duration_h: challengeRoute.duration_h,
-            track: challengeRoute.trackPoints,
-            pois: [
-              { name: routeType === 'motorcycle' ? 'Przełęcz Zakrętów' : 'Szczyt Górski', lat: shiftChallengeLat, lng: shiftChallengeLng }
-            ]
-          });
-        }
-
-        if (fastRoute) {
-          alternatives.push({
-            id: 'variant-c',
-            name: 'Trasa Szybka (Klasyczna)',
-            color: '#f59e0b', // Bursztynowy
-            distance_km: fastRoute.distance_km,
-            duration_h: fastRoute.duration_h,
-            track: fastRoute.trackPoints,
-            pois: isLoop ? [
-              { name: 'Start/Koniec pętli', lat: start.lat, lng: start.lng },
-              { name: 'Punkt zwrotny pętli', lat: places[1].lat, lng: places[1].lng }
-            ] : [
-              { name: 'Punkt Kontrolny Start', lat: start.lat, lng: start.lng },
-              { name: 'Punkt Kontrolny Meta', lat: end.lat, lng: end.lng }
-            ]
-          });
-        }
-
-        if (alternatives.length > 0) {
-          return alternatives;
-        }
-      } catch (err: any) {
-        console.warn(`[Routing] Real GraphHopper alternatives failed, falling back to mock sinusoid: ${err.message}`);
+    try {
+      console.log(`[Routing] Generating real road-snapped alternatives using Atlas Engine...`);
+      
+      let dLat: number;
+      let dLng: number;
+      let midLat: number;
+      let midLng: number;
+      
+      if (isLoop) {
+        const checkpoint = places[1];
+        dLat = checkpoint.lat - start.lat;
+        dLng = checkpoint.lng - start.lng;
+        midLat = checkpoint.lat;
+        midLng = checkpoint.lng;
+      } else {
+        dLat = end.lat - start.lat;
+        dLng = end.lng - start.lng;
+        midLat = (start.lat + end.lat) / 2;
+        midLng = (start.lng + end.lng) / 2;
       }
+      
+      const shiftScenicLat = midLat - dLng * 0.22;
+      const shiftScenicLng = midLng + dLat * 0.22;
+      
+      const shiftChallengeLat = midLat + dLng * 0.25;
+      const shiftChallengeLng = midLng - dLat * 0.25;
+
+      const scenicWaypoints: GeocodedPlace[] = [
+        start,
+        { name: 'Obejście widokowe', lat: shiftScenicLat, lng: shiftScenicLng, confidence: 1, source: 'derived', provider: 'derived' },
+        end
+      ];
+      
+      const challengeWaypoints: GeocodedPlace[] = [
+        start,
+        { name: 'Odcinek techniczny', lat: shiftChallengeLat, lng: shiftChallengeLng, confidence: 1, source: 'derived', provider: 'derived' },
+        end
+      ];
+      
+      const fastWaypoints: GeocodedPlace[] = isLoop ? [start, places[1], end] : [start, end];
+
+      // Fetch alternatives using the internal method which now maps to GraphHopper/Google
+      const [scenicRoute, challengeRoute, fastRoute] = await Promise.all([
+        this.getRoute(scenicWaypoints, routeType).catch(err => {
+          console.error(`[Routing] Scenic route fetch failed, falling back: ${err.message}`);
+          return null;
+        }),
+        this.getRoute(challengeWaypoints, routeType).catch(err => {
+          console.error(`[Routing] Challenge route fetch failed, falling back: ${err.message}`);
+          return null;
+        }),
+        this.getRoute(fastWaypoints, routeType).catch(err => {
+          console.error(`[Routing] Fast route fetch failed, falling back: ${err.message}`);
+          return null;
+        })
+      ]);
+
+      const alternatives: any[] = [];
+
+      if (scenicRoute) {
+        alternatives.push({
+          id: 'variant-a',
+          name: 'Trasa Krajobrazowa (Widokowa)',
+          color: '#10b981', // Szmaragdowy
+          distance_km: scenicRoute.distance_km,
+          duration_h: scenicRoute.duration_h,
+          track: scenicRoute.trackPoints,
+          pois: [
+            { name: 'Punkt Widokowy', lat: shiftScenicLat, lng: shiftScenicLng },
+            { name: 'Schronisko i Kawiarnia', lat: scenicRoute.trackPoints[Math.floor(scenicRoute.trackPoints.length * 0.6)][0], lng: scenicRoute.trackPoints[Math.floor(scenicRoute.trackPoints.length * 0.6)][1] }
+          ]
+        });
+      }
+
+      if (challengeRoute) {
+        alternatives.push({
+          id: 'variant-b',
+          name: routeType === 'motorcycle' ? 'Trasa Kręta (Techniczna)' : 'Trasa Wyzwanie (Górska)',
+          color: '#06b6d4', // Błękitny
+          distance_km: challengeRoute.distance_km,
+          duration_h: challengeRoute.duration_h,
+          track: challengeRoute.trackPoints,
+          pois: [
+            { name: routeType === 'motorcycle' ? 'Przełęcz Zakrętów' : 'Szczyt Górski', lat: shiftChallengeLat, lng: shiftChallengeLng }
+          ]
+        });
+      }
+
+      if (fastRoute) {
+        alternatives.push({
+          id: 'variant-c',
+          name: 'Trasa Szybka (Klasyczna)',
+          color: '#f59e0b', // Bursztynowy
+          distance_km: fastRoute.distance_km,
+          duration_h: fastRoute.duration_h,
+          track: fastRoute.trackPoints,
+          pois: isLoop ? [
+            { name: 'Start/Koniec pętli', lat: start.lat, lng: start.lng },
+            { name: 'Punkt zwrotny pętli', lat: places[1].lat, lng: places[1].lng }
+          ] : [
+            { name: 'Punkt Kontrolny Start', lat: start.lat, lng: start.lng },
+            { name: 'Punkt Kontrolny Meta', lat: end.lat, lng: end.lng }
+          ]
+        });
+      }
+
+      if (alternatives.length > 0) {
+        return alternatives;
+      }
+    } catch (err: any) {
+      console.warn(`[Routing] Real Atlas alternatives failed, falling back to mock sinusoid: ${err.message}`);
     }
 
     // --- FALLBACK MATEMATYCZNY (Gdy brak klucza API lub zapytanie zawiedzie) ---
