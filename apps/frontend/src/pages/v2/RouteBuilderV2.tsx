@@ -9,6 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 // Leaflet Components
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -673,28 +677,31 @@ ${points}
 
   const handleDownloadPdf = () => {
     if (!guideText) return;
-    const doc = new jsPDF();
-    doc.addFont("Helvetica", "Helvetica", "normal");
-    doc.setFont("Helvetica");
-    
-    // Split text to fit page width
-    const splitText = doc.splitTextToSize(guideText, 180);
-    
-    let y = 20;
-    doc.setFontSize(16);
-    doc.text("Przewodnik po Trasie", 10, y);
-    y += 15;
-    
-    doc.setFontSize(12);
-    for (let i = 0; i < splitText.length; i++) {
-        if (y > 280) {
-            doc.addPage();
-            y = 20;
-        }
-        doc.text(splitText[i], 10, y);
-        y += 7;
+    const element = document.getElementById('guidebook-content');
+    if (!element) {
+        toast.error('Nie znaleziono zawartości przewodnika');
+        return;
     }
-    doc.save("przewodnik_trasy.pdf");
+    
+    // Tworzymy kopię elementu, by PDF nie miał tła i szarych ramek (chcemy "czysty" styl druku)
+    const printElement = element.cloneNode(true) as HTMLElement;
+    printElement.className = 'prose prose-sm prose-emerald max-w-none p-8 bg-white';
+    
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(printElement);
+    document.body.appendChild(wrapper);
+
+    const opt = {
+      margin:       15,
+      filename:     'przewodnik_trasy.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(wrapper).save().then(() => {
+        document.body.removeChild(wrapper);
+    });
   };
 
   const handleChatSubmit = async (e: React.FormEvent) => {
@@ -951,8 +958,10 @@ ${points}
                 {guideText && (
                   <div className="space-y-2">
                     <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-wider">Przewodnik po trasie</h3>
-                    <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
-                      {guideText}
+                    <div id="guidebook-content" className="bg-slate-50 border border-slate-200/60 rounded-xl p-6 text-slate-800 prose prose-sm prose-emerald max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {guideText}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 )}
