@@ -262,7 +262,7 @@ async function renderTerrain(
   gridHelper.position.y = 0.16;
   scene.add(gridHelper);
 
-  const trackVectors = points.map((point) => new THREE.Vector3(point.x, 2.5, point.z));
+  const trackVectors = points.map((point) => new any(point.x, 2.5, point.z));
   const routeCurve = new THREE.CatmullRomCurve3(trackVectors);
   const routeGeometry = new THREE.TubeGeometry(routeCurve, Math.max(80, points.length * 2), 1.2, 12, false);
   const routeMaterial = new THREE.MeshStandardMaterial({
