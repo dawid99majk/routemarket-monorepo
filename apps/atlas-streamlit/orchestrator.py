@@ -101,12 +101,20 @@ class Orchestrator:
             raise ValueError("Route Planner nie mógł wyznaczyć minimum 2 punktów na podstawie researchu.")
             
         coords = []
+        enriched_points = []
         bias_point = None
         for pt in route_plan.points:
             # Resolving coordinates via Nominatim OSM with fallback
             try:
                 lon, lat = geocode_osm(pt.search_query, pt.name, bias_point=bias_point)
                 coords.append((lon, lat))
+                enriched_points.append({
+                    "name": pt.name,
+                    "search_query": pt.search_query,
+                    "description": pt.description,
+                    "lat": lat,
+                    "lng": lon
+                })
                 if not bias_point:
                     bias_point = (lon, lat)
             except ValueError as e:
@@ -119,8 +127,10 @@ class Orchestrator:
         if len(coords) >= 2:
             start_lon, start_lat = coords[0]
             filtered_coords = [coords[0]]
+            filtered_enriched = [enriched_points[0]]
             max_dist = 600.0 if profile.lower() in ["car", "motorcycle"] else 120.0
-            for lon, lat in coords[1:]:
+            for i in range(1, len(coords)):
+                lon, lat = coords[i]
                 # Calculate distance to start
                 R = 6371.0
                 phi1 = math.radians(start_lat)
@@ -135,7 +145,9 @@ class Orchestrator:
                     logger.warning(f"Dropping coordinate ({lon}, {lat}) because it is too far from start point ({dist:.1f} km > {max_dist} km)")
                 else:
                     filtered_coords.append((lon, lat))
+                    filtered_enriched.append(enriched_points[i])
             coords = filtered_coords
+            enriched_points = filtered_enriched
 
         if len(coords) < 2:
             raise ValueError("Po odrzuceniu zbyt odległych punktów zostało za mało lokalizacji by wyznaczyć trasę.")
@@ -151,7 +163,7 @@ class Orchestrator:
         return {
             "title": route_plan.title,
             "description": route_plan.description,
-            "points": route_plan.model_dump()["points"],
+            "points": enriched_points,
             "gpx": gpx_data,
             "guide": guide_md
         }

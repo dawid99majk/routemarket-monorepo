@@ -128,7 +128,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [vehicleType, setVehicleType] = useState<'motorcycle' | 'bicycle' | 'hiking' | 'city' | 'car'>(getInitialTypes().v);
   const [bikeSubtype, setBikeSubtype] = useState<'gravel' | 'road' | 'mtb'>(getInitialTypes().b);
   
-  const [waypoints, setWaypoints] = useState<{lat: number, lng: number, type: string}[]>([]);
+  const [waypoints, setWaypoints] = useState<{lat: number, lng: number, type: string, name?: string}[]>([]);
   const [tempMarker, setTempMarker] = useState<L.LatLng | null>(null);
 
   const handleAddPointFromTemp = (type: 'start' | 'end' | 'waypoint') => {
@@ -163,15 +163,25 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         }
       } else {
         // waypoint
-        if (currentWps.length === 0) {
+        if (currentWps.length < 2) {
            currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
         } else {
-           const endIdx = currentWps.findIndex(w => w.type === 'end');
-           if (endIdx >= 0) {
-               currentWps.splice(endIdx, 0, { lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
-           } else {
-               currentWps.push({ lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
+           // Znajdź najlepsze miejsce do wstawienia (najkrótszy obwód trójkąta)
+           let bestIdx = 1;
+           let minAddedDist = Infinity;
+           for (let i = 0; i < currentWps.length - 1; i++) {
+               const p1 = currentWps[i];
+               const p2 = currentWps[i+1];
+               const d1 = getHaversineDistance(p1.lat, p1.lng, tempMarker.lat, tempMarker.lng);
+               const d2 = getHaversineDistance(tempMarker.lat, tempMarker.lng, p2.lat, p2.lng);
+               const dOrig = getHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+               const addedDist = d1 + d2 - dOrig;
+               if (addedDist < minAddedDist) {
+                   minAddedDist = addedDist;
+                   bestIdx = i + 1;
+               }
            }
+           currentWps.splice(bestIdx, 0, { lat: tempMarker.lat, lng: tempMarker.lng, type: 'waypoint' });
         }
       }
       return currentWps;
@@ -457,7 +467,7 @@ ${points}
         },
         body: JSON.stringify({
           points: wps.map((wp, i) => ({
-            name: wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Punkt ${i}`),
+            name: wp.name || (wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Punkt ${i}`)),
             lat: wp.lat,
             lng: wp.lng
           })),
@@ -566,6 +576,17 @@ ${points}
         
         toast.success("Trasa wygenerowana pomyślnie!");
         setActiveTab('details');
+
+        let finalWaypoints = wps;
+        if (data.points && Array.isArray(data.points) && data.points.length >= 2) {
+          finalWaypoints = data.points.map((pt: any, i: number) => ({
+            lat: pt.lat,
+            lng: pt.lng,
+            name: pt.name,
+            type: i === 0 ? 'start' : (i === data.points.length - 1 ? 'end' : 'waypoint')
+          }));
+          setWaypoints(finalWaypoints);
+        }
         
         let finalGpx = data.gpx;
         if (!finalGpx) {
@@ -589,7 +610,7 @@ ${points}
                   requirements: {
                     title: data.title || 'Nowa Trasa AI',
                     chatMessages: messagesToUse,
-                    waypoints: wps,
+                    waypoints: finalWaypoints,
                     geometry: data.trackPoints,
                     gpxData: finalGpx,
                     guideText: data.guide,
@@ -611,7 +632,7 @@ ${points}
                   requirements: {
                     title: data.title || 'Nowa Trasa AI',
                     chatMessages: messagesToUse,
-                    waypoints: wps,
+                    waypoints: finalWaypoints,
                     geometry: data.trackPoints,
                     gpxData: finalGpx,
                     guideText: data.guide,
