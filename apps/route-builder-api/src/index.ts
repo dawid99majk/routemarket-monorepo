@@ -34,13 +34,14 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype } = await c.req.json() as { 
+    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype, routing_preference } = await c.req.json() as { 
       messages: {role: string, text: string}[], 
       project_id?: string, 
       input_notes?: string,
       current_waypoints?: {lat: number, lng: number}[],
       vehicle_type?: string,
-      bike_subtype?: string
+      bike_subtype?: string,
+      routing_preference?: string
     };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
@@ -60,6 +61,11 @@ Dystans docelowy: ${project.requirements.distance_target_km || '?'} km`;
       } catch (err) {
         console.warn('Could not fetch project for chat notes context', err);
       }
+    }
+
+    if (routing_preference) {
+      const prefText = routing_preference === 'popular' ? 'KLASYKI REGIONU (wybieraj najbardziej znane, turystyczne, popularne i sprawdzone punkty)' : 'POZA UTARTYM SZLAKIEM (szukaj ukrytych perełek, unikaj tłumów, wybieraj boczne dróżki i dzikie zakątki)';
+      projectContext += `\n\n[PREFERENCJA TRASY] Użytkownik wybrał styl: **${prefText}**. Dopasuj do tego swoje rekomendacje!`;
     }
 
     if (input_notes) {

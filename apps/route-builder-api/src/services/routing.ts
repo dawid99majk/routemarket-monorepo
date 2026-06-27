@@ -152,6 +152,13 @@ export class RoutingService {
         }
       };
     }
+    
+    // Apply routing preference (intent)
+    if (options?.intent === 'wild') {
+      body.preference = 'shortest'; // Shortest often chooses smaller, unpaved/wild backroads
+    } else {
+      body.preference = 'recommended'; // Popular/classic routes usually follow the recommended main path
+    }
 
     const url = `${this.orsBaseUrl}/${profile}/geojson`;
     console.log(`[ORS] Routing via profile=${profile} with ${places.length} waypoints`);
@@ -338,6 +345,11 @@ export class RoutingService {
     if (waypoints) {
       url.searchParams.set('waypoints', waypoints);
     }
+    
+    if (options?.intent === 'wild') {
+      url.searchParams.set('avoid', 'highways|tolls|ferries');
+    }
+
     url.searchParams.set('mode', 'driving');
     url.searchParams.set('key', this.googleApiKey);
 

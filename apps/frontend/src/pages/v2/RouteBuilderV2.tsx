@@ -81,6 +81,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const geometry = context.geometry;
   const gpxData = context.gpxData;
   const guideText = context.guideText;
+  const routingPreference = context.routingPreference;
   
   const isRouting = state.matches('generating_route') || state.matches('saving_project');
   const isTyping = state.matches('chatting');
@@ -511,6 +512,35 @@ ${points}
                       </button>
                     </div>
                   )}
+
+                  {/* Routing Preference Selector */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2 block">Styl trasy</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setField('routingPreference', 'popular')}
+                        className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg border transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
+                          routingPreference === 'popular'
+                            ? 'bg-amber-50 border-amber-200 text-amber-700 shadow-sm'
+                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-lg">🏆</span>
+                        Klasyki regionu
+                      </button>
+                      <button
+                        onClick={() => setField('routingPreference', 'wild')}
+                        className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg border transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
+                          routingPreference === 'wild'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm'
+                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-lg">🌲</span>
+                        Poza utartym szlakiem
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -628,9 +658,9 @@ ${points}
 
                 {/* Guide Text */}
                 {guideText && (
-                  <div className="space-y-2">
+                  <div className="space-y-3 mt-4">
                     <h3 className="font-bold text-slate-400 text-[10px] uppercase tracking-wider">Przewodnik po trasie</h3>
-                    <div id="guidebook-content" className="bg-slate-50 border border-slate-200/60 rounded-xl p-6 text-slate-800 prose prose-sm prose-emerald max-w-none">
+                    <div id="guidebook-content" className="bg-white border border-slate-200/60 shadow-sm rounded-xl p-6 sm:p-8 text-slate-800 prose prose-slate prose-sm sm:prose-base max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-emerald-600 hover:prose-a:text-emerald-500 prose-img:rounded-xl prose-p:leading-relaxed prose-strong:text-slate-900 prose-li:marker:text-emerald-500">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {guideText}
                       </ReactMarkdown>

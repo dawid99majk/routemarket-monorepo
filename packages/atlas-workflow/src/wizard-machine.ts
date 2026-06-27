@@ -26,6 +26,7 @@ export interface WizardContext {
   geometry: any | null;
   gpxData: string | null;
   guideText: string | null;
+  routingPreference: 'popular' | 'wild';
   
   // Stats
   routeStats: {
@@ -69,6 +70,7 @@ export const initialWizardContext: WizardContext = {
   geometry: null,
   gpxData: null,
   guideText: null,
+  routingPreference: 'popular',
   routeStats: { distance: 0, ascent: 0, descent: 0 },
 
   title: 'Nowa Trasa AI',

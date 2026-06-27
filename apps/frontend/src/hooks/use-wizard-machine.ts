@@ -36,13 +36,18 @@ export function useWizardMachine(initialProjectId: string | null = null) {
     // Override machine actors with our actual logic
     actors: {
       chatActor: async ({ input }: any) => {
-        const res = await fetch('/atlas/api/chat', {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+        const res = await fetch(`${apiUrl}/chat-interview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [...input.context.chatMessages, { role: 'user', content: input.text }],
-            profile: input.context.vehicleType === 'bicycle' ? input.context.bikeSubtype : input.context.vehicleType,
-            waypoints: input.context.waypoints
+            messages: [...input.context.chatMessages, { role: 'user', text: input.text }],
+            project_id: input.context.projectId,
+            input_notes: input.context.inputNotes,
+            current_waypoints: input.context.waypoints,
+            vehicle_type: input.context.vehicleType,
+            bike_subtype: input.context.bikeSubtype,
+            routing_preference: input.context.routingPreference
           })
         });
         if (!res.ok) throw new Error('Chat failed');
@@ -51,62 +56,45 @@ export function useWizardMachine(initialProjectId: string | null = null) {
       },
       routeGeneratorActor: async ({ input }: any) => {
         const { context } = input;
-        let messagesToUse = context.chatMessages;
         
-        if (messagesToUse.length === 0) {
-            let fallbackText = "Proszę wyznacz trasę na podstawie moich punktów.";
-            if (context.inputNotes) fallbackText += ` Moje notatki: ${context.inputNotes}`;
-            if (context.waypoints.length > 0) {
-                fallbackText += ` Wyznaczam przez ${context.waypoints.length} punktów.`;
-            }
-            messagesToUse = [{ role: 'user', text: fallbackText }];
+        if (context.waypoints.length < 2) {
+           return {
+             geometry: null,
+             waypoints: context.waypoints,
+             gpxData: null,
+             guideText: null,
+             title: 'Dodaj więcej punktów'
+           };
         }
         
-        const res = await fetch('/atlas/api/generate', {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+        const res = await fetch(`${apiUrl}/live-route`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: messagesToUse.map((m: any) => ({ role: m.role, content: m.text })),
-            profile: context.vehicleType === 'bicycle' ? context.bikeSubtype : context.vehicleType
+            points: context.waypoints,
+            route_type: context.vehicleType === 'bicycle' ? context.bikeSubtype : context.vehicleType,
+            intent: context.routingPreference
           })
         });
 
-        if (!res.ok) throw new Error('Generation failed: ' + res.status);
+        if (!res.ok) throw new Error('Live route generation failed: ' + res.status);
         const data = await res.json();
         
-        if (!data.trackPoints || data.trackPoints.length === 0) {
-            throw new Error("Brak trackPoints w odpowiedzi AI.");
+        if (!data.geometry || !data.trackPoints) {
+            throw new Error("Brak geometrii w odpowiedzi routingu.");
         }
 
-        const mappedCoords = data.trackPoints.map((p: number[]) => [p[1], p[0], p[2] || 0]);
-        const geometry = {
-          type: 'LineString',
-          coordinates: mappedCoords
-        };
-
-        let finalWaypoints = context.waypoints;
-        if (data.points && Array.isArray(data.points) && data.points.length >= 2) {
-          finalWaypoints = data.points.map((pt: any, i: number) => ({
-            lat: pt.lat,
-            lng: pt.lng,
-            name: pt.name,
-            type: i === 0 ? 'start' : (i === data.points.length - 1 ? 'end' : 'waypoint')
-          }));
-        }
-
-        let finalGpx = data.gpx;
-        if (!finalGpx) {
-          finalGpx = generateGpxString(mappedCoords, data.title || 'Nowa Trasa AI');
-        }
-
-        toast.success("Trasa wygenerowana pomyślnie!");
+        let finalGpx = generateGpxString(data.trackPoints, context.title || 'Nowa Trasa');
+        
+        toast.success("Trasa przeliczona!");
         
         return {
-          geometry,
-          waypoints: finalWaypoints,
+          geometry: data.geometry,
+          waypoints: context.waypoints,
           gpxData: finalGpx,
-          guideText: data.guide,
-          title: data.title
+          guideText: context.guideText,
+          title: context.title || 'Nowa Trasa'
         };
       },
       saveProjectActor: async ({ input }: any) => {
