@@ -23,6 +23,7 @@ const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const RouteDetail = lazy(() => import("./pages/RouteDetail"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
+const CreateRoute = lazy(() => import("./pages/CreateRoute"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const AuthError = lazy(() => import("./pages/AuthError"));
@@ -95,7 +96,7 @@ const App = () => (
                 <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
                 {/* Creator routes */}
-                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
+                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreateRoute /></ProtectedRoute>} />
                 <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
 
                 {/* Admin routes */}

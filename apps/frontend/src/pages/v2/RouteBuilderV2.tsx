@@ -79,7 +79,7 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 import { ElevationProfile } from '@/components/ElevationProfile';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
 
-export default function RouteBuilderV2({ onBack }: { onBack?: () => void }) {
+export default function RouteBuilderV2({ initialData, onBack }: { initialData?: any, onBack?: () => void }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -98,6 +98,21 @@ export default function RouteBuilderV2({ onBack }: { onBack?: () => void }) {
   
   const isRouting = state.matches('generating_route') || state.matches('saving_project');
   const isTyping = state.matches('chatting');
+
+  useEffect(() => {
+    if (initialData && !projectId && context.chatMessages.length === 0) {
+      setField('vehicleType', initialData.vehicleType);
+      if (initialData.bikeSubtype) setField('bikeSubtype', initialData.bikeSubtype);
+      setField('routingPreference', initialData.routingPreference);
+      setField('inputNotes', initialData.inputNotes);
+      
+      // Auto-start the conversation with the AI based on the user's setup
+      send({ 
+        type: 'SEND_MESSAGE', 
+        text: `Cześć, chcę stworzyć trasę. Oto moje założenia:\n${initialData.inputNotes}\nProszę, zaproponuj mi punkty trasy lub dopytaj o szczegóły jeśli potrzebujesz więcej informacji.` 
+      });
+    }
+  }, [initialData, projectId]);
 
   
   
