@@ -532,13 +532,15 @@ app.post('/route-projects/:id/jobs', async (c) => {
   if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
   
   try {
-    let job = await repo.createJob(projectId);
-
-    // Sprawdzenie czy istnieje GPX
+    const atlasUrl = process.env.ATLAS_API_BASE_URL || 'http://host.docker.internal:8787';
+    
+    // Check if it's GPX or prompt-based
     const gpxArtifact = await repo.getArtifactByType(projectId, 'gpx');
     const summaryArtifact = await repo.getArtifactByType(projectId, 'summary');
-
+    
     if (gpxArtifact && summaryArtifact) {
+      // Legacy GPX flow, keep it unchanged for now as it works locally
+      let job = await repo.createJob(projectId);
       job = await repo.updateJobState(job.id, {
         status: 'running',
         current_step: 'building_artifacts',
@@ -563,7 +565,6 @@ app.post('/route-projects/:id/jobs', async (c) => {
             duration_h: summary.duration_h
           } as any, project.requirements);
 
-          // Generujemy warianty na bazie pierwszego/ostatniego punktu
           const alternatives = await routingService.getRouteAlternatives(places as any[], project.requirements.route_type);
 
           await Promise.all([
@@ -591,108 +592,35 @@ app.post('/route-projects/:id/jobs', async (c) => {
       return c.json(job, 201);
     }
 
-    const reqs = project.requirements;
-    const missingInputs: string[] = [];
-    let errorCode: string | null = null;
-    let errorMessage: string | null = null;
-    let newStatus: typeof job.status = 'running';
-    
-    if (!reqs.end_point && !reqs.loop) {
-      newStatus = 'waiting_for_user';
-      errorCode = 'missing_end_or_loop_permission';
-      errorMessage = 'Do wygenerowania GPX potrzebuję punktu końcowego albo zgody na zaproponowanie pętli.';
-      missingInputs.push('end_point');
-    } else if (!reqs.distance_target_km && !reqs.duration_target_h && reqs.loop) {
-      newStatus = 'waiting_for_user';
-      errorCode = 'missing_distance_for_loop';
-      errorMessage = 'Aby wygenerować pętlę, musisz podać oczekiwany dystans (w km) lub czas (w h).';
-      missingInputs.push('distance_target_km');
-    }
-
-    if (newStatus === 'waiting_for_user') {
-      job = await repo.updateJobState(job.id, {
-        status: newStatus,
-        error_code: errorCode,
-        error_message: errorMessage,
-        missing_inputs: missingInputs,
-        human_message: errorMessage || 'Brakuje wymaganych danych wejściowych.',
-        current_step: 'validation_failed'
-      });
-      return c.json(job, 201);
-    }
-    
-    job = await repo.updateJobState(job.id, {
-      status: 'running',
-      current_step: 'geocoding',
-      human_message: 'Geokodowanie punktów...'
+    // Proxy to atlas-engine
+    const res = await fetch(`${atlasUrl}/projects/${projectId}/jobs/run-mvp2`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}) // empty body if required
     });
     
-    // Zautomatyzowany pipeline MVP v2
-    (async () => {
-      try {
-        const places = await geocodingService.geocodePoints(reqs.start_point || '', reqs.end_point, { 
-          loop: reqs.loop,
-          distanceTargetKm: reqs.distance_target_km,
-          intent: reqs.input_notes || '',
-          routeType: reqs.route_type,
-          keyWaypoints: reqs.key_waypoints || []
-        });
-        await repo.updateJobState(job.id, { 
-          progress: 30, 
-          current_step: 'routing', 
-          human_message: 'Wyznaczanie trasy...' 
-        });
-
-        const route = await routingService.getRoute(places, reqs.route_type, {
-          intent: reqs.input_notes || '',
-          surfacePreferences: reqs.surface_preferences || [],
-          distanceTargetKm: reqs.distance_target_km || undefined,
-          difficulty: reqs.difficulty
-        });
-        await repo.updateJobState(job.id, { 
-          progress: 60, 
-          current_step: 'building_artifacts', 
-          human_message: 'Budowanie artefaktów (GPX, Raport)...' 
-        });
-
-        const gpx = gpxService.buildGpx(route, project.id);
-        const { text: reportText, sources } = await reportService.generateShortReport(route, reqs);
-        const alternatives = await routingService.getRouteAlternatives(places, reqs.route_type, reqs.surface_preferences);
-        
-        // Save Artifacts
-        await Promise.all([
-          repo.upsertArtifact(project.id, 'gpx', { raw_data: gpx }),
-          repo.upsertArtifact(project.id, 'report', { raw_data: reportText }),
-          repo.upsertArtifact(project.id, 'research_sources', { content: sources }),
-          repo.upsertArtifact(project.id, 'places', { content: places }),
-          repo.upsertArtifact(project.id, 'alternatives', { content: alternatives }),
-          repo.upsertArtifact(project.id, 'summary', { content: {
-            distance_km: route.distance_km,
-            duration_h: route.duration_h,
-            points_count: route.trackPoints.length,
-            track: route.trackPoints
-          }})
-        ]);
-        
-        console.log(`[Job ${job.id}] Pipeline logic finished. Artifacts saved.`);
-
-        await repo.updateJobState(job.id, {
-          status: 'ready',
-          progress: 100,
-          current_step: 'completed',
-          human_message: 'Trasa gotowa do podglądu.'
-        });
-      } catch (err: any) {
-        console.error(`[Job ${job.id}] FAILED:`, err);
-        await repo.updateJobState(job.id, {
-          status: 'failed',
-          error_message: err.message
-        }).catch(console.error);
-      }
-    })();
+    if (!res.ok) {
+      const errorData = await res.text();
+      console.error(`Atlas Engine returned ${res.status}: ${errorData}`);
+      throw new Error(`Błąd tworzenia zadania w silniku. Status: ${res.status}`);
+    }
     
-    return c.json(job, 201);
+    const data = await res.json() as any;
+    const atlasJob = data.job || data;
+    
+    // Map AtlasJob back to legacy Job format for the frontend immediately
+    return c.json({
+      id: atlasJob.id,
+      project_id: projectId,
+      status: 'running',
+      progress: atlasJob.progress || 0,
+      current_step: atlasJob.currentStep || 'routing',
+      human_message: 'Uruchamianie silnika Atlas...',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }, 201);
   } catch (err: any) {
+    console.error(`[Atlas Proxy FAILED]:`, err);
     return c.json({ error: err.message }, 500);
   }
 });
@@ -706,6 +634,62 @@ app.get('/route-projects/:id/jobs/:jobId', async (c) => {
   if (!project) return c.json({ error: 'Project not found' }, 404);
   if (!repo.canAccessProject(project, user)) return c.json({ error: 'Forbidden' }, 403);
 
+  if (jobId.startsWith('job_')) {
+    // This is an atlas-engine job
+    try {
+      const atlasUrl = process.env.ATLAS_API_BASE_URL || 'http://host.docker.internal:8787';
+      const res = await fetch(`${atlasUrl}/jobs/${jobId}`);
+      if (!res.ok) {
+        return c.json({ error: 'Atlas Job not found' }, 404);
+      }
+      const data = await res.json() as any;
+      const atlasJob = data.job || data;
+      
+      // Map to frontend format
+      let mappedStatus = 'running';
+      let missingInputs: string[] = [];
+      let humanMsg = 'Przetwarzanie...';
+
+      if (atlasJob.status === 'completed') {
+        mappedStatus = 'ready';
+        humanMsg = 'Trasa gotowa do podglądu.';
+      } else if (atlasJob.status === 'failed') {
+        mappedStatus = 'failed';
+        humanMsg = atlasJob.error || 'Wystąpił błąd.';
+      } else if (atlasJob.status === 'waiting_for_approval') {
+        mappedStatus = 'waiting_for_user';
+        humanMsg = 'Wymagane dodatkowe informacje.';
+        
+        // Fetch missing inputs from atlas project
+        try {
+          const miRes = await fetch(`${atlasUrl}/projects/${projectId}/missing-inputs`);
+          if (miRes.ok) {
+            missingInputs = await miRes.json();
+          }
+        } catch (e) {
+          console.error("Failed fetching missing inputs", e);
+        }
+      }
+
+      return c.json({
+        id: atlasJob.id,
+        project_id: projectId,
+        status: mappedStatus,
+        progress: atlasJob.progress || 0,
+        current_step: atlasJob.currentStep || 'routing',
+        human_message: humanMsg,
+        missing_inputs: missingInputs,
+        error_message: atlasJob.error || null,
+        created_at: atlasJob.createdAt,
+        updated_at: atlasJob.updatedAt
+      });
+    } catch (err: any) {
+      console.error(`[Atlas Proxy GET FAILED]:`, err);
+      return c.json({ error: err.message }, 500);
+    }
+  }
+
+  // Legacy job
   const job = await repo.getJob(jobId);
   if (!job) return c.json({ error: 'Not found' }, 404);
   return c.json(job);

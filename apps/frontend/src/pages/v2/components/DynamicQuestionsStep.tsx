@@ -20,6 +20,8 @@ interface DynamicQuestionsStepProps {
   hasNotes?: boolean;
   distanceTarget: number;
   setDistanceTarget: (dist: number) => void;
+  targetDays?: number;
+  setTargetDays?: (days: number) => void;
   difficulty: string;
   setDifficulty: (diff: string) => void;
 }
@@ -38,6 +40,8 @@ export default function DynamicQuestionsStep({
   hasNotes = false,
   distanceTarget,
   setDistanceTarget,
+  targetDays = 1,
+  setTargetDays = () => {},
   difficulty,
   setDifficulty
 }: DynamicQuestionsStepProps) {
@@ -92,38 +96,66 @@ export default function DynamicQuestionsStep({
             <div className="space-y-1">
               <h4 className="text-sm font-bold text-cyan-300">AI przeanalizowało Twoje notatki!</h4>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Wyodrębniliśmy szczegóły trasy bezpośrednio z Twojego tekstu. Poniżej widzisz wykryte wartości – możesz je zweryfikować i zmienić przed wygenerowaniem wariantów.
+                Wyodrębniliśmy szczegóły trasy bezpośrednio z Twojego tekstu. Poniżej widzisz wykryte wartości — możesz je zweryfikować i zmienić przed wygenerowaniem wariantów.
               </p>
             </div>
           </div>
         )}
 
-        {/* Distance Target Control */}
-        <div className="space-y-3 p-4 rounded-xl bg-zinc-900/30 border border-zinc-800/80">
-          <div className="flex items-center justify-between">
-            <Label className="text-zinc-300 font-semibold flex items-center gap-1.5">
-              🥾 Oczekiwany dystans trasy
-            </Label>
-            {hasNotes && (
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-medium flex items-center gap-1">
-                ✨ Wykryto z notatek
+        {/* Distance or Days Target Control */}
+        {(routeType === 'hiking' || routeType === 'city_walk') ? (
+          <div className="space-y-3 p-4 rounded-xl bg-zinc-900/30 border border-zinc-800/80">
+            <div className="flex items-center justify-between">
+              <Label className="text-zinc-300 font-semibold flex items-center gap-1.5">
+                📅 Ilość dni
+              </Label>
+              {hasNotes && (
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-medium flex items-center gap-1">
+                  ✨ Wykryto z notatek
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <input 
+                type="range"
+                min="1"
+                max="14"
+                value={targetDays}
+                onChange={(e) => setTargetDays(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+              />
+              <span className="text-sm font-bold font-mono text-cyan-400 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg flex-shrink-0">
+                {targetDays} dni
               </span>
-            )}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <input 
-              type="range"
-              min="2"
-              max="100"
-              value={distanceTarget}
-              onChange={(e) => setDistanceTarget(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-            />
-            <span className="text-sm font-bold font-mono text-cyan-400 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg flex-shrink-0">
-              {distanceTarget} km
-            </span>
+        ) : (
+          <div className="space-y-3 p-4 rounded-xl bg-zinc-900/30 border border-zinc-800/80">
+            <div className="flex items-center justify-between">
+              <Label className="text-zinc-300 font-semibold flex items-center gap-1.5">
+                📏 Oczekiwany dystans trasy
+              </Label>
+              {hasNotes && (
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-medium flex items-center gap-1">
+                  ✨ Wykryto z notatek
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <input 
+                type="range"
+                min="2"
+                max="100"
+                value={distanceTarget}
+                onChange={(e) => setDistanceTarget(parseInt(e.target.value))}
+                className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+              />
+              <span className="text-sm font-bold font-mono text-cyan-400 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg flex-shrink-0">
+                {distanceTarget} km
+              </span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Difficulty Control */}
         <div className="space-y-3 p-4 rounded-xl bg-zinc-900/30 border border-zinc-800/80">
