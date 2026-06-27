@@ -16,7 +16,7 @@ import { getLanguageFlag, getLanguageName } from '@/lib/languages';
 import { useRouteTranslation, getUserLanguage } from '@/hooks/use-translations';
 import TranslationManager from '@/components/TranslationManager';
 
-import { TokenPurchaseModal } from '@/components/ui/TokenPurchaseModal';
+
 import { supabase } from '@/integrations/supabase/client';
 import { openSignedPdf } from '@/lib/open-signed-pdf';
 import { Button } from '@/components/ui/button';
@@ -39,45 +39,10 @@ const RouteGlobe3D = lazy(() => import('@/components/RouteGlobe3D'));
 const RouteExplorerGlobe = lazy(() => import('@/components/RouteExplorerGlobe'));
 const RouteDetailMap = lazy(() => import('@/components/RouteDetailMap'));
 
-function useCreatorReliability(userId: string | undefined) {
-  return useQuery({
-    queryKey: ['creator-reliability', userId],
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 5,
-    queryFn: async () => {
-      // Fetch creator profile (total_sales) + all their routes for aggregate rating
-      const [profileRes, routesRes] = await Promise.all([
-        supabase.from('creator_profiles').select('total_sales, created_at').eq('user_id', userId!).maybeSingle(),
-        supabase.from('routes').select('id').eq('user_id', userId!).eq('status', 'published'),
-      ]);
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ElevationProfile } from '@/components/ElevationProfile';
 
-      const totalSales = profileRes.data?.total_sales ?? 0;
-      const creatorSince = profileRes.data?.created_at;
-      const routeIds = (routesRes.data ?? []).map(r => r.id);
-
-      let avgRating = 0;
-      let totalRatings = 0;
-      if (routeIds.length > 0) {
-        const { data: ratings } = await supabase
-          .from('ratings')
-          .select('score')
-          .in('route_id', routeIds);
-        if (ratings && ratings.length > 0) {
-          totalRatings = ratings.length;
-          avgRating = Math.round((ratings.reduce((s, r) => s + r.score, 0) / totalRatings) * 10) / 10;
-        }
-      }
-
-      return {
-        totalSales,
-        totalRoutes: routeIds.length,
-        avgRating,
-        totalRatings,
-        creatorSince,
-      };
-    },
-  });
-}
 
 function StarRating({ rating, onRate, interactive = false, size = 'md' }: {
   rating: number; onRate?: (score: number) => void; interactive?: boolean; size?: 'sm' | 'md' | 'lg';
@@ -209,7 +174,7 @@ export default function RouteDetail() {
   const [submittingRating, setSubmittingRating] = useState(false);
   const [comments, setComments] = useState<{ id: number; content: string; created_at: string; user_id: string; display_name?: string }[]>([]);
   const [consentOpen, setConsentOpen] = useState(false);
-  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
+
   const [globeOpen, setGlobeOpen] = useState(false);
   const [spatialView, setSpatialView] = useState<'terrain' | 'globe' | '2d'>('2d');
 
@@ -223,7 +188,6 @@ export default function RouteDetail() {
   const [fullDescription, setFullDescription] = useState<string | null>(null);
   const userLang = getUserLanguage();
   const { data: translation } = useRouteTranslation(routeId, userLang);
-  const { data: creatorReliability } = useCreatorReliability(route?.user_id);
 
   // Load route POIs and Recommendations
   const { data: routePois = [] } = useQuery({
@@ -722,6 +686,11 @@ export default function RouteDetail() {
                     <Lock className="w-3 h-3" /> {t('route_detail.map_simplified', 'Simplified preview — full GPX available after purchase')}
                   </p>
                 )}
+                {hasTrackPreview && route.preview_track && (
+                  <div className="mt-4">
+                    <ElevationProfile coordinates={route.preview_track as number[][]} />
+                  </div>
+                )}
               </section>
             )}
 
@@ -859,21 +828,6 @@ export default function RouteDetail() {
               {translation?.is_auto_translated && (
                 <p className="text-[10px] text-muted-foreground mt-2 italic">{t('route_detail.auto_translated')}</p>
               )}
-              {fullDescription !== null && fullDescription.trim().length > 0 ? (
-                <div className="mt-6 pt-6 border-t border-border">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Pełny opis trasy
-                  </h3>
-                  <p className="text-foreground leading-relaxed whitespace-pre-line">{fullDescription}</p>
-                </div>
-              ) : !purchased && !isOwner ? (
-                <div className="mt-6 pt-6 border-t border-border bg-muted/40 rounded-lg p-4 flex items-start gap-3">
-                  <Lock className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                  <p className="text-sm text-muted-foreground">
-                    Pełny, szczegółowy opis trasy odblokujesz po zakupie. Znajdziesz go również w pliku PDF.
-                  </p>
-                </div>
-              ) : null}
               {(route.start_point || route.end_point) && (
                 <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-4 text-sm">
                   {route.start_point && <div><span className="text-muted-foreground">{t('route_detail.start')}:</span> <span className="font-medium">{route.start_point}</span></div>}
@@ -881,6 +835,29 @@ export default function RouteDetail() {
                 </div>
               )}
             </section>
+
+            {/* ── Guidebook (Full Description) ── */}
+            {fullDescription !== null && fullDescription.trim().length > 0 ? (
+              <section className="glass-premium rounded-xl p-6 shadow-md border-border/80">
+                <h2 className="text-base font-semibold uppercase tracking-wide text-muted-foreground mb-4 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" /> Przewodnik po trasie
+                </h2>
+                <div className="prose prose-sm md:prose-base prose-emerald max-w-none prose-headings:font-bold prose-headings:text-slate-800 prose-p:text-slate-600 prose-a:text-emerald-600 prose-strong:text-slate-800 marker:text-emerald-500">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {fullDescription}
+                  </ReactMarkdown>
+                </div>
+              </section>
+            ) : !purchased && !isOwner ? (
+              <section className="glass-premium rounded-xl p-6 shadow-md border-border/80">
+                <div className="bg-muted/40 rounded-lg p-4 flex items-start gap-3 border border-border/50">
+                  <Lock className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Pełny, szczegółowy przewodnik po trasie odblokujesz po zakupie. Znajdziesz go również w pliku PDF gotowym do druku.
+                  </p>
+                </div>
+              </section>
+            ) : null}
 
             {/* ── Niezbędnik Logistyczny Wyprawy ── */}
             {(purchased || isOwner) ? (
@@ -1480,76 +1457,13 @@ export default function RouteDetail() {
                 </div>
               </div>}
 
-              {/* ── Creator Reliability ── */}
-              {creatorReliability && (
-                <div className="glass-premium rounded-xl shadow-md border-border/80 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border bg-muted/30">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <Award className="w-3.5 h-3.5 text-primary" /> {t('route_detail.creator_reliability', 'Creator Reliability')}
-                    </h3>
-                  </div>
-                  <div className="p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">{route.creator_name}</p>
-                        {creatorReliability.creatorSince && (
-                          <p className="text-[11px] text-muted-foreground">
-                            {t('route_detail.creator_since', 'Creator since')} {new Date(creatorReliability.creatorSince).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="text-center bg-muted/50 rounded-lg py-2.5 px-1">
-                        <div className="flex items-center justify-center gap-1 mb-0.5">
-                          <TrendingUp className="w-3 h-3 text-primary" />
-                        </div>
-                        <p className="text-sm font-bold">{creatorReliability.totalSales}</p>
-                        <p className="text-[10px] text-muted-foreground leading-tight">{t('route_detail.sales', 'Sales')}</p>
-                      </div>
-                      <div className="text-center bg-muted/50 rounded-lg py-2.5 px-1">
-                        <div className="flex items-center justify-center gap-1 mb-0.5">
-                          <Star className="w-3 h-3 text-amber-500" />
-                        </div>
-                        <p className="text-sm font-bold">{creatorReliability.avgRating > 0 ? creatorReliability.avgRating : '—'}</p>
-                        <p className="text-[10px] text-muted-foreground leading-tight">{t('route_detail.avg_rating', 'Avg rating')}</p>
-                      </div>
-                      <div className="text-center bg-muted/50 rounded-lg py-2.5 px-1">
-                        <div className="flex items-center justify-center gap-1 mb-0.5">
-                          <MapIcon className="w-3 h-3 text-primary" />
-                        </div>
-                        <p className="text-sm font-bold">{creatorReliability.totalRoutes}</p>
-                        <p className="text-[10px] text-muted-foreground leading-tight">{t('route_detail.routes', 'Routes')}</p>
-                      </div>
-                    </div>
-                    {creatorReliability.totalRatings > 0 && (
-                      <p className="text-[10px] text-muted-foreground text-center mt-2">
-                        {t('route_detail.based_on_ratings', 'Based on {{count}} ratings', { count: creatorReliability.totalRatings })}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
       </main>
       <Footer />
 
-      <TokenPurchaseModal
-        open={purchaseModalOpen}
-        onOpenChange={setPurchaseModalOpen}
-        routeId={route.id}
-        routeTitle={displayTitle}
-        creatorId={route.user_id}
-        creatorName={route.creator_name}
-        onSuccess={() => {
-          setPurchaseModalOpen(false);
-        }}
-      />
+
 
       {/* CSS @media print block to guarantee high-end, clean styled roadbook print */}
       <style dangerouslySetInnerHTML={{ __html: `

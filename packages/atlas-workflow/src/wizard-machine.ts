@@ -15,6 +15,7 @@ export interface Waypoint {
 export interface WizardContext {
   projectId: string | null;
   userId: string | null;
+  retries: number;
 
   // Builder state
   chatMessages: ChatMessage[];
@@ -59,6 +60,7 @@ export type WizardEvent =
 export const initialWizardContext: WizardContext = {
   projectId: null,
   userId: null,
+  retries: 0,
   chatMessages: [],
   inputNotes: '',
   vehicleType: 'bicycle',
@@ -157,6 +159,12 @@ export const wizardMachine = setup({
       gpxData: null,
       guideText: null,
       projectId: null
+    }),
+    incrementRetries: assign({
+      retries: ({ context }) => context.retries + 1
+    }),
+    resetRetries: assign({
+      retries: 0
     })
   }
 }).createMachine({
@@ -170,13 +178,15 @@ export const wizardMachine = setup({
         CLEAR_ROUTE: { actions: 'clearRoute' },
         SEND_MESSAGE: {
           target: 'chatting',
-          actions: 'appendMessage'
+          actions: ['appendMessage', 'resetRetries']
         },
         CALCULATE_ROUTE: {
-          target: 'generating_route'
+          target: 'generating_route',
+          actions: 'resetRetries'
         },
         SAVE_PROJECT: {
-          target: 'saving_project'
+          target: 'saving_project',
+          actions: 'resetRetries'
         }
       }
     },
@@ -186,11 +196,18 @@ export const wizardMachine = setup({
         input: ({ context, event }) => ({ context, text: event.type === 'SEND_MESSAGE' ? event.text : '' }),
         onDone: {
           target: 'idle',
-          actions: 'appendAgentResponse'
+          actions: ['appendAgentResponse', 'resetRetries']
         },
-        onError: {
-          target: 'error'
-        }
+        onError: [
+          {
+            guard: ({ context }) => context.retries < 2,
+            target: 'chatting',
+            actions: 'incrementRetries'
+          },
+          {
+            target: 'error'
+          }
+        ]
       }
     },
     generating_route: {
@@ -199,11 +216,18 @@ export const wizardMachine = setup({
         input: ({ context }) => ({ context }),
         onDone: {
           target: 'saving_project', // Automatically save after generating
-          actions: 'assignGeneratedRoute'
+          actions: ['assignGeneratedRoute', 'resetRetries']
         },
-        onError: {
-          target: 'error'
-        }
+        onError: [
+          {
+            guard: ({ context }) => context.retries < 2,
+            target: 'generating_route',
+            actions: 'incrementRetries'
+          },
+          {
+            target: 'error'
+          }
+        ]
       }
     },
     saving_project: {
@@ -212,17 +236,24 @@ export const wizardMachine = setup({
         input: ({ context }) => ({ context }),
         onDone: {
           target: 'idle',
-          actions: 'assignProjectDetails'
+          actions: ['assignProjectDetails', 'resetRetries']
         },
-        onError: {
-          target: 'error'
-        }
+        onError: [
+          {
+            guard: ({ context }) => context.retries < 2,
+            target: 'saving_project',
+            actions: 'incrementRetries'
+          },
+          {
+            target: 'error'
+          }
+        ]
       }
     },
     error: {
       on: {
-        SEND_MESSAGE: { target: 'chatting', actions: 'appendMessage' },
-        CALCULATE_ROUTE: { target: 'generating_route' },
+        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
+        CALCULATE_ROUTE: { target: 'generating_route', actions: 'resetRetries' },
         SET_FIELD: { actions: 'assignField' }
       }
     }

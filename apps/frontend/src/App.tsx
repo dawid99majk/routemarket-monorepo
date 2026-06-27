@@ -22,8 +22,6 @@ const MapExplore = lazy(() => import("./pages/MapExplore"));
 const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const RouteDetail = lazy(() => import("./pages/RouteDetail"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
-const CreatorDashboard = lazy(() => import("./pages/CreatorDashboard"));
-const CreatorAiStudio = lazy(() => import("./pages/CreatorAiStudio"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
@@ -50,7 +48,6 @@ const Refunds = lazy(() => import("./pages/legal/Refunds"));
 const Documents = lazy(() => import("./pages/legal/Documents"));
 const AcceptableUse = lazy(() => import("./pages/legal/AcceptableUse"));
 const Copyright = lazy(() => import("./pages/legal/Copyright"));
-const CreatorAgreement = lazy(() => import("./pages/legal/CreatorAgreement"));
 const DSACompliance = lazy(() => import("./pages/legal/DSACompliance"));
 
 const queryClient = new QueryClient();
@@ -88,7 +85,6 @@ const App = () => (
                 <Route path="/legal/documents" element={<Documents />} />
                 <Route path="/legal/acceptable-use" element={<AcceptableUse />} />
                 <Route path="/legal/copyright" element={<Copyright />} />
-                <Route path="/legal/creator-agreement" element={<CreatorAgreement />} />
                 <Route path="/legal/dsa-compliance" element={<DSACompliance />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/brand" element={<Brand />} />
@@ -99,10 +95,8 @@ const App = () => (
                 <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
                 {/* Creator routes */}
-                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorAiStudio /></ProtectedRoute>} />
+                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
                 <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
-                <Route path="/creator-ai-studio" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorAiStudio /></ProtectedRoute>} />
-                <Route path="/creator-dashboard" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreatorDashboard /></ProtectedRoute>} />
 
                 {/* Admin routes */}
                 <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>

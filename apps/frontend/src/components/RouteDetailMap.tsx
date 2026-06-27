@@ -72,6 +72,8 @@ function RouteDetailMapInner({
 }: RouteDetailMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.CircleMarker | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -82,11 +84,13 @@ function RouteDetailMapInner({
     }
 
     const map = L.map(containerRef.current, {
-      zoomControl: true,
+      zoomControl: false,
       scrollWheelZoom: false,
       dragging: true,
-      maxZoom: 15,
+      maxZoom: 18,
     });
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     // Outdoor/terrain style tile layer
     L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
@@ -134,7 +138,7 @@ function RouteDetailMapInner({
       const latLngs = track.map(([lat, lng]) => L.latLng(lat, lng));
       L.polyline(latLngs, {
         color: '#6366f1', // standardowy fiolet
-        weight: 4,
+        weight: 5,
         opacity: 0.9,
         lineCap: 'round',
         lineJoin: 'round',
@@ -174,7 +178,7 @@ function RouteDetailMapInner({
     }
 
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13, animate: false });
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
     }
     setTimeout(() => map.invalidateSize(false), 50);
 
@@ -186,12 +190,69 @@ function RouteDetailMapInner({
 
     return () => {
       containerRef.current?.removeEventListener('contextmenu', preventContextMenu);
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
       map.remove();
       mapRef.current = null;
     };
   }, [track, places, alternatives, selectedAlternativeId]);
 
-  return <div ref={containerRef} className={`w-full h-full ${className}`} />;
+  const handleLocateMe = () => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    
+    if (!navigator.geolocation) {
+      alert("Twoja przeglądarka nie wspiera geolokalizacji.");
+      return;
+    }
+
+    if (watchIdRef.current) {
+      // If already tracking, just center
+      if (userMarkerRef.current) {
+        map.setView(userMarkerRef.current.getLatLng(), 16);
+      }
+      return;
+    }
+
+    // Custom blue dot
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const latlng = L.latLng(lat, lng);
+
+        if (!userMarkerRef.current) {
+          userMarkerRef.current = L.circleMarker(latlng, {
+            radius: 8,
+            fillColor: '#3b82f6',
+            color: '#ffffff',
+            weight: 3,
+            opacity: 1,
+            fillOpacity: 1
+          }).addTo(map);
+          map.setView(latlng, 16);
+        } else {
+          userMarkerRef.current.setLatLng(latlng);
+        }
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+    );
+  };
+
+  return (
+    <div className={`relative w-full h-full ${className}`}>
+      <div ref={containerRef} className="w-full h-full" />
+      <button 
+        onClick={handleLocateMe}
+        className="absolute top-4 right-4 z-[400] bg-white border border-slate-200 shadow-md text-slate-700 hover:text-emerald-600 rounded-full w-10 h-10 flex items-center justify-center transition-colors"
+        title="Centruj na mnie (Nawiguj)"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+      </button>
+    </div>
+  );
 }
 
 const RouteDetailMap = memo(RouteDetailMapInner);
