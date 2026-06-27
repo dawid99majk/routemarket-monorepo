@@ -8,6 +8,7 @@ export interface RouteResult {
     type: 'LineString';
     coordinates: number[][];
   };
+  waypoints?: GeocodedPlace[];
 }
 
 export class RoutingService {
@@ -34,10 +35,14 @@ export class RoutingService {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
     }
 
+    // Sort waypoints to avoid overlapping branches (odnogi)
+    const optimizedPlaces = this.optimizeWaypointsLocal(places);
+
     // PRIMARY: Google Maps for car and motorcycle
     if ((routeType === 'car' || routeType === 'motorcycle') && this.googleApiKey) {
       try {
-        return await this.fetchGoogleRoute(places, routeType, options);
+        const result = await this.fetchGoogleRoute(optimizedPlaces, routeType, options);
+        return { ...result, waypoints: optimizedPlaces };
       } catch (err: any) {
         console.warn(`[Routing] Google Maps routing failed, trying ORS: ${err.message}`);
       }
@@ -46,7 +51,8 @@ export class RoutingService {
     // SECONDARY: OpenRouteService (50 waypoints, cycling-mountain profile for gravel)
     if (this.orsApiKey) {
       try {
-        return await this.fetchOrsRoute(places, routeType, options);
+        const result = await this.fetchOrsRoute(optimizedPlaces, routeType, options);
+        return { ...result, waypoints: optimizedPlaces };
       } catch (err: any) {
         console.warn(`[Routing] ORS request failed, trying GraphHopper: ${err.message}`);
       }
@@ -56,11 +62,11 @@ export class RoutingService {
     if (this.ghApiKey) {
       try {
         const MAX_GH_POINTS = 5;
-        let routePlaces = places;
-        if (places.length > MAX_GH_POINTS) {
-          const start = places[0];
-          const end = places[places.length - 1];
-          const middle = places.slice(1, -1);
+        let routePlaces = optimizedPlaces;
+        if (optimizedPlaces.length > MAX_GH_POINTS) {
+          const start = optimizedPlaces[0];
+          const end = optimizedPlaces[optimizedPlaces.length - 1];
+          const middle = optimizedPlaces.slice(1, -1);
           const step = middle.length / (MAX_GH_POINTS - 2);
           const sampled = Array.from({ length: MAX_GH_POINTS - 2 }, (_, i) => 
             middle[Math.round(i * step)]
@@ -68,7 +74,8 @@ export class RoutingService {
           routePlaces = [start, ...sampled, end];
           console.log(`[Routing] Trimmed to ${routePlaces.length} for GH free tier.`);
         }
-        return await this.fetchGraphHopperRoute(routePlaces, routeType, options);
+        const result = await this.fetchGraphHopperRoute(routePlaces, routeType, options);
+        return { ...result, waypoints: optimizedPlaces };
       } catch (err: any) {
         console.warn(`[Routing] GraphHopper also failed, trying BRouter: ${err.message}`);
       }
@@ -76,7 +83,8 @@ export class RoutingService {
 
     // TERTIARY: BRouter (No API key required)
     try {
-      return await this.fetchBRouterRoute(places, routeType, options);
+      const result = await this.fetchBRouterRoute(optimizedPlaces, routeType, options);
+      return { ...result, waypoints: optimizedPlaces };
     } catch (err: any) {
       console.warn(`[Routing] BRouter also failed, using mock: ${err.message}`);
     }
@@ -104,7 +112,8 @@ export class RoutingService {
       geometry: {
         type: 'LineString',
         coordinates: points.map(p => [p[1], p[0]])
-      }
+      },
+      waypoints: optimizedPlaces
     };
   }
 
@@ -386,6 +395,50 @@ export class RoutingService {
         coordinates: decoded.map(([lat, lng]) => [lng, lat]) // GeoJSON expects [lng, lat]
       }
     };
+  }
+
+  private optimizeWaypointsLocal(places: GeocodedPlace[]): GeocodedPlace[] {
+    if (places.length <= 3) return places;
+    
+    // We only want to sort the intermediate points.
+    // However, if the start and end are the exact same point (a loop), we should treat all other points as intermediate.
+    const start = places[0];
+    const end = places[places.length - 1];
+    
+    // Nearest neighbor algorithm for intermediate points
+    const intermediates = places.slice(1, -1);
+    const optimized: GeocodedPlace[] = [start];
+    let current = start;
+    
+    while (intermediates.length > 0) {
+      let nearestIdx = 0;
+      let minDistance = Infinity;
+      
+      for (let i = 0; i < intermediates.length; i++) {
+        const candidate = intermediates[i];
+        // Calculate haversine distance
+        const R = 6371;
+        const dLat = (candidate.lat - current.lat) * Math.PI / 180;
+        const dLon = (candidate.lng - current.lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(current.lat * Math.PI / 180) * Math.cos(candidate.lat * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const dist = R * c;
+        
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestIdx = i;
+        }
+      }
+      
+      current = intermediates[nearestIdx];
+      optimized.push(current);
+      intermediates.splice(nearestIdx, 1);
+    }
+    
+    optimized.push(end);
+    return optimized;
   }
 
   async getRouteAlternatives(places: GeocodedPlace[], routeType: string, preferences: string[] = []): Promise<any[]> {

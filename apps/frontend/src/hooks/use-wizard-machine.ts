@@ -91,7 +91,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         
         return {
           geometry: data.geometry,
-          waypoints: context.waypoints,
+          waypoints: data.waypoints || context.waypoints,
           gpxData: finalGpx,
           guideText: context.guideText,
           title: context.title || 'Nowa Trasa'
