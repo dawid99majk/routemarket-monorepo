@@ -53,7 +53,7 @@ app.post('/chat-interview', async (c) => {
       try {
         const project = await repo.getProject(project_id);
         if (project) {
-          const isHikingOrCity = project.requirements.route_type === 'hiking' || project.requirements.route_type === 'city';
+          const isHikingOrCity = project.requirements.route_type === 'hiking' || project.requirements.route_type === 'city' || vehicle_type === 'hiking' || vehicle_type === 'city';
           projectContext = `\nAktualny stan projektu:
   Trasa: z ${project.requirements.start_point || '?'} do ${project.requirements.end_point || '?'}
   Typ: ${project.requirements.route_type || '?'}
@@ -94,7 +94,8 @@ app.post('/chat-interview', async (c) => {
     }
     
     if (vehicle_type) {
-      projectContext += `\n\n[KONTEKST UI] Użytkownik ma zaznaczony typ pojazdu w aplikacji: **${vehicle_type}${bike_subtype ? ` (typ: ${bike_subtype})` : ''}**. Nie pytaj już o środek transportu!`;
+      const subtypeText = (vehicle_type === 'hiking' || vehicle_type === 'city') ? '' : (bike_subtype ? ` (typ: ${bike_subtype})` : '');
+      projectContext += `\n\n[KONTEKST UI] Użytkownik ma zaznaczony typ pojazdu w aplikacji: **${vehicle_type}${subtypeText}**. Nie pytaj już o środek transportu!`;
     }
 
     const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
@@ -110,7 +111,7 @@ ${projectContext}
 
 === CO JUŻ WIEMY (z interfejsu, NIE pytaj o to!) ===
 ${knowStart ? '✅ PUNKT STARTOWY - znamy z pinezki na mapie' : '❌ Brak punktu startowego - zapytaj!'}
-${knowVehicle ? `✅ POJAZD - ${vehicle_type}${bike_subtype ? ` (${bike_subtype})` : ''} - wybrane w interfejsie` : '❌ Brak pojazdu - zapytaj!'}
+${knowVehicle ? `✅ POJAZD - ${vehicle_type}${(vehicle_type === 'hiking' || vehicle_type === 'city') ? '' : (bike_subtype ? ` (${bike_subtype})` : '')} - wybrane w interfejsie` : '❌ Brak pojazdu - zapytaj!'}
 ${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '❌ Brak preferencji popularności - ZAPYTAJ O TO!'}
 
 === CZEGO JESZCZE BRAKUJE ===
