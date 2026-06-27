@@ -395,10 +395,17 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, projectId]);
 
-  // Recalculate route whenever vehicle type changes
+  // Flag to prevent automatic recalculation when waypoints are updated from AI or DB load
+  const skipRecalcRef = useRef(false);
+
+  // Recalculate route whenever vehicle type, bike subtype or waypoints change
   useEffect(() => {
     if (skipNextCalc.current) {
         skipNextCalc.current = false;
+        return;
+    }
+    if (skipRecalcRef.current) {
+        skipRecalcRef.current = false;
         return;
     }
     if (waypoints.length >= 2) {
@@ -408,7 +415,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleType, bikeSubtype]);
+  }, [waypoints, vehicleType, bikeSubtype]);
 
   const handleMapClick = (latlng: L.LatLng) => {
     setTempMarker(latlng);
@@ -589,6 +596,7 @@ ${points}
             name: pt.name,
             type: i === 0 ? 'start' : (i === data.points.length - 1 ? 'end' : 'waypoint')
           }));
+          skipRecalcRef.current = true;
           setWaypoints(finalWaypoints);
         }
         

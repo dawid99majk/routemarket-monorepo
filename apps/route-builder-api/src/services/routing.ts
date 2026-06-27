@@ -70,8 +70,15 @@ export class RoutingService {
         }
         return await this.fetchGraphHopperRoute(routePlaces, routeType, options);
       } catch (err: any) {
-        console.warn(`[Routing] GraphHopper also failed, using mock: ${err.message}`);
+        console.warn(`[Routing] GraphHopper also failed, trying BRouter: ${err.message}`);
       }
+    }
+
+    // TERTIARY: BRouter (No API key required)
+    try {
+      return await this.fetchBRouterRoute(places, routeType, options);
+    } catch (err: any) {
+      console.warn(`[Routing] BRouter also failed, using mock: ${err.message}`);
     }
 
     // FALLBACK: Mathematical mock route
@@ -226,6 +233,57 @@ export class RoutingService {
       duration_h: parseFloat((path.time / 3600000).toFixed(2)),
       trackPoints,
       geometry: { type: 'LineString', coordinates }
+    };
+  }
+
+  private async fetchBRouterRoute(
+    places: GeocodedPlace[], 
+    routeType: string,
+    options?: {
+      intent?: string;
+      surfacePreferences?: string[];
+    }
+  ): Promise<RouteResult> {
+    const profileMap: Record<string, string> = {
+      car: 'car-fast',
+      motorcycle: 'car-fast',
+      cycling: 'fastbike',
+      gravel: 'trekking',
+      mtb: 'trekking',
+      hiking: 'shortest',
+      city: 'shortest',
+      city_walk: 'shortest'
+    };
+    const brouterProfile = profileMap[routeType] || 'trekking';
+    
+    const lonlats = places.map(p => `${p.lng},${p.lat}`).join('|');
+    const url = `https://brouter.de/brouter?lonlats=${lonlats}&profile=${brouterProfile}&alternativeidx=0&format=geojson`;
+    
+    console.log(`[BRouter] Routing via profile=${brouterProfile} for ${places.length} waypoints...`);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`BRouter returned ${res.status}: ${errText}`);
+    }
+
+    const data = await res.json() as any;
+    if (!data.features || data.features.length === 0) {
+      throw new Error('BRouter returned empty features.');
+    }
+
+    const feature = data.features[0];
+    const coordinates = feature.geometry.coordinates as number[][];
+    // BRouter geojson coordinates are [lng, lat, elevation]
+    const trackPoints = coordinates.map(c => [c[1], c[0], c[2] || 0] as [number, number, number]);
+    
+    const distance_km = parseFloat((feature.properties['track-length'] / 1000).toFixed(2)) || 0;
+    const duration_h = parseFloat((feature.properties['total-time'] / 3600).toFixed(2)) || 0;
+
+    return {
+      distance_km,
+      duration_h,
+      trackPoints,
+      geometry: feature.geometry
     };
   }
 
