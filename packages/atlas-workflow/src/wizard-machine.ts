@@ -119,7 +119,7 @@ export const wizardMachine = setup({
     appendMessage: assign({
       chatMessages: ({ context, event }) => {
         if (event.type === 'SEND_MESSAGE') {
-          return [...context.chatMessages, { role: 'user', text: event.text }];
+          return [...context.chatMessages, { role: 'user' as const, text: event.text }];
         }
         return context.chatMessages;
       }
@@ -129,7 +129,7 @@ export const wizardMachine = setup({
         // @ts-ignore
         if (event.output && event.output.message) {
            // @ts-ignore
-           return [...context.chatMessages, { role: 'agent', text: event.output.message }];
+           return [...context.chatMessages, { role: 'agent' as const, text: event.output.message }];
         }
         return context.chatMessages;
       }
