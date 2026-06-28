@@ -37,7 +37,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
     /* @ts-ignore */
     actors: {
       chatActor: async ({ input }: any) => {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+        const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
         const res = await fetch(`${apiUrl}/chat-interview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -68,7 +68,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
            };
         }
         
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+        const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
         const res = await fetch(`${apiUrl}/live-route`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
