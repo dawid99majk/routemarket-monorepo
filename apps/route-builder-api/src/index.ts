@@ -133,6 +133,8 @@ MUSISZ ZEBRAĆ te informacje (jeśli nie padły w rozmowie):
    Wyliczoną wartość wpisz jako liczbę w polu "distance". Dobieraj punkty tak, aby pasowały do rejonu, a nie byle nabić kilometry.
 4. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
 5. Pytaj tylko o JEDNO brakujące pole naraz. Bądź konkretny, max 2-3 zdania.
+6. KOLEJNOŚĆ PUNKTÓW (BARDZO WAŻNE!): Zwrócona tablica \`suggested_waypoints\` MUSI być ułożona w logicznej, geograficznej kolejności, tworząc płynną ścieżkę lub pętlę BEZ KRZYŻOWANIA SIĘ (tzw. pajęczyn). Upewnij się, że punkty następują po sobie chronologicznie w taki sposób, jak przebiegałaby prawdziwa podróż.
+
 
 === ZASADY SELEKCJI PUNKTÓW (JAKOŚĆ I LOGIKA) ===
 Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez znaczenia turystycznego! Zamiast tego dobieraj punkty reprezentujące rzeczywiste atrakcje, walory przyrodnicze lub znane szlaki dla danego pojazdu:

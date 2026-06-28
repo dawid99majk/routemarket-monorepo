@@ -32,8 +32,9 @@ export class RoutingService {
       throw new Error('Za mało punktów do wyznaczenia trasy (minimum 2).');
     }
 
-    // Sort waypoints to avoid overlapping branches (odnogi)
-    const optimizedPlaces = this.optimizeWaypointsLocal(places);
+    // We trust the AI (or the user's manual input) for the order of waypoints.
+    // Nearest Neighbor optimization ruins logical loops (e.g., outbound ridge, inbound valley).
+    const optimizedPlaces = places;
 
     // Mapped routing profile for internal engines
     const profileMap: Record<string, RoutingProfile> = {
