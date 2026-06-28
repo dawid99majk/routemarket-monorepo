@@ -3,6 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { wizardMachine, WizardContext } from '@routemarket/atlas-workflow/wizard-machine';
+import { fromPromise } from 'xstate';
 
 function generateGpxString(coordinates: number[][], title: string): string {
   let gpx = `<?xml version="1.0" encoding="UTF-8"?>
@@ -32,11 +33,10 @@ function generateGpxString(coordinates: number[][], title: string): string {
 }
 
 export function useWizardMachine(initialProjectId: string | null = null) {
-  const [state, send] = useMachine(wizardMachine, {
+  const [state, send] = useMachine(wizardMachine.provide({
     // Override machine actors with our actual logic
-    /* @ts-ignore */
     actors: {
-      chatActor: async ({ input }: any) => {
+      chatActor: fromPromise(async ({ input }: any) => {
         const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
         const res = await fetch(`${apiUrl}/chat-interview`, {
           method: 'POST',
@@ -54,8 +54,8 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         if (!res.ok) throw new Error('Chat failed');
         const data = await res.json();
         return { message: data.reply || data.message || data.text, done: data.done, suggested_waypoints: data.suggested_waypoints };
-      },
-      routeGeneratorActor: async ({ input }: any) => {
+      }),
+      routeGeneratorActor: fromPromise(async ({ input }: any) => {
         const { context } = input;
         
         if (context.waypoints.length < 2) {
@@ -97,8 +97,8 @@ export function useWizardMachine(initialProjectId: string | null = null) {
           guideText: context.guideText,
           title: context.title || 'Nowa Trasa'
         };
-      },
-      saveProjectActor: async ({ input }: any) => {
+      }),
+      saveProjectActor: fromPromise(async ({ input }: any) => {
         const { context } = input;
         
         const { data: userData } = await supabase.auth.getUser();
@@ -138,9 +138,9 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         }
 
         return { projectId };
-      }
+      })
     }
-  });
+  }));
 
   const context = state.context;
 
