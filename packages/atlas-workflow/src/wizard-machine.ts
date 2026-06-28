@@ -147,6 +147,19 @@ export const wizardMachine = setup({
       }
       return {};
     }),
+    assignSuggestedWaypoints: assign(({ context, event }) => {
+      // @ts-ignore
+      const output = event.output;
+      if (output && output.suggested_waypoints && output.suggested_waypoints.length >= 2) {
+        // Zmień typ pierwszego na 'start', ostatniego na 'end', reszta 'waypoint'
+        const wps = output.suggested_waypoints.map((wp: any, i: number) => ({
+          ...wp,
+          type: i === 0 ? 'start' : (i === output.suggested_waypoints.length - 1 ? 'end' : 'waypoint')
+        }));
+        return { waypoints: wps };
+      }
+      return {};
+    }),
     assignProjectDetails: assign(({ context, event }) => {
        // @ts-ignore
        if (event.output && event.output.projectId) {
@@ -196,10 +209,18 @@ export const wizardMachine = setup({
       invoke: {
         src: 'chatActor',
         input: ({ context, event }) => ({ context, text: event.type === 'SEND_MESSAGE' ? event.text : '' }),
-        onDone: {
-          target: 'idle',
-          actions: ['appendAgentResponse', 'resetRetries']
-        },
+        onDone: [
+          {
+            target: 'generating_route',
+            // @ts-ignore
+            guard: ({ event }) => event.output && event.output.done === true,
+            actions: ['appendAgentResponse', 'assignSuggestedWaypoints', 'resetRetries']
+          },
+          {
+            target: 'idle',
+            actions: ['appendAgentResponse', 'resetRetries']
+          }
+        ],
         onError: [
           {
             guard: ({ context }) => context.retries < 2,

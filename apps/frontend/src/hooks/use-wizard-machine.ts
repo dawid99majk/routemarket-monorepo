@@ -53,7 +53,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         });
         if (!res.ok) throw new Error('Chat failed');
         const data = await res.json();
-        return { message: data.message || data.text };
+        return { message: data.reply || data.message || data.text, done: data.done, suggested_waypoints: data.suggested_waypoints };
       },
       routeGeneratorActor: async ({ input }: any) => {
         const { context } = input;
