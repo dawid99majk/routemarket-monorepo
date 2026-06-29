@@ -6,8 +6,8 @@ import type { Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { createAtlasApiServer } from "../apps/api/src/http.js";
 import { JobManager } from "../apps/api/src/jobs.js";
-import { AtlasWorkflowService } from "@routemarket/atlas-workflow/src/index.js";
-import { AtlasClient, AtlasClientError, MagicAiAtlasClient, RouteMarketAtlasApiClient } from "@routemarket/atlas-client/src/index.js";
+import { AtlasWorkflowService } from "@routemarket/atlas-workflow";
+import { AtlasClient, AtlasClientError, MagicAiAtlasClient, RouteMarketAtlasApiClient } from "@routemarket/atlas-client";
 
 let tempRoots: string[] = [];
 let servers: Server[] = [];

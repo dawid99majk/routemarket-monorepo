@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runGoldenRoutePipeline } from "../scripts/demo-golden-route.js";
-import { readJsonFile } from "@routemarket/atlas-core/src/index.js";
+import { readJsonFile } from "@routemarket/atlas-core";
 import { readFile, stat } from "node:fs/promises";
 
 async function fileExists(path: string): Promise<boolean> {

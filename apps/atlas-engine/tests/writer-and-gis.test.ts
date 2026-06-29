@@ -2,10 +2,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createRouteProject } from "@routemarket/atlas-core/src/index.js";
-import { validateGeoJson, validateGpxXml } from "@routemarket/atlas-gis/src/index.js";
-import { analyzeGpx } from "@routemarket/atlas-research/src/index.js";
-import { generateGuideDraft, generateQualityReport, generateRouteConcept } from "@routemarket/atlas-writer/src/index.js";
+import { createRouteProject } from "@routemarket/atlas-core";
+import { validateGeoJson, validateGpxXml } from "@routemarket/atlas-gis";
+import { analyzeGpx } from "@routemarket/atlas-research";
+import { generateGuideDraft, generateQualityReport, generateRouteConcept } from "@routemarket/atlas-writer";
 
 let tempRoots: string[] = [];
 

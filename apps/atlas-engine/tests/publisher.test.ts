@@ -2,12 +2,12 @@ import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createRouteProject, FileProjectRepository } from "@routemarket/atlas-core/src/index.js";
-import { buildResearchPack, generateClaims, analyzeGpx } from "@routemarket/atlas-research/src/index.js";
-import { getRouteMarketCategoryId } from "@routemarket/atlas-publisher/src/index.js";
-import { prepareRouteMarketDraft } from "@routemarket/atlas-workflow/src/index.js";
-import { generateGuideV2, generateQualityReport, generateRecommendations, generateRouteConcept, generateRouteTips, prepareMediaPack, writeGuideOutline, writeReviewChecklist } from "@routemarket/atlas-writer/src/index.js";
-import { saveProjectApprovalDecision } from "@routemarket/atlas-workflow/src/index.js";
+import { createRouteProject, FileProjectRepository } from "@routemarket/atlas-core";
+import { buildResearchPack, generateClaims, analyzeGpx } from "@routemarket/atlas-research";
+import { getRouteMarketCategoryId } from "@routemarket/atlas-publisher";
+import { prepareRouteMarketDraft } from "@routemarket/atlas-workflow";
+import { generateGuideV2, generateQualityReport, generateRecommendations, generateRouteConcept, generateRouteTips, prepareMediaPack, writeGuideOutline, writeReviewChecklist } from "@routemarket/atlas-writer";
+import { saveProjectApprovalDecision } from "@routemarket/atlas-workflow";
 import { checkQualityGates } from "@routemarket/atlas-workflow/src/quality-gates.js";
 
 let tempRoots: string[] = [];

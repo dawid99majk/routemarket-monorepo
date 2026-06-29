@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atlasCoreVersion } from "@routemarket/atlas-core/src/index.js";
+import { atlasCoreVersion } from "@routemarket/atlas-core";
 
 describe("workspace smoke test", () => {
   it("loads atlas core", () => {

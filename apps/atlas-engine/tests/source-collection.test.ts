@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createRouteProject } from "@routemarket/atlas-core/src/index.js";
-import { collectSources } from "@routemarket/atlas-research/src/index.js";
+import { createRouteProject } from "@routemarket/atlas-core";
+import { collectSources } from "@routemarket/atlas-research";
 
 let tempRoots: string[] = [];
 

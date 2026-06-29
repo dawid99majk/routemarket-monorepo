@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scoreTopic } from "@routemarket/atlas-core/src/index.js";
+import { scoreTopic } from "@routemarket/atlas-core";
 
 describe("topic scoring", () => {
   it("scores GPX route topics as research candidates", () => {

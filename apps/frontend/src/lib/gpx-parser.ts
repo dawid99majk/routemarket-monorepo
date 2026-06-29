@@ -55,10 +55,17 @@ export function parseGpx(xmlString: string): GpxParseResult {
 
   const points: TrackPoint[] = [];
 
-  // Collect trkpt and rtept
+  // Collect trkpt, rtept, and fallback to wpt
   const trkpts = doc.querySelectorAll('trkpt');
   const rtepts = doc.querySelectorAll('rtept');
-  const allPts = trkpts.length > 0 ? trkpts : rtepts;
+  let allPts = trkpts.length > 0 ? trkpts : rtepts;
+  
+  if (allPts.length === 0) {
+    const wpts = doc.querySelectorAll('wpt');
+    if (wpts.length > 0) {
+      allPts = wpts;
+    }
+  }
 
   allPts.forEach((pt) => {
     const lat = parseFloat(pt.getAttribute('lat') || '0');

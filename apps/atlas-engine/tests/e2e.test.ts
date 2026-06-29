@@ -2,9 +2,9 @@ import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { AtlasWorkflowService } from "@routemarket/atlas-workflow/src/index.js";
-import { ProjectAlreadyExistsError } from "@routemarket/atlas-core/src/index.js";
-import { QualityGateError } from "@routemarket/atlas-workflow/src/index.js";
+import { AtlasWorkflowService } from "@routemarket/atlas-workflow";
+import { ProjectAlreadyExistsError } from "@routemarket/atlas-core";
+import { QualityGateError } from "@routemarket/atlas-workflow";
 
 describe("Atlas Workflow E2E", () => {
   let rootDir: string;

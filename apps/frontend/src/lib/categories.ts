@@ -9,68 +9,29 @@ import React from 'react';
 
 // Main category icons (keyed by category name from DB)
 export const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  'Motorcycling': Compass,
   'Cycling': Bike,
-  'Hiking': Mountain,
   'Car': Car,
-  'Running': Footprints,
-  'Winter Sports': Snowflake,
-  'Water Sports': Waves,
   'City': Building2,
 };
 
 // Sub-categories mapped by parent category name
 export const SUB_CATEGORIES: Record<string, string[]> = {
-  'Motorcycling': ['Scenic Rides', 'Adventure Routes', 'Road Trips', 'Travel', 'Enduro'],
-  'Cycling': ['Road Cycling', 'Gravel', 'MTB', 'Bikepacking', 'Enduro', 'Trekking'],
-  'Hiking': ['Easy Walks', 'Day Hikes', 'Mountain Hikes', 'Multi-day Treks', 'Backpacking'],
+  'Cycling': ['Road Cycling', 'Zaskocz mnie'],
   'Car': ['Road Trips', 'Scenic Drives', '4x4 Lite', '4x4 Hard', 'Caravaning / Vanlife'],
-  'Running': ['Road Running', 'Trail Running', 'City Runs', 'Scenic Runs'],
-  'Winter Sports': ['Ski Touring', 'Cross-country Skiing', 'Snowshoeing', 'Winter Hiking'],
-  'Water Sports': ['Kayaking', 'Paddleboarding', 'Sailing Routes', 'Wild Swimming Spots'],
   'City': ['Highlights', 'City Walks', 'Food & Drink', 'Culture & History', 'Themed Routes', 'Nature in City', 'Night & Lifestyle'],
 };
 
 // Icons for sub-categories
 export const SUB_CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  // Motorcycling
-  'Scenic Rides': Eye,
-  'Adventure Routes': Compass,
-  'Road Trips': MapIcon,
-  'Travel': MapPinned,
-  'Enduro': Gauge,
   // Cycling
   'Road Cycling': Route,
-  'Gravel': Route,
-  'MTB': Mountain,
-  'Bikepacking': Backpack,
-  'Trekking': Footprints,
-  // Hiking
-  'Easy Walks': Footprints,
-  'Day Hikes': Sunrise,
-  'Mountain Hikes': MountainSnow,
-  'Multi-day Treks': Tent,
-  'Backpacking': Backpack,
+  'Zaskocz mnie': Compass,
   // Car
   'Scenic Drives': Eye,
   '4x4 Lite': Car,
   '4x4 Hard': MountainSnow,
   'Caravaning / Vanlife': Caravan,
-  // Running
-  'Road Running': Route,
-  'Trail Running': Mountain,
-  'City Runs': Building2,
-  'Scenic Runs': Eye,
-  // Winter Sports
-  'Ski Touring': MountainSnow,
-  'Cross-country Skiing': Route,
-  'Snowshoeing': Footprints,
-  'Winter Hiking': TreePine,
-  // Water Sports
-  'Kayaking': Waves,
-  'Paddleboarding': Waves,
-  'Sailing Routes': Wind,
-  'Wild Swimming Spots': Waves,
+  'Road Trips': MapIcon,
   // City
   'Highlights': Star,
   'City Walks': Footprints,
@@ -106,46 +67,17 @@ const AUDIENCE_OPTIONS = ['solo', 'couples', 'family', 'groups'] as const;
 const BUDGET_OPTIONS = ['free', '$', '$$', '$$$'] as const;
 
 export const CATEGORY_FILTERS: Record<string, CategoryFilterConfig> = {
-  'Motorcycling': {
-    showDistance: true,
-    showElevation: true,
-    showRoadType: true,
-    roadTypeOptions: [...ROAD_TYPE_OPTIONS],
-  },
   'Cycling': {
     showDistance: true,
     showElevation: true,
     showSurface: true,
     surfaceOptions: [...SURFACE_OPTIONS],
   },
-  'Hiking': {
-    showDistance: true,
-    showElevation: true,
-    showDuration: true,
-    durationOptions: [...DURATION_SHORT],
-  },
   'Car': {
     showDuration: true,
     showRoadType: true,
     durationOptions: [...DURATION_DAYS],
     roadTypeOptions: [...ROAD_TYPE_OPTIONS],
-  },
-  'Running': {
-    showDistance: true,
-    showElevation: true,
-    showSurface: true,
-    surfaceOptions: ['asphalt', 'trail', 'mixed'],
-  },
-  'Winter Sports': {
-    showDistance: true,
-    showElevation: true,
-    showDuration: true,
-    durationOptions: [...DURATION_SHORT],
-  },
-  'Water Sports': {
-    showDistance: true,
-    showDuration: true,
-    durationOptions: [...DURATION_SHORT],
   },
   'City': {
     showDuration: true,

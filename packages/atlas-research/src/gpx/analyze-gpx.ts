@@ -135,6 +135,10 @@ function parseGpxPoints(xml: string): { points: GpxPoint[]; warnings: RouteWarni
   if (!pointRegex.test(xml)) {
     pointRegex = /<rtept\b([^>]*?)(?:\/>|>([\s\S]*?)<\/rtept>)/gis;
     source = "route_points";
+    if (!pointRegex.test(xml)) {
+      pointRegex = /<wpt\b([^>]*?)(?:\/>|>([\s\S]*?)<\/wpt>)/gis;
+      source = "waypoints";
+    }
   }
   pointRegex.lastIndex = 0;
   const attrRegex = /\b(lat|lon)=["']([^"']+)["']/gi;
@@ -167,7 +171,8 @@ function parseGpxPoints(xml: string): { points: GpxPoint[]; warnings: RouteWarni
       time: timeMatch ? timeMatch[1] : undefined
     });
   }
-  warnings.push({ code: source, message: `Analyzed GPX using ${source === "track_points" ? "track points" : "route points"}.`, severity: "low" });
+  const sourceName = source === "track_points" ? "track points" : (source === "waypoints" ? "waypoints" : "route points");
+  warnings.push({ code: source, message: `Analyzed GPX using ${sourceName}.`, severity: "low" });
   if (skipped > 0) warnings.push({ code: "invalid_points_skipped", message: `Skipped ${skipped} GPX point(s) with invalid coordinates.`, severity: "medium" });
 
   return { points, warnings };

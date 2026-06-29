@@ -2,9 +2,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createRouteProject, readJsonFile, updateProjectStatus, type MediaManifest, type RouteProject } from "@routemarket/atlas-core/src/index.js";
-import { buildResearchPack, collectSources, extractPois, generateClaims, runDeepResearch } from "@routemarket/atlas-research/src/index.js";
-import { generateRecommendations, generateRouteTips, prepareMediaPack, writeReviewChecklist } from "@routemarket/atlas-writer/src/index.js";
+import { createRouteProject, readJsonFile, updateProjectStatus, type MediaManifest, type RouteProject } from "@routemarket/atlas-core";
+import { buildResearchPack, collectSources, extractPois, generateClaims, runDeepResearch } from "@routemarket/atlas-research";
+import { generateRecommendations, generateRouteTips, prepareMediaPack, writeReviewChecklist } from "@routemarket/atlas-writer";
 
 let tempRoots: string[] = [];
 
