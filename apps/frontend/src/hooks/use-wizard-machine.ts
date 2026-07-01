@@ -1,5 +1,5 @@
 import { useMachine } from '@xstate/react';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { wizardMachine, WizardContext } from '@routemarket/atlas-workflow/wizard-machine';
@@ -33,28 +33,30 @@ function generateGpxString(coordinates: number[][], title: string): string {
 }
 
 export function useWizardMachine(initialProjectId: string | null = null) {
-  const [state, send] = useMachine(wizardMachine.provide({
-    // Override machine actors with our actual logic
-    actors: {
-      chatActor: fromPromise(async ({ input }: any) => {
-        const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
-        const res = await fetch(`${apiUrl}/chat-interview`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [...input.context.chatMessages, { role: 'user', text: input.text }],
-            project_id: input.context.projectId,
-            input_notes: input.context.inputNotes,
-            current_waypoints: input.context.waypoints,
-            vehicle_type: input.context.vehicleType,
-            bike_subtype: input.context.bikeSubtype,
-            routing_preference: input.context.routingPreference
-          })
-        });
-        if (!res.ok) throw new Error('Chat failed');
-        const data = await res.json();
-        return { message: data.reply || data.message || data.text, done: data.done, suggested_waypoints: data.suggested_waypoints };
-      }),
+  // Memoize the machine to avoid recreation and restarts on every render
+  const machine = useMemo(() => {
+    return wizardMachine.provide({
+      // Override machine actors with our actual logic
+      actors: {
+        chatActor: fromPromise(async ({ input }: any) => {
+          const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
+          const res = await fetch(`${apiUrl}/chat-interview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [...input.context.chatMessages, { role: 'user', text: input.text }],
+              project_id: input.context.projectId,
+              input_notes: input.context.inputNotes,
+              current_waypoints: input.context.waypoints,
+              vehicle_type: input.context.vehicleType,
+              bike_subtype: input.context.bikeSubtype,
+              routing_preference: input.context.routingPreference
+            })
+          });
+          if (!res.ok) throw new Error('Chat failed');
+          const data = await res.json();
+          return { message: data.reply || data.message || data.text, done: data.done, suggested_waypoints: data.suggested_waypoints };
+        }),
       routeGeneratorActor: fromPromise(async ({ input }: any) => {
         const { context } = input;
         
@@ -140,9 +142,16 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         return { projectId };
       })
     }
-  }));
+  });
+}, []);
 
-  const context = state.context;
+const [state, send] = useMachine(machine, {
+  input: {
+    projectId: initialProjectId
+  }
+});
+
+const context = state.context;
 
   const setField = useCallback((field: keyof WizardContext, value: any) => {
     send({ type: 'SET_FIELD', field, value });

@@ -18,6 +18,54 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', version: '2.0.0', service: 'route-builder-api' });
 });
 
+// Get short description and recommendations for a waypoint/POI
+app.post('/point-details', async (c) => {
+  try {
+    const { name, lat, lng } = await c.req.json() as { name: string, lat?: number, lng?: number };
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      throw new Error("Missing GEMINI_API_KEY");
+    }
+
+    const prompt = `Jesteś profesjonalnym przewodnikiem turystycznym i ekspertem od atrakcji turystycznych. 
+Zbuduj krótki, interesujący opis (2-3 zdania) i jedną praktyczną wskazówkę/rekomendację dla miejsca o nazwie: "${name}".
+Współrzędne geograficzne tego punktu to: lat: ${lat || 'nieznane'}, lng: ${lng || 'nieznane'}.
+
+Zwróć odpowiedź WYŁĄCZNIE jako obiekt JSON z dwoma polami: "description" (tekst opisu po polsku) oraz "recommendation" (wskazówka po polsku).
+Nie dodawaj żadnych tagów markdown, po prostu czysty obiekt JSON, np.:
+{
+  "description": "...",
+  "recommendation": "..."
+}`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("Gemini API error " + await response.text());
+    }
+
+    const data = await response.json() as any;
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (generatedText) {
+      const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const resultObj = JSON.parse(cleanText);
+      return c.json(resultObj);
+    }
+    throw new Error("No text from Gemini");
+  } catch (err: any) {
+    console.error("Point details error:", err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.use('/route-projects/*', authMiddleware);
 
 // Listowanie projektów
@@ -114,6 +162,16 @@ ${knowStart ? '✅ PUNKT STARTOWY - znamy z pinezki na mapie' : '❌ Brak punktu
 ${knowVehicle ? `✅ POJAZD - ${vehicle_type}${(vehicle_type === 'hiking' || vehicle_type === 'city') ? '' : (bike_subtype ? ` (${bike_subtype})` : '')} - wybrane w interfejsie` : '❌ Brak pojazdu - zapytaj!'}
 ${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '❌ Brak preferencji popularności - ZAPYTAJ O TO!'}
 
+=== JAK ZACHOWAĆ SIĘ W ZALEŻNOŚCI OD POPULARNOŚCI (BARDZO WAŻNE!) ===
+Jeśli wybrano Klasyk ("popular"):
+- Szukaj najważniejszych, najbardziej znanych, ikonicznych i popularnych atrakcji turystycznych w okolicy (np. we Wrocławiu: Rynek, Ostrów Tumski, Hala Stulecia, Ogród Japoński).
+- Trasa ma prowadzić przez miejsca, które są "obowiązkowymi punktami" (klasykami) do zobaczenia dla każdego turysty.
+
+Jeśli wybrano Niszowa ("wild"):
+- Omijaj zatłoczone, komercyjne i najbardziej oblegane punkty.
+- Wyszukuj ukryte perełki, lokalne tajemnice, ciche ścieżki i niszowe, urokliwe zakątki (np. we Wrocławiu: klimatyczne Nadodrze i murale, Park Szczytnicki z dala od głównej alei, ciche zatoki Odry, alternatywne trasy spacerowe).
+- Skup się na pokazaniu unikalnego charakteru poza głównym szlakiem.
+
 === CZEGO JESZCZE BRAKUJE ===
 MUSISZ ZEBRAĆ te informacje (jeśli nie padły w rozmowie):
 - Zależnie od POJAZDU:
@@ -121,7 +179,7 @@ MUSISZ ZEBRAĆ te informacje (jeśli nie padły w rozmowie):
   b) Dla rowerów/motocykli/aut: ZAPYTAJ O DYSTANS lub CZAS (np. "25km", "na 3 godziny").
 - PĘTLA czy LINIOWA? (Domyślnie proponuj pętlę).
 - PREFERENCJE terenu (jeśli to gravel/mtb, nie pytaj o to, bo wiemy).
-- POPULARNOŚĆ (Zawsze daj 2 opcje wyboru: "zaproponuj popularne trasy/klasyki regionu" albo "wybierz małouczęszczane miejsca z dala od tłumów").
+- POPULARNOŚĆ (Jeśli nie była wybrana - zawsze daj 2 opcje wyboru: "zaproponuj popularne trasy/klasyki regionu" albo "wybierz małouczęszczane miejsca z dala od tłumów").
 
 === ZASADY DZIAŁANIA ===
 1. Gdy zbierzesz WSZYSTKIE wymagane dane (Start, Pojazd, Dni/Dystans, Trudność, Popularność), NIE GENERUJ TRASY OD RAZU (done: false). Zamiast tego, przedstaw krótkie podsumowanie w jednym zdaniu (np. "Zaplanuję 3-dniową umiarkowaną wędrówkę z Zakopanego, z dala od tłumów.") i ZAPYTAJ: "Czy chcesz dodać coś jeszcze (np. konkretne miejsca), czy mam wygenerować trasę?".

@@ -88,6 +88,7 @@ export const wizardMachine = setup({
   types: {
     context: {} as WizardContext,
     events: {} as WizardEvent,
+    input: {} as { projectId?: string | null }
   },
   actors: {
     chatActor: fromPromise(async ({ input }: { input: { context: WizardContext, text: string, chatCallback?: any } }) => {
@@ -140,7 +141,9 @@ export const wizardMachine = setup({
       if (output) {
         return {
           geometry: output.geometry,
-          waypoints: output.waypoints,
+          // Do NOT update waypoints here — they are the user's map pins and
+          // replacing them with the router's snapped points would cause the
+          // useEffect watcher in RouteBuilderV2 to trigger another recalculation (infinite loop).
           gpxData: output.gpxData,
           guideText: output.guideText,
         };
@@ -180,17 +183,53 @@ export const wizardMachine = setup({
     }),
     resetRetries: assign({
       retries: 0
+    }),
+    addWaypoint: assign({
+      waypoints: ({ context, event }) => {
+        if (event.type === 'ADD_WAYPOINT') {
+          const newWps = [...context.waypoints];
+          if (event.index !== undefined) {
+            newWps.splice(event.index, 0, event.waypoint);
+          } else {
+            newWps.push(event.waypoint);
+          }
+          return newWps;
+        }
+        return context.waypoints;
+      }
+    }),
+    removeWaypoint: assign({
+      waypoints: ({ context, event }) => {
+        if (event.type === 'REMOVE_WAYPOINT') {
+          return context.waypoints.filter((_, idx) => idx !== event.index);
+        }
+        return context.waypoints;
+      }
+    }),
+    updateWaypoint: assign({
+      waypoints: ({ context, event }) => {
+        if (event.type === 'UPDATE_WAYPOINT') {
+          return context.waypoints.map((wp, idx) => idx === event.index ? { ...wp, ...event.waypoint } : wp);
+        }
+        return context.waypoints;
+      }
     })
   }
 }).createMachine({
   id: 'wizard',
   initial: 'idle',
-  context: initialWizardContext,
+  context: ({ input }) => ({
+    ...initialWizardContext,
+    projectId: input?.projectId || null
+  }),
   states: {
     idle: {
       on: {
         SET_FIELD: { actions: 'assignField' },
         CLEAR_ROUTE: { actions: 'clearRoute' },
+        ADD_WAYPOINT: { actions: 'addWaypoint' },
+        REMOVE_WAYPOINT: { actions: 'removeWaypoint' },
+        UPDATE_WAYPOINT: { actions: 'updateWaypoint' },
         SEND_MESSAGE: {
           target: 'chatting',
           actions: ['appendMessage', 'resetRetries']
@@ -277,7 +316,11 @@ export const wizardMachine = setup({
       on: {
         SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
         CALCULATE_ROUTE: { target: 'generating_route', actions: 'resetRetries' },
-        SET_FIELD: { actions: 'assignField' }
+        SET_FIELD: { actions: 'assignField' },
+        ADD_WAYPOINT: { actions: 'addWaypoint' },
+        REMOVE_WAYPOINT: { actions: 'removeWaypoint' },
+        UPDATE_WAYPOINT: { actions: 'updateWaypoint' },
+        CLEAR_ROUTE: { actions: 'clearRoute' }
       }
     }
   }

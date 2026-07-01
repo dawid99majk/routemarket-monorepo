@@ -79,6 +79,11 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 import { ElevationProfile } from '@/components/ElevationProfile';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
 
+const areWaypointsGeometricallyEqual = (a: any[], b: any[]) => {
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((p, i) => Math.abs(p.lat - b[i].lat) < 0.00001 && Math.abs(p.lng - b[i].lng) < 0.00001);
+};
+
 export default function RouteBuilderV2({ initialData, onBack }: { initialData?: any, onBack?: () => void }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -98,6 +103,15 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   
   const isRouting = state.matches('generating_route') || state.matches('saving_project');
   const isTyping = state.matches('chatting');
+
+  console.log("[RouteBuilderV2] Render details:", {
+    projectId,
+    lastLoadedId: lastLoadedId.current,
+    stateValue: state.value,
+    waypointsCount: waypoints.length,
+    vehicleType,
+    bikeSubtype
+  });
 
   useEffect(() => {
     if (initialData && !projectId && context.chatMessages.length === 0) {
@@ -122,6 +136,62 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   
   
   const [tempMarker, setTempMarker] = useState<L.LatLng | null>(null);
+
+  // State to store AI-generated descriptions and recommendations for clicked waypoints
+  const [poiDetails, setPoiDetails] = useState<Record<string, { description: string, recommendation: string, loading?: boolean }>>({});
+
+  // Helper to prevent clicks and double clicks inside leaflet popups from bubbling up to map click events
+  const disablePropagation = (el: HTMLElement | null) => {
+    if (el) {
+      L.DomEvent.disableClickPropagation(el);
+    }
+  };
+
+  const handleMarkerClick = async (wp: any, index: number) => {
+    const pointKey = wp.name || `Punkt ${index + 1}`;
+    
+    // Skip if already loading or loaded
+    if (poiDetails[pointKey]) return;
+    
+    // Set loading state
+    setPoiDetails(prev => ({
+      ...prev,
+      [pointKey]: { description: '', recommendation: '', loading: true }
+    }));
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
+      const res = await fetch(`${apiUrl}/point-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: pointKey,
+          lat: wp.lat,
+          lng: wp.lng
+        })
+      });
+      if (!res.ok) throw new Error('Failed to fetch details');
+      const data = await res.json();
+      setPoiDetails(prev => ({
+        ...prev,
+        [pointKey]: {
+          description: data.description || 'Brak opisu dla tego miejsca.',
+          recommendation: data.recommendation || 'Brak dodatkowych rekomendacji.',
+          loading: false
+        }
+      }));
+    } catch (err) {
+      console.error("Error fetching point details:", err);
+      setPoiDetails(prev => ({
+        ...prev,
+        [pointKey]: {
+          description: 'Nie udało się załadować opisu.',
+          recommendation: 'Spróbuj ponownie później.',
+          loading: false
+        }
+      }));
+    }
+  };
 
   const handleAddPointFromTemp = (type: 'start' | 'end' | 'waypoint') => {
     if (!tempMarker) return;
@@ -182,14 +252,23 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     };
   }, [geometry]);
 
-  // Load existing project if projectId is in URL
-  const skipNextCalc = useRef(false);
+  // Load existing project if projectId is in URL / context on mount
+  const lastLoadedId = useRef<string | null>(null);
+
   useEffect(() => {
-    if (projectId) {
+    console.log("[RouteBuilderV2] useEffect load project checks:", {
+      projectId,
+      lastLoadedId: lastLoadedId.current
+    });
+    if (projectId && lastLoadedId.current !== projectId) {
+      console.log("[RouteBuilderV2] useEffect load project starting FETCH for:", projectId);
+      lastLoadedId.current = projectId;
       (supabase as any).from('route_builder_projects').select('*').eq('id', projectId).single()
         .then(({ data }) => {
+           console.log("[RouteBuilderV2] Supabase loaded project data:", data);
            if (data && data.requirements) {
               const reqs = data.requirements;
+              console.log("[RouteBuilderV2] Restoring requirements:", reqs);
               if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
               if (reqs.gpxData) setField('gpxData', reqs.gpxData);
               if (reqs.guideText) setField('guideText', reqs.guideText);
@@ -202,7 +281,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 });
               }
               if (reqs.waypoints) {
-                  skipNextCalc.current = true;
                   setField('waypoints', reqs.waypoints);
               }
               if (reqs.gpxData || reqs.guideText) {
@@ -212,7 +290,14 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [projectId]);
+
+  // Sync browser URL search params with the current projectId from machine context
+  useEffect(() => {
+    if (projectId && searchParams.get('projectId') !== projectId) {
+      navigate(`/create?projectId=${projectId}`, { replace: true });
+    }
+  }, [projectId, navigate, searchParams]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -258,7 +343,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
        setField('geometry', null);
     }
     if (reqs.waypoints) {
-       skipNextCalc.current = true;
        setField('waypoints', reqs.waypoints);
     } else {
        setField('waypoints', []);
@@ -297,27 +381,38 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   }, [activeTab]);
 
 
-  // Flag to prevent automatic recalculation when waypoints are updated from AI or DB load
-  const skipRecalcRef = useRef(false);
 
-  // Recalculate route whenever vehicle type, bike subtype or waypoints change
-  useEffect(() => {
-    if (skipNextCalc.current) {
-        skipNextCalc.current = false;
-        return;
-    }
-    if (skipRecalcRef.current) {
-        skipRecalcRef.current = false;
-        return;
-    }
+  // Ref to always have current machine state available inside timeouts
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Event-driven recalculation handlers triggered ONLY on user clicking UI selector buttons.
+  // This completely removes the reactive useEffect and prevents any automatic/mount-time loop.
+  const handleVehicleChange = (type: any) => {
+    console.log("[RouteBuilderV2] handleVehicleChange called with:", type);
+    setField('vehicleType', type);
     if (waypoints.length >= 2) {
-      const timer = setTimeout(() => {
-        send({ type: 'CALCULATE_ROUTE' });
-      }, 500);
-      return () => clearTimeout(timer);
+      setTimeout(() => {
+        console.log("[RouteBuilderV2] handleVehicleChange sending CALCULATE_ROUTE. Current state matches idle?", stateRef.current.matches('idle'));
+        if (stateRef.current.matches('idle')) {
+          send({ type: 'CALCULATE_ROUTE' });
+        }
+      }, 100);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, vehicleType, bikeSubtype]);
+  };
+
+  const handleBikeSubtypeChange = (subtype: any) => {
+    console.log("[RouteBuilderV2] handleBikeSubtypeChange called with:", subtype);
+    setField('bikeSubtype', subtype);
+    if (waypoints.length >= 2) {
+      setTimeout(() => {
+        console.log("[RouteBuilderV2] handleBikeSubtypeChange sending CALCULATE_ROUTE. Current state matches idle?", stateRef.current.matches('idle'));
+        if (stateRef.current.matches('idle')) {
+          send({ type: 'CALCULATE_ROUTE' });
+        }
+      }, 100);
+    }
+  };
 
   const handleMapClick = (latlng: L.LatLng) => {
     setTempMarker(latlng);
@@ -730,35 +825,35 @@ ${points}
             <Button 
               variant={vehicleType === 'motorcycle' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setField('vehicleType', 'motorcycle')}
+              onClick={() => handleVehicleChange('motorcycle')}
             >
               <Navigation className="w-4 h-4 mr-2" /> Motocykl
             </Button>
             <Button 
               variant={vehicleType === 'bicycle' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'bicycle' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setField('vehicleType', 'bicycle')}
+              onClick={() => handleVehicleChange('bicycle')}
             >
               <Bike className="w-4 h-4 mr-2" /> Rower
             </Button>
             <Button 
               variant={vehicleType === 'hiking' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'hiking' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setField('vehicleType', 'hiking')}
+              onClick={() => handleVehicleChange('hiking')}
             >
               <RouteIcon className="w-4 h-4 mr-2" /> Pieszo
             </Button>
             <Button 
               variant={vehicleType === 'city' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'city' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setField('vehicleType', 'city')}
+              onClick={() => handleVehicleChange('city')}
             >
               <Building2 className="w-4 h-4 mr-2" /> Miasto
             </Button>
             <Button 
               variant={vehicleType === 'car' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'car' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              onClick={() => setField('vehicleType', 'car')}
+              onClick={() => handleVehicleChange('car')}
             >
               <Car className="w-4 h-4 mr-2" /> Samochód
             </Button>
@@ -771,7 +866,7 @@ ${points}
                 variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} 
                 size="sm"
                 className={`rounded-full px-4 h-8 text-xs ${bikeSubtype === 'road' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500'}`}
-                onClick={() => setField('bikeSubtype', 'road')}
+                onClick={() => handleBikeSubtypeChange('road')}
               >
                 Szosa / Asfalt
               </Button>
@@ -779,7 +874,7 @@ ${points}
                 variant={bikeSubtype === 'gravel' ? 'secondary' : 'ghost'} 
                 size="sm"
                 className={`rounded-full px-4 h-8 text-xs ${bikeSubtype === 'gravel' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500'}`}
-                onClick={() => setField('bikeSubtype', 'gravel')}
+                onClick={() => handleBikeSubtypeChange('gravel')}
               >
                 Szuter / Gravel
               </Button>
@@ -787,7 +882,7 @@ ${points}
                 variant={bikeSubtype === 'mtb' ? 'secondary' : 'ghost'} 
                 size="sm"
                 className={`rounded-full px-4 h-8 text-xs ${bikeSubtype === 'mtb' ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500'}`}
-                onClick={() => setField('bikeSubtype', 'mtb')}
+                onClick={() => handleBikeSubtypeChange('mtb')}
               >
                 MTB / Góry
               </Button>
@@ -838,20 +933,63 @@ ${points}
               icon={wp.type === 'start' ? startIcon : (wp.type === 'end' ? endIcon : wpIcon)}
               draggable={true}
               eventHandlers={{
-                dragend: (e) => handleMarkerDrag(i, e)
+                dragend: (e) => handleMarkerDrag(i, e),
+                click: () => handleMarkerClick(wp, i)
               }}
             >
               <Popup>
-                <div className="text-center">
-                  <p className="text-sm font-semibold mb-2">Punkt trasy</p>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="h-7 text-xs"
-                    onClick={() => handleRemoveWaypoint(i)}
-                  >
-                    <Trash2 className="w-3 h-3 mr-1" /> Usuń punkt
-                  </Button>
+                <div 
+                  ref={disablePropagation}
+                  className="w-[260px] text-left p-1 text-slate-800 font-sans"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                    <span className="font-bold text-sm text-slate-800 truncate block pr-2 max-w-[180px]" title={wp.name || `Punkt ${i + 1}`}>
+                      {wp.name || `Punkt ${i + 1}`}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded tracking-wider shrink-0">
+                      {wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Stop ${i}`)}
+                    </span>
+                  </div>
+                  
+                  <div className="text-xs leading-relaxed min-h-[50px] mb-3">
+                    {poiDetails[wp.name || `Punkt ${i + 1}`]?.loading ? (
+                      <div className="flex flex-col items-center justify-center py-4 text-emerald-600 font-semibold gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-[10px] text-slate-400">Pobieram informacje z AI...</span>
+                      </div>
+                    ) : poiDetails[wp.name || `Punkt ${i + 1}`] ? (
+                      <div className="space-y-2.5 animate-in fade-in duration-200">
+                        <p className="text-slate-600 font-medium">{poiDetails[wp.name || `Punkt ${i + 1}`].description}</p>
+                        {poiDetails[wp.name || `Punkt ${i + 1}`].recommendation && (
+                          <div className="bg-emerald-50/50 border border-emerald-100/70 rounded-lg p-2 flex items-start gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                            <div className="text-[11px] text-emerald-800 font-medium leading-normal m-0">
+                              <strong className="text-emerald-950 block text-[10px] uppercase tracking-wider mb-0.5 font-bold">Wskazówka AI</strong>
+                              {poiDetails[wp.name || `Punkt ${i + 1}`].recommendation}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-2 text-center text-slate-400">
+                        <span className="text-[10px]">Wczytuję szczegóły...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 border-t border-slate-100 pt-2.5 mt-2">
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="w-full h-8 text-xs font-semibold"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveWaypoint(i);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1.5" /> Usuń z trasy
+                    </Button>
+                  </div>
                 </div>
               </Popup>
             </Marker>
@@ -859,18 +997,18 @@ ${points}
 
           {tempMarker && (
             <Popup position={[tempMarker.lat, tempMarker.lng]}>
-                <div className="flex flex-col gap-2 min-w-[140px] p-1">
-                  <p className="text-xs font-bold text-slate-700 mb-1 text-center">Opcje punktu</p>
-                  <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('start')}>
-                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2" /> Ustaw jako Start
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('end')}>
-                    <div className="w-2 h-2 rounded-full bg-red-500 mr-2" /> Ustaw jako Metę
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('waypoint')}>
-                    <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" /> Dodaj do trasy
-                  </Button>
-                </div>
+              <div ref={disablePropagation} className="flex flex-col gap-2 min-w-[140px] p-1">
+                <p className="text-xs font-bold text-slate-700 mb-1 text-center">Opcje punktu</p>
+                <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('start')}>
+                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2" /> Ustaw jako Start
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('end')}>
+                  <div className="w-2 h-2 rounded-full bg-red-500 mr-2" /> Ustaw jako Metę
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('waypoint')}>
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" /> Dodaj do trasy
+                </Button>
+              </div>
             </Popup>
           )}
           

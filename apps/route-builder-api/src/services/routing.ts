@@ -75,7 +75,7 @@ export class RoutingService {
       console.warn(`[Routing] GraphHopper failed: ${err.message}`);
     }
 
-    // FALLBACK: Mathematical mock route
+    // FALLBACK: Mathematical mock route (deterministic, no Math.random to prevent route jumping)
     const start = places[0];
     const end = places[places.length - 1];
     
@@ -84,8 +84,11 @@ export class RoutingService {
     for (let i = 0; i <= steps; i++) {
       const ratio = i / steps;
       const wave = Math.sin(ratio * Math.PI) * 0.004;
-      const lat = start.lat + (end.lat - start.lat) * ratio + wave + (Math.random() - 0.5) * 0.001;
-      const lng = start.lng + (end.lng - start.lng) * ratio + wave * 0.6 + (Math.random() - 0.5) * 0.001;
+      // Using deterministic sine-based offsets instead of Math.random
+      const jitterLat = Math.sin(i * 1.5) * 0.0005;
+      const jitterLng = Math.cos(i * 1.5) * 0.0005;
+      const lat = start.lat + (end.lat - start.lat) * ratio + wave + jitterLat;
+      const lng = start.lng + (end.lng - start.lng) * ratio + wave * 0.6 + jitterLng;
       points.push([lat, lng]);
     }
 
@@ -106,12 +109,64 @@ export class RoutingService {
   private optimizeWaypointsLocal(places: GeocodedPlace[]): GeocodedPlace[] {
     if (places.length <= 3) return places;
     
-    // We only want to sort the intermediate points.
-    // However, if the start and end are the exact same point (a loop), we should treat all other points as intermediate.
     const start = places[0];
     const end = places[places.length - 1];
     
-    // Nearest neighbor algorithm for intermediate points
+    const intermediates = places.slice(1, -1);
+    const n = intermediates.length;
+    
+    // If there are too many intermediate points, fall back to nearest neighbor to prevent CPU lockups
+    if (n > 9) {
+      return this.optimizeWaypointsLocalNearestNeighbor(places);
+    }
+    
+    let bestPath: GeocodedPlace[] = [];
+    let minTotalDist = Infinity;
+    
+    const getDistance = (p1: GeocodedPlace, p2: GeocodedPlace) => {
+      const R = 6371; // Earth's radius in km
+      const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+      const dLon = (p2.lng - p1.lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    };
+
+    const permute = (arr: GeocodedPlace[], memo: GeocodedPlace[] = []) => {
+      if (arr.length === 0) {
+        let currentDist = 0;
+        let lastPt = start;
+        for (const pt of memo) {
+          currentDist += getDistance(lastPt, pt);
+          lastPt = pt;
+        }
+        currentDist += getDistance(lastPt, end);
+        
+        if (currentDist < minTotalDist) {
+          minTotalDist = currentDist;
+          bestPath = [...memo];
+        }
+        return;
+      }
+      
+      for (let i = 0; i < arr.length; i++) {
+        const curr = arr.splice(i, 1);
+        permute(arr.slice(), memo.concat(curr));
+        arr.splice(i, 0, curr[0]);
+      }
+    };
+    
+    permute(intermediates);
+    
+    return [start, ...bestPath, end];
+  }
+
+  private optimizeWaypointsLocalNearestNeighbor(places: GeocodedPlace[]): GeocodedPlace[] {
+    const start = places[0];
+    const end = places[places.length - 1];
+    
     const intermediates = places.slice(1, -1);
     const optimized: GeocodedPlace[] = [start];
     let current = start;
@@ -122,7 +177,6 @@ export class RoutingService {
       
       for (let i = 0; i < intermediates.length; i++) {
         const candidate = intermediates[i];
-        // Calculate haversine distance
         const R = 6371;
         const dLat = (candidate.lat - current.lat) * Math.PI / 180;
         const dLon = (candidate.lng - current.lng) * Math.PI / 180;
