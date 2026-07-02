@@ -56,69 +56,73 @@ const queryClient = new QueryClient();
 const ALL_AUTHENTICATED = [ROLES.USER, ROLES.CREATOR, ROLES.ADMIN];
 const CREATOR_AND_ADMIN = [ROLES.CREATOR, ROLES.ADMIN];
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
 const App = () => (
-  <HelmetProvider>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <GaTracker />
-            <Suspense fallback={null}>
-              <GuideHub />
-              <NavigationLauncher />
-            </Suspense>
-            <Suspense fallback={null}>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/map" element={<MapExplore />} />
-                <Route path="/lab/globe" element={<GlobeLab />} />
-                <Route path="/route/:id" element={<RouteDetail />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/auth/error" element={<AuthError />} />
-                <Route path="/legal/terms" element={<Terms />} />
-                <Route path="/legal/privacy" element={<Privacy />} />
-                <Route path="/legal/cookies" element={<Cookies />} />
-                <Route path="/legal/refunds" element={<Refunds />} />
-                <Route path="/legal/documents" element={<Documents />} />
-                <Route path="/legal/acceptable-use" element={<AcceptableUse />} />
-                <Route path="/legal/copyright" element={<Copyright />} />
-                <Route path="/legal/dsa-compliance" element={<DSACompliance />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/brand" element={<Brand />} />
+  <ErrorBoundary>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <GaTracker />
+              <Suspense fallback={null}>
+                <GuideHub />
+                <NavigationLauncher />
+              </Suspense>
+              <Suspense fallback={null}>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/map" element={<MapExplore />} />
+                  <Route path="/lab/globe" element={<GlobeLab />} />
+                  <Route path="/route/:id" element={<RouteDetail />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/auth/error" element={<AuthError />} />
+                  <Route path="/legal/terms" element={<Terms />} />
+                  <Route path="/legal/privacy" element={<Privacy />} />
+                  <Route path="/legal/cookies" element={<Cookies />} />
+                  <Route path="/legal/refunds" element={<Refunds />} />
+                  <Route path="/legal/documents" element={<Documents />} />
+                  <Route path="/legal/acceptable-use" element={<AcceptableUse />} />
+                  <Route path="/legal/copyright" element={<Copyright />} />
+                  <Route path="/legal/dsa-compliance" element={<DSACompliance />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/brand" element={<Brand />} />
 
-                {/* Authenticated routes */}
-                <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
-                <Route path="/favorites" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><Favorites /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
+                  {/* Authenticated routes */}
+                  <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
+                  <Route path="/favorites" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><Favorites /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
-                {/* Creator routes */}
-                <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreateRoute /></ProtectedRoute>} />
-                <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
+                  {/* Creator routes */}
+                  <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreateRoute /></ProtectedRoute>} />
+                  <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
 
-                {/* Admin routes */}
-                <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
-                  <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="users" element={<AdminUsers />} />
-                  <Route path="routes" element={<AdminRoutes />} />
-                  <Route path="moderation" element={<AdminModeration />} />
-                  <Route path="messages" element={<AdminMessages />} />
-                  <Route path="content-generator" element={<AdminContentGenerator />} />
-                  <Route path="atlas" element={<AdminAtlas />} />
-                </Route>
+                  {/* Admin routes */}
+                  <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
+                    <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="routes" element={<AdminRoutes />} />
+                    <Route path="moderation" element={<AdminModeration />} />
+                    <Route path="messages" element={<AdminMessages />} />
+                    <Route path="content-generator" element={<AdminContentGenerator />} />
+                    <Route path="atlas" element={<AdminAtlas />} />
+                  </Route>
 
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </HelmetProvider>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </HelmetProvider>
+  </ErrorBoundary>
 );
 
 export default App;
