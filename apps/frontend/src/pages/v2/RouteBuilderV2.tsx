@@ -59,7 +59,7 @@ function MapResizer({ geometry }: { geometry: any }) {
   useEffect(() => {
     if (geometry && geometry.coordinates && geometry.coordinates.length > 0) {
       const bounds = L.geoJSON(geometry).getBounds();
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 });
     }
   }, [geometry, map]);
   return null;
@@ -906,13 +906,15 @@ ${points}
         <MapContainer 
           center={[52.069, 19.480]} // Center of Poland roughly
           zoom={6} 
+          maxZoom={18}
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
           className="z-0"
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+            maxZoom={18}
           />
           
           <ClickableMap onMapClick={handleMapClick} />
