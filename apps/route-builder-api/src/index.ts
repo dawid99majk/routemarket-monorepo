@@ -164,12 +164,13 @@ ${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '�
 
 === JAK ZACHOWAĆ SIĘ W ZALEŻNOŚCI OD POPULARNOŚCI (BARDZO WAŻNE!) ===
 Jeśli wybrano Klasyk ("popular"):
-- Szukaj najważniejszych, najbardziej znanych, ikonicznych i popularnych atrakcji turystycznych w okolicy (np. we Wrocławiu: Rynek, Ostrów Tumski, Hala Stulecia, Ogród Japoński).
-- Trasa ma prowadzić przez miejsca, które są "obowiązkowymi punktami" (klasykami) do zobaczenia dla każdego turysty.
+- MASZ ZEZWOLENIE I OBOWIĄZEK użyć wyszukiwarki Google, aby znaleźć FAKTYCZNE, popularne i sprawdzone trasy polecane w internecie dla danego obszaru i pojazdu (szukaj na blogach turystycznych, motocyklowych, rowerowych, portalach).
+- NIE WYMYŚLAJ losowych punktów! Znajdź prawdziwą, istniejącą trasę w sieci, wyciągnij z niej kluczowe punkty (np. miejscowości, szczyty, atrakcje, przełęcze) i podaj je jako 'suggested_waypoints'.
+- Trasa ma prowadzić przez miejsca, które są "obowiązkowymi punktami" (klasykami).
 
 Jeśli wybrano Niszowa ("wild"):
 - Omijaj zatłoczone, komercyjne i najbardziej oblegane punkty.
-- Wyszukuj ukryte perełki, lokalne tajemnice, ciche ścieżki i niszowe, urokliwe zakątki (np. we Wrocławiu: klimatyczne Nadodrze i murale, Park Szczytnicki z dala od głównej alei, ciche zatoki Odry, alternatywne trasy spacerowe).
+- Użyj wyszukiwarki Google, by odnaleźć "ukryte perełki", lokalne tajemnice i trasy alternatywne dla danego regionu. Opieraj się na mniej znanych relacjach z podróży.
 - Skup się na pokazaniu unikalnego charakteru poza głównym szlakiem.
 
 === CZEGO JESZCZE BRAKUJE ===
@@ -276,6 +277,7 @@ Przykład 4: Użytkownik zatwierdził -> generujesz JSON (done: true):
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }],
         generationConfig: { responseMimeType: "application/json" }
       })
     });
