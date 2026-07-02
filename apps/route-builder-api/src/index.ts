@@ -272,22 +272,55 @@ Przykład 4: Użytkownik zatwierdził -> generujesz JSON (done: true):
   }
 }`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    // === ETAP 1: Gemini z Google Search (tekst, bez wymuszenia JSON) ===
+    const searchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ googleSearch: {} }],
+        tools: [{ googleSearch: {} }]
+      })
+    });
+
+    if (!searchResponse.ok) {
+      throw new Error("Gemini Search API error " + await searchResponse.text());
+    }
+
+    const searchData = await searchResponse.json() as any;
+    const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log("[chat-interview] Gemini raw response (first 500 chars):", rawText.substring(0, 500));
+
+    // === ETAP 2: Konwersja tekstu na czysty JSON (bez narzedzi, z wymuszeniem JSON) ===
+    const jsonPrompt = `Przekonwertuj ponizszy tekst na CZYSTY obiekt JSON. Nie dodawaj zadnych komentarzy.
+Tekst do konwersji:
+---
+${rawText}
+---
+
+Zwroc DOKLADNIE obiekt JSON z polami:
+- "done": boolean (true jesli agent zakonczyl zbieranie danych i podaje trase, false jesli jeszcze pyta)
+- "reply": string (odpowiedz agenta po polsku)
+- "add_waypoints": tablica stringow z nazwami punktow (TYLKO gdy done=true)
+- "extracted": obiekt z polami start_point, end_point, route_type, distance, intent, loop, key_waypoints (TYLKO gdy done=true)
+
+Jesli tekst zawiera pytanie do uzytkownika, ustaw done=false i zwroc samo reply.
+Jesli tekst zawiera gotowa trase z punktami, ustaw done=true i wypelnij add_waypoints i extracted.`;
+
+    const jsonResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: jsonPrompt }] }],
         generationConfig: { responseMimeType: "application/json" }
       })
     });
 
-    if (!response.ok) {
-      throw new Error("Gemini API error " + await response.text());
+    if (!jsonResponse.ok) {
+      throw new Error("Gemini JSON API error " + await jsonResponse.text());
     }
 
-    const data = await response.json() as any;
-    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const jsonData = await jsonResponse.json() as any;
+    const generatedText = jsonData.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (generatedText) {
       const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
