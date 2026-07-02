@@ -17,60 +17,90 @@ export class GraphHopperRoutingProvider implements RoutingProvider {
       throw new Error('At least two waypoints are required to generate a route.');
     }
 
-    const ghProfile = this.mapProfile(profile);
+    const maxPointsPerRequest = 5;
     
-    const url = new URL(this.baseUrl);
-    url.searchParams.set('key', this.apiKey);
-
-    const body = {
-      points: waypoints.map(w => [w.lng, w.lat]),
-      profile: ghProfile,
-      locale: 'en',
-      points_encoded: false,
-      instructions: false,
-      elevation: true
-    };
-
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`GraphHopper API error (${response.status}): ${errorText}`);
+    // Chunking logic to bypass GraphHopper's 5-location free tier limit
+    // We need to overlap by 1 point so the segments connect smoothly
+    const chunks: Waypoint[][] = [];
+    const step = maxPointsPerRequest - 1;
+    for (let i = 0; i < waypoints.length - 1; i += step) {
+        chunks.push(waypoints.slice(i, i + maxPointsPerRequest));
     }
 
-    const data = await response.json() as any;
-    
-    if (!data.paths || data.paths.length === 0) {
-      throw new Error('GraphHopper returned no paths for the given waypoints.');
-    }
+    let totalDistanceKm = 0;
+    let totalEstimatedTimeH = 0;
+    let allCoordinates: number[][] = [];
+    let allResultPoints: Waypoint[] = [];
 
-    const path = data.paths[0];
-    const coordinates = path.points.coordinates as number[][];
-    
-    const resultPoints: Waypoint[] = coordinates.map(coord => {
-      const wp: Waypoint & { ele?: number } = {
-        lng: coord[0],
-        lat: coord[1]
-      };
-      if (coord.length > 2) {
-        wp.ele = coord[2];
-      }
-      return wp;
-    });
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        const ghProfile = this.mapProfile(profile);
+        
+        const url = new URL(this.baseUrl);
+        url.searchParams.set('key', this.apiKey);
+
+        const body = {
+          points: chunk.map(w => [w.lng, w.lat]),
+          profile: ghProfile,
+          locale: 'en',
+          points_encoded: false,
+          instructions: false,
+          elevation: true
+        };
+
+        const response = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`GraphHopper API error (${response.status}): ${errorText}`);
+        }
+
+        const data = await response.json() as any;
+        
+        if (!data.paths || data.paths.length === 0) {
+          throw new Error('GraphHopper returned no paths for the given waypoints.');
+        }
+
+        const path = data.paths[0];
+        const coordinates = path.points.coordinates as number[][];
+        
+        const resultPoints: Waypoint[] = coordinates.map(coord => {
+          const wp: Waypoint & { ele?: number } = {
+            lng: coord[0],
+            lat: coord[1]
+          };
+          if (coord.length > 2) {
+            wp.ele = coord[2];
+          }
+          return wp;
+        });
+
+        // To avoid duplicate coordinates at the stitch points
+        if (chunkIndex > 0) {
+            allCoordinates.push(...coordinates.slice(1));
+            allResultPoints.push(...resultPoints.slice(1));
+        } else {
+            allCoordinates.push(...coordinates);
+            allResultPoints.push(...resultPoints);
+        }
+
+        totalDistanceKm += Math.round((path.distance / 1000) * 100) / 100;
+        totalEstimatedTimeH += Math.round((path.time / 3600000) * 100) / 100;
+    }
 
     return {
-      points: resultPoints,
-      distanceKm: Math.round((path.distance / 1000) * 100) / 100,
-      estimatedTimeH: Math.round((path.time / 3600000) * 100) / 100,
+      points: allResultPoints,
+      distanceKm: Math.round(totalDistanceKm * 100) / 100,
+      estimatedTimeH: Math.round(totalEstimatedTimeH * 100) / 100,
       geometryGeoJson: {
         type: 'LineString',
-        coordinates: coordinates
+        coordinates: allCoordinates
       }
     };
   }
