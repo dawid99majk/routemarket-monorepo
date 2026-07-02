@@ -102,6 +102,8 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const isRouting = state.matches('generating_route') || state.matches('saving_project');
   const isTyping = state.matches('chatting');
 
+  const lastLoadedId = useRef<string | null>(null);
+
   console.log("[RouteBuilderV2] Render details:", {
     projectId,
     lastLoadedId: lastLoadedId.current,
@@ -251,7 +253,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   }, [geometry]);
 
   // Load existing project if projectId is in URL / context on mount
-  const lastLoadedId = useRef<string | null>(null);
 
   useEffect(() => {
     console.log("[RouteBuilderV2] useEffect load project checks:", {
