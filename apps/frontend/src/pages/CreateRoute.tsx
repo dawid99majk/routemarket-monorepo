@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Map as MapIcon, Bike, Mountain, Footprints, Building2, Car } from 'lucide-react';
 import RouteBuilderV2 from './v2/RouteBuilderV2';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type VehicleType = 'motorcycle' | 'bicycle' | 'hiking' | 'city' | 'car';
 type BikeSubtype = 'gravel' | 'road' | 'mtb';
@@ -57,14 +58,16 @@ export default function CreateRoute() {
   // If wizard is completed OR we have a projectId parameter, show the map builder
   if (projectId || wizardData) {
     return (
-      <RouteBuilderV2 
-        initialData={wizardData || undefined} 
-        onBack={() => {
-          setWizardData(null);
-          setStep(1);
-          navigate('/create');
-        }} 
-      />
+      <ErrorBoundary>
+        <RouteBuilderV2 
+          initialData={wizardData || undefined} 
+          onBack={() => {
+            setWizardData(null);
+            setStep(1);
+            navigate('/create');
+          }} 
+        />
+      </ErrorBoundary>
     );
   }
 
