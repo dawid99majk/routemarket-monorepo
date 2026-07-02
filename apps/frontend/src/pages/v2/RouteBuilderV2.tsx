@@ -253,15 +253,27 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   }, [geometry]);
 
   // Load existing project if projectId is in URL / context on mount
+  // IMPORTANT: Do NOT overwrite geometry/waypoints if we already have them in state
+  // (this happens when save assigns a new projectId — we already have the fresh route)
 
   useEffect(() => {
     console.log("[RouteBuilderV2] useEffect load project checks:", {
       projectId,
-      lastLoadedId: lastLoadedId.current
+      lastLoadedId: lastLoadedId.current,
+      hasGeometry: !!geometry
     });
     if (projectId && lastLoadedId.current !== projectId) {
-      console.log("[RouteBuilderV2] useEffect load project starting FETCH for:", projectId);
+      // If we already have geometry in state, it means we just generated a route
+      // and saveProjectActor assigned a new projectId. Skip reload to prevent overwriting.
+      const alreadyHasRoute = !!geometry;
+      console.log("[RouteBuilderV2] useEffect load project starting FETCH for:", projectId, "alreadyHasRoute:", alreadyHasRoute);
       lastLoadedId.current = projectId;
+
+      if (alreadyHasRoute) {
+        console.log("[RouteBuilderV2] Skipping Supabase reload — we already have a fresh route in state.");
+        return;
+      }
+
       (supabase as any).from('route_builder_projects').select('*').eq('id', projectId).single()
         .then(({ data }) => {
            console.log("[RouteBuilderV2] Supabase loaded project data:", data);
