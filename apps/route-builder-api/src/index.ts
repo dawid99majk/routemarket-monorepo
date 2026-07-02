@@ -218,6 +218,7 @@ Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez 
    
 5. spacer miejski (city_walk / route_type = city_walk):
    - Szukaj: rynków, zabytków architektonicznych, parków miejskich, tarasów widokowych, bulwarów, znanych kawiarni.
+   - BARDZO WAŻNE: Pilnuj dystansu! Jeśli użytkownik poprosił o wycieczkę "1 dniową", to trasa z samego ścisłego centrum (np. Rynek -> Ratusz -> Most) będzie miała zaledwie 3-4 kilometry! Aby ułożyć pełnowymiarową trasę na cały dzień (ok 15 km), MUSISZ rozciągnąć wycieczkę, dodając klasyki również z bardziej oddalonych dzielnic (np. we Wrocławiu koniecznie dodaj Halę Stulecia i ZOO, które są daleko od Rynku). Używaj rozumu przestrzennego.
    
 === WAŻNE: FORMATOWANIE PUNKTÓW DLA GEOKODERA ===
 Aby geokoder bezbłędnie zlokalizował punkty pośrednie, każdy punkt w tablicy "add_waypoints" MUSI być podany w formacie:

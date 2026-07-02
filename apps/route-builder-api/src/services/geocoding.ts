@@ -74,44 +74,7 @@ export class GeocodingService {
   async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
     
-    // 1. Próba GraphHopper Geocoding
-    if (apiKey) {
-      try {
-        console.log(`[Geocoding] Trying GraphHopper Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
-        let url = `https://graphhopper.com/api/1/geocode?q=${encodeURIComponent(query)}&locale=pl&key=${apiKey}`;
-        if (biasPoint) {
-          url += `&point=${biasPoint.lat},${biasPoint.lng}`;
-        }
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json() as any;
-          if (data.hits && data.hits.length > 0) {
-            let hits = data.hits;
-            if (biasPoint) {
-              hits = [...hits].sort((a, b) => {
-                const distA = getDistance(a.point.lat, a.point.lng, biasPoint.lat, biasPoint.lng);
-                const distB = getDistance(b.point.lat, b.point.lng, biasPoint.lat, biasPoint.lng);
-                return distA - distB;
-              });
-            }
-            const hit = hits[0];
-            const displayName = [hit.name, hit.city, hit.country].filter(Boolean).join(', ');
-            return {
-              name: displayName || query,
-              lat: hit.point.lat,
-              lng: hit.point.lng,
-              confidence: 0.95,
-              source: 'graphhopper_api',
-              provider: 'graphhopper'
-            };
-          }
-        }
-      } catch (err: any) {
-        console.warn(`[Geocoding] GraphHopper geocoding failed: ${err.message}`);
-      }
-    }
-
-    // 2. Fallback do OpenStreetMap Nominatim (darmowy i niezawodny)
+    // 1. Główne geokodowanie - OpenStreetMap Nominatim (świetny do POI, dzielnic, zabytków)
     try {
       console.log(`[Geocoding] Trying OSM Nominatim Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
       const limit = biasPoint ? 10 : 1;
@@ -143,6 +106,43 @@ export class GeocodingService {
       }
     } catch (err: any) {
       console.warn(`[Geocoding] OSM Nominatim geocoding failed: ${err.message}`);
+    }
+
+    // 2. Fallback do GraphHopper (lepszy tylko dla ścisłych adresów z numerami domów)
+    if (apiKey) {
+      try {
+        console.log(`[Geocoding] Trying GraphHopper Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
+        let url = `https://graphhopper.com/api/1/geocode?q=${encodeURIComponent(query)}&locale=pl&key=${apiKey}`;
+        if (biasPoint) {
+          url += `&point=${biasPoint.lat},${biasPoint.lng}`;
+        }
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json() as any;
+          if (data.hits && data.hits.length > 0) {
+            let hits = data.hits;
+            if (biasPoint) {
+              hits = [...hits].sort((a, b) => {
+                const distA = getDistance(a.point.lat, a.point.lng, biasPoint.lat, biasPoint.lng);
+                const distB = getDistance(b.point.lat, b.point.lng, biasPoint.lat, biasPoint.lng);
+                return distA - distB;
+              });
+            }
+            const hit = hits[0];
+            const displayName = [hit.name, hit.city, hit.country].filter(Boolean).join(', ');
+            return {
+              name: displayName || query,
+              lat: hit.point.lat,
+              lng: hit.point.lng,
+              confidence: 0.85,
+              source: 'graphhopper_api',
+              provider: 'graphhopper'
+            };
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Geocoding] GraphHopper geocoding failed: ${err.message}`);
+      }
     }
 
     throw new Error(`Nie udało się odnaleźć punktu "${query}". Doprecyzuj nazwę miejsca, dodaj kraj/region albo użyj dokładniejszych danych wejściowych.`);
