@@ -25,8 +25,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-// @ts-ignore
-import html2pdf from 'html2pdf.js';
 // Leaflet Components
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -460,13 +458,18 @@ ${points}
     navigate('/create', { replace: true });
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!guideText) return;
     const element = document.getElementById('guidebook-content');
     if (!element) {
         toast.error('Nie znaleziono zawartości przewodnika');
         return;
     }
+    
+    // Dynamic import of html2pdf to prevent load-time crashes
+    // @ts-ignore
+    const html2pdfModule = await import('html2pdf.js');
+    const html2pdf = html2pdfModule.default || html2pdfModule;
     
     // Tworzymy kopię elementu, by PDF nie miał tła i szarych ramek (chcemy "czysty" styl druku)
     const printElement = element.cloneNode(true) as HTMLElement;
