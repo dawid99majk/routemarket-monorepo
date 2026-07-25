@@ -64,7 +64,7 @@ async function buildGpxProject(job: RouteBuilderJob, project: RouteProject) {
     trackPoints,
     distance_km: summary.distance_km,
     duration_h: summary.duration_h
-  } as any, project.requirements);
+  } as any, project.requirements, places);
 
   let alternatives: any[];
   try {

@@ -732,7 +732,7 @@ app.post('/route-projects/:id/select-alternative', async (c) => {
     ];
 
     // 4. Wygenerowanie przewodnika AI dla nowego wariantu
-    const { text: newReportText, sources } = await reportService.generateShortReport(route, project.requirements);
+    const { text: newReportText, sources } = await reportService.generateShortReport(route, project.requirements, newPlaces);
 
     // 5. Zapisanie/nadpisanie artefaktów
     await Promise.all([
