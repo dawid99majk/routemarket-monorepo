@@ -10,6 +10,7 @@ import { reportService } from './services/report.js';
 import { gpxParserService } from './services/gpx-parser.js';
 
 import { authMiddleware } from './middleware/auth.js';
+import { poiService, PoiCandidate } from './services/poi.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
@@ -146,6 +147,25 @@ app.post('/chat-interview', async (c) => {
       projectContext += `\n\n[KONTEKST UI] Użytkownik ma zaznaczony typ pojazdu w aplikacji: **${vehicle_type}${subtypeText}**. Nie pytaj już o środek transportu!`;
     }
 
+    // Warstwa prawdy o POI: realne atrakcje z OSM wokół punktu startu.
+    // Gemini wybiera z tej listy zamiast wymyślać nazwy — współrzędne bierzemy z OSM.
+    let poiCandidates: PoiCandidate[] = [];
+    if (current_waypoints && current_waypoints.length > 0) {
+      const poiRouteType = vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking');
+      try {
+        poiCandidates = await poiService.fetchCandidates(
+          { lat: current_waypoints[0].lat, lng: current_waypoints[0].lng },
+          poiRouteType
+        );
+        console.log(`[chat-interview] Loaded ${poiCandidates.length} OSM POI candidates (${poiRouteType})`);
+      } catch (err) {
+        console.warn('[chat-interview] POI candidates fetch failed, continuing without:', err);
+      }
+    }
+    if (poiCandidates.length > 0) {
+      projectContext += poiService.buildPromptSection(poiCandidates, routing_preference);
+    }
+
     const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
 
     // Determine what we already know from UI context
@@ -164,13 +184,13 @@ ${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '�
 
 === JAK ZACHOWAĆ SIĘ W ZALEŻNOŚCI OD POPULARNOŚCI (BARDZO WAŻNE!) ===
 Jeśli wybrano Klasyk ("popular"):
-- MASZ ZEZWOLENIE I OBOWIĄZEK użyć wyszukiwarki Google, aby znaleźć FAKTYCZNE, popularne i sprawdzone trasy polecane w internecie dla danego obszaru i pojazdu (szukaj na blogach turystycznych, motocyklowych, rowerowych, portalach).
-- NIE WYMYŚLAJ losowych punktów! Znajdź prawdziwą, istniejącą trasę w sieci, wyciągnij z niej kluczowe punkty (np. miejscowości, szczyty, atrakcje, przełęcze) i podaj je jako 'suggested_waypoints'.
-- Trasa ma prowadzić przez miejsca, które są "obowiązkowymi punktami" (klasykami).
+- Użyj wyszukiwarki Google, aby sprawdzić, jak przebiegają FAKTYCZNE, popularne i sprawdzone trasy polecane w internecie dla danego obszaru i pojazdu (blogi turystyczne, motocyklowe, rowerowe, portale) — wyszukiwarka służy do ustalenia LOGIKI i KOLEJNOŚCI trasy.
+- Konkretne punkty trasy dobieraj z sekcji "ZWERYFIKOWANE ATRAKCJE W OKOLICY" (jeśli jest dostępna) — to są potwierdzone miejsca z dokładnymi współrzędnymi. Trasa ma prowadzić przez punkty oznaczone "KLASYK".
+- NIE WYMYŚLAJ losowych punktów!
 
 Jeśli wybrano Niszowa ("wild"):
-- Omijaj zatłoczone, komercyjne i najbardziej oblegane punkty.
-- Użyj wyszukiwarki Google, by odnaleźć "ukryte perełki", lokalne tajemnice i trasy alternatywne dla danego regionu. Opieraj się na mniej znanych relacjach z podróży.
+- Omijaj zatłoczone, komercyjne i najbardziej oblegane punkty (oznaczone "KLASYK").
+- Wybieraj z listy zweryfikowanych atrakcji miejsca mniej znane; wyszukiwarki Google użyj, by potwierdzić ich charakter i znaleźć logiczne połączenie w trasę.
 - Skup się na pokazaniu unikalnego charakteru poza głównym szlakiem.
 
 === CZEGO JESZCZE BRAKUJE ===
@@ -305,7 +325,8 @@ Zwroc DOKLADNIE obiekt JSON z polami:
 - "extracted": obiekt z polami start_point, end_point, route_type, distance, intent, loop, key_waypoints (TYLKO gdy done=true)
 
 Jesli tekst zawiera pytanie do uzytkownika, ustaw done=false i zwroc samo reply.
-Jesli tekst zawiera gotowa trase z punktami, ustaw done=true i wypelnij add_waypoints i extracted.`;
+Jesli tekst zawiera gotowa trase z punktami, ustaw done=true i wypelnij add_waypoints i extracted.
+WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wystepuja w tekscie zrodlowym (z polskimi znakami). Nie skracaj, nie parafrazuj, nie pomijaj zadnego punktu z tekstu.`;
 
     const jsonResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -348,7 +369,15 @@ Jesli tekst zawiera gotowa trase z punktami, ustaw done=true i wypelnij add_wayp
           }
         }
 
+        const failed_waypoints: string[] = [];
         for (const placeName of resultObj.add_waypoints) {
+          // Najpierw dopasowanie do zweryfikowanych POI z OSM — dokładne współrzędne bez geokodera
+          const matched = poiService.matchCandidate(placeName, poiCandidates);
+          if (matched) {
+            suggested_waypoints.push({ lat: matched.lat, lng: matched.lng, name: placeName });
+            if (!biasPoint) biasPoint = { lat: matched.lat, lng: matched.lng };
+            continue;
+          }
           try {
             const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint);
             if (place) {
@@ -364,9 +393,15 @@ Jesli tekst zawiera gotowa trase z punktami, ustaw done=true i wypelnij add_wayp
             }
           } catch (e) {
             console.error("Geocoding failed for place:", placeName, e);
+            failed_waypoints.push(placeName);
           }
         }
         resultObj.suggested_waypoints = suggested_waypoints;
+        if (failed_waypoints.length > 0) {
+          // Nie gubimy punktów po cichu — informujemy użytkownika, których miejsc nie udało się zlokalizować
+          resultObj.failed_waypoints = failed_waypoints;
+          resultObj.reply = `${resultObj.reply}\n\n⚠️ Nie udało się zlokalizować: ${failed_waypoints.join(', ')}. Trasa została wyznaczona bez tych punktów.`;
+        }
       }
 
       return c.json(resultObj);
