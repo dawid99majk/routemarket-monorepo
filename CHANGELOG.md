@@ -4,7 +4,29 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
 
 ---
 
-## 📅 Ostatnia aktualizacja: 25 Maja 2026
+## 📅 Ostatnia aktualizacja: 25 Lipca 2026
+
+### 🚀 Przebudowa jakości generowania tras (25 Lipca 2026)
+
+#### 20. Warstwa prawdy o POI — Overpass/OSM [BACKEND route-builder-api]
+* **Problem**: Trasy pomijały klasyczne atrakcje regionu (nawet w trybie "Klasyk"), a dobór punktów opierał się wyłącznie na jednym wywołaniu Gemini z Google Search, bez weryfikacji.
+* **Rozwiązanie**: Nowy serwis `poi.ts` pobiera realne atrakcje z OpenStreetMap (Overpass API, bbox wokół startu, kategorie zależne od pojazdu) z rankingiem popularności (tagi wikipedia/wikidata). Gemini wybiera punkty z tej listy; tryb Klasyk MUSI zawierać punkty oznaczone KLASYK, tryb Niszowy je omija. Nazwy dopasowywane do OSM → współrzędne bez geokodera.
+* **Pliki**: `apps/route-builder-api/src/services/poi.ts`, `apps/route-builder-api/src/index.ts` (chat-interview).
+* **Uwaga operacyjna**: publiczne endpointy Overpass bywają przeciążone — jest failover na 3 mirrory + cache 1h. Zapytania działają z VPS; z innych IP mogą być rate-limitowane.
+
+#### 21. Pętla walidacyjna trasy [BACKEND]
+* **Rozwiązanie**: Nowy `route-validator.ts`: (a) filtr punktów zgeokodowanych w złym regionie, (b) porównanie szacowanego dystansu z celem + automatyczna jednorazowa korekta doboru punktów przez Gemini przy odchyle >60%, (c) po routingu kontrola korytarza (czy ślad przechodzi przy obiecanych POI), domknięcia pętli i dystansu vs cel (ostrzeżenie >40%). `/live-route` zwraca pole `validation`; wizard pokazuje ostrzeżenia jako toasty.
+* **Usunięto**: sinusoidalne mocki tras, zmyślone POI w wariantach ("Schronisko i Kawiarnia"), ciche gubienie niegeokodowalnych punktów (teraz komunikat dla użytkownika).
+
+#### 22. Routing: BRouter + kręte drogi dla moto + 2-opt [BACKEND]
+* **Rozwiązanie**: BRouter (brouter.de) jako główny silnik tras pieszych/rowerowych — profile szlakowe (hiking-mountain, trekking, fastbike), brak limitu punktów, realne dane wysokościowe w śladzie. GraphHopper został fallbackiem. Motocykle: Google Routes z `avoidHighways` (kręte drogi zamiast ekspresówek). Kolejność punktów: Nearest Neighbor + poprawka 2-opt (eliminacja przecięć). Worker: pętle bez key_waypoints prowadzą przez top-POI z OSM zamiast syntetycznego "punktu kontrolnego".
+* **Pliki**: `apps/route-builder-api/src/services/brouter-provider.ts`, `routing.ts`, `waypoint-enrichment.ts`, `geocoding.ts`, `jobs/route-builder-worker.ts`, `packages/atlas-gis/src/routing/google-routes-provider.ts`.
+
+#### 23. Przewodniki o konkretnej trasie [BACKEND]
+* **Rozwiązanie**: `generateShortReport` dostaje finalną listę punktów trasy i statystyki wysokościowe (min/max/suma podejść z realnego śladu). Nowy prompt wymusza opis odcinek po odcinku w kolejności punktów, z faktami weryfikowanymi w Google per POI (bilety, godziny schronisk, utrudnienia).
+* **Plik**: `apps/route-builder-api/src/services/report.ts`.
+
+## 📅 Poprzednia aktualizacja: 25 Maja 2026
 
 ### 🚀 Najnowsze wdrożenia & Poprawki krytyczne (25 Maja 2026 - Sesja 2)
 
