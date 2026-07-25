@@ -11,8 +11,49 @@ import { gpxParserService } from './services/gpx-parser.js';
 
 import { authMiddleware } from './middleware/auth.js';
 import { poiService, PoiCandidate } from './services/poi.js';
+import { routeValidatorService } from './services/route-validator.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
+
+/**
+ * Jednorazowa korekta doboru waypointów, gdy szacowany dystans rażąco odbiega od celu.
+ * Gemini w trybie JSON (bez wyszukiwarki) dostaje obecną listę, szacunek i cel oraz
+ * listę zweryfikowanych kandydatów OSM do dodania/wymiany.
+ */
+async function correctWaypointSelection(
+  apiKey: string,
+  currentNames: string[],
+  estimatedKm: number,
+  targetKm: number,
+  candidates: { name: string; kind: string; score: number }[],
+  routeType: string
+): Promise<string[] | null> {
+  const direction = estimatedKm > targetKm ? 'ZA DŁUGA — usuń najbardziej oddalone punkty' : 'ZA KRÓTKA — dodaj punkty ze listy kandydatów';
+  const prompt = `Trasa (${routeType}) przez punkty:
+${currentNames.map((n, i) => `${i + 1}. ${n}`).join('\n')}
+ma szacunkowo ${estimatedKm.toFixed(0)} km, a użytkownik chce ${targetKm} km. Trasa jest ${direction}.
+
+Dostępne zweryfikowane punkty w okolicy (używaj DOKŁADNIE tych nazw):
+${candidates.slice(0, 40).map((c) => `- "${c.name}" (${c.kind})`).join('\n')}
+
+Zwróć poprawioną listę punktów trasy (zachowaj pierwszy i ostatni punkt bez zmian, zachowaj logiczną kolejność geograficzną).
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json' }
+    })
+  });
+  if (!response.ok) throw new Error(`Gemini correction error ${response.status}`);
+  const data = await response.json() as any;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return null;
+  const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+  return Array.isArray(parsed.waypoints) ? parsed.waypoints : null;
+}
 
 // Healthcheck
 app.get('/health', (c) => {
@@ -396,7 +437,67 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
             failed_waypoints.push(placeName);
           }
         }
-        resultObj.suggested_waypoints = suggested_waypoints;
+        // Walidacja 1: odrzuć punkty absurdalnie oddalone od startu (pomyłki geokodera)
+        const routeTypeForValidation = resultObj.extracted?.route_type || (vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking'));
+        let finalWaypoints = suggested_waypoints;
+        if (suggested_waypoints.length > 1) {
+          const { kept, dropped } = routeValidatorService.filterOutliers(
+            suggested_waypoints[0],
+            suggested_waypoints,
+            routeTypeForValidation
+          );
+          if (dropped.length > 0) {
+            console.warn('[chat-interview] Dropped outlier waypoints:', dropped.map((d: any) => d.name));
+            failed_waypoints.push(...dropped.map((d: any) => `${d.name} (znaleziono w złym regionie)`));
+            finalWaypoints = kept;
+          }
+        }
+
+        // Walidacja 2: szacowany dystans łańcucha punktów vs cel — przy rażącej
+        // rozbieżności jedna automatyczna korekta doboru punktów przez Gemini
+        const targetKm = Number(resultObj.extracted?.distance) || null;
+        if (targetKm && finalWaypoints.length >= 3) {
+          const estimatedKm = routeValidatorService.estimateChainKm(finalWaypoints, routeTypeForValidation);
+          const deviation = Math.abs(estimatedKm - targetKm) / targetKm;
+          if (deviation > 0.6 && poiCandidates.length > 0) {
+            console.warn(`[chat-interview] Distance mismatch: estimated ${estimatedKm.toFixed(1)} km vs target ${targetKm} km. Requesting correction...`);
+            try {
+              const corrected = await correctWaypointSelection(
+                GEMINI_API_KEY, finalWaypoints.map((w: any) => w.name), estimatedKm, targetKm, poiCandidates, routeTypeForValidation
+              );
+              if (corrected && corrected.length >= 2) {
+                const rebuilt: any[] = [];
+                for (const name of corrected) {
+                  const matched = poiService.matchCandidate(name, poiCandidates);
+                  if (matched) {
+                    rebuilt.push({ lat: matched.lat, lng: matched.lng, name });
+                    continue;
+                  }
+                  const prev = finalWaypoints.find((w: any) => w.name === name);
+                  if (prev) {
+                    rebuilt.push(prev);
+                    continue;
+                  }
+                  try {
+                    const place = await geocodingService.geocodeSinglePoint(name, biasPoint);
+                    if (place) rebuilt.push({ lat: place.lat, lng: place.lng, name });
+                  } catch { /* pomijamy niegeokodowalne punkty korekty */ }
+                }
+                if (rebuilt.length >= 2) {
+                  const newEstimate = routeValidatorService.estimateChainKm(rebuilt, routeTypeForValidation);
+                  if (Math.abs(newEstimate - targetKm) < Math.abs(estimatedKm - targetKm)) {
+                    console.log(`[chat-interview] Correction accepted: ${newEstimate.toFixed(1)} km (was ${estimatedKm.toFixed(1)} km)`);
+                    finalWaypoints = rebuilt;
+                  }
+                }
+              }
+            } catch (corrErr) {
+              console.warn('[chat-interview] Waypoint correction failed, keeping original:', corrErr);
+            }
+          }
+        }
+
+        resultObj.suggested_waypoints = finalWaypoints;
         if (failed_waypoints.length > 0) {
           // Nie gubimy punktów po cichu — informujemy użytkownika, których miejsc nie udało się zlokalizować
           resultObj.failed_waypoints = failed_waypoints;
@@ -829,7 +930,7 @@ app.get('/route-projects/:id/jobs/:jobId', async (c) => {
 // Fast endpoint for live routing on the interactive map
 app.post('/live-route', async (c) => {
   try {
-    const { points, route_type, surface_preferences, intent } = await c.req.json();
+    const { points, route_type, surface_preferences, intent, distance_target_km } = await c.req.json();
     if (!points || points.length < 2) {
       return c.json({ error: 'At least 2 points required' }, 400);
     }
@@ -847,7 +948,21 @@ app.post('/live-route', async (c) => {
       surfacePreferences: surface_preferences || []
     });
 
-    return c.json(route);
+    // Walidacja: czy ślad faktycznie przechodzi przy zadanych punktach, czy pętla domknięta
+    const isLoop = points.length > 2 &&
+      Math.abs(points[0].lat - points[points.length - 1].lat) < 1e-6 &&
+      Math.abs(points[0].lng - points[points.length - 1].lng) < 1e-6;
+    const validation = routeValidatorService.validate(route.trackPoints, places, {
+      routeType: route_type || 'hiking',
+      distanceTargetKm: distance_target_km || null,
+      actualDistanceKm: route.distance_km,
+      isLoop
+    });
+    if (!validation.ok) {
+      console.warn('[LiveRoute] Validation warnings:', validation.warnings);
+    }
+
+    return c.json({ ...route, validation });
   } catch (err: any) {
     console.error('[LiveRoute] Error:', err);
     return c.json({ error: err.message }, 500);

@@ -89,8 +89,14 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         }
 
         let finalGpx = generateGpxString(data.trackPoints, context.title || 'Nowa Trasa');
-        
-        toast.success("Trasa przeliczona!");
+
+        if (data.validation?.warnings?.length) {
+          for (const warning of data.validation.warnings) {
+            toast.warning(warning, { duration: 8000 });
+          }
+        } else {
+          toast.success("Trasa przeliczona!");
+        }
         
         return {
           geometry: data.geometry,
