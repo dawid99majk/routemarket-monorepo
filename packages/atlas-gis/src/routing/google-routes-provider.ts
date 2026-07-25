@@ -15,7 +15,7 @@ export class GoogleRoutesRoutingProvider implements RoutingProvider {
     this.motorcycleTravelMode = options.motorcycleTravelMode || (process.env.GOOGLE_ROUTES_MOTORCYCLE_MODE === 'TWO_WHEELER' ? 'TWO_WHEELER' : 'DRIVE');
   }
 
-  async getRoute(waypoints: Waypoint[], profile: RoutingProfile): Promise<RoutingResult> {
+  async getRoute(waypoints: Waypoint[], profile: RoutingProfile, options: { avoidHighways?: boolean } = {}): Promise<RoutingResult> {
     if (!this.apiKey) {
       throw new Error('GOOGLE_MAPS_API_KEY is missing.');
     }
@@ -37,6 +37,10 @@ export class GoogleRoutesRoutingProvider implements RoutingProvider {
       polylineQuality: 'HIGH_QUALITY',
       intermediates: normalized.slice(1, -1).map(toRouteLocation)
     };
+
+    if (options.avoidHighways) {
+      body.routeModifiers = { avoidHighways: true };
+    }
 
     const response = await fetch(this.baseUrl, {
       method: 'POST',

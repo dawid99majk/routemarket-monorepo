@@ -1,4 +1,5 @@
 import { waypointEnrichmentService } from './waypoint-enrichment.js';
+import { poiService } from './poi.js';
 
 export interface GeocodedPlace {
   name: string;
@@ -47,23 +48,50 @@ export class GeocodingService {
           places.push(endPlace);
         }
       } else if (options.loop) {
-        if (options.intent || (options.keyWaypoints && options.keyWaypoints.length > 0)) {
+        if (options.keyWaypoints && options.keyWaypoints.length > 0) {
           const enriched = await waypointEnrichmentService.enrichWaypoints(
-            startPlace, startPlace, 
+            startPlace, startPlace,
             options.intent || '', options.routeType || 'hiking', options.distanceTargetKm || 0, options.keyWaypoints
           );
-          places.push(...enriched.slice(1)); 
+          places.push(...enriched.slice(1));
         } else {
-          const targetOffset = options.distanceTargetKm ? options.distanceTargetKm / 314 : 0.015;
-          places.push({
-            name: `${startPlace.name} - punkt kontrolny pętli (${options.distanceTargetKm || '?'} km)`,
-            lat: startPlace.lat + targetOffset,
-            lng: startPlace.lng + targetOffset,
-            confidence: 0.85,
-            source: 'ai_suggested_loop',
-            provider: startPlace.provider
-          });
-          places.push(startPlace);
+          // Brak konkretnych punktów: zamiast sztucznego "punktu kontrolnego" pobieramy
+          // realne atrakcje z OSM wokół startu i budujemy pętlę przez najpopularniejsze z nich.
+          const routeType = options.routeType || 'hiking';
+          const radiusKm = options.distanceTargetKm ? Math.max(3, options.distanceTargetKm / 4) : undefined;
+          const pois = await poiService.fetchCandidates(
+            { lat: startPlace.lat, lng: startPlace.lng },
+            routeType,
+            radiusKm ? { radiusKm, limit: 12 } : { limit: 12 }
+          );
+          if (pois.length > 0) {
+            const topPois: GeocodedPlace[] = pois.slice(0, 6).map((p) => ({
+              name: p.name,
+              lat: p.lat,
+              lng: p.lng,
+              confidence: 0.95,
+              source: 'osm_poi',
+              provider: 'overpass'
+            }));
+            const ordered = await waypointEnrichmentService.enrichWaypoints(
+              startPlace, startPlace,
+              options.intent || '', routeType, options.distanceTargetKm || 0,
+              undefined, topPois
+            );
+            places.push(...ordered.slice(1));
+          } else {
+            // Ostateczny fallback bez POI: minimalna pętla przez punkt oddalony o ~1/4 dystansu
+            const targetOffset = options.distanceTargetKm ? options.distanceTargetKm / 314 : 0.015;
+            places.push({
+              name: `${startPlace.name} - punkt kontrolny pętli (${options.distanceTargetKm || '?'} km)`,
+              lat: startPlace.lat + targetOffset,
+              lng: startPlace.lng + targetOffset,
+              confidence: 0.85,
+              source: 'ai_suggested_loop',
+              provider: startPlace.provider
+            });
+            places.push(startPlace);
+          }
         }
       }
     }

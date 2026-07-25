@@ -20,9 +20,16 @@ export class WaypointEnrichmentService {
     intent: string,
     routeType: string,
     distanceKm: number,
-    keyWaypoints?: string[]
+    keyWaypoints?: string[],
+    preGeocoded?: GeocodedPlace[]
   ): Promise<GeocodedPlace[]> {
-    
+
+    // 0. Punkty z gotowymi współrzędnymi (np. POI z OSM) → tylko optymalizacja kolejności
+    if (preGeocoded && preGeocoded.length > 0) {
+      const orderedPre = this.orderWaypoints(startPoint, preGeocoded, endPoint || startPoint);
+      return [startPoint, ...orderedPre, endPoint].filter((p): p is GeocodedPlace => p !== null);
+    }
+
     // 1. Jeśli AI interview dostarczył key_waypoints → geokoduj je
     if (keyWaypoints && keyWaypoints.length > 0) {
       // Ogranicz do 15 punktów ze względu na rozsądny limit zapytań do geokodera (ORS pozwala na 50 punktów)
@@ -36,31 +43,81 @@ export class WaypointEnrichmentService {
       );
       
       const validWaypoints = geocoded.filter((p): p is GeocodedPlace => p !== null);
-      
-      // 2. Optymalizacja przestrzenna (Nearest Neighbor), aby uniknąć plątaniny (tzw. problem komiwojażera)
-      const unvisited = [...validWaypoints];
-      const optimized: GeocodedPlace[] = [];
-      let current = startPoint;
-      
-      while (unvisited.length > 0) {
-        let nearestIdx = 0;
-        let minDistance = Infinity;
-        for (let i = 0; i < unvisited.length; i++) {
-          const dist = getDistance(current.lat, current.lng, unvisited[i].lat, unvisited[i].lng);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestIdx = i;
+
+      const ordered = this.orderWaypoints(startPoint, validWaypoints, endPoint || startPoint);
+
+      return [startPoint, ...ordered, endPoint].filter((p): p is GeocodedPlace => p !== null);
+    }
+
+    return [startPoint, endPoint].filter((p): p is GeocodedPlace => p !== null);
+  }
+
+  /**
+   * Optymalizacja kolejności: Nearest Neighbor + poprawka 2-opt.
+   * Sam NN psuje pętle (wraca tą samą doliną); 2-opt usuwa przecięcia trasy.
+   */
+  private orderWaypoints(startPoint: GeocodedPlace, points: GeocodedPlace[], endPoint: GeocodedPlace): GeocodedPlace[] {
+    const unvisited = [...points];
+    const optimized: GeocodedPlace[] = [];
+    let current = startPoint;
+
+    while (unvisited.length > 0) {
+      let nearestIdx = 0;
+      let minDistance = Infinity;
+      for (let i = 0; i < unvisited.length; i++) {
+        const dist = getDistance(current.lat, current.lng, unvisited[i].lat, unvisited[i].lng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestIdx = i;
+        }
+      }
+      current = unvisited[nearestIdx];
+      optimized.push(current);
+      unvisited.splice(nearestIdx, 1);
+    }
+
+    return this.twoOptImprove(startPoint, optimized, endPoint);
+  }
+
+  /**
+   * Klasyczna poprawka 2-opt: odwraca segmenty trasy dopóki zmniejsza to jej łączną
+   * długość — eliminuje przecięcia ("pajęczyny") zostawione przez Nearest Neighbor.
+   * Start i meta pozostają nieruchome.
+   */
+  private twoOptImprove(start: GeocodedPlace, middle: GeocodedPlace[], end: GeocodedPlace): GeocodedPlace[] {
+    if (middle.length < 3) return middle;
+    const route = [start, ...middle, end];
+    let improvement = true;
+    let guard = 0;
+
+    while (improvement && guard < 50) {
+      improvement = false;
+      guard += 1;
+      for (let i = 1; i < route.length - 2; i++) {
+        for (let j = i + 1; j < route.length - 1; j++) {
+          const before =
+            getDistance(route[i - 1].lat, route[i - 1].lng, route[i].lat, route[i].lng) +
+            getDistance(route[j].lat, route[j].lng, route[j + 1].lat, route[j + 1].lng);
+          const after =
+            getDistance(route[i - 1].lat, route[i - 1].lng, route[j].lat, route[j].lng) +
+            getDistance(route[i].lat, route[i].lng, route[j + 1].lat, route[j + 1].lng);
+          if (after < before - 0.01) {
+            // Odwróć segment i..j
+            let left = i;
+            let right = j;
+            while (left < right) {
+              const tmp = route[left];
+              route[left] = route[right];
+              route[right] = tmp;
+              left += 1;
+              right -= 1;
+            }
+            improvement = true;
           }
         }
-        current = unvisited[nearestIdx];
-        optimized.push(current);
-        unvisited.splice(nearestIdx, 1);
       }
-      
-      return [startPoint, ...optimized, endPoint].filter((p): p is GeocodedPlace => p !== null);
     }
-    
-    return [startPoint, endPoint].filter((p): p is GeocodedPlace => p !== null);
+    return route.slice(1, -1);
   }
 }
 

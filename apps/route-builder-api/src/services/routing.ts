@@ -1,5 +1,6 @@
 import { GeocodedPlace } from './geocoding.js';
 import { GraphHopperRoutingProvider, GoogleRoutesRoutingProvider, RoutingProfile } from '@routemarket/atlas-gis';
+import { brouterProvider } from './brouter-provider.js';
 
 export interface RouteResult {
   distance_km: number;
@@ -44,10 +45,13 @@ export class RoutingService {
     };
     const profile = profileMap[routeType] || 'bike';
 
-    // PRIMARY: Google Maps for car and motorcycle
+    // PRIMARY: Google Maps for car and motorcycle.
+    // Motocykl: unikamy autostrad/ekspresówek — motocyklista chce krętych, malowniczych dróg.
     if (routeType === 'car' || routeType === 'motorcycle') {
       try {
-        const result = await this.googleProvider.getRoute(optimizedPlaces, profile);
+        const result = await this.googleProvider.getRoute(optimizedPlaces, profile, {
+          avoidHighways: routeType === 'motorcycle'
+        });
         return {
           distance_km: result.distanceKm,
           duration_h: result.estimatedTimeH,
@@ -60,10 +64,27 @@ export class RoutingService {
       }
     }
 
-    // GraphHopper for all non-motorized (hiking, gravel, cycling) and fallback for motorized
+    // PRIMARY dla tras niemotorowych: BRouter — profile pod szlaki piesze/rowerowe
+    // i brak limitu punktów pośrednich (GraphHopper free tier tnie trasę na kawałki po 5).
+    if (brouterProvider.supportsRouteType(routeType)) {
+      try {
+        const result = await brouterProvider.getRoute(optimizedPlaces, routeType);
+        return {
+          distance_km: result.distanceKm,
+          duration_h: result.estimatedTimeH,
+          trackPoints: result.points.map(p => [p.lat, p.lng, p.ele || 0]),
+          geometry: result.geometryGeoJson,
+          waypoints: optimizedPlaces
+        };
+      } catch (err: any) {
+        console.warn(`[Routing] BRouter failed, trying GraphHopper: ${err.message}`);
+      }
+    }
+
+    // GraphHopper as universal fallback
     try {
       const result = await this.ghProvider.getRoute(optimizedPlaces, profile);
-      
+
       return {
         distance_km: result.distanceKm,
         duration_h: result.estimatedTimeH,

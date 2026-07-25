@@ -110,7 +110,10 @@ async function buildGeneratedProject(job: RouteBuilderJob, project: RouteProject
 
   const places = await geocodingService.geocodePoints(reqs.start_point || '', reqs.end_point, {
     loop: reqs.loop,
-    distanceTargetKm: reqs.distance_target_km
+    distanceTargetKm: reqs.distance_target_km,
+    intent: reqs.input_notes || '',
+    routeType: reqs.route_type,
+    keyWaypoints: reqs.key_waypoints
   });
 
   await repo.updateJobState(job.id, {
