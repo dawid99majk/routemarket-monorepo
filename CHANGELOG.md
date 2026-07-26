@@ -4,7 +4,7 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
 
 ---
 
-## 📅 Ostatnia aktualizacja: 26 Lipca 2026
+## 📅 Ostatnia aktualizacja: 26 Lipca 2026 (sesja 2)
 
 ### 🚀 Przebudowa jakości generowania tras (25 Lipca 2026)
 
@@ -38,6 +38,21 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
   7. **Szosa ma własne kategorie POI** (przełęcze drogowe, zamki, miasteczka, zapory) zamiast szczytów i sztolni osiągalnych tylko pieszo.
 * **Efekt (test: pętla szosowa 90 km ze Zlatých Hor)**: 13 punktów, 0 zgubionych, korekta 157 km → 110 km, walidacja OK.
 * **Pliki**: `apps/route-builder-api/src/index.ts`, `services/poi.ts`, `services/geocoding.ts`, `packages/atlas-workflow/src/wizard-machine.ts`, `apps/frontend/src/hooks/use-wizard-machine.ts`.
+---
+
+#### 25. Agent-doradca zamiast ankiety: wywiad fazowy z kartami wyboru (26 Lipca 2026) [BACKEND + FRONTEND]
+* **Problem**: Agent zbierał parametry techniczne (start, dystans, trudność, pętla/liniowa) i generował. Użytkownik znający teren jakoś sobie radził, ale ktoś lecący np. do Tirany nie wie nawet, o co pytać. Trasa piesza 2-dniowa ze Szklarskiej Poręby wychodziła jako krążenie po okolicy zamiast klasyka Szklarska → Śnieżka → powrót pod reglami.
+* **Rozwiązanie — rozmowa w fazach, każda z klikalnymi kartami wyboru**:
+  1. `discovery` — agent najpierw robi rozeznanie (Google Search + POI z OSM) i otwiera konkretem, a potem zadaje JEDNO pytanie rozstrzygające o strukturę wyjazdu: nocleg w bazie czy na trasie (pieszo), powrót do bazy czy w jedną stronę (pojazdy). To pytanie przesądza geometrię trasy, więc musi paść przed doborem punktów.
+  2. `variant_choice` — 2-4 NAZWANE warianty z twardymi liczbami (dystans dzienny, przewyższenia, trudność), opisem charakteru i listą konkretnych punktów. Minimum dwa; przy wyjeździe wielodniowym co najmniej jeden musi prowadzić do głównego obiektu pasma.
+  3. `refine` — dopytania istotne dla wybranego wariantu (które schronisko, czy zahaczyć o sąsiedni kraj).
+  4. `confirm` — podsumowanie planu do zatwierdzenia.
+  Wpisanie „generuj" w dowolnym momencie pomija fazy (tryb dla znających teren).
+* **Kontrakt**: `/chat-interview` zwraca `phase`, `options[]` (id, title, subtitle, description, highlights, implies) oraz `allow_custom`. Kliknięcie karty wnosi jej `implies` do `trip_profile` (structure, region, difficulty, pattern), który wraca w kolejnych zapytaniach jako USTALENIA — agent nie pyta o to samo dwa razy, a backend dostaje twarde parametry zamiast wyciągać je z prozy.
+* **Frontend**: nowy `RouteOptionCards.tsx` renderuje karty pod wiadomością agenta; karty ze starszych wiadomości są wygaszone. `WizardContext` dostał `tripProfile`, `ChatMessage` dostał `options`/`allowCustom`.
+* **Wędrówki wielodniowe**: przestały być modelowane jako pierścień wokół startu. Przy noclegu na trasie punkt zwrotny leży ok. D/2, przy noclegu w bazie liczy się pojedynczy dzień (D/dni/2π). Dzienne dystanse podniesione do 15/20/25 km; podane dni bez trudności zakładają tempo umiarkowane zamiast spadać do ciasnego promienia domyślnego. Efekt: 2 dni ze Szklarskiej Poręby sięgają Śnieżki (18 km), wcześniej promień wynosił 8 km.
+* **Usunięto drugą turę Gemini**: etap 1 zwraca już poprawny JSON, a tura „konwertująca" podwajała czas odpowiedzi, gubiła punkty trasy i przy kartach wyboru wpadła w pętlę generowania (138 tys. znaków uciętych w połowie = zerwana rozmowa). Zostaje jako fallback z limitem tokenów. Czas odpowiedzi: 4m33s → ok. 1m.
+* **Pliki**: `apps/route-builder-api/src/index.ts`, `packages/atlas-workflow/src/wizard-machine.ts`, `apps/frontend/src/hooks/use-wizard-machine.ts`, `apps/frontend/src/pages/v2/RouteBuilderV2.tsx`, `apps/frontend/src/pages/v2/components/RouteOptionCards.tsx`.
 ---
 
 ## 📅 Poprzednia aktualizacja: 25 Maja 2026
