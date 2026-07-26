@@ -76,6 +76,7 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 
 import { ElevationProfile } from '@/components/ElevationProfile';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
+import RouteOptionCards from '@/pages/v2/components/RouteOptionCards';
 
 const areWaypointsGeometricallyEqual = (a: any[], b: any[]) => {
   if (!a || !b || a.length !== b.length) return false;
@@ -86,7 +87,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { state, context, send, setField } = useWizardMachine(searchParams.get('projectId'));
+  const { state, context, send, setField, chooseOption } = useWizardMachine(searchParams.get('projectId'));
   
   const projectId = context.projectId;
   const chatMessages = context.chatMessages;
@@ -645,12 +646,22 @@ ${points}
               )}
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed shadow-sm ${
-                    msg.role === 'user' 
-                      ? 'bg-emerald-600 text-white rounded-br-sm' 
-                      : 'bg-white text-slate-800 rounded-bl-sm border border-slate-200/50'
-                  }`}>
-                    {msg.text.replace(/\s*\[[^\]]+\]/g, '')}
+                  <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'w-full'}`}>
+                    <div className={`rounded-2xl p-3 text-sm leading-relaxed shadow-sm ${
+                      msg.role === 'user'
+                        ? 'bg-emerald-600 text-white rounded-br-sm'
+                        : 'bg-white text-slate-800 rounded-bl-sm border border-slate-200/50'
+                    }`}>
+                      {msg.text.replace(/\s*\[[^\]]+\]/g, '')}
+                    </div>
+                    {msg.options && msg.options.length > 0 && (
+                      <RouteOptionCards
+                        options={msg.options}
+                        allowCustom={msg.allowCustom}
+                        disabled={i !== chatMessages.length - 1 || isTyping}
+                        onChoose={chooseOption}
+                      />
+                    )}
                   </div>
                 </div>
               ))}

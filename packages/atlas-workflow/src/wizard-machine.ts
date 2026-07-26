@@ -1,8 +1,20 @@
 import { setup, assign, fromPromise } from 'xstate';
 
+export interface RouteOption {
+  id: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  highlights?: string[];
+  /** Ustalenia, które wybór tej karty wnosi do profilu wyjazdu (np. structure, region). */
+  implies?: Record<string, any>;
+}
+
 export interface ChatMessage {
   role: 'agent' | 'user';
   text: string;
+  options?: RouteOption[];
+  allowCustom?: boolean;
 }
 
 export interface Waypoint {
@@ -28,6 +40,8 @@ export interface WizardContext {
   guideText: string | null;
   routingPreference: 'popular' | 'wild';
   distanceTargetKm: number | null;
+  /** Decyzje podjęte kliknięciem kart wyboru — sterują geometrią generowanej trasy. */
+  tripProfile: Record<string, any>;
 
   // Stats
   routeStats: {
@@ -73,6 +87,7 @@ export const initialWizardContext: WizardContext = {
   guideText: null,
   routingPreference: 'popular',
   distanceTargetKm: null,
+  tripProfile: {},
   routeStats: { distance: 0, ascent: 0, descent: 0 },
 
   title: 'Nowa Trasa AI',
@@ -130,9 +145,14 @@ export const wizardMachine = setup({
     appendAgentResponse: assign({
       chatMessages: ({ context, event }) => {
         // @ts-ignore
-        if (event.output && event.output.message) {
-           // @ts-ignore
-           return [...context.chatMessages, { role: 'agent' as const, text: event.output.message }];
+        const output = event.output;
+        if (output && output.message) {
+          const message: ChatMessage = { role: 'agent', text: output.message };
+          if (Array.isArray(output.options) && output.options.length > 0) {
+            message.options = output.options;
+            message.allowCustom = output.allow_custom !== false;
+          }
+          return [...context.chatMessages, message];
         }
         return context.chatMessages;
       }

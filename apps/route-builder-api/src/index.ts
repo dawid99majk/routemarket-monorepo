@@ -15,6 +15,57 @@ import { routeValidatorService } from './services/route-validator.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
+/** Kształt odpowiedzi agenta wywiadu, wymuszany na Gemini (OpenAPI subset). */
+const CHAT_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    done: { type: 'boolean' },
+    phase: { type: 'string', enum: ['discovery', 'variant_choice', 'refine', 'confirm', 'generate'] },
+    reply: { type: 'string' },
+    allow_custom: { type: 'boolean' },
+    options: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          subtitle: { type: 'string' },
+          description: { type: 'string' },
+          highlights: { type: 'array', items: { type: 'string' } },
+          implies: {
+            type: 'object',
+            properties: {
+              structure: { type: 'string' },
+              region: { type: 'string' },
+              difficulty: { type: 'string' },
+              pattern: { type: 'string' },
+              accommodation: { type: 'string' },
+              variant: { type: 'string' }
+            }
+          }
+        },
+        required: ['id', 'title']
+      }
+    },
+    add_waypoints: { type: 'array', items: { type: 'string' } },
+    extracted: {
+      type: 'object',
+      properties: {
+        start_point: { type: 'string' },
+        end_point: { type: 'string' },
+        route_type: { type: 'string' },
+        distance: { type: 'string' },
+        days: { type: 'integer' },
+        intent: { type: 'string' },
+        loop: { type: 'boolean' },
+        key_waypoints: { type: 'array', items: { type: 'string' } }
+      }
+    }
+  },
+  required: ['done', 'reply']
+};
+
 /**
  * Wyciąga z rozmowy miejsce startu i docelowy dystans, gdy użytkownik nie postawił
  * pinezki na mapie. Bez tego nie znamy centrum obszaru i warstwa POI nie ma jak zadziałać.
@@ -23,14 +74,15 @@ async function extractLocationFromConversation(
   apiKey: string,
   conversationText: string,
   inputNotes?: string
-): Promise<{ startPlace: string | null; distanceKm: number | null; isLoop: boolean }> {
+): Promise<{ startPlace: string | null; distanceKm: number | null; isLoop: boolean; days: number | null }> {
   const prompt = `Z poniższej rozmowy o planowaniu trasy wyciągnij:
 1. "start_place" — nazwę miejscowości startu w formie NADAJĄCEJ SIĘ DO WYSZUKANIA NA MAPIE:
    - mianownik, oficjalna pisownia w języku kraju, w którym leży to miejsce (np. z "ze Złotych Hor i okolicy" → "Zlaté Hory", z "spod Zakopanego" → "Zakopane", z "w Krakowie" → "Kraków");
    - SAMA nazwa miejscowości — bez słów "okolice", "i okolicy", "rejon", bez przyimków i bez opisów;
    - jeśli w rozmowie nie padła żadna konkretna miejscowość, zwróć null.
-2. "distance_km" — docelowy dystans trasy w km jako liczbę (dla tras wielodniowych pieszych oszacuj sumarycznie). Jeśli nie padł, zwróć null.
+2. "distance_km" — docelowy dystans trasy w km jako liczbę. Dla wędrówek pieszych określonych w dniach przelicz: lekki 15 km/dzień, umiarkowany 20 km/dzień, wymagający 25 km/dzień. Jeśli padła liczba dni, ale nie padła trudność — przyjmij umiarkowaną (20 km/dzień). Zwróć null tylko wtedy, gdy nie padł ani dystans, ani liczba dni.
 3. "is_loop" — true jeśli trasa ma być pętlą (powrót do startu), false jeśli liniowa. Domyślnie true.
+4. "days" — liczba dni wędrówki, jeśli padła w rozmowie (np. "2 dni" → 2). Jeśli nie padła, zwróć null.
 
 Rozmowa:
 """
@@ -38,7 +90,7 @@ ${conversationText.slice(0, 6000)}
 """
 ${inputNotes ? `Notatki użytkownika: "${inputNotes.slice(0, 2000)}"` : ''}
 
-Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "is_loop": true}`;
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "is_loop": true, "days": null}`;
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -51,12 +103,13 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "
   if (!response.ok) throw new Error(`Gemini location extraction error ${response.status}`);
   const data = await response.json() as any;
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) return { startPlace: null, distanceKm: null, isLoop: true };
+  if (!text) return { startPlace: null, distanceKm: null, isLoop: true, days: null };
   const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
   return {
     startPlace: parsed.start_place || null,
     distanceKm: Number(parsed.distance_km) || null,
-    isLoop: parsed.is_loop !== false
+    isLoop: parsed.is_loop !== false,
+    days: Number(parsed.days) || null
   };
 }
 
@@ -65,11 +118,37 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "
  * więc szukanie atrakcji dalej niż ~D/5 od startu z założenia produkuje trasę
  * dłuższą, niż użytkownik zamówił.
  */
-function poiRadiusForRoute(distanceKm: number | null, isLoop: boolean): number | undefined {
-  if (!distanceKm) return undefined;
-  // Pętla o obwodzie D to okrąg o promieniu D/(2π). Dzielenie przez mniejszą liczbę
-  // dawało pierścień o obwodzie większym niż zamówiony dystans.
-  const raw = isLoop ? distanceKm / (2 * Math.PI) : distanceKm / 2.2;
+function poiRadiusForRoute(
+  distanceKm: number | null,
+  isLoop: boolean,
+  days?: number | null,
+  structure?: string
+): number | undefined {
+  const dayCount = days ?? 1;
+  // Gdy padła liczba dni, ale nie trudność, dystans bywa nieustalony — zamiast
+  // spadać do ciasnego domyślnego promienia przyjmujemy umiarkowane tempo,
+  // inaczej główny szczyt pasma wypada poza obszar szukania.
+  const effectiveDistanceKm = distanceKm ?? (dayCount >= 2 ? dayCount * 20 : null);
+  if (!effectiveDistanceKm) return undefined;
+  distanceKm = effectiveDistanceKm;
+
+  // "radial" = nocleg w bazie, czyli kilka niezależnych jednodniowych pętli —
+  // zasięg wyznacza pojedynczy dzień, nie suma wyjazdu.
+  if (structure === 'radial' && dayCount >= 2) {
+    return Math.min(150, Math.max(6, Math.round(distanceKm / dayCount / (2 * Math.PI))));
+  }
+
+  // Wędrówka wielodniowa z noclegiem na trasie nie jest okręgiem wokół startu —
+  // turysta idzie do celu i wraca inną drogą, więc punkt zwrotny leży ok. D/2.5
+  // od startu. Traktowanie jej jak pętli (D/2π) zawężało obszar tak, że główny
+  // szczyt pasma wypadał poza zasięg (Śnieżka 22 km od Szklarskiej Poręby przy
+  // promieniu 8 km).
+  const isMultiDay = dayCount >= 2 || structure === 'traverse';
+  const raw = isMultiDay
+    ? distanceKm / 2
+    : isLoop
+      ? distanceKm / (2 * Math.PI)
+      : distanceKm / 2.2;
   return Math.min(150, Math.max(6, Math.round(raw)));
 }
 
@@ -190,14 +269,15 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype, routing_preference } = await c.req.json() as { 
+    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype, routing_preference, trip_profile } = await c.req.json() as { 
       messages: {role: string, text: string}[], 
       project_id?: string, 
       input_notes?: string,
       current_waypoints?: {lat: number, lng: number}[],
       vehicle_type?: string,
       bike_subtype?: string,
-      routing_preference?: string
+      routing_preference?: string,
+      trip_profile?: Record<string, any>
     };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
@@ -223,6 +303,31 @@ app.post('/chat-interview', async (c) => {
     if (routing_preference) {
       const prefText = routing_preference === 'popular' ? 'KLASYKI REGIONU (wybieraj najbardziej znane, turystyczne, popularne i sprawdzone punkty)' : 'POZA UTARTYM SZLAKIEM (szukaj ukrytych perełek, unikaj tłumów, wybieraj boczne dróżki i dzikie zakątki)';
       projectContext += `\n\n[PREFERENCJA TRASY] Użytkownik wybrał styl: **${prefText}**. Dopasuj do tego swoje rekomendacje!`;
+    }
+
+    // Decyzje podjęte przez kliknięcie kart w poprzednich fazach — to ustalenia,
+    // nie sugestie; agent nie ma o nie pytać drugi raz.
+    if (trip_profile && Object.keys(trip_profile).length > 0) {
+      const labels: Record<string, string> = {
+        structure: 'Struktura wyjazdu',
+        region: 'Wybrany rejon',
+        difficulty: 'Trudność',
+        pattern: 'Wzorzec trasy',
+        accommodation: 'Nocleg',
+        variant: 'Wybrany wariant'
+      };
+      const decided = Object.entries(trip_profile)
+        .filter(([, v]) => v !== null && v !== undefined && v !== '')
+        .map(([k, v]) => `- ${labels[k] || k}: **${v}**`)
+        .join('\n');
+      if (decided) {
+        projectContext += `\n\n=== USTALENIA Z POPRZEDNICH FAZ (użytkownik już to wybrał — NIE PYTAJ PONOWNIE) ===\n${decided}`;
+        if (trip_profile.structure === 'radial') {
+          projectContext += `\nStruktura "radial" oznacza nocleg w bazie: zaplanuj kilka niezależnych jednodniowych pętli startujących i kończących się w miejscowości bazowej. Punkty trzymaj blisko bazy.`;
+        } else if (trip_profile.structure === 'traverse') {
+          projectContext += `\nStruktura "traverse" oznacza nocleg na trasie: zaplanuj JEDNĄ ciągłą trasę z dalekim punktem zwrotnym (główny cel pasma) i noclegiem w schronisku ok. półmetka. Powrót inną drogą niż dojście.`;
+        }
+      }
     }
 
     if (input_notes) {
@@ -268,12 +373,14 @@ app.post('/chat-interview', async (c) => {
         : null;
     let conversationDistanceKm: number | null = null;
     let conversationIsLoop = true;
+    let conversationDays: number | null = null;
 
     if (messages.length > 0) {
       try {
         const extracted = await extractLocationFromConversation(GEMINI_API_KEY, conversationText, input_notes);
         conversationDistanceKm = extracted.distanceKm;
         conversationIsLoop = extracted.isLoop;
+        conversationDays = extracted.days;
         if (!poiCenter && extracted.startPlace) {
           const startPlace = await geocodingService.geocodeSettlement(extracted.startPlace);
           poiCenter = { lat: startPlace.lat, lng: startPlace.lng };
@@ -284,7 +391,7 @@ app.post('/chat-interview', async (c) => {
       }
     }
 
-    const poiRadiusKm = poiRadiusForRoute(conversationDistanceKm, conversationIsLoop);
+    const poiRadiusKm = poiRadiusForRoute(conversationDistanceKm, conversationIsLoop, conversationDays, trip_profile?.structure);
     if (poiCenter) {
       try {
         poiCandidates = await poiService.fetchCandidates(
@@ -301,8 +408,13 @@ app.post('/chat-interview', async (c) => {
       projectContext += poiService.buildPromptSection(poiCandidates, routing_preference);
       if (conversationDistanceKm && poiRadiusKm) {
         projectContext += `\n\n=== BUDŻET GEOGRAFICZNY (twarde ograniczenie) ===
-Trasa ma mieć ok. ${conversationDistanceKm} km${conversationIsLoop ? ' i być PĘTLĄ' : ''}. Przy każdej atrakcji podana jest jej odległość od startu w linii prostej.
-${conversationIsLoop
+Trasa ma mieć ok. ${conversationDistanceKm} km${conversationDays && conversationDays >= 2 ? ` i zająć ${conversationDays} dni` : conversationIsLoop ? ' i być PĘTLĄ' : ''}. Przy każdej atrakcji podana jest jej odległość od startu w linii prostej.
+${conversationDays && conversationDays >= 2
+  ? `Wędrówka ${conversationDays}-dniowa — turysta ma DOJŚĆ DO CELU, nie krążyć wokół startu:
+- Główny cel (najważniejszy szczyt/obiekt pasma) powinien leżeć ok. ${poiRadiusKm} km od startu w linii prostej. Punkty w promieniu 2-3 km od startu to strata dnia — wybieraj je tylko jako początek i koniec trasy.
+- Ułóż punkty jako ciąg: start → kolejne punkty w stronę celu → NOCLEG (schronisko) ok. połowy trasy → cel → powrót INNĄ drogą do startu.
+- Suma odległości między kolejnymi punktami ma wynieść ok. ${conversationDistanceKm} km (${Math.round(conversationDistanceKm / conversationDays)} km na dzień).`
+  : conversationIsLoop
   ? `Dla pętli tej długości:
 - Najdalszy punkt może leżeć maksymalnie ok. ${poiRadiusKm} km od startu. Punkty położone dalej ROZSADZĄ dystans — nie wybieraj ich, nawet jeśli są klasykami.
 - Punkty rozłóż DOOKOŁA startu, w różnych kierunkach (np. część na północ, część na wschód, część na południe), tak aby tworzyły pierścień. Nie wybieraj 5 punktów po jednej stronie — powstanie wtedy trasa "tam i z powrotem", o połowę za krótka.
@@ -323,7 +435,7 @@ ${projectContext}
 === CO JUŻ WIEMY (z interfejsu, NIE pytaj o to!) ===
 ${knowStart ? '✅ PUNKT STARTOWY - znamy z pinezki na mapie' : '❌ Brak punktu startowego - zapytaj!'}
 ${knowVehicle ? `✅ POJAZD - ${vehicle_type}${(vehicle_type === 'hiking' || vehicle_type === 'city') ? '' : (bike_subtype ? ` (${bike_subtype})` : '')} - wybrane w interfejsie` : '❌ Brak pojazdu - zapytaj!'}
-${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '❌ Brak preferencji popularności - ZAPYTAJ O TO!'}
+${routing_preference ? `✅ POPULARNOŚĆ - wybrano: ${routing_preference}` : '⚠️ Brak preferencji popularności - NIE pytaj o to osobno; zamiast tego niech Twoje warianty w fazie "variant_choice" różnią się charakterem (klasyki vs miejsca na uboczu), a użytkownik wybierze kartą.'}
 
 === JAK ZACHOWAĆ SIĘ W ZALEŻNOŚCI OD POPULARNOŚCI (BARDZO WAŻNE!) ===
 Jeśli wybrano Klasyk ("popular"):
@@ -337,25 +449,57 @@ Jeśli wybrano Niszowa ("wild"):
 - Skup się na pokazaniu unikalnego charakteru poza głównym szlakiem.
 
 === CZEGO JESZCZE BRAKUJE ===
-MUSISZ ZEBRAĆ te informacje (jeśli nie padły w rozmowie):
+Te informacje są potrzebne do wygenerowania trasy. NIE odpytuj z nich po kolei jak z ankiety — wplataj je w fazy rozmowy opisane niżej, a większość ustal sam na podstawie wybranego wariantu:
 - Zależnie od POJAZDU:
-  a) Dla "hiking" (pieszo) lub "city" (spacer miejski): ZAPYTAJ O ILOŚĆ DNI i POZIOM TRUDNOŚCI (lekki, umiarkowany, wymagający). NIE PYTAJ o kilometry!
-  b) Dla rowerów/motocykli/aut: ZAPYTAJ O DYSTANS lub CZAS (np. "25km", "na 3 godziny").
-- PĘTLA czy LINIOWA? (Domyślnie proponuj pętlę).
-- PREFERENCJE terenu (jeśli to gravel/mtb, nie pytaj o to, bo wiemy).
-- POPULARNOŚĆ (Jeśli nie była wybrana - zawsze daj 2 opcje wyboru: "zaproponuj popularne trasy/klasyki regionu" albo "wybierz małouczęszczane miejsca z dala od tłumów").
+  a) Dla "hiking" (pieszo) lub "city" (spacer miejski): potrzebna ILOŚĆ DNI i POZIOM TRUDNOŚCI. Jeśli dni nie padły — zapytaj. Trudności NIE pytaj osobno: wynika z wybranego wariantu (każdy wariant ma podaną trudność w "subtitle").
+  b) Dla rowerów/motocykli/aut: potrzebny DYSTANS lub CZAS. Jeśli nie padł — zapytaj w fazie "discovery" razem z pytaniem o strukturę.
+- PĘTLA czy LINIOWA — wynika z odpowiedzi na pytanie o strukturę w fazie "discovery", nie pytaj osobno.
+- PREFERENCJE terenu — jeśli to gravel/mtb, nie pytaj, bo wiemy.
+- POPULARNOŚĆ — nie pytaj osobno. Warianty w fazie "variant_choice" mają się różnić charakterem, w tym stopniem oblegania.
 
-=== ZASADY DZIAŁANIA ===
-1. Gdy zbierzesz WSZYSTKIE wymagane dane (Start, Pojazd, Dni/Dystans, Trudność, Popularność), NIE GENERUJ TRASY OD RAZU (done: false). Zamiast tego, przedstaw krótkie podsumowanie w jednym zdaniu (np. "Zaplanuję 3-dniową umiarkowaną wędrówkę z Zakopanego, z dala od tłumów.") i ZAPYTAJ: "Czy chcesz dodać coś jeszcze (np. konkretne miejsca), czy mam wygenerować trasę?".
-2. DOPIERO gdy użytkownik potwierdzi generowanie (odpowie "generuj", "nie, to wszystko", "jest ok", itp.), ustaw 'done: true' i wygeneruj JSON trasy.
-3. UKRYTY DYSTANS: Kiedy użytkownik potwierdzi wygenerowanie dla trasy pieszej/miejskiej (hiking/city), i dajesz 'done: true', wylicz sumaryczny dystans w JSON na podstawie liczby dni i trudności. Kalkulacja:
-   - Lekki: 12 km/dzień (np. 3 dni = 36)
-   - Umiarkowany: 16 km/dzień (np. 3 dni = 48)
-   - Wymagający: 22 km/dzień (np. 3 dni = 66)
-   Wyliczoną wartość wpisz jako liczbę w polu "distance". Dobieraj punkty tak, aby pasowały do rejonu, a nie byle nabić kilometry.
-4. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
-5. Pytaj tylko o JEDNO brakujące pole naraz. Bądź konkretny, max 2-3 zdania.
-6. KOLEJNOŚĆ PUNKTÓW (BARDZO WAŻNE!): Zwrócona tablica \`suggested_waypoints\` MUSI być ułożona w logicznej, geograficznej kolejności, tworząc płynną ścieżkę lub pętlę BEZ KRZYŻOWANIA SIĘ (tzw. pajęczyn). Upewnij się, że punkty następują po sobie chronologicznie w taki sposób, jak przebiegałaby prawdziwa podróż.
+=== JAK PROWADZIĆ ROZMOWĘ: JESTEŚ DORADCĄ, NIE ANKIETĄ ===
+Użytkownik często NIE ZNA terenu — może lecieć do Tirany i nie mieć pojęcia, co tam jest. Twoim zadaniem jest zrobić rozeznanie ZA NIEGO, pokazać możliwości i przeprowadzić go przez decyzje. Nigdy nie odpytuj go z parametrów technicznych, których nie ma jak znać.
+
+Prowadzisz rozmowę w FAZACH. W każdej odpowiedzi zwracasz pole "phase" oraz — gdy dajesz wybór — tablicę "options" z konkretnymi kartami do kliknięcia.
+
+FAZA 1 — "discovery" (otwarcie rozeznaniem, NIE pytaniem o parametry)
+Masz miejscowość, czas i pojazd. Użyj wyszukiwarki Google, żeby dowiedzieć się, co realnie jest w zasięgu.
+Zacznij od KONKRETU, który pokazuje, że znasz teren, a potem zadaj JEDNO pytanie rozstrzygające o STRUKTURĘ wyjazdu — bo ono przesądza kształt trasy:
+- Wyjazd wielodniowy pieszo: "nocujesz w bazie i robisz wypady, czy śpisz na trasie (schroniska)?"
+  → baza = kilka niezależnych jednodniowych pętli; schroniska = jedna ciągła trasa z dalekim punktem zwrotnym. To ZUPEŁNIE inne trasy.
+- Motocykl/rower/auto: "wracasz na noc do bazy, czy jedziesz w jedną stronę?"
+- Wyjazd jednodniowy: pomiń tę fazę i przejdź od razu do FAZY 2.
+Podaj to jako "options" z 2 kartami.
+
+FAZA 2 — "variant_choice" (ZAWSZE 2-4 NAZWANE warianty tematyczne — nigdy jeden!)
+Na podstawie rozeznania i listy zweryfikowanych atrakcji zaproponuj konkretne, różniące się charakterem warianty. To najważniejszy moment rozmowy.
+Każdy wariant MUSI mieć:
+- "title" — nazwa własna mówiąca, dokąd się idzie/jedzie (np. "Grzbietem Karkonoszy na Śnieżkę", a nie "Wariant A")
+- "subtitle" — twarde liczby: dystans dzienny, przewyższenia lub czas
+- "description" — jedno zdanie: co zobaczysz i jaki jest charakter (ruch turystyczny, nawierzchnia, trudność)
+- "highlights" — 3-5 nazw konkretnych miejsc na tej trasie
+Warianty mają się RÓŻNIĆ kierunkiem lub charakterem (inne pasmo, grzbiet vs doliny, klasyki vs miejsca na uboczu), a nie być wariacjami tego samego.
+MINIMUM DWA WARIANTY — podanie jednej propozycji to błąd, bo użytkownik nie ma wtedy czego wybierać. Jeśli region wydaje się oczywisty, i tak pokaż wariant alternatywny (np. krótszy/łatwiejszy, inne pasmo, albo ten sam kierunek w odwrotną stronę).
+CEL WĘDRÓWKI: przy wyjeździe wielodniowym co najmniej jeden wariant MUSI prowadzić do najważniejszego obiektu pasma (najwyższy szczyt, główna atrakcja), nawet jeśli leży 20 km od startu. Wariant kręcący się w promieniu kilku kilometrów od bazy jest do przyjęcia tylko przy noclegu w bazie (structure: radial).
+
+FAZA 3 — "refine" (1-2 dopytania istotne dla wybranego wariantu)
+Po wyborze wariantu dopytaj o rzeczy, które faktycznie zmieniają trasę — np. konkretne schronisko na nocleg, czy zahaczyć o sąsiedni kraj, czy dołożyć dodatkową atrakcję po drodze. Podaj jako "options", zawsze zostawiając możliwość wpisania czegoś od siebie.
+
+FAZA 4 — "confirm" (podsumowanie do zatwierdzenia)
+Streść plan w 1-2 zdaniach z konkretami (dokąd, przez co, ile km, gdzie nocleg) i zapytaj, czy generować.
+
+FAZA 5 — generowanie: done: true, pełna lista "add_waypoints".
+
+=== POZOSTAŁE ZASADY ===
+1. SKRÓT DLA ZNAWCÓW: jeśli użytkownik w dowolnym momencie napisze "generuj", "rób", "nie pytaj", albo sam poda konkretne miejsca i dystans — natychmiast przeskocz do generowania (done: true). Nie zmuszaj go do przechodzenia przez fazy.
+2. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
+3. Zadawaj JEDNO pytanie naraz, max 2-3 zdania tekstu. Konkrety wrzucaj w "options", nie w ścianę tekstu.
+4. UKRYTY DYSTANS: dla trasy pieszej/miejskiej (hiking/city) przy done: true wylicz sumaryczny dystans z liczby dni i trudności:
+   - Lekki: 15 km/dzień (np. 3 dni = 45)
+   - Umiarkowany: 20 km/dzień (np. 3 dni = 60)
+   - Wymagający: 25 km/dzień (np. 3 dni = 75)
+   Wpisz go jako liczbę w polu "distance", a liczbę dni w polu "days".
+5. KOLEJNOŚĆ PUNKTÓW (BARDZO WAŻNE!): Zwrócona tablica \`suggested_waypoints\` MUSI być ułożona w logicznej, geograficznej kolejności, tworząc płynną ścieżkę lub pętlę BEZ KRZYŻOWANIA SIĘ (tzw. pajęczyn). Upewnij się, że punkty następują po sobie chronologicznie w taki sposób, jak przebiegałaby prawdziwa podróż.
 
 
 === ZASADY SELEKCJI PUNKTÓW (JAKOŚĆ I LOGIKA) ===
@@ -365,6 +509,16 @@ Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez 
    - Szukaj: szczytów, przełęczy, schronisk turystycznych, wodospadów, formacji skalnych, polan leśnych, rezerwatów przyrody.
    - BEZWZGLĘDNY zakaz prowadzenia tras po miastach i drogach asfaltowych (poza punktem startu/mety).
    - PRZYKŁAD (Karkonosze z Karpacza): ["Karpacz, Świątynia Wang", "Schronisko Samotnia, Karpacz", "Schronisko Strzecha Akademicka, Karpacz", "Śnieżka, Karkonosze", "Schronisko nad Łomniczką, Karpacz", "Karpacz"]
+
+   WĘDRÓWKA WIELODNIOWA (2+ dni) — TO NIE JEST DUŻA PĘTLA WOKÓŁ MIEJSCOWOŚCI!
+   Turysta idzie DOKĄDŚ: zdobywa główny cel pasma i nocuje po drodze w schronisku. Kręcenie się w promieniu kilku kilometrów od startu to najgorszy możliwy wynik.
+   Obowiązkowy schemat:
+   a) Wyznacz GŁÓWNY CEL wędrówki — najważniejszy szczyt/obiekt pasma, nawet jeśli leży 20-25 km od startu (np. ze Szklarskiej Poręby celem jest Śnieżka, nie okoliczne wodospady).
+   b) Dzień 1: dojście do celu jedną drogą — dla pasm górskich prowadź GRZBIETEM (najlepsze widoki).
+   c) NOCLEG: wskaż konkretne schronisko możliwie blisko półmetka trasy — to osobny punkt w "add_waypoints".
+   d) Dzień 2: powrót INNĄ drogą niż dzień 1 — typowo niżej, pod reglami/doliną. Powrót tą samą ścieżką jest błędem.
+   - PRZYKŁAD (Karkonosze, 2 dni ze Szklarskiej Poręby): ["Szklarska Poręba", "Wodospad Kamieńczyka, Szklarska Poręba", "Szrenica, Karkonosze", "Śnieżne Kotły, Karkonosze", "Schronisko Dom Śląski, Karkonosze", "Śnieżka, Karkonosze", "Przełęcz Okraj, Karkonosze", "Jagniątków", "Szklarska Poręba"]
+     (dzień 1 grzbietem przez Szrenicę na Śnieżkę z noclegiem, dzień 2 powrót niżej)
 
 2. rower szutrowy/MTB (gravel/mtb / route_type = gravel):
    - Szukaj: dróg pożarowych/leśnych, dróg szutrowych, grobli między stawami (np. Stawy Milickie), punktów widokowych, wiat turystycznych, jezior, rzek.
@@ -410,37 +564,95 @@ ${conversationText}
 
 Odpowiedz WYŁĄCZNIE W FORMACIE JSON (bez markdown, czysty JSON):
 
-Przykład 1: Brakuje dni i trudności (tylko hiking/city):
+Przykład 1 — FAZA "discovery": otwierasz rozeznaniem i pytasz o strukturę wyjazdu:
 {
   "done": false,
-  "reply": "Widzę start z Zakopanego. Na ile dni planujesz tę wędrówkę i jaki poziom trudności preferujesz (lekki, umiarkowany, wymagający)?"
+  "phase": "discovery",
+  "reply": "Szklarska Poręba to świetna baza — w 2 dni masz w zasięgu główny grzbiet Karkonoszy ze Śnieżką albo spokojniejsze Góry Izerskie. Najpierw jedna rzecz, bo przesądza kształt trasy: nocujesz w Szklarskiej, czy śpisz na trasie?",
+  "options": [
+    {
+      "id": "base",
+      "title": "Baza w Szklarskiej Porębie",
+      "subtitle": "2 × jednodniowa pętla",
+      "description": "Co wieczór wracasz do miasta, idziesz z lekkim plecakiem. Zasięg ok. 10 km od miasta.",
+      "implies": { "structure": "radial" }
+    },
+    {
+      "id": "huts",
+      "title": "Nocleg w schronisku na trasie",
+      "subtitle": "jedna ciągła trasa 2-dniowa",
+      "description": "Pełny plecak, ale otwiera się cały grzbiet aż po Śnieżkę (22 km od startu).",
+      "implies": { "structure": "traverse" }
+    }
+  ],
+  "allow_custom": true
 }
 
-Przykład 2: Pytasz o dystans (rower/moto):
+Przykład 2 — FAZA "variant_choice": nazwane warianty z twardymi liczbami:
 {
   "done": false,
-  "reply": "Mamy to, Gravel! Jaki dystans planujesz przejechać - 20km, 40km, a może dłużej?"
+  "phase": "variant_choice",
+  "reply": "Świetnie — nocleg na trasie otwiera Ci Śnieżkę. Mam dwa pomysły o różnym charakterze:",
+  "options": [
+    {
+      "id": "ridge",
+      "title": "Grzbietem Karkonoszy na Śnieżkę",
+      "subtitle": "25 km/dzień • +1400 m • wymagająca",
+      "description": "Klasyka: dzień 1 grzbietem przez Szrenicę i Śnieżne Kotły, nocleg w Domu Śląskim, dzień 2 powrót niżej pod reglami. Najlepsze widoki w Sudetach, ale w sezonie tłoczno.",
+      "highlights": ["Wodospad Kamieńczyka", "Szrenica", "Śnieżne Kotły", "Śnieżka"],
+      "implies": { "region": "Karkonosze", "difficulty": "hard", "pattern": "ridge_out_valley_back" }
+    },
+    {
+      "id": "izery",
+      "title": "Torfowiska Gór Izerskich",
+      "subtitle": "20 km/dzień • +600 m • umiarkowana",
+      "description": "Łagodniejsze podejścia, hale i torfowiska wysokie, nocleg w Chatce Górzystów. Zdecydowanie spokojniej niż na grzbiecie Karkonoszy.",
+      "highlights": ["Hala Izerska", "Stóg Izerski", "Torfowiska Izerskie"],
+      "implies": { "region": "Góry Izerskie", "difficulty": "moderate", "pattern": "loop" }
+    }
+  ],
+  "allow_custom": true
 }
 
-Przykład 3: Zebrano wszystko, pytasz o zatwierdzenie (done: false!):
+Przykład 3 — FAZA "refine": dopytanie istotne dla wybranego wariantu:
 {
   "done": false,
-  "reply": "Zaplanuję 3-dniową umiarkowaną wędrówkę z Zakopanego, z dala od tłumów. Czy chcesz dodać coś jeszcze, czy mam wygenerować trasę?"
+  "phase": "refine",
+  "reply": "Gdzie wolisz nocleg na półmetku?",
+  "options": [
+    { "id": "dom_slaski", "title": "Dom Śląski", "subtitle": "tuż pod Śnieżką, 1400 m", "description": "Najwyżej, krótkie podejście na szczyt o wschodzie słońca." },
+    { "id": "odrodzenie", "title": "Schronisko Odrodzenie", "subtitle": "Przełęcz Karkonoska, 1237 m", "description": "Bliżej półmetka, równiej rozkłada oba dni." }
+  ],
+  "allow_custom": true
 }
 
-Przykład 4: Użytkownik zatwierdził -> generujesz JSON (done: true):
+Przykład 4 — FAZA "confirm": podsumowanie do zatwierdzenia:
+{
+  "done": false,
+  "phase": "confirm",
+  "reply": "Plan: 2 dni ze Szklarskiej Poręby, dzień 1 grzbietem przez Szrenicę i Śnieżne Kotły na Śnieżkę z noclegiem w Domu Śląskim, dzień 2 powrót pod reglami. Około 50 km. Generuję?",
+  "options": [
+    { "id": "go", "title": "Generuj trasę", "subtitle": "", "description": "" },
+    { "id": "change", "title": "Chcę coś zmienić", "subtitle": "", "description": "" }
+  ],
+  "allow_custom": true
+}
+
+Przykład 5 — użytkownik zatwierdził → generujesz trasę (done: true):
 {
   "done": true,
-  "reply": "Proszę bardzo! Wytyczyłem 3-dniową umiarkowaną trasę po Tatrach omijając najbardziej tłoczne miejsca. Sprawdź mapę!",
-  "add_waypoints": ["Karpacz", "Schronisko Samotnia, Karpacz", "Śnieżka, Karkonosze", "Karpacz"],
+  "phase": "generate",
+  "reply": "Proszę bardzo! Dzień 1 grzbietem na Śnieżkę z noclegiem w Domu Śląskim, dzień 2 powrót pod reglami. Sprawdź mapę!",
+  "add_waypoints": ["Szklarska Poręba", "Wodospad Kamieńczyka, Szklarska Poręba", "Szrenica, Karkonosze", "Śnieżne Kotły, Karkonosze", "Schronisko Dom Śląski, Karkonosze", "Śnieżka, Karkonosze", "Jagniątków", "Szklarska Poręba"],
   "extracted": {
-    "start_point": "Karpacz",
-    "end_point": "Karpacz",
+    "start_point": "Szklarska Poręba",
+    "end_point": "Szklarska Poręba",
     "route_type": "hiking",
-    "distance": "48",
-    "intent": "3 dni umiarkowany hiking z dala od tłumów",
+    "distance": "50",
+    "days": 2,
+    "intent": "2 dni grzbietem Karkonoszy na Śnieżkę, nocleg w schronisku, powrót pod reglami",
     "loop": true,
-    "key_waypoints": ["Schronisko Samotnia, Karpacz", "Śnieżka, Karkonosze"]
+    "key_waypoints": ["Szrenica, Karkonosze", "Śnieżka, Karkonosze", "Schronisko Dom Śląski, Karkonosze"]
   }
 }`;
 
@@ -462,8 +674,26 @@ Przykład 4: Użytkownik zatwierdził -> generujesz JSON (done: true):
     const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     console.log("[chat-interview] Gemini raw response (first 500 chars):", rawText.substring(0, 500));
 
-    // === ETAP 2: Konwersja tekstu na czysty JSON (bez narzedzi, z wymuszeniem JSON) ===
-    const jsonPrompt = `Przekonwertuj ponizszy tekst na CZYSTY obiekt JSON. Nie dodawaj zadnych komentarzy.
+    // Etap 1 zwykle zwraca już gotowy JSON (opakowany w ```json). Jeśli da się go
+    // sparsować, druga tura jest zbędna — a była ryzykowna: gubiła punkty trasy,
+    // podwajała czas odpowiedzi i przy kartach wyboru potrafiła wpaść w pętlę
+    // generowania (138 tys. znaków uciętych w połowie = zerwana rozmowa).
+    let directResult: any = null;
+    try {
+      const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      if (stripped.startsWith('{')) {
+        const parsed = JSON.parse(stripped);
+        if (parsed && typeof parsed.reply === 'string') {
+          directResult = parsed;
+          console.log('[chat-interview] Stage 1 output parsed directly, skipping conversion pass.');
+        }
+      }
+    } catch {
+      // Niepoprawny JSON z etapu 1 — schodzimy do konwersji poniżej
+    }
+
+    // === ETAP 2 (fallback): Konwersja tekstu na czysty JSON (bez narzedzi, z wymuszeniem JSON) ===
+    const jsonPrompt = directResult ? '' : `Przekonwertuj ponizszy tekst na CZYSTY obiekt JSON. Nie dodawaj zadnych komentarzy.
 Tekst do konwersji:
 ---
 ${rawText}
@@ -471,33 +701,50 @@ ${rawText}
 
 Zwroc DOKLADNIE obiekt JSON z polami:
 - "done": boolean (true jesli agent zakonczyl zbieranie danych i podaje trase, false jesli jeszcze pyta)
+- "phase": string (jedna z: discovery, variant_choice, refine, confirm, generate)
 - "reply": string (odpowiedz agenta po polsku)
+- "options": tablica kart wyboru, kazda z polami id, title, subtitle, description, highlights (tablica stringow), implies (obiekt) — TYLKO gdy tekst przedstawia warianty do wyboru
+- "allow_custom": boolean (czy uzytkownik moze wpisac wlasna odpowiedz zamiast wybrac karte)
 - "add_waypoints": tablica stringow z nazwami punktow (TYLKO gdy done=true)
-- "extracted": obiekt z polami start_point, end_point, route_type, distance, intent, loop, key_waypoints (TYLKO gdy done=true)
+- "extracted": obiekt z polami start_point, end_point, route_type, distance, days, intent, loop, key_waypoints (TYLKO gdy done=true)
 
-Jesli tekst zawiera pytanie do uzytkownika, ustaw done=false i zwroc samo reply.
+Jesli tekst zawiera pytanie do uzytkownika, ustaw done=false.
+Jesli tekst przedstawia warianty/opcje do wyboru (wyliczenie z nazwami, liczbami, opisami) — KONIECZNIE przenies je do tablicy "options" jako osobne karty, a w "reply" zostaw samo zdanie wprowadzajace. Nie zostawiaj wariantow jako wypunktowania w tekscie reply.
 Jesli tekst zawiera gotowa trase z punktami, ustaw done=true i wypelnij add_waypoints i extracted.
 WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wystepuja w tekscie zrodlowym (z polskimi znakami). Nie skracaj, nie parafrazuj, nie pomijaj zadnego punktu z tekstu.`;
 
-    const jsonResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: jsonPrompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      })
-    });
+    let generatedText: string | null = null;
+    if (!directResult) {
+      const jsonResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: jsonPrompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            // Schemat zamiast polegania na dyscyplinie modelu — przy zagnieżdżonych
+            // kartach wyboru swobodne generowanie JSON-a potrafiło zwrócić składnię
+            // nie do sparsowania i wywalić całą rozmowę.
+            responseSchema: CHAT_RESPONSE_SCHEMA,
+            // Twardy limit: bez niego model potrafił wpaść w pętlę i wygenerować
+            // 138 tys. znaków uciętych w połowie.
+            maxOutputTokens: 8192
+          }
+        })
+      });
 
-    if (!jsonResponse.ok) {
-      throw new Error("Gemini JSON API error " + await jsonResponse.text());
+      if (!jsonResponse.ok) {
+        throw new Error("Gemini JSON API error " + await jsonResponse.text());
+      }
+
+      const jsonData = await jsonResponse.json() as any;
+      generatedText = jsonData.candidates?.[0]?.content?.parts?.[0]?.text || null;
     }
 
-    const jsonData = await jsonResponse.json() as any;
-    const generatedText = jsonData.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (generatedText) {
-      const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const resultObj = JSON.parse(cleanText);
+    if (directResult || generatedText) {
+      const resultObj = directResult
+        ? directResult
+        : JSON.parse((generatedText as string).replace(/```json/g, '').replace(/```/g, '').trim());
       
       // Jeśli agent zasugerował dodanie waypointów, geokodujemy je przed zwróceniem na frontend
       if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {

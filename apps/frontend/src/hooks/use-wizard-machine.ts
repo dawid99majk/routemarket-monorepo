@@ -50,7 +50,8 @@ export function useWizardMachine(initialProjectId: string | null = null) {
               current_waypoints: input.context.waypoints,
               vehicle_type: input.context.vehicleType,
               bike_subtype: input.context.bikeSubtype,
-              routing_preference: input.context.routingPreference
+              routing_preference: input.context.routingPreference,
+              trip_profile: input.context.tripProfile
             })
           });
           if (!res.ok) throw new Error('Chat failed');
@@ -59,7 +60,10 @@ export function useWizardMachine(initialProjectId: string | null = null) {
             message: data.reply || data.message || data.text,
             done: data.done,
             suggested_waypoints: data.suggested_waypoints,
-            distance_target_km: data.distance_target_km
+            distance_target_km: data.distance_target_km,
+            phase: data.phase,
+            options: data.options,
+            allow_custom: data.allow_custom
           };
         }),
       routeGeneratorActor: fromPromise(async ({ input }: any) => {
@@ -175,10 +179,21 @@ const context = state.context;
     }
   }, [state.value]);
 
+  // Wybór karty: ustalenia z karty wchodzą do profilu wyjazdu, a jej tytuł leci
+  // do agenta jako odpowiedź użytkownika — dzięki temu rozmowa czyta się naturalnie,
+  // a backend dostaje twarde parametry zamiast domyślać się ich z tekstu.
+  const chooseOption = useCallback((option: { title: string; implies?: Record<string, any> }) => {
+    if (option.implies && Object.keys(option.implies).length > 0) {
+      send({ type: 'SET_FIELD', field: 'tripProfile', value: { ...context.tripProfile, ...option.implies } });
+    }
+    send({ type: 'SEND_MESSAGE', text: option.title });
+  }, [send, context.tripProfile]);
+
   return { 
     state,
     context, 
     send, 
-    setField
+    setField,
+    chooseOption
   };
 }
