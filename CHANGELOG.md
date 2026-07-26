@@ -26,6 +26,20 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
 * **Rozwiązanie**: `generateShortReport` dostaje finalną listę punktów trasy i statystyki wysokościowe (min/max/suma podejść z realnego śladu). Nowy prompt wymusza opis odcinek po odcinku w kolejności punktów, z faktami weryfikowanymi w Google per POI (bilety, godziny schronisk, utrudnienia).
 * **Plik**: `apps/route-builder-api/src/services/report.ts`.
 
+#### 24. Domknięcie warstwy POI po testach użytkownika (26 Lipca 2026) [BACKEND + FRONTEND]
+* **Problem**: Po wdrożeniu etapów 20-23 trasa szosowa po Jesionikach nadal wychodziła słabo — 2 z 8 punktów przepadały, brakowało klasyków regionu, dystans nie był kontrolowany.
+* **Przyczyny i naprawy**:
+  1. **Warstwa POI w ogóle nie działała bez pinezki na mapie** — `chat-interview` pobierał kandydatów tylko przy niepustym `current_waypoints`. Gdy użytkownik podał start w czacie, cały Etap 1 był pomijany. Teraz miejsce startu i dystans są wyciągane z rozmowy i geokodowane (`geocodeSettlement`, `featuretype=settlement`, żeby fraza typu "ze Złotych Hor i okolicy" nie trafiła w przypadkowe miejsce w innym regionie).
+  2. **Geokoder gubił punkty z egzonimami** — "Vidly, Jesioniki" nie istnieje w OSM. Dodano retry z progresywnym skracaniem kontekstu po przecinku + regułę w prompcie: nazwy w języku kraju, kontekst to realna miejscowość, nie polska nazwa pasma.
+  3. **Cel dystansu nie docierał do walidacji** — frontend nie wysyłał `distance_target_km` do `/live-route`. Przepięte przez `WizardContext`.
+  4. **Korekta dystansu opierała się na szacunku** (haversine × 1.25), który w górach mylił się o kilkadziesiąt procent i nie odpalał korekty. Teraz mierzy REALNY dystans po drogach (dodatkowe zapytanie do routingu), z zabezpieczeniem przed przestrzeleniem w drugą stronę (odrzuca korektę przeskakującą cel).
+  5. **Promień szukania POI** liczony z geometrii pętli (obwód/2π), nie ze stałej — dla pętli 90 km szuka w promieniu ~14 km, nie 35 km. Prompt dostaje twardy "budżet geograficzny" z odległościami POI od startu.
+  6. **Overpass**: `overpass.private.coffee` i `openstreetmap.ru` są nieosiągalne z tego VPS (timeouty) — usunięte, dodany `maps.mail.ru` (najszybszy, ~1s). Mirrory odpytywane RÓWNOLEGLE (`Promise.any`), zapytanie o miejsca znane i szerokie znoszą awarie niezależnie, limity wyników podniesione (spatial truncation ukrywała klasyki jak Praděd).
+  7. **Szosa ma własne kategorie POI** (przełęcze drogowe, zamki, miasteczka, zapory) zamiast szczytów i sztolni osiągalnych tylko pieszo.
+* **Efekt (test: pętla szosowa 90 km ze Zlatých Hor)**: 13 punktów, 0 zgubionych, korekta 157 km → 110 km, walidacja OK.
+* **Pliki**: `apps/route-builder-api/src/index.ts`, `services/poi.ts`, `services/geocoding.ts`, `packages/atlas-workflow/src/wizard-machine.ts`, `apps/frontend/src/hooks/use-wizard-machine.ts`.
+---
+
 ## 📅 Poprzednia aktualizacja: 25 Maja 2026
 
 ### 🚀 Najnowsze wdrożenia & Poprawki krytyczne (25 Maja 2026 - Sesja 2)
