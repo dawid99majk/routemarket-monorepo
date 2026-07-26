@@ -16,6 +16,64 @@ import { routeValidatorService } from './services/route-validator.js';
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
 /**
+ * Wyciąga z rozmowy miejsce startu i docelowy dystans, gdy użytkownik nie postawił
+ * pinezki na mapie. Bez tego nie znamy centrum obszaru i warstwa POI nie ma jak zadziałać.
+ */
+async function extractLocationFromConversation(
+  apiKey: string,
+  conversationText: string,
+  inputNotes?: string
+): Promise<{ startPlace: string | null; distanceKm: number | null; isLoop: boolean }> {
+  const prompt = `Z poniższej rozmowy o planowaniu trasy wyciągnij:
+1. "start_place" — nazwę miejscowości startu w formie NADAJĄCEJ SIĘ DO WYSZUKANIA NA MAPIE:
+   - mianownik, oficjalna pisownia w języku kraju, w którym leży to miejsce (np. z "ze Złotych Hor i okolicy" → "Zlaté Hory", z "spod Zakopanego" → "Zakopane", z "w Krakowie" → "Kraków");
+   - SAMA nazwa miejscowości — bez słów "okolice", "i okolicy", "rejon", bez przyimków i bez opisów;
+   - jeśli w rozmowie nie padła żadna konkretna miejscowość, zwróć null.
+2. "distance_km" — docelowy dystans trasy w km jako liczbę (dla tras wielodniowych pieszych oszacuj sumarycznie). Jeśli nie padł, zwróć null.
+3. "is_loop" — true jeśli trasa ma być pętlą (powrót do startu), false jeśli liniowa. Domyślnie true.
+
+Rozmowa:
+"""
+${conversationText.slice(0, 6000)}
+"""
+${inputNotes ? `Notatki użytkownika: "${inputNotes.slice(0, 2000)}"` : ''}
+
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "is_loop": true}`;
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json' }
+    })
+  });
+  if (!response.ok) throw new Error(`Gemini location extraction error ${response.status}`);
+  const data = await response.json() as any;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return { startPlace: null, distanceKm: null, isLoop: true };
+  const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+  return {
+    startPlace: parsed.start_place || null,
+    distanceKm: Number(parsed.distance_km) || null,
+    isLoop: parsed.is_loop !== false
+  };
+}
+
+/**
+ * Zasięg obszaru poszukiwań POI. Dla pętli o obwodzie D promień koła wynosi D/(2π),
+ * więc szukanie atrakcji dalej niż ~D/5 od startu z założenia produkuje trasę
+ * dłuższą, niż użytkownik zamówił.
+ */
+function poiRadiusForRoute(distanceKm: number | null, isLoop: boolean): number | undefined {
+  if (!distanceKm) return undefined;
+  // Pętla o obwodzie D to okrąg o promieniu D/(2π). Dzielenie przez mniejszą liczbę
+  // dawało pierścień o obwodzie większym niż zamówiony dystans.
+  const raw = isLoop ? distanceKm / (2 * Math.PI) : distanceKm / 2.2;
+  return Math.min(150, Math.max(6, Math.round(raw)));
+}
+
+/**
  * Jednorazowa korekta doboru waypointów, gdy szacowany dystans rażąco odbiega od celu.
  * Gemini w trybie JSON (bez wyszukiwarki) dostaje obecną listę, szacunek i cel oraz
  * listę zweryfikowanych kandydatów OSM do dodania/wymiany.
@@ -25,18 +83,26 @@ async function correctWaypointSelection(
   currentNames: string[],
   estimatedKm: number,
   targetKm: number,
-  candidates: { name: string; kind: string; score: number }[],
+  candidates: { name: string; kind: string; score: number; distanceKm?: number }[],
   routeType: string
 ): Promise<string[] | null> {
-  const direction = estimatedKm > targetKm ? 'ZA DŁUGA — usuń najbardziej oddalone punkty' : 'ZA KRÓTKA — dodaj punkty ze listy kandydatów';
+  const ratio = estimatedKm / targetKm;
+  const direction = estimatedKm > targetKm
+    ? `ZA DŁUGA ${ratio.toFixed(1)}x — zamień najbardziej oddalone punkty na bliższe (nie usuwaj wszystkich naraz, celuj dokładnie w ${targetKm} km)`
+    : `ZA KRÓTKA — dodaj kolejne punkty z listy, rozkładając je szerzej wokół trasy (celuj dokładnie w ${targetKm} km)`;
   const prompt = `Trasa (${routeType}) przez punkty:
 ${currentNames.map((n, i) => `${i + 1}. ${n}`).join('\n')}
 ma szacunkowo ${estimatedKm.toFixed(0)} km, a użytkownik chce ${targetKm} km. Trasa jest ${direction}.
 
 Dostępne zweryfikowane punkty w okolicy (używaj DOKŁADNIE tych nazw):
-${candidates.slice(0, 40).map((c) => `- "${c.name}" (${c.kind})`).join('\n')}
+${candidates.slice(0, 40).map((c) => `- "${c.name}" (${c.kind}${c.distanceKm != null ? `, ${c.distanceKm} km od startu` : ''})`).join('\n')}
 
-Zwróć poprawioną listę punktów trasy (zachowaj pierwszy i ostatni punkt bez zmian, zachowaj logiczną kolejność geograficzną).
+ZASADY:
+- Zachowaj pierwszy i ostatni punkt bez zmian.
+- Zachowaj logiczną kolejność geograficzną (bez zawracania i krzyżowania się trasy).
+- NIE przestrzel w drugą stronę: suma odległości między kolejnymi punktami ma wynieść ok. ${targetKm} km, a nie znacznie mniej.
+- Jeśli trasa jest za długa, częściej pomaga zamiana odległego punktu na bliższy niż skasowanie kilku punktów.
+
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -188,26 +254,62 @@ app.post('/chat-interview', async (c) => {
       projectContext += `\n\n[KONTEKST UI] Użytkownik ma zaznaczony typ pojazdu w aplikacji: **${vehicle_type}${subtypeText}**. Nie pytaj już o środek transportu!`;
     }
 
+    const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
+
     // Warstwa prawdy o POI: realne atrakcje z OSM wokół punktu startu.
     // Gemini wybiera z tej listy zamiast wymyślać nazwy — współrzędne bierzemy z OSM.
+    // Centrum bierzemy z pinezki, a gdy jej nie ma (użytkownik podał start w czacie),
+    // ustalamy je z treści rozmowy — inaczej cała warstwa POI by nie zadziałała.
     let poiCandidates: PoiCandidate[] = [];
-    if (current_waypoints && current_waypoints.length > 0) {
-      const poiRouteType = vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking');
+    const poiRouteType = vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking');
+    let poiCenter: { lat: number; lng: number } | null =
+      current_waypoints && current_waypoints.length > 0
+        ? { lat: current_waypoints[0].lat, lng: current_waypoints[0].lng }
+        : null;
+    let conversationDistanceKm: number | null = null;
+    let conversationIsLoop = true;
+
+    if (messages.length > 0) {
+      try {
+        const extracted = await extractLocationFromConversation(GEMINI_API_KEY, conversationText, input_notes);
+        conversationDistanceKm = extracted.distanceKm;
+        conversationIsLoop = extracted.isLoop;
+        if (!poiCenter && extracted.startPlace) {
+          const startPlace = await geocodingService.geocodeSettlement(extracted.startPlace);
+          poiCenter = { lat: startPlace.lat, lng: startPlace.lng };
+          console.log(`[chat-interview] POI center from conversation: "${extracted.startPlace}" -> ${poiCenter.lat},${poiCenter.lng}`);
+        }
+      } catch (err) {
+        console.warn('[chat-interview] Could not derive POI center from conversation:', err);
+      }
+    }
+
+    const poiRadiusKm = poiRadiusForRoute(conversationDistanceKm, conversationIsLoop);
+    if (poiCenter) {
       try {
         poiCandidates = await poiService.fetchCandidates(
-          { lat: current_waypoints[0].lat, lng: current_waypoints[0].lng },
-          poiRouteType
+          poiCenter,
+          poiRouteType,
+          poiRadiusKm ? { radiusKm: poiRadiusKm, limit: 45 } : { limit: 45 }
         );
-        console.log(`[chat-interview] Loaded ${poiCandidates.length} OSM POI candidates (${poiRouteType})`);
+        console.log(`[chat-interview] Loaded ${poiCandidates.length} OSM POI candidates (${poiRouteType}, radius ${poiRadiusKm || 'default'} km)`);
       } catch (err) {
         console.warn('[chat-interview] POI candidates fetch failed, continuing without:', err);
       }
     }
     if (poiCandidates.length > 0) {
       projectContext += poiService.buildPromptSection(poiCandidates, routing_preference);
+      if (conversationDistanceKm && poiRadiusKm) {
+        projectContext += `\n\n=== BUDŻET GEOGRAFICZNY (twarde ograniczenie) ===
+Trasa ma mieć ok. ${conversationDistanceKm} km${conversationIsLoop ? ' i być PĘTLĄ' : ''}. Przy każdej atrakcji podana jest jej odległość od startu w linii prostej.
+${conversationIsLoop
+  ? `Dla pętli tej długości:
+- Najdalszy punkt może leżeć maksymalnie ok. ${poiRadiusKm} km od startu. Punkty położone dalej ROZSADZĄ dystans — nie wybieraj ich, nawet jeśli są klasykami.
+- Punkty rozłóż DOOKOŁA startu, w różnych kierunkach (np. część na północ, część na wschód, część na południe), tak aby tworzyły pierścień. Nie wybieraj 5 punktów po jednej stronie — powstanie wtedy trasa "tam i z powrotem", o połowę za krótka.
+- Wybierz 6-10 punktów: suma odległości między kolejnymi punktami (start → 1 → 2 → ... → start) ma wynosić ok. ${conversationDistanceKm} km.`
+  : `Punkty rozłóż równomiernie wzdłuż kierunku przejazdu, do ok. ${poiRadiusKm} km od startu, tak aby suma odległości między kolejnymi punktami dała ok. ${conversationDistanceKm} km.`}`;
+      }
     }
-
-    const conversationText = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
 
     // Determine what we already know from UI context
     const knowStart = current_waypoints && current_waypoints.length > 0;
@@ -283,8 +385,16 @@ Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez 
    
 === WAŻNE: FORMATOWANIE PUNKTÓW DLA GEOKODERA ===
 Aby geokoder bezbłędnie zlokalizował punkty pośrednie, każdy punkt w tablicy "add_waypoints" MUSI być podany w formacie:
-"NAZWA ATRAKCJI/PUNKTU, NAJBLIŻSZA MIEJSCOWOŚĆ lub REGION" (np. "Schronisko Odrodzenie, Karkonosze", "Wodospad Szklarki, Szklarska Poręba", "Zamek Chojnik, Jelenia Góra", "Postolin (wieża widokowa), Milicz").
+"NAZWA ATRAKCJI/PUNKTU, NAJBLIŻSZA MIEJSCOWOŚĆ" (np. "Schronisko Odrodzenie, Karkonosze", "Wodospad Szklarki, Szklarska Poręba", "Zamek Chojnik, Jelenia Góra", "Postolin (wieża widokowa), Milicz").
 Unikaj podawania samych gołych, pospolitych nazw typu "Stawno" czy "Laskowa", bo geokoder znajdzie je w innej części Polski! Zawsze dodawaj kontekst geograficzny (np. "Stawno, Milicz" lub "Laskowa, Milicz").
+
+KRYTYCZNE — NAZWY MIEJSCOWE, NIE POLSKIE TŁUMACZENIA:
+Geokoder korzysta z OpenStreetMap, gdzie miejsca zapisane są w języku KRAJU, w którym leżą.
+- Używaj oryginalnej pisowni: "Červenohorské sedlo", "Vrbno pod Pradědem", "Praděd" (NIE "Pradziad").
+- Jako kontekst po przecinku podawaj REALNĄ pobliską miejscowość, nigdy polski egzonim pasma górskiego.
+  ŹLE: "Vidly, Jesioniki", "Rejvíz, Jesioniki" (nazwa "Jesioniki" nie istnieje w OpenStreetMap → punkt przepada).
+  DOBRZE: "Vidly, Vrbno pod Pradědem", "Rejvíz, Zlaté Hory".
+- Ta sama zasada dotyczy każdego kraju: "Kruja Castle, Krujë" (nie "Kruja, Albania Środkowa").
 
 === ZASADY TWORZENIA PĘTLI ===
 Dla PĘTLI (loop: true):
@@ -392,12 +502,10 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
       // Jeśli agent zasugerował dodanie waypointów, geokodujemy je przed zwróceniem na frontend
       if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
         const suggested_waypoints = [];
-        let biasPoint: {lat: number, lng: number} | undefined = undefined;
-        
-        if (current_waypoints && current_waypoints.length > 0) {
-          biasPoint = { lat: current_waypoints[0].lat, lng: current_waypoints[0].lng };
-        }
-        
+        // poiCenter to pinezka z mapy albo start ustalony z rozmowy — w obu przypadkach
+        // najlepszy punkt odniesienia dla geokodera.
+        let biasPoint: {lat: number, lng: number} | undefined = poiCenter || undefined;
+
         // Jeśli nie mamy biasPoint z UI, spróbujmy geokodować pierwszy sugerowany punkt bez biasu i użyć go jako bias
         if (!biasPoint && resultObj.add_waypoints.length > 0) {
           try {
@@ -455,44 +563,76 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
 
         // Walidacja 2: szacowany dystans łańcucha punktów vs cel — przy rażącej
         // rozbieżności jedna automatyczna korekta doboru punktów przez Gemini
-        const targetKm = Number(resultObj.extracted?.distance) || null;
-        if (targetKm && finalWaypoints.length >= 3) {
-          const estimatedKm = routeValidatorService.estimateChainKm(finalWaypoints, routeTypeForValidation);
-          const deviation = Math.abs(estimatedKm - targetKm) / targetKm;
-          if (deviation > 0.6 && poiCandidates.length > 0) {
-            console.warn(`[chat-interview] Distance mismatch: estimated ${estimatedKm.toFixed(1)} km vs target ${targetKm} km. Requesting correction...`);
+        const targetKm = Number(resultObj.extracted?.distance) || conversationDistanceKm || null;
+        // Front potrzebuje celu, żeby przy przeliczaniu trasy uruchomić kontrolę dystansu
+        if (targetKm) resultObj.distance_target_km = targetKm;
+        // Korekta na podstawie REALNEGO dystansu po drogach, nie szacunku z linii
+        // prostych — ten w terenie górskim mylił się o kilkadziesiąt procent i korekta
+        // w ogóle się nie uruchamiała. Kosztuje to jedno dodatkowe zapytanie do routingu.
+        const measureRouteKm = async (wps: any[]): Promise<number | null> => {
+          try {
+            const measured = await routingService.getRoute(
+              wps.map((w: any) => ({ name: w.name, lat: w.lat, lng: w.lng })) as any,
+              routeTypeForValidation
+            );
+            return measured.distance_km;
+          } catch (err: any) {
+            console.warn(`[chat-interview] Could not measure route distance: ${err.message}`);
+            return null;
+          }
+        };
+
+        if (targetKm && finalWaypoints.length >= 3 && poiCandidates.length > 0) {
+          for (let pass = 0; pass < 2; pass++) {
+            const measuredKm = await measureRouteKm(finalWaypoints);
+            const estimatedKm = measuredKm ?? routeValidatorService.estimateChainKm(finalWaypoints, routeTypeForValidation);
+            const deviation = Math.abs(estimatedKm - targetKm) / targetKm;
+            if (deviation <= 0.25) {
+              if (pass > 0) console.log(`[chat-interview] Route within tolerance: ${estimatedKm.toFixed(1)} km (target ${targetKm} km).`);
+              break;
+            }
+
+            console.warn(`[chat-interview] Distance mismatch (pass ${pass + 1}): ${measuredKm ? 'routed' : 'estimated'} ${estimatedKm.toFixed(1)} km vs target ${targetKm} km. Requesting correction...`);
             try {
               const corrected = await correctWaypointSelection(
                 GEMINI_API_KEY, finalWaypoints.map((w: any) => w.name), estimatedKm, targetKm, poiCandidates, routeTypeForValidation
               );
-              if (corrected && corrected.length >= 2) {
-                const rebuilt: any[] = [];
-                for (const name of corrected) {
-                  const matched = poiService.matchCandidate(name, poiCandidates);
-                  if (matched) {
-                    rebuilt.push({ lat: matched.lat, lng: matched.lng, name });
-                    continue;
-                  }
-                  const prev = finalWaypoints.find((w: any) => w.name === name);
-                  if (prev) {
-                    rebuilt.push(prev);
-                    continue;
-                  }
-                  try {
-                    const place = await geocodingService.geocodeSinglePoint(name, biasPoint);
-                    if (place) rebuilt.push({ lat: place.lat, lng: place.lng, name });
-                  } catch { /* pomijamy niegeokodowalne punkty korekty */ }
+              if (!corrected || corrected.length < 2) break;
+
+              const rebuilt: any[] = [];
+              for (const name of corrected) {
+                const matched = poiService.matchCandidate(name, poiCandidates);
+                if (matched) {
+                  rebuilt.push({ lat: matched.lat, lng: matched.lng, name });
+                  continue;
                 }
-                if (rebuilt.length >= 2) {
-                  const newEstimate = routeValidatorService.estimateChainKm(rebuilt, routeTypeForValidation);
-                  if (Math.abs(newEstimate - targetKm) < Math.abs(estimatedKm - targetKm)) {
-                    console.log(`[chat-interview] Correction accepted: ${newEstimate.toFixed(1)} km (was ${estimatedKm.toFixed(1)} km)`);
-                    finalWaypoints = rebuilt;
-                  }
+                const prev = finalWaypoints.find((w: any) => w.name === name);
+                if (prev) {
+                  rebuilt.push(prev);
+                  continue;
                 }
+                try {
+                  const place = await geocodingService.geocodeSinglePoint(name, biasPoint);
+                  if (place) rebuilt.push({ lat: place.lat, lng: place.lng, name });
+                } catch { /* pomijamy niegeokodowalne punkty korekty */ }
               }
+              if (rebuilt.length < 2) break;
+
+              const newEstimate = (await measureRouteKm(rebuilt)) ?? routeValidatorService.estimateChainKm(rebuilt, routeTypeForValidation);
+              const oldDev = (estimatedKm - targetKm) / targetKm;
+              const newDev = (newEstimate - targetKm) / targetKm;
+              // Model potrafi wyciąć za dużo punktów naraz i przestrzelić w drugą stronę
+              // (np. 160 km -> 40 km przy celu 90). Taka "poprawka" jest odrzucana.
+              const overshot = Math.sign(newDev) !== Math.sign(oldDev) && Math.abs(newDev) > 0.25;
+              if (Math.abs(newDev) >= Math.abs(oldDev) || overshot) {
+                console.log(`[chat-interview] Correction rejected (${newEstimate.toFixed(1)} km vs ${estimatedKm.toFixed(1)} km, target ${targetKm} km).`);
+                break;
+              }
+              console.log(`[chat-interview] Correction accepted: ${newEstimate.toFixed(1)} km (was ${estimatedKm.toFixed(1)} km)`);
+              finalWaypoints = rebuilt;
             } catch (corrErr) {
               console.warn('[chat-interview] Waypoint correction failed, keeping original:', corrErr);
+              break;
             }
           }
         }

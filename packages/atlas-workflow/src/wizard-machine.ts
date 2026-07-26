@@ -27,7 +27,8 @@ export interface WizardContext {
   gpxData: string | null;
   guideText: string | null;
   routingPreference: 'popular' | 'wild';
-  
+  distanceTargetKm: number | null;
+
   // Stats
   routeStats: {
     distance: number;
@@ -71,6 +72,7 @@ export const initialWizardContext: WizardContext = {
   gpxData: null,
   guideText: null,
   routingPreference: 'popular',
+  distanceTargetKm: null,
   routeStats: { distance: 0, ascent: 0, descent: 0 },
 
   title: 'Nowa Trasa AI',
@@ -159,7 +161,11 @@ export const wizardMachine = setup({
           ...wp,
           type: i === 0 ? 'start' : (i === output.suggested_waypoints.length - 1 ? 'end' : 'waypoint')
         }));
-        return { waypoints: wps };
+        // Cel dystansu jest potrzebny przy przeliczaniu trasy, żeby backend mógł
+        // sprawdzić, czy wynik odpowiada temu, co obiecano użytkownikowi.
+        return output.distance_target_km
+          ? { waypoints: wps, distanceTargetKm: output.distance_target_km }
+          : { waypoints: wps };
       }
       return {};
     }),

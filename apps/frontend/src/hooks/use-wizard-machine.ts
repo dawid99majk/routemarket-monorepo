@@ -55,7 +55,12 @@ export function useWizardMachine(initialProjectId: string | null = null) {
           });
           if (!res.ok) throw new Error('Chat failed');
           const data = await res.json();
-          return { message: data.reply || data.message || data.text, done: data.done, suggested_waypoints: data.suggested_waypoints };
+          return {
+            message: data.reply || data.message || data.text,
+            done: data.done,
+            suggested_waypoints: data.suggested_waypoints,
+            distance_target_km: data.distance_target_km
+          };
         }),
       routeGeneratorActor: fromPromise(async ({ input }: any) => {
         const { context } = input;
@@ -77,7 +82,8 @@ export function useWizardMachine(initialProjectId: string | null = null) {
           body: JSON.stringify({
             points: context.waypoints,
             route_type: context.vehicleType === 'bicycle' ? context.bikeSubtype : context.vehicleType,
-            intent: context.routingPreference
+            intent: context.routingPreference,
+            distance_target_km: context.distanceTargetKm
           })
         });
 

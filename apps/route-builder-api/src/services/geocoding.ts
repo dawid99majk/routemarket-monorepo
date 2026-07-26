@@ -99,9 +99,68 @@ export class GeocodingService {
     return places;
   }
 
+  /**
+   * Geokodowanie z progresywnym skracaniem zapytania. LLM dopisuje kontekst po przecinku,
+   * często egzonim, którego OSM nie zna ("Vidly, Jesioniki" — nazwa Jesioniki nie istnieje
+   * w bazie). Zamiast gubić punkt, próbujemy kolejno krótszych wariantów; biasPoint
+   * pilnuje, żeby skrócona nazwa nie trafiła w inną część Europy.
+   */
+  /**
+   * Geokodowanie miejscowości startowej. W odróżnieniu od zwykłych punktów trasy
+   * ograniczamy wynik do osad (featuretype=settlement) — luźne frazy w rodzaju
+   * "Złotych Hor i okolicy" potrafią inaczej dopasować się do przypadkowego obiektu
+   * po drugiej stronie kraju i przenieść całą trasę w zły region.
+   */
+  async geocodeSettlement(query: string): Promise<GeocodedPlace> {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&featuretype=settlement&addressdetails=1`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0' } });
+      if (res.ok) {
+        const data = await res.json() as any;
+        if (data && data.length > 0) {
+          const item = data[0];
+          return {
+            name: item.display_name || query,
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+            confidence: 0.95,
+            source: 'nominatim_settlement',
+            provider: 'nominatim'
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Geocoding] Settlement lookup failed for "${query}": ${err.message}`);
+    }
+    return this.geocodeSinglePoint(query);
+  }
+
   async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}): Promise<GeocodedPlace> {
+    const parts = query.split(',').map((p) => p.trim()).filter(Boolean);
+    const variants: string[] = [query];
+    // "A, B, C" -> "A, B" -> "A"
+    for (let take = parts.length - 1; take >= 1; take--) {
+      const variant = parts.slice(0, take).join(', ');
+      if (variant && !variants.includes(variant)) variants.push(variant);
+    }
+
+    let lastError: any = null;
+    for (const variant of variants) {
+      try {
+        return await this.geocodeExact(variant, biasPoint, variant !== query ? query : undefined);
+      } catch (err) {
+        lastError = err;
+        if (variant !== variants[variants.length - 1]) {
+          console.warn(`[Geocoding] "${variant}" not found, retrying with shorter context...`);
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  private async geocodeExact(query: string, biasPoint?: {lat: number, lng: number}, originalName?: string): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
-    
+
     // 1. Główne geokodowanie - OpenStreetMap Nominatim (świetny do POI, dzielnic, zabytków)
     try {
       console.log(`[Geocoding] Trying OSM Nominatim Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
@@ -123,7 +182,7 @@ export class GeocodingService {
             item = sorted[0];
           }
           return {
-            name: item.display_name || query,
+            name: originalName || item.display_name || query,
             lat: parseFloat(item.lat),
             lng: parseFloat(item.lon),
             confidence: 0.90,
@@ -159,7 +218,7 @@ export class GeocodingService {
             const hit = hits[0];
             const displayName = [hit.name, hit.city, hit.country].filter(Boolean).join(', ');
             return {
-              name: displayName || query,
+              name: originalName || displayName || query,
               lat: hit.point.lat,
               lng: hit.point.lng,
               confidence: 0.85,

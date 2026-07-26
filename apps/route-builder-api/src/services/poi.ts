@@ -6,6 +6,18 @@ export interface PoiCandidate {
   kind: string;
   score: number;
   wikipedia?: string;
+  distanceKm?: number;
+  rank?: number;
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 interface OverpassElement {
@@ -17,9 +29,11 @@ interface OverpassElement {
   tags?: Record<string, string>;
 }
 
+// Zmierzone z VPS: overpass-api.de bywa przeciążony (504), maps.mail.ru odpowiada
+// stabilnie. Odpytujemy równolegle i bierzemy pierwszą poprawną odpowiedź.
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter'
 ];
 
@@ -40,6 +54,17 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
     'nwr["tourism"="attraction"]["name"]',
     'nwr["historic"="castle"]["name"]',
     'nwr["waterway"="dam"]["name"]'
+  ],
+  // Szosa: cele osiągalne na rowerze szosowym — przełęcze drogowe, miasteczka,
+  // zabytki. Bez szczytów, jaskiń i sztolni, do których prowadzą tylko szlaki piesze.
+  road: [
+    'node["mountain_pass"="yes"]["name"]',
+    'node["natural"="saddle"]["name"]',
+    'node["tourism"="viewpoint"]["name"]',
+    'nwr["historic"~"^(castle|monument|city_gate)$"]["name"]',
+    'nwr["tourism"="attraction"]["name"]',
+    'nwr["waterway"="dam"]["name"]',
+    'nwr["natural"="water"]["wikidata"]["name"]'
   ],
   motorcycle: [
     'node["tourism"="viewpoint"]["name"]',
@@ -66,7 +91,7 @@ const ROUTE_TYPE_ALIASES: Record<string, string> = {
   gravel: 'cycling',
   mtb: 'cycling',
   bicycle: 'cycling',
-  road: 'cycling',
+  road: 'road',
   motorcycle: 'motorcycle',
   car: 'motorcycle'
 };
@@ -76,6 +101,7 @@ const DEFAULT_RADIUS_KM: Record<string, number> = {
   hiking: 15,
   city_walk: 8,
   cycling: 35,
+  road: 45,
   motorcycle: 100
 };
 
@@ -106,10 +132,54 @@ function kindOf(tags: Record<string, string>): string {
 }
 
 export class PoiService {
+  private buildQuery(bbox: string, typeKey: string, notableOnly: boolean): string {
+    // notableOnly: tylko obiekty z wpisem w Wikidata — czyli miejsca faktycznie znane,
+    // te, których użytkownik oczekuje w trybie "Klasyk".
+    const selectors = CATEGORY_SELECTORS[typeKey]
+      .map((s) => (notableOnly ? `${s}["wikidata"];` : `${s};`))
+      .join('\n');
+    // Limit musi być wysoki: `out ... qt N` obcina wyniki w kolejności geograficznej,
+    // więc zbyt niski cap wycina całe połacie obszaru (tak wypadał Praděd z Jesioników).
+    const cap = notableOnly ? 3000 : 1500;
+    return `[out:json][timeout:25][bbox:${bbox}];(\n${selectors}\n);out center qt ${cap};`;
+  }
+
+  /**
+   * Odpytuje wszystkie mirrory równolegle i bierze pierwszą poprawną odpowiedź —
+   * publiczne serwery Overpass bywają przeciążone, a sekwencyjny failover zjadał
+   * cały budżet czasu requestu użytkownika.
+   */
+  private async runQuery(query: string, label: string): Promise<OverpassElement[]> {
+    const attempts = OVERPASS_ENDPOINTS.map(async (endpoint) => {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'RouteMarketBuilderV3/1.0 (routemarket.io)'
+        },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(25000)
+      });
+      if (!res.ok) throw new Error(`${endpoint} HTTP ${res.status}`);
+      const data = (await res.json()) as any;
+      const elements = data.elements || [];
+      if (elements.length === 0) throw new Error(`${endpoint} returned no elements`);
+      console.log(`[POI] ${label}: ${elements.length} elements from ${new URL(endpoint).host}`);
+      return elements as OverpassElement[];
+    });
+
+    try {
+      return await Promise.any(attempts);
+    } catch (err: any) {
+      const reasons = (err.errors || []).map((e: any) => e.message).join('; ');
+      throw new Error(`all Overpass mirrors failed (${reasons})`);
+    }
+  }
+
   async fetchCandidates(
     center: { lat: number; lng: number },
     routeType: string,
-    options: { radiusKm?: number; limit?: number } = {}
+    options: { radiusKm?: number; limit?: number; includeMinor?: boolean } = {}
   ): Promise<PoiCandidate[]> {
     const typeKey = ROUTE_TYPE_ALIASES[routeType] || 'hiking';
     const radiusKm = options.radiusKm || DEFAULT_RADIUS_KM[typeKey];
@@ -126,34 +196,35 @@ export class PoiService {
     const dLng = radiusKm / (111 * Math.cos((center.lat * Math.PI) / 180));
     const bbox = `${(center.lat - dLat).toFixed(4)},${(center.lng - dLng).toFixed(4)},${(center.lat + dLat).toFixed(4)},${(center.lng + dLng).toFixed(4)}`;
 
-    const selectors = CATEGORY_SELECTORS[typeKey].map((s) => `${s};`).join('\n');
-    const query = `[out:json][timeout:20][bbox:${bbox}];(\n${selectors}\n);out center qt 800;`;
-
-    let elements: OverpassElement[] = [];
-    let lastError: any = null;
-    for (const endpoint of OVERPASS_ENDPOINTS) {
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'RouteMarketBuilderV3/1.0 (routemarket.io)'
-          },
-          body: `data=${encodeURIComponent(query)}`,
-          signal: AbortSignal.timeout(22000)
-        });
-        if (!res.ok) throw new Error(`Overpass ${endpoint} HTTP ${res.status}`);
-        const data = (await res.json()) as any;
-        elements = data.elements || [];
-        lastError = null;
-        break;
-      } catch (err) {
-        lastError = err;
-        console.warn(`[POI] Overpass endpoint failed: ${endpoint}`, err);
-      }
+    // Dwa rozdzielne zapytania zamiast jednego: samo `out ... 800` obcina wyniki
+    // w kolejności geograficznej, więc przy tysiącach drobnych szczytów klasyki
+    // regionu (np. Praděd) mogłyby w ogóle nie trafić do listy.
+    // Każde zapytanie samodzielnie znosi awarię — wynik jednego jest wart więcej
+    // niż nic, a Overpass potrafi obsłużyć jedno, a wywrócić się na drugim.
+    const queries: Promise<OverpassElement[]>[] = [
+      this.runQuery(this.buildQuery(bbox, typeKey, true), `${cacheKey}/notable`).catch((err) => {
+        console.warn(`[POI] Notable query failed: ${err.message}`);
+        return [] as OverpassElement[];
+      })
+    ];
+    if (options.includeMinor !== false) {
+      queries.push(
+        this.runQuery(this.buildQuery(bbox, typeKey, false), `${cacheKey}/all`).catch((err) => {
+          console.warn(`[POI] Broad query failed: ${err.message}`);
+          return [] as OverpassElement[];
+        })
+      );
     }
-    if (lastError) {
-      console.error('[POI] All Overpass endpoints failed:', lastError);
+
+    const elements = (await Promise.all(queries)).flat();
+    if (elements.length === 0) {
+      // Przeterminowany cache jest znacznie lepszy niż brak atrakcji w prompcie
+      const stale = cache.get(cacheKey);
+      if (stale) {
+        console.warn('[POI] Overpass unavailable — serving stale cached candidates.');
+        return stale.data.slice(0, limit);
+      }
+      console.error('[POI] Overpass unavailable and no cached candidates.');
       return [];
     }
 
@@ -179,7 +250,14 @@ export class PoiService {
       });
     }
 
-    candidates.sort((a, b) => b.score - a.score);
+    // Ranking: rozpoznawalność, ale z karą za oddalenie — atrakcja 50 km za granicą
+    // obszaru nie jest lepszym punktem trasy niż porównywalny klasyk tuż obok.
+    for (const c of candidates) {
+      const distKm = haversineKm(center.lat, center.lng, c.lat, c.lng);
+      c.distanceKm = Math.round(distKm * 10) / 10;
+      c.rank = c.score - (distKm / radiusKm) * 2.5;
+    }
+    candidates.sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
     cache.set(cacheKey, { at: Date.now(), data: candidates });
     return candidates.slice(0, limit);
   }
@@ -232,9 +310,10 @@ export class PoiService {
 
     const top = candidates.slice(0, 25);
     const rest = candidates.slice(25);
+    // Odległość od startu jest dla agenta kluczowa przy dopasowaniu trasy do dystansu
     const fmt = (list: PoiCandidate[]) =>
       list
-        .map((p) => `- "${p.name}" (${p.kind}${p.score >= 3 ? ', KLASYK' : ''})`)
+        .map((p) => `- "${p.name}" (${p.kind}${p.distanceKm != null ? `, ${p.distanceKm} km od startu` : ''}${p.score >= 3 ? ', KLASYK' : ''})`)
         .join('\n');
 
     let section = `\n=== ZWERYFIKOWANE ATRAKCJE W OKOLICY (realne dane OpenStreetMap, posortowane wg popularności) ===\n${fmt(top)}`;
