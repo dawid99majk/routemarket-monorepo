@@ -2,6 +2,35 @@
 
 Poniższe notatki zawierają kluczowe informacje o architekturze i logice wprowadzonej podczas ostatnich sesji. Są niezbędne do zachowania spójności przy dalszym rozwoju projektów **RouteMarket** i **Atlas**.
 
+## 🚀 Wdrażanie na VPS — kolejność kroków
+
+### Frontend: Docker NIE buduje aplikacji!
+`apps/frontend/Dockerfile` zawiera wyłącznie `COPY apps/frontend/dist /usr/share/nginx/html`. Uruchomienie samego `docker compose build frontend` **nie przebuduje aplikacji** — spakuje stary katalog `dist`, warstwa COPY pokaże `CACHED`, a compose i tak wypisze „Image Built". Zmiany w kodzie po cichu nie trafią na produkcję.
+
+Poprawna kolejność:
+```bash
+cd /root/routemarket-workspace/apps/frontend
+npm run build                       # Vite -> regeneruje dist/
+docker compose build frontend
+docker compose up -d frontend
+```
+Weryfikacja (nie ufaj komunikatowi „Built"):
+```bash
+docker images routemarket-frontend:latest --format "{{.CreatedSince}}"   # ma być "seconds ago"
+docker exec frontend-frontend-1 grep -l "<unikalny tekst ze zmiany>" /usr/share/nginx/html/assets/*.js
+```
+
+### Backend (route-builder-api / atlas-api): buduje się w Dockerze
+```bash
+cd /root/routemarket-workspace/apps/atlas-engine/deploy
+docker compose -f docker-compose.vps.yml build route-builder-api
+docker compose -f docker-compose.vps.yml up -d route-builder-api
+```
+Build kompiluje TypeScript, więc błędy typów zatrzymają wdrożenie — warto filtrować log po `error TS`.
+Uwaga: budowanie trwa kilka minut; przy uruchamianiu przez SSH w tle użyj `nohup`, inaczej zerwana sesja zabije build (exit 255).
+
+---
+
 ## 🧠 Silnik AI & Agent Atlas (Wywiad)
 
 ### 1. Priorytet Notatek (Zasada Naczelna)
