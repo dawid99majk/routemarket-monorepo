@@ -366,6 +366,7 @@ app.post('/chat-interview', async (c) => {
     // Centrum bierzemy z pinezki, a gdy jej nie ma (użytkownik podał start w czacie),
     // ustalamy je z treści rozmowy — inaczej cała warstwa POI by nie zadziałała.
     let poiCandidates: PoiCandidate[] = [];
+    let poiMatchPool: PoiCandidate[] = [];
     const poiRouteType = vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking');
     let poiCenter: { lat: number; lng: number } | null =
       current_waypoints && current_waypoints.length > 0
@@ -400,6 +401,14 @@ app.post('/chat-interview', async (c) => {
           poiRadiusKm ? { radiusKm: poiRadiusKm, limit: 45 } : { limit: 45 }
         );
         console.log(`[chat-interview] Loaded ${poiCandidates.length} OSM POI candidates (${poiRouteType}, radius ${poiRadiusKm || 'default'} km)`);
+        // Do promptu idzie top 45, ale dopasowywać nazwy chcemy do pełnej puli —
+        // punkt w rodzaju grani "Kępa" bywa poza czołówką rankingu, a to właśnie
+        // jego współrzędne z OSM ratują go przed pomyłką geokodera.
+        poiMatchPool = await poiService.fetchCandidates(
+          poiCenter,
+          poiRouteType,
+          poiRadiusKm ? { radiusKm: poiRadiusKm, limit: 800 } : { limit: 800 }
+        );
       } catch (err) {
         console.warn('[chat-interview] POI candidates fetch failed, continuing without:', err);
       }
@@ -779,7 +788,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         const failed_waypoints: string[] = [];
         for (const placeName of resultObj.add_waypoints) {
           // Najpierw dopasowanie do zweryfikowanych POI z OSM — dokładne współrzędne bez geokodera
-          const matched = poiService.matchCandidate(placeName, poiCandidates);
+          const matched = poiService.matchCandidate(placeName, poiMatchPool);
           if (matched) {
             suggested_waypoints.push({ lat: matched.lat, lng: matched.lng, name: placeName });
             if (!biasPoint) biasPoint = { lat: matched.lat, lng: matched.lng };
@@ -859,7 +868,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
 
               const rebuilt: any[] = [];
               for (const name of corrected) {
-                const matched = poiService.matchCandidate(name, poiCandidates);
+                const matched = poiService.matchCandidate(name, poiMatchPool);
                 if (matched) {
                   rebuilt.push({ lat: matched.lat, lng: matched.lng, name });
                   continue;

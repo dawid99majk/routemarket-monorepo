@@ -145,27 +145,45 @@ export class GeocodingService {
     }
 
     let lastError: any = null;
-    for (const variant of variants) {
-      try {
-        return await this.geocodeExact(variant, biasPoint, variant !== query ? query : undefined);
-      } catch (err) {
-        lastError = err;
-        if (variant !== variants[variants.length - 1]) {
-          console.warn(`[Geocoding] "${variant}" not found, retrying with shorter context...`);
+    // Najpierw wszystkie warianty nazwy w obrębie regionu trasy, dopiero potem
+    // wyszukiwanie globalne — inaczej pospolita nazwa trafia w drugi koniec kraju.
+    const passes = biasPoint ? [true, false] : [false];
+    for (const bounded of passes) {
+      for (const variant of variants) {
+        try {
+          return await this.geocodeExact(variant, biasPoint, variant !== query ? query : undefined, bounded);
+        } catch (err) {
+          lastError = err;
         }
+      }
+      if (bounded) {
+        console.warn(`[Geocoding] "${query}" not found within the route region, widening search...`);
       }
     }
     throw lastError;
   }
 
-  private async geocodeExact(query: string, biasPoint?: {lat: number, lng: number}, originalName?: string): Promise<GeocodedPlace> {
+  private async geocodeExact(query: string, biasPoint?: {lat: number, lng: number}, originalName?: string, boundedToRegion = false): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
 
     // 1. Główne geokodowanie - OpenStreetMap Nominatim (świetny do POI, dzielnic, zabytków)
     try {
-      console.log(`[Geocoding] Trying OSM Nominatim Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
+      console.log(`[Geocoding] Trying OSM Nominatim Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}${boundedToRegion ? ' [bounded]' : ''}`);
       const limit = biasPoint ? 10 : 1;
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=${limit}`;
+      let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=${limit}`;
+      if (biasPoint && boundedToRegion) {
+        // Zamknięcie wyszukiwania w okolicy trasy. Pospolite nazwy ("Kępa", "Stawno")
+        // występują w Polsce dziesiątki razy i sortowanie wyników po odległości nie
+        // pomaga, jeśli Nominatim w ogóle nie zwróci tego właściwego w pierwszej
+        // dziesiątce. bounded=1 odcina resztę kraju.
+        const dLat = 0.45;
+        const dLng = 0.45 / Math.max(0.2, Math.cos((biasPoint.lat * Math.PI) / 180));
+        const left = (biasPoint.lng - dLng).toFixed(4);
+        const right = (biasPoint.lng + dLng).toFixed(4);
+        const top = (biasPoint.lat + dLat).toFixed(4);
+        const bottom = (biasPoint.lat - dLat).toFixed(4);
+        url += `&viewbox=${left},${top},${right},${bottom}&bounded=1`;
+      }
       const res = await fetch(url, {
         headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0' }
       });
@@ -195,8 +213,10 @@ export class GeocodingService {
       console.warn(`[Geocoding] OSM Nominatim geocoding failed: ${err.message}`);
     }
 
-    // 2. Fallback do GraphHopper (lepszy tylko dla ścisłych adresów z numerami domów)
-    if (apiKey) {
+    // 2. Fallback do GraphHopper (lepszy tylko dla ścisłych adresów z numerami domów).
+    // W przebiegu ograniczonym do regionu pomijamy go — nie ma parametru bbox, więc
+    // odesłałby odległy wynik i zniweczył sens zawężenia obszaru.
+    if (apiKey && !boundedToRegion) {
       try {
         console.log(`[Geocoding] Trying GraphHopper Geocoding for: "${query}"${biasPoint ? ` near ${biasPoint.lat},${biasPoint.lng}` : ''}`);
         let url = `https://graphhopper.com/api/1/geocode?q=${encodeURIComponent(query)}&locale=pl&key=${apiKey}`;
