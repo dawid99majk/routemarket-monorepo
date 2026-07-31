@@ -20,7 +20,7 @@ const CHAT_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
     done: { type: 'boolean' },
-    phase: { type: 'string', enum: ['discovery', 'variant_choice', 'refine', 'confirm', 'generate'] },
+    phase: { type: 'string', enum: ['start_point', 'discovery', 'variant_choice', 'refine', 'confirm', 'generate'] },
     reply: { type: 'string' },
     allow_custom: { type: 'boolean' },
     options: {
@@ -37,7 +37,10 @@ const CHAT_RESPONSE_SCHEMA = {
             type: 'object',
             properties: {
               structure: { type: 'string' },
+              start_point: { type: 'string' },
               region: { type: 'string' },
+              pace: { type: 'string' },
+              interests: { type: 'string' },
               difficulty: { type: 'string' },
               pattern: { type: 'string' },
               accommodation: { type: 'string' },
@@ -310,6 +313,9 @@ app.post('/chat-interview', async (c) => {
     if (trip_profile && Object.keys(trip_profile).length > 0) {
       const labels: Record<string, string> = {
         structure: 'Struktura wyjazdu',
+        start_point: 'Punkt startu',
+        pace: 'Tempo',
+        interests: 'Zainteresowania',
         region: 'Wybrany rejon',
         difficulty: 'Trudność',
         pattern: 'Wzorzec trasy',
@@ -471,6 +477,14 @@ Użytkownik często NIE ZNA terenu — może lecieć do Tirany i nie mieć poję
 
 Prowadzisz rozmowę w FAZACH. W każdej odpowiedzi zwracasz pole "phase" oraz — gdy dajesz wybór — tablicę "options" z konkretnymi kartami do kliknięcia.
 
+FAZA 0 — "start_point" (PUNKT STARTU — ZAWSZE PIERWSZE PYTANIE)
+Jeśli użytkownik podał tylko miasto/region, a nie wiadomo, skąd konkretnie rusza (brak pinezki na mapie), TO JEST PIERWSZA RZECZ DO USTALENIA — start determinuje całą resztę trasy.
+Nie pytaj sucho „skąd startujesz?". Zaproponuj wybór:
+- karta 1: konkretny, popularny punkt startowy, który SAM dobierzesz dla tego miasta i rodzaju trasy (parking przy szlaku, dworzec, rynek, węzeł szlaków) — podaj jego nazwę w "title" i uzasadnij w "description" (dojazd, parking, komunikacja);
+- karta 2: „Chcę podać własny punkt" — z podpowiedzią w "description", że może wpisać hotel, dworzec, adres lub postawić pinezkę na mapie.
+Jeśli region ma kilka naturalnych baz wypadowych, możesz dać 2-3 karty z propozycjami plus kartę „własny punkt".
+Gdy użytkownik wybierze konkretny punkt, zapisz go w implies jako {"start_point": "<dokładna nazwa>"}.
+
 FAZA 1 — "discovery" (otwarcie rozeznaniem, NIE pytaniem o parametry)
 Masz miejscowość, czas i pojazd. Użyj wyszukiwarki Google, żeby dowiedzieć się, co realnie jest w zasięgu.
 Zacznij od KONKRETU, który pokazuje, że znasz teren, a potem zadaj JEDNO pytanie rozstrzygające o STRUKTURĘ wyjazdu — bo ono przesądza kształt trasy:
@@ -496,11 +510,19 @@ Warianty mają się RÓŻNIĆ kierunkiem lub charakterem (inne pasmo, grzbiet vs
 MINIMUM DWA WARIANTY — podanie jednej propozycji to błąd, bo użytkownik nie ma wtedy czego wybierać. Jeśli region wydaje się oczywisty, i tak pokaż wariant alternatywny (np. krótszy/łatwiejszy, inne pasmo, albo ten sam kierunek w odwrotną stronę).
 CEL WĘDRÓWKI: przy wyjeździe wielodniowym co najmniej jeden wariant MUSI prowadzić do najważniejszego obiektu pasma (najwyższy szczyt, główna atrakcja), nawet jeśli leży 20 km od startu. Wariant kręcący się w promieniu kilku kilometrów od bazy jest do przyjęcia tylko przy noclegu w bazie (structure: radial).
 
-FAZA 3 — "refine" (1-2 dopytania istotne dla wybranego wariantu)
-Po wyborze wariantu dopytaj o rzeczy, które faktycznie zmieniają trasę — np. konkretne schronisko na nocleg, czy zahaczyć o sąsiedni kraj, czy dołożyć dodatkową atrakcję po drodze. Podaj jako "options", zawsze zostawiając możliwość wpisania czegoś od siebie.
+FAZA 3 — "refine" (2-4 dopytania — to jest WYWIAD, nie formalność)
+Klient ma poczuć, że trasa powstaje pod NIEGO. Zadaj kolejno kilka pytań, każde jako osobna odpowiedź z kartami (jedno pytanie naraz). Dobieraj je do pojazdu i wybranego wariantu — pytaj o rzeczy, które REALNIE zmienią trasę lub przewodnik:
+- tempo i kondycja: spokojnie z zapasem czasu / normalnie / sportowo bez przystanków;
+- co Cię najbardziej ciekawi: widoki i przyroda / historia i zabytki / jedzenie i lokalne knajpy / fotografia / cisza i pustka;
+- przerwy i jedzenie: schroniska i knajpki po drodze / prowiant własny, bez postojów;
+- czego unikać: stromych podejść, ekspozycji i łańcuchów, tłumów, dróg ruchliwych, odcinków płatnych;
+- pora startu i światło: wschód słońca, wczesny start, spokojne popołudnie;
+- konkrety zależne od wariantu: które schronisko na nocleg, czy zahaczyć o sąsiedni kraj, czy dołożyć konkretną atrakcję po drodze.
+Nie zadawaj wszystkich naraz i nie pytaj o rzeczy, które już wynikają z rozmowy albo z wybranego wariantu. Po 2-4 pytaniach przechodź do podsumowania.
+Przy każdym pytaniu zostawiaj "allow_custom": true — użytkownik może dopisać coś od siebie zamiast wybierać kartę.
 
 FAZA 4 — "confirm" (podsumowanie do zatwierdzenia)
-Streść plan w 1-2 zdaniach z konkretami (dokąd, przez co, ile km, gdzie nocleg) i zapytaj, czy generować.
+Streść plan z konkretami: skąd start, dokąd, przez co, ile km, gdzie nocleg — ORAZ wypunktuj, jak uwzględniłeś odpowiedzi z wywiadu (np. „spokojne tempo, przerwa w schronisku, omijamy odcinki z łańcuchami"). To moment, w którym klient ma zobaczyć, że trasa jest ułożona pod niego. Zapytaj, czy generować.
 
 FAZA 5 — generowanie: done: true, pełna lista "add_waypoints".
 
@@ -721,7 +743,7 @@ ${rawText}
 
 Zwroc DOKLADNIE obiekt JSON z polami:
 - "done": boolean (true jesli agent zakonczyl zbieranie danych i podaje trase, false jesli jeszcze pyta)
-- "phase": string (jedna z: discovery, variant_choice, refine, confirm, generate)
+- "phase": string (jedna z: start_point, discovery, variant_choice, refine, confirm, generate)
 - "reply": string (odpowiedz agenta po polsku)
 - "options": tablica kart wyboru, kazda z polami id, title, subtitle, description, highlights (tablica stringow), implies (obiekt) — TYLKO gdy tekst przedstawia warianty do wyboru
 - "allow_custom": boolean (czy uzytkownik moze wpisac wlasna odpowiedz zamiast wybrac karte)

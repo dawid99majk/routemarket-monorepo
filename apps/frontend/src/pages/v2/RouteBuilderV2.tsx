@@ -102,6 +102,16 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   
   const isRouting = state.matches('generating_route') || state.matches('saving_project');
   const isTyping = state.matches('chatting');
+  const isGenerating = state.matches('generating_route');
+  const isSaving = state.matches('saving_project');
+  // Status pracy agenta — bez tego użytkownik nie wie, czy system liczy, czy zamarł.
+  const busyLabel = isTyping
+    ? 'Agent myśli…'
+    : isGenerating
+      ? 'Wyznaczam trasę…'
+      : isSaving
+        ? 'Zapisuję projekt…'
+        : null;
 
   const lastLoadedId = useRef<string | null>(null);
 
@@ -509,6 +519,8 @@ ${points}
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isTyping) return;
+    // W trakcie generowania/zapisu wiadomość przerywa bieżącą pracę — maszyna
+    // obsługuje SEND_MESSAGE w tych stanach, więc nie blokujemy wysyłki.
     const userText = inputValue;
     setInputValue('');
     send({ type: 'SEND_MESSAGE', text: userText });
@@ -665,9 +677,10 @@ ${points}
                   </div>
                 </div>
               ))}
-              {isTyping && (
+              {busyLabel && (
                 <div className="flex justify-start">
-                  <div className="bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-200/50 p-4 shadow-sm flex items-center gap-1">
+                  <div className="bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-200/50 p-4 shadow-sm flex items-center gap-2">
+                    <span className="text-xs text-slate-500">{busyLabel}</span>
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
@@ -683,7 +696,7 @@ ${points}
                 <Input 
                   value={inputValue}
                   onChange={e => setInputValue(e.target.value)}
-                  placeholder="Zapytaj agenta o poradę..."
+                  placeholder={isGenerating || isSaving ? "Możesz napisać, co zmienić…" : "Zapytaj agenta o poradę..."}
                   className="w-full bg-slate-50 border-slate-200 rounded-full pl-4 pr-12 py-5 text-slate-900 focus-visible:ring-emerald-500/50"
                 />
                 <Button type="submit" size="icon" className="absolute right-1 rounded-full bg-emerald-600 hover:bg-emerald-500 w-8 h-8 text-white">

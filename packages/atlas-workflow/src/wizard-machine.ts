@@ -299,6 +299,12 @@ export const wizardMachine = setup({
       }
     },
     generating_route: {
+      // Bez tego zdarzenie jest cicho porzucane przez xstate: użytkownik pisze
+      // "zmień trasę" w trakcie liczenia, wiadomość znika i wygląda to na zawieszenie.
+      on: {
+        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
+        SET_FIELD: { actions: 'assignField' }
+      },
       invoke: {
         src: 'routeGeneratorActor',
         input: ({ context }) => ({ context }),
@@ -319,6 +325,12 @@ export const wizardMachine = setup({
       }
     },
     saving_project: {
+      // Zapis jest upsertem, więc przerwanie go nową wiadomością nic nie psuje —
+      // kolejny zapis i tak utrwali stan projektu.
+      on: {
+        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
+        SET_FIELD: { actions: 'assignField' }
+      },
       invoke: {
         src: 'saveProjectActor',
         input: ({ context }) => ({ context }),
