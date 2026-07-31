@@ -15,6 +15,7 @@ export interface ChatMessage {
   text: string;
   options?: RouteOption[];
   allowCustom?: boolean;
+  phase?: string;
 }
 
 export interface Waypoint {
@@ -42,6 +43,8 @@ export interface WizardContext {
   distanceTargetKm: number | null;
   /** Decyzje podjęte kliknięciem kart wyboru — sterują geometrią generowanej trasy. */
   tripProfile: Record<string, any>;
+  /** Aktualny etap wywiadu — steruje paskiem kroków w warstwie wywiadu. */
+  phase: string | null;
 
   // Stats
   routeStats: {
@@ -88,6 +91,7 @@ export const initialWizardContext: WizardContext = {
   routingPreference: 'popular',
   distanceTargetKm: null,
   tripProfile: {},
+  phase: null,
   routeStats: { distance: 0, ascent: 0, descent: 0 },
 
   title: 'Nowa Trasa AI',
@@ -142,12 +146,18 @@ export const wizardMachine = setup({
         return context.chatMessages;
       }
     }),
+    assignPhase: assign({
+      phase: ({ context, event }) => {
+        // @ts-ignore
+        return event.output?.phase ?? context.phase;
+      }
+    }),
     appendAgentResponse: assign({
       chatMessages: ({ context, event }) => {
         // @ts-ignore
         const output = event.output;
         if (output && output.message) {
-          const message: ChatMessage = { role: 'agent', text: output.message };
+          const message: ChatMessage = { role: 'agent', text: output.message, phase: output.phase };
           if (Array.isArray(output.options) && output.options.length > 0) {
             message.options = output.options;
             message.allowCustom = output.allow_custom !== false;
@@ -279,11 +289,11 @@ export const wizardMachine = setup({
             target: 'generating_route',
             // @ts-ignore
             guard: ({ event }) => event.output && event.output.done === true,
-            actions: ['appendAgentResponse', 'assignSuggestedWaypoints', 'resetRetries']
+            actions: ['appendAgentResponse', 'assignPhase', 'assignSuggestedWaypoints', 'resetRetries']
           },
           {
             target: 'idle',
-            actions: ['appendAgentResponse', 'resetRetries']
+            actions: ['appendAgentResponse', 'assignPhase', 'resetRetries']
           }
         ],
         onError: [

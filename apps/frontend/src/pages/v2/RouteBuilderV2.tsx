@@ -77,6 +77,7 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 import { ElevationProfile } from '@/components/ElevationProfile';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
 import RouteOptionCards from '@/pages/v2/components/RouteOptionCards';
+import InterviewOverlay from '@/pages/v2/components/InterviewOverlay';
 
 const areWaypointsGeometricallyEqual = (a: any[], b: any[]) => {
   if (!a || !b || a.length !== b.length) return false;
@@ -105,6 +106,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const isGenerating = state.matches('generating_route');
   const isSaving = state.matches('saving_project');
   // Status pracy agenta — bez tego użytkownik nie wie, czy system liczy, czy zamarł.
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
   const busyLabel = isTyping
     ? 'Agent myśli…'
     : isGenerating
@@ -526,8 +528,28 @@ ${points}
     send({ type: 'SEND_MESSAGE', text: userText });
   };
 
+  // Wywiad zajmuje cały ekran, dopóki nie ma trasy — panel 400 px był za ciasny
+  // na karty wyboru. Po wygenerowaniu warstwa znika i odsłania mapę.
+  const interviewActive =
+    !overlayDismissed &&
+    chatMessages.length > 0 &&
+    !geometry &&
+    context.phase !== null &&
+    context.phase !== 'generate';
+
   return (
-    <div className="flex h-screen w-full bg-slate-50 font-sans overflow-hidden">
+    <div className="relative flex h-screen w-full bg-slate-50 font-sans overflow-hidden">
+      {interviewActive && (
+        <InterviewOverlay
+          messages={chatMessages}
+          phase={context.phase}
+          tripProfile={context.tripProfile}
+          busyLabel={busyLabel}
+          onChoose={chooseOption}
+          onSend={(text) => send({ type: 'SEND_MESSAGE', text })}
+          onClose={() => setOverlayDismissed(true)}
+        />
+      )}
       
       {/* Left Panel - Control & Chat */}
       <div className="w-[400px] flex flex-col bg-white border-r border-slate-200 shadow-xl z-10 shrink-0">
