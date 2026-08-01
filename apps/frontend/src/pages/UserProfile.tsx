@@ -24,8 +24,8 @@ function StripeConnectStatus({ userId }: { userId: string }) {
     queryKey: ['creator-profile-stripe', userId],
     queryFn: async () => {
       const { data } = await supabase
-        .from('creator_profiles')
-        .select('stripe_connect_account_id, stripe_onboarding_complete, total_earnings, total_sales')
+        .from('profiles')
+        .select('id')
         .eq('user_id', userId)
         .maybeSingle();
       return data;

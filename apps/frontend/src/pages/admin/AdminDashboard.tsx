@@ -8,7 +8,7 @@ export default function AdminDashboard() {
     queryKey: ['admin-stats'],
     queryFn: async () => {
       const [routesRes, profilesRes, aiProjectsRes] = await Promise.all([
-        supabase.from('routes').select('id, status, created_at', { count: 'exact' }),
+        (supabase as any).from('trip_projects').select('id, created_at', { count: 'exact' }),
         supabase.from('profiles').select('id', { count: 'exact' }),
         (supabase as any).from('route_builder_projects').select('id', { count: 'exact' }),
       ]);

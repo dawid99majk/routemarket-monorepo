@@ -1,306 +1,135 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Compass, Smartphone, MapPin, Loader2, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Loader2, Navigation, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchPurchaseAccess } from '@/lib/purchase-access';
-import { parseGpx } from '@/lib/gpx-parser';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { parseGpx } from '@/lib/gpx-parser';
 import NavigationMode from './NavigationMode';
 import type { Polyline } from '@/lib/geo-utils';
 
-interface RouteAccessInfo {
-  routeId: number;
-  routeTitle: string;
-  startLat: number;
-  startLng: number;
-  hasAccess: boolean;
+interface NavigableRoute {
+  id: string;
+  title: string;
+  track: Polyline;
 }
 
+/**
+ * Pływający przycisk nawigacji. Wcześniej prowadził po trasach kupionych w
+ * marketplace; teraz źródłem są własne trasy z kreatora, bo tylko one w nowym
+ * modelu istnieją.
+ */
 export default function NavigationLauncher() {
   const isMobile = useIsMobile();
-  const [showOnTablet, setShowOnTablet] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)').matches : false,
+  const [narrowScreen, setNarrowScreen] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)').matches : false
   );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mql = window.matchMedia('(max-width: 1023px)');
-    const handler = () => setShowOnTablet(mql.matches);
+    const handler = () => setNarrowScreen(mql.matches);
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
   }, []);
 
-  const visible = isMobile || showOnTablet;
+  // Nawigacja ma sens tylko na urządzeniu, które nosisz ze sobą
+  const visible = isMobile || narrowScreen;
 
   const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const params = useParams();
+  const [picking, setPicking] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [routes, setRoutes] = useState<NavigableRoute[]>([]);
+  const [active, setActive] = useState<NavigableRoute | null>(null);
 
-  const [open, setOpen] = useState(false);
-  const [loadingGpx, setLoadingGpx] = useState(false);
-  const [navTrack, setNavTrack] = useState<Polyline | null>(null);
-  const [routeInfo, setRouteInfo] = useState<RouteAccessInfo | null>(null);
-  const [checkingAccess, setCheckingAccess] = useState(false);
+  const openPicker = async () => {
+    setPicking(true);
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('route_builder_projects')
+        .select('id, requirements')
+        .order('updated_at', { ascending: false, nullsFirst: false })
+        .limit(30);
+      if (error) throw error;
 
-  // Determine if we are on a route detail page
-  const routeIdMatch = location.pathname.match(/^\/route\/(\d+)/);
-  const currentRouteId = routeIdMatch ? Number(routeIdMatch[1]) : null;
-
-  // Fetch route info + access status when on a route page
-  useEffect(() => {
-    if (!currentRouteId || !user) {
-      setRouteInfo(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setCheckingAccess(true);
-      try {
-        const [{ data: route }, { data: purchase }] = await Promise.all([
-          supabase
-            .from('routes')
-            .select('id, title, latitude, longitude, preview_track, user_id')
-            .eq('id', currentRouteId)
-            .maybeSingle(),
-          supabase
-            .from('purchases')
-            .select('id')
-            .eq('route_id', currentRouteId)
-            .eq('user_id', user.id)
-            .maybeSingle(),
-        ]);
-        if (cancelled || !route) return;
-        const isOwner = route.user_id === user.id;
-        const purchased = !!purchase;
-        const preview = route.preview_track as Array<[number, number]> | null;
-        setRouteInfo({
-          routeId: route.id,
-          routeTitle: route.title,
-          startLat: preview?.[0]?.[0] ?? route.latitude,
-          startLng: preview?.[0]?.[1] ?? route.longitude,
-          hasAccess: purchased || isOwner,
-        });
-      } finally {
-        if (!cancelled) setCheckingAccess(false);
+      const usable: NavigableRoute[] = [];
+      for (const project of data || []) {
+        const gpx = project.requirements?.gpxData;
+        if (!gpx) continue;
+        try {
+          const parsed = parseGpx(gpx);
+          const track = (parsed?.trackPoints || []) as Polyline;
+          if (track.length >= 2) {
+            usable.push({ id: project.id, title: project.requirements?.title || 'Trasa bez nazwy', track });
+          }
+        } catch {
+          // Uszkodzony ślad pomijamy — nie ma powodu wywracać całej listy
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentRouteId, user, params.id]);
-
-  if (!visible || authLoading) return null;
-
-  const handleClick = () => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    if (currentRouteId) {
-      if (checkingAccess) return;
-      if (routeInfo?.hasAccess) {
-        setOpen(true);
-      } else {
-        toast.info('Kup tę trasę, aby uruchomić nawigację');
-        const buyBtn = document.querySelector('[data-buy-cta]');
-        buyBtn?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setRoutes(usable);
+      if (usable.length === 0) {
+        toast.info('Nie masz jeszcze trasy z wygenerowanym plikiem GPX');
       }
-      return;
+    } catch (err: any) {
+      toast.error(err.message || 'Nie udało się wczytać tras');
+    } finally {
+      setLoading(false);
     }
-    navigate('/my-routes');
   };
 
-  // External app deep link to start point
-  const openExternalToStart = () => {
-    if (!routeInfo) return;
-    const ua = navigator.userAgent;
-    const isIOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    let url: string;
-    if (isIOS) {
-      url = `maps://?daddr=${routeInfo.startLat},${routeInfo.startLng}&dirflg=d`;
-    } else if (isAndroid) {
-      url = `geo:0,0?q=${routeInfo.startLat},${routeInfo.startLng}(Start trasy)`;
-    } else {
-      url = `https://www.google.com/maps/dir/?api=1&destination=${routeInfo.startLat},${routeInfo.startLng}`;
-    }
-    window.open(url, '_blank');
-  };
+  if (!visible || authLoading || !user) return null;
 
-  async function fetchGpxBlob(): Promise<{ blob: Blob; xml: string } | null> {
-    if (!routeInfo) return null;
-    const access = await fetchPurchaseAccess({ routeId: routeInfo.routeId });
-    if (!access.gpx_download?.url) {
-      toast.error('Nie udało się pobrać pliku GPX');
-      return null;
-    }
-    const res = await fetch(access.gpx_download.url);
-    if (!res.ok) {
-      toast.error('Nie udało się pobrać pliku GPX');
-      return null;
-    }
-    const xml = await res.text();
-    const blob = new Blob([xml], { type: 'application/gpx+xml' });
-    return { blob, xml };
+  if (active) {
+    return <NavigationMode track={active.track} routeTitle={active.title} onClose={() => setActive(null)} />;
   }
-
-  const handleShareGpx = async () => {
-    if (!routeInfo) return;
-    setLoadingGpx(true);
-    try {
-      const result = await fetchGpxBlob();
-      if (!result) return;
-      const file = new File(
-        [result.blob],
-        `${routeInfo.routeTitle.replace(/[^a-z0-9]+/gi, '-')}.gpx`,
-        { type: 'application/gpx+xml' },
-      );
-      const shareData: ShareData = { files: [file], title: routeInfo.routeTitle, text: 'Trasa GPX' };
-      const navAny = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-      if (navAny.share && navAny.canShare?.(shareData)) {
-        await navAny.share(shareData);
-      } else {
-        const url = URL.createObjectURL(result.blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-        toast.success('Plik GPX pobrany — otwórz w aplikacji turystycznej');
-      }
-      setOpen(false);
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        toast.error(err?.message || 'Nie udało się udostępnić pliku GPX');
-      }
-    } finally {
-      setLoadingGpx(false);
-    }
-  };
-
-  const handleStartInAppNav = async () => {
-    setLoadingGpx(true);
-    try {
-      const result = await fetchGpxBlob();
-      if (!result) return;
-      const parsed = parseGpx(result.xml);
-      if (parsed.trackPoints.length < 2) {
-        toast.error('Plik GPX nie zawiera trasy do nawigacji');
-        return;
-      }
-      setNavTrack(parsed.trackPoints);
-      setOpen(false);
-    } catch (err: any) {
-      toast.error(err?.message || 'Nie udało się załadować trasy');
-    } finally {
-      setLoadingGpx(false);
-    }
-  };
 
   return (
     <>
-      {/* Expandable FAB — sits above GuideHub */}
       <button
-        onClick={handleClick}
-        aria-label="Nawiguj"
-        className="group fixed right-4 bottom-[88px] z-[1300] lg:hidden flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        onClick={openPicker}
+        aria-label="Nawigacja"
+        className="fixed bottom-5 right-5 z-[1400] w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg flex items-center justify-center transition-colors"
       >
-        {checkingAccess ? (
-          <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
-        ) : (
-          <Compass className="w-5 h-5 shrink-0" />
-        )}
-        <span className="overflow-hidden max-w-0 group-hover:max-w-[140px] group-focus-visible:max-w-[140px] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-hover:ml-2 group-focus-visible:ml-2 text-sm font-semibold whitespace-nowrap transition-all duration-300 ease-out">
-          Nawiguj
-        </span>
+        <Navigation className="w-6 h-6" />
       </button>
 
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>Wybierz tryb nawigacji</DrawerTitle>
-            <DrawerDescription>
-              Możesz nawigować bezpośrednio w aplikacji lub otworzyć trasę w zewnętrznym programie.
-            </DrawerDescription>
-          </DrawerHeader>
-
-          <div className="px-4 pb-6 space-y-3">
-            <button
-              onClick={handleStartInAppNav}
-              disabled={loadingGpx}
-              className="w-full text-left bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors disabled:opacity-60 flex items-start gap-3"
-            >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                {loadingGpx ? <Loader2 className="w-5 h-5 animate-spin" /> : <Compass className="w-5 h-5" />}
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm">Nawiguj w przeglądarce</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Pełnoekranowa mapa z Twoją pozycją GPS i wskaźnikiem dystansu
+      {picking && (
+        <div className="fixed inset-0 z-[1500] bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-background rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <span className="font-semibold">Którą trasą nawigujemy?</span>
+              <button onClick={() => setPicking(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-3 space-y-2">
+              {loading && (
+                <div className="flex items-center gap-2 justify-center py-8 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" /> Wczytuję trasy…
+                </div>
+              )}
+              {!loading && routes.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8 px-4">
+                  Żadna z Twoich tras nie ma jeszcze pliku GPX. Wygeneruj trasę w kreatorze, a pojawi się tutaj.
                 </p>
-              </div>
-            </button>
-
-            <button
-              onClick={handleShareGpx}
-              disabled={loadingGpx}
-              className="w-full text-left bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors disabled:opacity-60 flex items-start gap-3"
-            >
-              <div className="w-10 h-10 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
-                {loadingGpx ? <Loader2 className="w-5 h-5 animate-spin" /> : <Smartphone className="w-5 h-5" />}
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm flex items-center gap-1.5">
-                  Otwórz w aplikacji turystycznej <ExternalLink className="w-3 h-3" />
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Eksport GPX do Komoot, Mapy.cz, OsmAnd, Locus Map i innych
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                openExternalToStart();
-                setOpen(false);
-              }}
-              className="w-full text-left bg-card border border-border rounded-xl p-4 hover:border-primary transition-colors flex items-start gap-3"
-            >
-              <div className="w-10 h-10 rounded-lg bg-success/10 text-success flex items-center justify-center shrink-0">
-                <MapPin className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm flex items-center gap-1.5">
-                  Jedź do startu <ExternalLink className="w-3 h-3" />
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Nawigacja samochodowa do punktu początkowego (Google Maps / Apple Maps)
-                </p>
-              </div>
-            </button>
+              )}
+              {routes.map((route) => (
+                <button
+                  key={route.id}
+                  onClick={() => {
+                    setActive(route);
+                    setPicking(false);
+                  }}
+                  className="w-full text-left rounded-xl border p-3 hover:border-emerald-500 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="font-medium text-sm">{route.title}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{route.track.length} punktów śladu</div>
+                </button>
+              ))}
+            </div>
           </div>
-        </DrawerContent>
-      </Drawer>
-
-      {navTrack && routeInfo && (
-        <NavigationMode
-          track={navTrack}
-          routeTitle={routeInfo.routeTitle}
-          onClose={() => setNavTrack(null)}
-        />
+        </div>
       )}
     </>
   );

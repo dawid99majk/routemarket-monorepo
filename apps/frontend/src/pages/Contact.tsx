@@ -44,33 +44,22 @@ export default function Contact() {
 
     setSending(true);
     try {
-      // Generate ID client-side so we don't need SELECT access for anon users
-      const convId = crypto.randomUUID();
-
-      // Create conversation
-      const { error: convErr } = await supabase
-        .from('conversations')
-        .insert({
-          id: convId,
-          user_id: user?.id || null,
-          guest_name: user ? null : parsed.data.name,
-          guest_email: user ? null : parsed.data.email,
-          subject: parsed.data.subject,
-        });
-
-      if (convErr) throw convErr;
-
-      // Insert first message
-      const { error: msgErr } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: convId,
-          sender_id: user?.id || null,
-          sender_type: user ? 'user' : 'guest',
-          content: parsed.data.message,
-        });
-
-      if (msgErr) throw msgErr;
+      // Skrzynka kontaktowa żyła w tabelach marketplace'u. Formularz trafia teraz
+      // wprost do kolejki mailowej — bez osobnego modułu wiadomości w aplikacji.
+      const { error } = await (supabase as any).rpc('enqueue_email', {
+        queue_name: 'transactional_emails',
+        payload: {
+          message_id: `contact-${crypto.randomUUID()}`,
+          label: 'contact_form',
+          to: 'kontakt@routemarket.io',
+          from: 'RouteMarket <noreply@routemarket.io>',
+          reply_to: parsed.data.email,
+          subject: `[Kontakt] ${parsed.data.subject}`,
+          text: `Od: ${parsed.data.name} <${parsed.data.email}>\n\n${parsed.data.message}`,
+          html: `<p><strong>${parsed.data.name}</strong> &lt;${parsed.data.email}&gt;</p><p>${parsed.data.message.replace(/\n/g, '<br>')}</p>`
+        }
+      });
+      if (error) throw error;
 
       setSent(true);
       toast.success('Wiadomość wysłana!');
