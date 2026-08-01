@@ -13,6 +13,7 @@ import { authMiddleware } from './middleware/auth.js';
 import { poiService, PoiCandidate } from './services/poi.js';
 import { routeValidatorService } from './services/route-validator.js';
 import { describeAvailability, isOpenDuring } from './services/opening-hours.js';
+import { callGeminiTracked } from './services/ai-usage.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
@@ -354,13 +355,11 @@ Zwróć 6-10 propozycji. Dla każdej podaj:
 
 Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}.`;
 
-    const searchRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] })
-    });
-    if (!searchRes.ok) throw new Error('Gemini search error ' + await searchRes.text());
-    const searchData = await searchRes.json() as any;
+    const searchData = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      { contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] },
+      { operation: 'discover-places', model: 'gemini-2.5-flash' }
+    );
     const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     let places: any[] | null = null;
@@ -533,10 +532,9 @@ ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "re
 
 Odpowiedz WYŁĄCZNIE obiektem JSON.`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
@@ -585,10 +583,9 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
           // JSON urywał się w połowie zdania. Limit musi mieścić jedno i drugie.
           maxOutputTokens: 32768
         }
-      })
-    });
-    if (!res.ok) throw new Error('Gemini plan error ' + await res.text());
-    const data = await res.json() as any;
+      },
+      { operation: 'plan-trip', model: 'gemini-2.5-flash' }
+    );
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const finish = data.candidates?.[0]?.finishReason;
     if (!text) throw new Error(`Pusta odpowiedź planera (finishReason: ${finish})`);
@@ -1210,20 +1207,11 @@ Przykład 5 — użytkownik zatwierdził → generujesz trasę (done: true):
 }`;
 
     // === ETAP 1: Gemini z Google Search (tekst, bez wymuszenia JSON) ===
-    const searchResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ googleSearch: {} }]
-      })
-    });
-
-    if (!searchResponse.ok) {
-      throw new Error("Gemini Search API error " + await searchResponse.text());
-    }
-
-    const searchData = await searchResponse.json() as any;
+    const searchData = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      { contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] },
+      { operation: 'chat-interview', model: 'gemini-2.5-flash', userId: c.get('userId') || null, projectId: project_id || null }
+    );
     const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     console.log("[chat-interview] Gemini raw response (first 500 chars):", rawText.substring(0, 500));
 
