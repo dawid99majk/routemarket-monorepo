@@ -12,6 +12,7 @@ import { gpxParserService } from './services/gpx-parser.js';
 import { authMiddleware } from './middleware/auth.js';
 import { poiService, PoiCandidate } from './services/poi.js';
 import { routeValidatorService } from './services/route-validator.js';
+import { describeAvailability, isOpenDuring } from './services/opening-hours.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
@@ -402,6 +403,188 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
     return c.json({ destination, center: { lat: center.lat, lng: center.lng }, places: results });
   } catch (err: any) {
     console.error('[discover-places] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Układa przypięte miejsca w konkretne dni i godziny. Wykonalność liczymy w kodzie
+ * (godziny otwarcia, czasy przejść), a modelowi zostawiamy kolejność i narrację —
+ * odwrotnie byłoby zgadywaniem: model nie policzy rzetelnie, czy zdążysz.
+ */
+app.post('/plan-trip', async (c) => {
+  try {
+    const body = await c.req.json() as {
+      destination: string;
+      days: number;
+      window: { start: string; end: string };
+      start_date?: string;
+      hotel?: { name: string; lat?: number; lng?: number } | null;
+      fixed?: { time: string; label: string; minutes?: number }[];
+      places: {
+        name: string; category?: string; priority?: 'must' | 'nice';
+        lat?: number | null; lng?: number | null;
+        opening_hours?: string | null; visit_minutes?: number | null; description?: string | null;
+      }[];
+      creator_preferences?: Record<string, number>;
+    };
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+    if (!body.places?.length) return c.json({ error: 'Brak przypiętych miejsc' }, 400);
+
+    const toMin = (t: string) => {
+      const m = t.match(/^(\d{1,2}):(\d{2})$/);
+      return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+    };
+    const windowStart = toMin(body.window.start);
+    const windowEnd = toMin(body.window.end);
+    const minutesPerDay = Math.max(0, windowEnd - windowStart);
+    const dayCount = Math.max(1, body.days || 1);
+
+    const baseDate = body.start_date ? new Date(`${body.start_date}T12:00:00`) : new Date();
+    const dayNames = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
+
+    // Dostępność każdego miejsca w każdym dniu — policzona, nie zgadnięta
+    const dayInfos = Array.from({ length: dayCount }, (_, i) => {
+      const date = new Date(baseDate);
+      date.setDate(date.getDate() + i);
+      return {
+        index: i + 1,
+        date: date.toISOString().slice(0, 10),
+        weekday: dayNames[date.getDay()],
+        dateObj: date
+      };
+    });
+
+    const placeLines = body.places.map((pl) => {
+      const minutes = pl.visit_minutes || 60;
+      const perDay = dayInfos.map((d) => {
+        const fits = isOpenDuring(pl.opening_hours, d.dateObj, windowStart, Math.min(minutes, minutesPerDay));
+        const desc = describeAvailability(pl.opening_hours, d.dateObj);
+        const verdict = fits === false ? ' — NIE MIEŚCI SIĘ W TWOIM OKNIE' : '';
+        return `dzień ${d.index} (${d.weekday}): ${desc}${verdict}`;
+      }).join(' | ');
+      return `- "${pl.name}" [${pl.priority === 'must' ? 'KONIECZNIE' : 'jeśli wyjdzie'}, ${pl.category || 'attraction'}, ok. ${minutes} min] ${perDay}`;
+    }).join('\n');
+
+    const totalVisitMinutes = body.places.reduce((sum, p) => sum + (p.visit_minutes || 60), 0);
+    const mustMinutes = body.places.filter((p) => p.priority === 'must')
+      .reduce((sum, p) => sum + (p.visit_minutes || 60), 0);
+    const budget = minutesPerDay * dayCount;
+
+    const prefLines = body.creator_preferences
+      ? Object.entries(body.creator_preferences)
+          .filter(([, v]) => v < 40 || v > 60)
+          .map(([k, v]) => `${k}=${v}`).join(', ')
+      : '';
+
+    const fixedLines = (body.fixed || [])
+      .map((f) => `- ${f.time} ${f.label}${f.minutes ? ` (${f.minutes} min)` : ''}`).join('\n');
+
+    const prompt = `Ułóż plan zwiedzania miasta ${body.destination}.
+
+RAMY: ${dayCount} dni, każdego dnia od ${body.window.start} do ${body.window.end} (${Math.round(minutesPerDay / 60 * 10) / 10} h dziennie, łącznie ${Math.round(budget / 60)} h).
+${body.hotel?.name ? `BAZA: ${body.hotel.name} — każdy dzień zaczyna się i kończy tutaj.` : ''}
+${fixedLines ? `STAŁE PUNKTY DNIA (nie do przesunięcia):\n${fixedLines}` : ''}
+${prefLines ? `PREFERENCJE UŻYTKOWNIKA (0-100, 50 to środek): ${prefLines}` : ''}
+
+MIEJSCA DO ROZPLANOWANIA (dostępność policzona dla Twoich okien czasowych):
+${placeLines}
+
+BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a budżet to ${Math.round(budget / 60)} h. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
+
+ZASADY:
+1. Miejsca oznaczone KONIECZNIE mają pierwszeństwo — wstaw je najpierw, w dniach, w których są otwarte.
+2. NIGDY nie planuj wizyty w miejscu oznaczonym jako ZAMKNIĘTE danego dnia ani takiego, które NIE MIEŚCI SIĘ W OKNIE.
+3. Grupuj miejsca leżące blisko siebie w ten sam dzień — dzień ma być spójny geograficznie, bez biegania przez miasto.
+4. Nie upychaj na siłę. Jeśli coś się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
+5. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
+6. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
+
+ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
+
+Odpowiedz WYŁĄCZNIE obiektem JSON.`;
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              days: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    day: { type: 'integer' },
+                    summary: { type: 'string' },
+                    items: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          time: { type: 'string' },
+                          name: { type: 'string' },
+                          kind: { type: 'string' },
+                          minutes: { type: 'integer' },
+                          note: { type: 'string' }
+                        },
+                        required: ['time', 'name']
+                      }
+                    }
+                  },
+                  required: ['day', 'items']
+                }
+              },
+              not_scheduled: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { name: { type: 'string' }, reason: { type: 'string' } },
+                  required: ['name']
+                }
+              },
+              warnings: { type: 'array', items: { type: 'string' } },
+              question: { type: 'string' }
+            },
+            required: ['days']
+          },
+          // Model 2.5 zużywa część budżetu na rozumowanie — przy ciasnym limicie
+          // JSON urywał się w połowie zdania. Limit musi mieścić jedno i drugie.
+          maxOutputTokens: 32768
+        }
+      })
+    });
+    if (!res.ok) throw new Error('Gemini plan error ' + await res.text());
+    const data = await res.json() as any;
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const finish = data.candidates?.[0]?.finishReason;
+    if (!text) throw new Error(`Pusta odpowiedź planera (finishReason: ${finish})`);
+    if (finish && finish !== 'STOP') {
+      console.warn(`[plan-trip] Odpowiedź niekompletna, finishReason=${finish}, długość=${text.length}`);
+    }
+    let plan: any;
+    try {
+      plan = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+    } catch (parseErr: any) {
+      console.error(`[plan-trip] Niepoprawny JSON (${text.length} zn., finishReason=${finish}). Początek: ${text.slice(0, 220)}`);
+      throw new Error(`Planer zwrócił niekompletną odpowiedź (${finish || 'nieznany powód'}). Spróbuj ponownie lub zmniejsz liczbę miejsc.`);
+    }
+
+    // Daty i nazwy dni dokładamy po stronie serwera, żeby nie zależały od modelu
+    plan.days = (plan.days || []).map((d: any) => {
+      const info = dayInfos.find((x) => x.index === d.day);
+      return { ...d, date: info?.date, weekday: info?.weekday };
+    });
+
+    return c.json(plan);
+  } catch (err: any) {
+    console.error('[plan-trip] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });

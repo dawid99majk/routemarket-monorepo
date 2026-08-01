@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Bed, Clock, Coins, Loader2, MapPin, Music, Pin, Plus, Search, Star, Trash2, Utensils, X
+  AlertTriangle, Bed, CalendarDays, Clock, Coins, Loader2, MapPin, Music, Pin, Plus, Search, Star, Trash2, Utensils
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,10 @@ export default function TripProjects() {
 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', destination: '', days: '', hours: '' });
+
+  const [planning, setPlanning] = useState(false);
+  const [plan, setPlan] = useState<any | null>(null);
+  const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -173,6 +177,39 @@ export default function TripProjects() {
     const next = place.priority === 'must' ? 'nice' : 'must';
     await (supabase as any).from('trip_project_places').update({ priority: next }).eq('id', place.id);
     setPlaces((prev) => prev.map((p) => (p.id === place.id ? { ...p, priority: next } : p)));
+  };
+
+  const buildPlan = async () => {
+    if (!active || places.length === 0) return;
+    setPlanning(true);
+    setPlan(null);
+    try {
+      const hotel = places.find((p) => p.category === 'hotel');
+      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
+      const res = await fetch(`${apiUrl}/plan-trip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          destination: active.destination,
+          days: active.days || 1,
+          window: { start: planForm.start, end: planForm.end },
+          start_date: planForm.date || undefined,
+          hotel: hotel ? { name: hotel.name } : null,
+          fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
+          places: places.map((p) => ({
+            name: p.name, category: p.category, priority: p.priority,
+            opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
+          }))
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Planowanie nie powiodło się');
+      setPlan(data);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setPlanning(false);
+    }
   };
 
   if (loading) {
@@ -359,6 +396,95 @@ export default function TripProjects() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {places.length > 0 && (
+              <div className="border-t pt-4 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-emerald-600" /> Ułóż plan dni
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-5">
+                  <label className="text-xs text-muted-foreground">Od
+                    <Input type="time" value={planForm.start}
+                      onChange={(e) => setPlanForm({ ...planForm, start: e.target.value })} className="mt-1" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">Do
+                    <Input type="time" value={planForm.end}
+                      onChange={(e) => setPlanForm({ ...planForm, end: e.target.value })} className="mt-1" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">Pierwszy dzień
+                    <Input type="date" value={planForm.date}
+                      onChange={(e) => setPlanForm({ ...planForm, date: e.target.value })} className="mt-1" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">Kolacja o
+                    <Input type="time" value={planForm.dinner}
+                      onChange={(e) => setPlanForm({ ...planForm, dinner: e.target.value })} className="mt-1" />
+                  </label>
+                  <Button onClick={buildPlan} disabled={planning}
+                    className="self-end bg-emerald-600 hover:bg-emerald-500">
+                    {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Zaplanuj'}
+                  </Button>
+                </div>
+                {planning && (
+                  <p className="text-xs text-muted-foreground">
+                    Sprawdzam godziny otwarcia i układam dni…
+                  </p>
+                )}
+              </div>
+            )}
+
+            {plan && (
+              <div className="space-y-4">
+                {(plan.days || []).map((day: any) => (
+                  <div key={day.day} className="rounded-xl border overflow-hidden">
+                    <div className="bg-muted/60 px-4 py-2 text-sm font-semibold">
+                      Dzień {day.day}
+                      {day.weekday && <span className="font-normal text-muted-foreground"> · {day.weekday} {day.date}</span>}
+                    </div>
+                    <div className="divide-y">
+                      {(day.items || []).map((it: any, i: number) => (
+                        <div key={i} className="flex gap-3 px-4 py-2 text-sm">
+                          <span className="font-mono text-xs text-muted-foreground pt-0.5 w-12 shrink-0">{it.time}</span>
+                          <div className="min-w-0">
+                            <div className="font-medium">{it.name}</div>
+                            {it.note && <div className="text-xs text-muted-foreground">{it.note}</div>}
+                          </div>
+                          {it.minutes && (
+                            <span className="ml-auto text-xs text-muted-foreground shrink-0">{it.minutes} min</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {plan.not_scheduled?.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+                    <div className="text-sm font-semibold text-amber-900 mb-1">Nie zmieściło się</div>
+                    {plan.not_scheduled.map((n: any) => (
+                      <div key={n.name} className="text-xs text-amber-900/80">
+                        <strong>{n.name}</strong>{n.reason ? ` — ${n.reason}` : ''}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {plan.warnings?.length > 0 && (
+                  <div className="space-y-1.5">
+                    {plan.warnings.map((w: string, i: number) => (
+                      <div key={i} className="flex gap-2 text-xs text-muted-foreground">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <span>{w}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {plan.question && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-900">
+                    {plan.question}
+                  </div>
+                )}
               </div>
             )}
           </>
