@@ -49,6 +49,9 @@ export default function InterviewOverlay({
   onClose
 }: InterviewOverlayProps) {
   const [draft, setDraft] = useState('');
+  // Karta typu "podaj własny punkt" rozwija pole tekstowe zamiast wysyłać swój tytuł
+  const [inputCard, setInputCard] = useState<RouteOption | null>(null);
+  const [cardValue, setCardValue] = useState('');
 
   const started = messages.length > 0;
   const lastAgent = [...messages].reverse().find((m) => m.role === 'agent');
@@ -57,6 +60,23 @@ export default function InterviewOverlay({
 
   // Podsumowanie dotychczasowych wyborów pokazywane pod paskiem kroków
   const decided = Object.entries(tripProfile).filter(([, v]) => v);
+
+  const pickCard = (option: RouteOption) => {
+    if (option.requiresInput) {
+      setInputCard(option);
+      setCardValue('');
+      return;
+    }
+    onChoose(option);
+  };
+
+  const submitCardValue = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cardValue.trim() || busyLabel || !inputCard) return;
+    onChoose({ ...inputCard, title: cardValue, implies: { ...(inputCard.implies || {}), start_point: cardValue } });
+    setInputCard(null);
+    setCardValue('');
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,13 +215,34 @@ export default function InterviewOverlay({
             </div>
           )}
 
-          {!busyLabel && options.length > 0 && (
+          {!busyLabel && inputCard && (
+            <form onSubmit={submitCardValue} className="mb-4 rounded-2xl border border-emerald-400/50 bg-white/10 backdrop-blur-md p-4">
+              <div className="text-white font-medium mb-2">{inputCard.title}</div>
+              <div className="flex gap-2">
+                <Input
+                  autoFocus
+                  value={cardValue}
+                  onChange={(e) => setCardValue(e.target.value)}
+                  placeholder={inputCard.inputPlaceholder || 'Wpisz miejsce…'}
+                  className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full px-5 py-5"
+                />
+                <Button type="submit" disabled={!cardValue.trim()} className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-white px-5">
+                  Zatwierdź
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setInputCard(null)} className="rounded-full text-white/60 hover:text-white">
+                  Anuluj
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {!busyLabel && !inputCard && options.length > 0 && (
             <div className={`grid grid-cols-1 ${gridCols} gap-3`}>
               {options.map((option) => (
                 <button
                   key={option.id || option.title}
                   type="button"
-                  onClick={() => onChoose(option)}
+                  onClick={() => pickCard(option)}
                   className="text-left rounded-2xl border border-white/15 bg-white/10 hover:bg-white/20 hover:border-emerald-400/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
                 >
                   <div className="font-semibold text-white leading-snug">{option.title}</div>

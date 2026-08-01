@@ -6,6 +6,9 @@ export interface RouteOption {
   subtitle?: string;
   description?: string;
   highlights?: string[];
+  /** Karta otwiera pole tekstowe zamiast od razu wysyłać swój tytuł. */
+  requiresInput?: boolean;
+  inputPlaceholder?: string;
   /** Ustalenia, które wybór tej karty wnosi do profilu wyjazdu (np. structure, region). */
   implies?: Record<string, any>;
 }
@@ -159,7 +162,11 @@ export const wizardMachine = setup({
         if (output && output.message) {
           const message: ChatMessage = { role: 'agent', text: output.message, phase: output.phase };
           if (Array.isArray(output.options) && output.options.length > 0) {
-            message.options = output.options;
+            message.options = output.options.map((o: any) => ({
+              ...o,
+              requiresInput: o.requires_input ?? o.requiresInput,
+              inputPlaceholder: o.input_placeholder ?? o.inputPlaceholder
+            }));
             message.allowCustom = output.allow_custom !== false;
           }
           return [...context.chatMessages, message];
@@ -281,6 +288,12 @@ export const wizardMachine = setup({
       }
     },
     chatting: {
+      // Kliknięcie karty w trakcie odpowiedzi agenta było cicho porzucane przez
+      // xstate i wyglądało jak zawieszenie — nowa wiadomość zastępuje bieżące zapytanie.
+      on: {
+        SEND_MESSAGE: { target: 'chatting', reenter: true, actions: ['appendMessage', 'resetRetries'] },
+        SET_FIELD: { actions: 'assignField' }
+      },
       invoke: {
         src: 'chatActor',
         input: ({ context, event }) => ({ context, text: event.type === 'SEND_MESSAGE' ? event.text : '' }),

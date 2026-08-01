@@ -33,6 +33,8 @@ const CHAT_RESPONSE_SCHEMA = {
           subtitle: { type: 'string' },
           description: { type: 'string' },
           highlights: { type: 'array', items: { type: 'string' } },
+          requires_input: { type: 'boolean' },
+          input_placeholder: { type: 'string' },
           implies: {
             type: 'object',
             properties: {
@@ -500,7 +502,7 @@ FAZA 0 — "start_point" (PUNKT STARTU — ZAWSZE PIERWSZE PYTANIE)
 Jeśli użytkownik podał tylko miasto/region, a nie wiadomo, skąd konkretnie rusza (brak pinezki na mapie), TO JEST PIERWSZA RZECZ DO USTALENIA — start determinuje całą resztę trasy.
 Nie pytaj sucho „skąd startujesz?". Zaproponuj wybór:
 - karta 1: konkretny, popularny punkt startowy, który SAM dobierzesz dla tego miasta i rodzaju trasy (parking przy szlaku, dworzec, rynek, węzeł szlaków) — podaj jego nazwę w "title" i uzasadnij w "description" (dojazd, parking, komunikacja);
-- karta 2: „Chcę podać własny punkt" — z podpowiedzią w "description", że może wpisać hotel, dworzec, adres lub postawić pinezkę na mapie.
+- karta 2: „Chcę podać własny punkt" — MUSI mieć "requires_input": true oraz "input_placeholder" z przykładem (np. "np. Hotel Rogner, Tirana"). Kliknięcie takiej karty otwiera użytkownikowi pole tekstowe; nie każ mu pisać w rozmowie.
 Jeśli region ma kilka naturalnych baz wypadowych, możesz dać 2-3 karty z propozycjami plus kartę „własny punkt".
 Gdy użytkownik wybierze konkretny punkt, zapisz go w implies jako {"start_point": "<dokładna nazwa>"}.
 
@@ -649,6 +651,14 @@ Przykład 1 — FAZA "discovery": otwierasz rozeznaniem i pytasz o strukturę wy
       "implies": { "structure": "radial" }
     },
     {
+      "id": "custom",
+      "title": "Chcę podać własny punkt",
+      "subtitle": "hotel, dworzec, adres",
+      "description": "Wpisz miejsce, z którego faktycznie ruszasz.",
+      "requires_input": true,
+      "input_placeholder": "np. Hotel Rogner, Tirana"
+    },
+    {
       "id": "huts",
       "title": "Nocleg w schronisku na trasie",
       "subtitle": "jedna ciągła trasa 2-dniowa",
@@ -774,7 +784,7 @@ Zwroc DOKLADNIE obiekt JSON z polami:
 - "done": boolean (true jesli agent zakonczyl zbieranie danych i podaje trase, false jesli jeszcze pyta)
 - "phase": string (jedna z: start_point, discovery, variant_choice, refine, confirm, generate)
 - "reply": string (odpowiedz agenta po polsku)
-- "options": tablica kart wyboru, kazda z polami id, title, subtitle, description, highlights (tablica stringow), implies (obiekt) — TYLKO gdy tekst przedstawia warianty do wyboru
+- "options": tablica kart wyboru, kazda z polami id, title, subtitle, description, highlights (tablica stringow), implies (obiekt), requires_input (boolean), input_placeholder (string) — TYLKO gdy tekst przedstawia warianty do wyboru
 - "allow_custom": boolean (czy uzytkownik moze wpisac wlasna odpowiedz zamiast wybrac karte)
 - "add_waypoints": tablica stringow z nazwami punktow (TYLKO gdy done=true)
 - "extracted": obiekt z polami start_point, end_point, route_type, distance, days, intent, loop, key_waypoints (TYLKO gdy done=true)
