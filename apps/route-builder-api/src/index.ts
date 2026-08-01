@@ -405,21 +405,27 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
     }
 
     // Dowiązanie do OSM: współrzędne i godziny otwarcia biorą się z bazy, nie z modelu
-    const results = (places || []).slice(0, limit || 10).map((pl: any) => {
-      const matched = poiService.matchCandidate(pl.name, candidates, { lat: center.lat, lng: center.lng });
-      return {
-        name: pl.name,
-        category: pl.category || 'attraction',
-        description: pl.description || '',
-        why: pl.why || '',
-        visit_minutes: pl.visit_minutes || null,
-        price_hint: pl.price_hint || null,
-        lat: matched?.lat ?? null,
-        lng: matched?.lng ?? null,
-        opening_hours: matched?.openingHours ?? null,
-        verified: !!matched
-      };
-    });
+    const results = await Promise.all(
+      (places || []).slice(0, limit || 10).map(async (pl: any) => {
+        const matched = poiService.matchCandidate(pl.name, candidates, { lat: center.lat, lng: center.lng });
+        const wiki = await fetchWikiCard(matched?.wikipedia);
+        return {
+          name: pl.name,
+          category: pl.category || 'attraction',
+          description: pl.description || '',
+          why: pl.why || '',
+          visit_minutes: pl.visit_minutes || null,
+          price_hint: pl.price_hint || null,
+          lat: matched?.lat ?? null,
+          lng: matched?.lng ?? null,
+          opening_hours: matched?.openingHours ?? null,
+          website: matched?.website ?? null,
+          image_url: wiki.image ?? null,
+          wiki_extract: wiki.extract ?? null,
+          verified: !!matched
+        };
+      })
+    );
 
     return c.json({ destination, center: { lat: center.lat, lng: center.lng }, places: results });
   } catch (err: any) {
@@ -609,6 +615,33 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
     return c.json({ error: err.message }, 500);
   }
 });
+
+
+/**
+ * Zdjęcie i skrót z Wikipedii dla miejsca. Tag `wikipedia` w OSM ma postać
+ * "pl:Sukiennice", więc mamy zarówno język, jak i tytuł — bez zgadywania.
+ * Bez tego karta miejsca to sam tekst, a użytkownik chce zobaczyć, co wybiera.
+ */
+async function fetchWikiCard(wikipediaTag: string | undefined): Promise<{ image?: string; extract?: string }> {
+  if (!wikipediaTag) return {};
+  const m = wikipediaTag.match(/^([a-z-]{2,10}):(.+)$/i);
+  const lang = m ? m[1] : 'pl';
+  const title = m ? m[2] : wikipediaTag;
+  try {
+    const res = await fetch(
+      `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`,
+      { headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0 (routemarket.io)' }, signal: AbortSignal.timeout(6000) }
+    );
+    if (!res.ok) return {};
+    const data = await res.json() as any;
+    return {
+      image: data.thumbnail?.source || data.originalimage?.source,
+      extract: data.extract
+    };
+  } catch {
+    return {};
+  }
+}
 
 // Healthcheck
 app.get('/health', (c) => {

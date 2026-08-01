@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, Loader2, MapPin, Music, Pin, Plus, Search, Star, Trash2, Utensils
+  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, Search, Share2, Star, Trash2, Users, Utensils
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -19,14 +19,19 @@ interface TripProject extends Partial<AxisValues> {
   trip_type: string | null;
 }
 
+type Priority = 'must' | 'nice' | 'rejected';
+
 interface PinnedPlace {
   id: string;
   name: string;
   category: string;
-  priority: 'must' | 'nice';
+  priority: Priority;
   description: string | null;
   opening_hours: string | null;
   visit_minutes: number | null;
+  website: string | null;
+  image_url: string | null;
+  wiki_extract: string | null;
 }
 
 interface DiscoveredPlace {
@@ -37,10 +42,20 @@ interface DiscoveredPlace {
   visit_minutes: number | null;
   price_hint: string | null;
   opening_hours: string | null;
+  website: string | null;
+  image_url: string | null;
+  wiki_extract: string | null;
   lat: number | null;
   lng: number | null;
   verified: boolean;
 }
+
+/** Strefy tablicy — kartkę przeciąga się między nimi. */
+const ZONES: { id: Priority; label: string; hint: string }[] = [
+  { id: 'must', label: 'Chcę zobaczyć', hint: 'Te miejsca planer wstawi w pierwszej kolejności' },
+  { id: 'nice', label: 'Może', hint: 'Wypełnią luki, jeśli zostanie czas' },
+  { id: 'rejected', label: 'Odrzucone', hint: 'Pomijane przy planowaniu' }
+];
 
 const CATEGORY_ICON: Record<string, any> = {
   attraction: MapPin,
@@ -70,6 +85,9 @@ export default function TripProjects() {
   const [userPrefs, setUserPrefs] = useState<Record<string, number> | null>(null);
 
   const [savedPlans, setSavedPlans] = useState<any[]>([]);
+  const [shares, setShares] = useState<any[]>([]);
+  const [shareEmail, setShareEmail] = useState('');
+  const [sharing, setSharing] = useState(false);
   const [editingType, setEditingType] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [plan, setPlan] = useState<any | null>(null);
@@ -106,7 +124,7 @@ export default function TripProjects() {
     (async () => {
       const { data } = await (supabase as any)
         .from('trip_project_places')
-        .select('id, name, category, priority, description, opening_hours, visit_minutes')
+        .select('id, name, category, priority, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
         .eq('project_id', activeId)
         .order('created_at', { ascending: true });
       setPlaces(data || []);
@@ -116,6 +134,11 @@ export default function TripProjects() {
         .eq('project_id', activeId)
         .order('created_at', { ascending: false });
       setSavedPlans(plans || []);
+      const { data: sh } = await (supabase as any)
+        .from('trip_project_shares')
+        .select('id, shared_with_email, role')
+        .eq('project_id', activeId);
+      setShares(sh || []);
       setPlan(null);
     })();
   }, [activeId]);
@@ -169,7 +192,7 @@ export default function TripProjects() {
     }
   };
 
-  const pin = async (place: DiscoveredPlace, priority: 'must' | 'nice') => {
+  const pin = async (place: DiscoveredPlace, priority: Priority) => {
     if (!active) return;
     const { data, error } = await (supabase as any)
       .from('trip_project_places')
@@ -182,9 +205,12 @@ export default function TripProjects() {
         lng: place.lng,
         description: place.description,
         opening_hours: place.opening_hours,
-        visit_minutes: place.visit_minutes
+        visit_minutes: place.visit_minutes,
+        website: place.website,
+        image_url: place.image_url,
+        wiki_extract: place.wiki_extract
       })
-      .select('id, name, category, priority, description, opening_hours, visit_minutes')
+      .select('id, name, category, priority, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
       .single();
     if (error) return toast.error(error.message);
     setPlaces((prev) => [...prev, data]);
@@ -197,10 +223,10 @@ export default function TripProjects() {
     setPlaces((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const togglePriority = async (place: PinnedPlace) => {
-    const next = place.priority === 'must' ? 'nice' : 'must';
-    await (supabase as any).from('trip_project_places').update({ priority: next }).eq('id', place.id);
-    setPlaces((prev) => prev.map((p) => (p.id === place.id ? { ...p, priority: next } : p)));
+  const movePlace = async (id: string, priority: Priority) => {
+    setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, priority } : p)));
+    const { error } = await (supabase as any).from('trip_project_places').update({ priority }).eq('id', id);
+    if (error) toast.error(error.message);
   };
 
   const changeTripType = async (presetId: string) => {
@@ -252,6 +278,31 @@ export default function TripProjects() {
     setProjects((prev) => [copy, ...prev]);
     setActiveId(copy.id);
     toast.success('Skopiowano tablicę razem z miejscami — zmień charakter i planuj po swojemu');
+  };
+
+  const shareProject = async () => {
+    if (!active || !shareEmail.trim()) return;
+    setSharing(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('trip_project_shares')
+        .insert({ project_id: active.id, shared_with_email: shareEmail.trim().toLowerCase() })
+        .select('id, shared_with_email, role')
+        .single();
+      if (error) throw error;
+      setShares((prev) => [...prev, data]);
+      setShareEmail('');
+      toast.success('Tablica udostępniona — druga osoba zobaczy ją u siebie po zalogowaniu');
+    } catch (err: any) {
+      toast.error(err.message.includes('duplicate') ? 'Ta osoba już ma dostęp' : err.message);
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const revokeShare = async (id: string) => {
+    await (supabase as any).from('trip_project_shares').delete().eq('id', id);
+    setShares((prev) => prev.filter((s) => s.id !== id));
   };
 
   const deletePlan = async (id: string) => {
@@ -420,6 +471,11 @@ export default function TripProjects() {
                 className="text-xs flex items-center gap-1 hover:text-foreground transition-colors">
                 <Copy className="w-3.5 h-3.5" /> Kopiuj tablicę
               </button>
+              {shares.length > 0 && (
+                <span className="text-xs flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5" /> {shares.length}
+                </span>
+              )}
               <span>Przypięte: <strong className="text-foreground">{places.length}</strong> ({mustCount} koniecznie)</span>
               {totalMinutes > 0 && (
                 <span>Zwiedzanie łącznie: <strong className="text-foreground">{Math.round(totalMinutes / 60)} h</strong></span>
@@ -482,34 +538,48 @@ export default function TripProjects() {
             )}
 
             {results.length > 0 && (
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {results.map((r) => {
                   const Icon = CATEGORY_ICON[r.category] || MapPin;
                   return (
-                    <div key={r.name} className="rounded-xl border p-3 space-y-2 bg-background">
-                      <div className="flex items-start gap-2">
-                        <Icon className="w-4 h-4 mt-0.5 text-emerald-600 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm leading-snug">{r.name}</div>
-                          {r.why && <div className="text-xs text-emerald-700 mt-0.5">{r.why}</div>}
+                    <div key={r.name} className="rounded-xl border overflow-hidden bg-background flex flex-col">
+                      {r.image_url && (
+                        <img src={r.image_url} alt="" loading="lazy"
+                          className="w-full h-32 object-cover bg-muted" />
+                      )}
+                      <div className="p-3 space-y-2 flex-1 flex flex-col">
+                        <div className="flex items-start gap-2">
+                          <Icon className="w-4 h-4 mt-0.5 text-emerald-600 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm leading-snug">{r.name}</div>
+                            {r.why && <div className="text-xs text-emerald-700 mt-0.5">{r.why}</div>}
+                          </div>
                         </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{r.description}</p>
-                      <div className="flex flex-wrap gap-1.5 text-[11px]">
-                        {r.visit_minutes && <Badge variant="secondary">{r.visit_minutes} min</Badge>}
-                        {r.price_hint && (
-                          <Badge variant="secondary" className="gap-1"><Coins className="w-3 h-3" />{r.price_hint}</Badge>
+                        <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+                          {r.description || r.wiki_extract}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 text-[11px]">
+                          {r.visit_minutes && <Badge variant="secondary">{r.visit_minutes} min</Badge>}
+                          {r.price_hint && (
+                            <Badge variant="secondary" className="gap-1"><Coins className="w-3 h-3" />{r.price_hint}</Badge>
+                          )}
+                          {r.opening_hours && <Badge variant="outline" className="font-normal">{r.opening_hours}</Badge>}
+                        </div>
+                        {r.website && (
+                          <a href={r.website} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-emerald-700 hover:underline inline-flex items-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Strona miejsca
+                          </a>
                         )}
-                        {r.opening_hours && <Badge variant="outline" className="font-normal">{r.opening_hours}</Badge>}
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-500 h-8"
-                          onClick={() => pin(r, 'must')}>
-                          <Star className="w-3.5 h-3.5 mr-1" /> Koniecznie
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex-1 h-8" onClick={() => pin(r, 'nice')}>
-                          Jeśli wyjdzie
-                        </Button>
+                        <div className="flex gap-2 pt-1">
+                          <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-500 h-8"
+                            onClick={() => pin(r, 'must')}>
+                            <Star className="w-3.5 h-3.5 mr-1" /> Chcę
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1 h-8" onClick={() => pin(r, 'nice')}>
+                            Może
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -518,35 +588,120 @@ export default function TripProjects() {
             )}
 
             {places.length > 0 && (
-              <div className="border-t pt-4 space-y-2">
-                <h3 className="text-sm font-semibold">Przypięte miejsca</h3>
-                {places.map((p) => {
-                  const Icon = CATEGORY_ICON[p.category] || MapPin;
-                  return (
-                    <div key={p.id} className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-                      <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{p.name}</div>
-                        {p.opening_hours && (
-                          <div className="text-[11px] text-muted-foreground truncate">{p.opening_hours}</div>
-                        )}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold mb-2">Tablica miejsc</h3>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {ZONES.map((zone) => {
+                    const zonePlaces = places.filter((p) => p.priority === zone.id);
+                    return (
+                      <div
+                        key={zone.id}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const id = e.dataTransfer.getData('text/plain');
+                          if (id) movePlace(id, zone.id);
+                        }}
+                        className={`rounded-xl p-2.5 min-h-[120px] transition-colors ${
+                          zone.id === 'rejected' ? 'bg-muted/40' : 'bg-muted/60'
+                        }`}
+                      >
+                        <div className="flex items-baseline justify-between mb-2 px-1">
+                          <span className="text-xs font-semibold">{zone.label}</span>
+                          <span className="text-[11px] text-muted-foreground">{zonePlaces.length}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {zonePlaces.map((p) => {
+                            const Icon = CATEGORY_ICON[p.category] || MapPin;
+                            return (
+                              <div
+                                key={p.id}
+                                draggable
+                                onDragStart={(e) => e.dataTransfer.setData('text/plain', p.id)}
+                                className={`rounded-lg border bg-background overflow-hidden cursor-grab active:cursor-grabbing ${
+                                  zone.id === 'rejected' ? 'opacity-60' : ''
+                                }`}
+                              >
+                                {p.image_url && zone.id !== 'rejected' && (
+                                  <img src={p.image_url} alt="" loading="lazy"
+                                    className="w-full h-20 object-cover bg-muted" />
+                                )}
+                                <div className="p-2 space-y-1">
+                                  <div className="flex items-start gap-1.5">
+                                    <Icon className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
+                                    <span className="text-xs font-medium leading-snug flex-1">{p.name}</span>
+                                    <button onClick={() => unpin(p.id)}
+                                      className="text-muted-foreground hover:text-red-500 shrink-0">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  {p.opening_hours && (
+                                    <div className="text-[10px] text-muted-foreground truncate">{p.opening_hours}</div>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {p.visit_minutes && (
+                                      <span className="text-[10px] text-muted-foreground">{p.visit_minutes} min</span>
+                                    )}
+                                    {p.website && (
+                                      <a href={p.website} target="_blank" rel="noopener noreferrer"
+                                        className="text-[10px] text-emerald-700 hover:underline inline-flex items-center gap-0.5">
+                                        <ExternalLink className="w-2.5 h-2.5" /> strona
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {zonePlaces.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground px-1 py-3 text-center">
+                              {zone.hint}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <button onClick={() => togglePriority(p)}
-                        className={`text-[11px] rounded-full px-2 py-0.5 border transition-colors ${
-                          p.priority === 'must'
-                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                            : 'bg-background text-muted-foreground hover:bg-muted'
-                        }`}>
-                        {p.priority === 'must' ? 'koniecznie' : 'jeśli wyjdzie'}
-                      </button>
-                      <button onClick={() => unpin(p.id)} className="text-muted-foreground hover:text-red-500">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Przeciągnij kartkę między kolumnami, żeby zmienić jej wagę.
+                </p>
               </div>
             )}
+
+            <div className="border-t pt-4 space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-emerald-600" /> Udostępnij tablicę
+              </h3>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  value={shareEmail}
+                  onChange={(e) => setShareEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && shareProject()}
+                  placeholder="adres e-mail osoby, która ma współtworzyć"
+                  className="flex-1"
+                />
+                <Button onClick={shareProject} disabled={sharing || !shareEmail.trim()} variant="outline">
+                  {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Udostępnij'}
+                </Button>
+              </div>
+              {shares.length > 0 && (
+                <div className="space-y-1">
+                  {shares.map((sh) => (
+                    <div key={sh.id} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-muted/50">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="flex-1 truncate">{sh.shared_with_email}</span>
+                      <span className="text-muted-foreground">{sh.role === 'editor' ? 'może edytować' : 'podgląd'}</span>
+                      <button onClick={() => revokeShare(sh.id)} className="text-muted-foreground hover:text-red-500">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {savedPlans.length > 0 && (
               <div className="border-t pt-4 space-y-2">
                 <h3 className="text-sm font-semibold">Zapisane plany ({savedPlans.length})</h3>
