@@ -530,12 +530,10 @@ ${points}
 
   // Wywiad zajmuje cały ekran, dopóki nie ma trasy — panel 400 px był za ciasny
   // na karty wyboru. Po wygenerowaniu warstwa znika i odsłania mapę.
-  const interviewActive =
-    !overlayDismissed &&
-    chatMessages.length > 0 &&
-    !geometry &&
-    context.phase !== null &&
-    context.phase !== 'generate';
+  // Wywiad jest ekranem startowym kreatora, nie dodatkiem po pierwszej wiadomości:
+  // wcześniej użytkownik lądował na mapie z wąskim panelem czatu i to właśnie
+  // ten ciasny widok był pierwszym wrażeniem.
+  const interviewActive = !overlayDismissed && !geometry && context.phase !== 'generate';
 
   return (
     <div className="relative flex h-screen w-full bg-slate-50 font-sans overflow-hidden">
@@ -545,6 +543,10 @@ ${points}
           phase={context.phase}
           tripProfile={context.tripProfile}
           busyLabel={busyLabel}
+          vehicleType={vehicleType}
+          routingPreference={routingPreference}
+          onVehicleChange={handleVehicleChange}
+          onRoutingPreferenceChange={(pref) => setField('routingPreference', pref)}
           onChoose={chooseOption}
           onSend={(text) => send({ type: 'SEND_MESSAGE', text })}
           onClose={() => setOverlayDismissed(true)}

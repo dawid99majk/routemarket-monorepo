@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronRight, Send, Sparkles, X } from 'lucide-react';
+import { Bike, Building2, Car, Check, ChevronRight, Footprints, MapPin, Mountain, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ChatMessage, RouteOption } from '@routemarket/atlas-workflow/wizard-machine';
@@ -13,11 +13,23 @@ const STEPS = [
   { id: 'confirm', label: 'Podsumowanie' }
 ] as const;
 
+const VEHICLES = [
+  { id: 'motorcycle', label: 'Motocykl', Icon: Mountain },
+  { id: 'bicycle', label: 'Rower', Icon: Bike },
+  { id: 'hiking', label: 'Pieszo', Icon: Footprints },
+  { id: 'city', label: 'Miasto', Icon: Building2 },
+  { id: 'car', label: 'Samochód', Icon: Car }
+] as const;
+
 interface InterviewOverlayProps {
   messages: ChatMessage[];
   phase: string | null;
   tripProfile: Record<string, any>;
   busyLabel: string | null;
+  vehicleType: string;
+  routingPreference: string;
+  onVehicleChange: (type: string) => void;
+  onRoutingPreferenceChange: (pref: 'popular' | 'wild') => void;
   onChoose: (option: RouteOption) => void;
   onSend: (text: string) => void;
   onClose: () => void;
@@ -28,12 +40,17 @@ export default function InterviewOverlay({
   phase,
   tripProfile,
   busyLabel,
+  vehicleType,
+  routingPreference,
+  onVehicleChange,
+  onRoutingPreferenceChange,
   onChoose,
   onSend,
   onClose
 }: InterviewOverlayProps) {
   const [draft, setDraft] = useState('');
 
+  const started = messages.length > 0;
   const lastAgent = [...messages].reverse().find((m) => m.role === 'agent');
   const options = lastAgent?.options ?? [];
   const activeIdx = Math.max(0, STEPS.findIndex((s) => s.id === phase));
@@ -55,7 +72,7 @@ export default function InterviewOverlay({
   return (
     <div className="absolute inset-0 z-[1200] flex flex-col bg-slate-950/45 backdrop-blur-xl animate-in fade-in duration-300">
       {/* Pasek kroków */}
-      <div className="shrink-0 px-8 pt-6 pb-4">
+      <div className={`shrink-0 px-8 pt-6 ${started ? 'pb-4' : 'pb-2'}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-white/90">
             <Sparkles className="w-5 h-5 text-emerald-400" />
@@ -70,7 +87,7 @@ export default function InterviewOverlay({
           </button>
         </div>
 
-        <div className="mt-5 flex items-center gap-1 overflow-x-auto pb-1">
+        {started && <div className="mt-5 flex items-center gap-1 overflow-x-auto pb-1">
           {STEPS.map((step, i) => {
             const done = i < activeIdx;
             const active = i === activeIdx;
@@ -96,7 +113,7 @@ export default function InterviewOverlay({
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {decided.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -115,7 +132,55 @@ export default function InterviewOverlay({
       {/* Pytanie agenta + karty */}
       <div className="flex-1 overflow-y-auto px-8 pb-4">
         <div className="max-w-5xl mx-auto">
-          {lastAgent && (
+          {!started && (
+            <div className="pt-6 pb-2">
+              <h1 className="text-white text-3xl font-semibold tracking-tight">Zaplanujmy Twoją trasę</h1>
+              <p className="text-white/60 mt-2 max-w-2xl">
+                Powiedz, dokąd się wybierasz i ile masz czasu — resztę ustalimy po kolei. Najpierw wybierz, czym się poruszasz.
+              </p>
+
+              <div className="mt-7 flex flex-wrap gap-2">
+                {VEHICLES.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onVehicleChange(id)}
+                    className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition-all border ${
+                      vehicleType === id
+                        ? 'bg-emerald-500 border-emerald-400 text-white font-medium'
+                        : 'bg-white/10 border-white/15 text-white/80 hover:bg-white/20'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {([
+                  { id: 'popular', label: 'Klasyki regionu', Icon: Sparkles },
+                  { id: 'wild', label: 'Poza szlakiem', Icon: MapPin }
+                ] as const).map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onRoutingPreferenceChange(id)}
+                    className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition-all border ${
+                      routingPreference === id
+                        ? 'bg-white/25 border-white/40 text-white font-medium'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/15'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {started && lastAgent && (
             <p className="text-white text-lg leading-relaxed mb-6 max-w-3xl">
               {lastAgent.text.replace(/\s*\[[^\]]+\]/g, '')}
             </p>
@@ -168,7 +233,7 @@ export default function InterviewOverlay({
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Napisz coś od siebie albo „generuj”, żeby pominąć pytania…"
+            placeholder={started ? 'Napisz coś od siebie albo „generuj”, żeby pominąć pytania…' : 'np. Tirana, kilka godzin, miejsca związane ze sztuką…'}
             className="w-full bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full pl-5 pr-12 py-6 backdrop-blur-md focus-visible:ring-emerald-400/50"
           />
           <Button
