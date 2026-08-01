@@ -548,7 +548,12 @@ ${points}
           onVehicleChange={handleVehicleChange}
           onRoutingPreferenceChange={(pref) => setField('routingPreference', pref)}
           onChoose={chooseOption}
-          onSend={(text) => send({ type: 'SEND_MESSAGE', text })}
+          onSend={(text) => {
+            // Pierwsza wypowiedź jest briefem wyjazdu — zapisujemy ją jako założenia,
+            // żeby była widoczna w panelu i trafiała do agenta przy kolejnych turach.
+            if (chatMessages.length === 0 && !inputNotes.trim()) setField('inputNotes', text);
+            send({ type: 'SEND_MESSAGE', text });
+          }}
           onClose={() => setOverlayDismissed(true)}
         />
       )}
@@ -631,6 +636,18 @@ ${points}
                     value={inputNotes}
                     onChange={e => setField('inputNotes', e.target.value)}
                   />
+                  <Button
+                    type="button"
+                    disabled={!inputNotes.trim() || !!busyLabel}
+                    onClick={() => {
+                      send({ type: 'SEND_MESSAGE', text: inputNotes });
+                      setOverlayDismissed(false);
+                    }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    {chatMessages.length > 0 ? 'Przelicz z tymi założeniami' : 'Zacznij od tych założeń'}
+                  </Button>
                   {waypoints.length > 0 && (
                     <div className="flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-xs font-medium">
                       <span>Punkty na mapie: {waypoints.length}</span>
