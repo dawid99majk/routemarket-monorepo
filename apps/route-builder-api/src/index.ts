@@ -79,7 +79,7 @@ async function extractLocationFromConversation(
   apiKey: string,
   conversationText: string,
   inputNotes?: string
-): Promise<{ startPlace: string | null; distanceKm: number | null; isLoop: boolean; days: number | null }> {
+): Promise<{ startPlace: string | null; distanceKm: number | null; isLoop: boolean; days: number | null; durationH: number | null }> {
   const prompt = `Z poniższej rozmowy o planowaniu trasy wyciągnij:
 1. "start_place" — nazwę miejscowości startu w formie NADAJĄCEJ SIĘ DO WYSZUKANIA NA MAPIE:
    - mianownik, oficjalna pisownia w języku kraju, w którym leży to miejsce (np. z "ze Złotych Hor i okolicy" → "Zlaté Hory", z "spod Zakopanego" → "Zakopane", z "w Krakowie" → "Kraków");
@@ -91,6 +91,7 @@ async function extractLocationFromConversation(
    Zwróć null tylko wtedy, gdy nie padł ani dystans, ani liczba dni.
 3. "is_loop" — true jeśli trasa ma być pętlą (powrót do startu), false jeśli liniowa. Domyślnie true.
 4. "days" — liczba dni wędrówki, jeśli padła w rozmowie (np. "2 dni" → 2). Jeśli nie padła, zwróć null.
+5. "duration_h" — ile GODZIN ma zająć trasa, jeśli padło w rozmowie ("na kilka godzin" → 4, "całodniowy" → 8, "na pół dnia" → 4, "2-3 godziny" → 2.5). Jeśli nie padło, null.
 
 Rozmowa:
 """
@@ -98,7 +99,7 @@ ${conversationText.slice(0, 6000)}
 """
 ${inputNotes ? `Notatki użytkownika: "${inputNotes.slice(0, 2000)}"` : ''}
 
-Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "is_loop": true, "days": null}`;
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "is_loop": true, "days": null, "duration_h": null}`;
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -111,13 +112,14 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "
   if (!response.ok) throw new Error(`Gemini location extraction error ${response.status}`);
   const data = await response.json() as any;
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) return { startPlace: null, distanceKm: null, isLoop: true, days: null };
+  if (!text) return { startPlace: null, distanceKm: null, isLoop: true, days: null, durationH: null };
   const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
   return {
     startPlace: parsed.start_place || null,
     distanceKm: Number(parsed.distance_km) || null,
     isLoop: parsed.is_loop !== false,
-    days: Number(parsed.days) || null
+    days: Number(parsed.days) || null,
+    durationH: Number(parsed.duration_h) || null
   };
 }
 
@@ -126,6 +128,16 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"start_place": "...", "distance_km": 50, "
  * więc szukanie atrakcji dalej niż ~D/5 od startu z założenia produkuje trasę
  * dłuższą, niż użytkownik zamówił.
  */
+/**
+ * Ile realnie da się przejść w zadanym czasie. Ludzie nie mają wyczucia, ile to
+ * 8 km po mieście — myślą godzinami. Przy zwiedzaniu większość czasu schodzi na
+ * oglądanie, nie na marsz, więc na chodzenie zostaje ok. 40% godzin przy ~3,5 km/h.
+ */
+function walkableKmForHours(hours: number, routeType: string): number {
+  const cityLike = routeType === 'city' || routeType === 'city_walk';
+  return cityLike ? Math.round(hours * 1.4 * 10) / 10 : Math.round(hours * 3 * 10) / 10;
+}
+
 function poiRadiusForRoute(
   distanceKm: number | null,
   isLoop: boolean,
@@ -452,6 +464,7 @@ app.post('/chat-interview', async (c) => {
     let conversationDistanceKm: number | null = null;
     let conversationIsLoop = true;
     let conversationDays: number | null = null;
+    let conversationDurationH: number | null = null;
 
     if (messages.length > 0) {
       try {
@@ -459,6 +472,12 @@ app.post('/chat-interview', async (c) => {
         conversationDistanceKm = extracted.distanceKm;
         conversationIsLoop = extracted.isLoop;
         conversationDays = extracted.days;
+        conversationDurationH = extracted.durationH;
+        // Podany czas jest wiarygodniejszy niż kilometry — użytkownik wie, ile ma godzin
+        if (extracted.durationH && !extracted.distanceKm) {
+          conversationDistanceKm = walkableKmForHours(extracted.durationH, poiRouteType);
+          console.log(`[chat-interview] ${extracted.durationH} h -> ok. ${conversationDistanceKm} km marszu (${poiRouteType})`);
+        }
         if (!poiCenter && extracted.startPlace) {
           const startPlace = await geocodingService.geocodeSettlement(extracted.startPlace);
           poiCenter = { lat: startPlace.lat, lng: startPlace.lng };
@@ -499,7 +518,7 @@ app.post('/chat-interview', async (c) => {
 Trasa ma mieć ok. ${conversationDistanceKm} km${conversationDays && conversationDays >= 2 ? ` i zająć ${conversationDays} dni` : conversationIsLoop ? ' i być PĘTLĄ' : ''}. Przy każdej atrakcji podana jest jej odległość od startu w linii prostej.
 ${poiRouteType === 'city' || poiRouteType === 'city_walk'
   ? `Zwiedzanie miasta — NIE UKŁADAJ PUNKTÓW W PIERŚCIEŃ:
-- ${conversationDistanceKm} km to GÓRNY LIMIT marszu na dzień, a nie cel do wyrobienia. Krótsza trasa z lepszymi miejscami jest lepsza niż dłuższa z gorszymi.
+${conversationDurationH ? `- Budżet czasu: ok. ${conversationDurationH} h. To około ${conversationDistanceKm} km marszu — reszta godzin schodzi na zwiedzanie, kawę i jedzenie. MÓW DO UŻYTKOWNIKA GODZINAMI, nie kilometrami.\n` : ''}- ${conversationDistanceKm} km to GÓRNY LIMIT marszu, a nie cel do wyrobienia. Krótsza trasa z lepszymi miejscami jest lepsza niż dłuższa z gorszymi.
 - Wybierz 6-10 NAJWAŻNIEJSZYCH punktów z listy powyżej — te najwyżej na liście są najbardziej znane. Nie pomijaj ikon miasta na rzecz mniej znanych obiektów tylko po to, żeby rozciągnąć trasę.
 - Punkty mają leżeć BLISKO SIEBIE i układać się dzielnicami: zwiedź jedną okolicę do końca, dopiero potem przejdź do sąsiedniej. Rozrzucanie punktów na wszystkie strony od startu to błąd — turysta spędzi dzień na chodzeniu między nimi zamiast na zwiedzaniu.
 - Jeśli suma odległości wychodzi wyraźnie poniżej ${conversationDistanceKm} km, to DOBRZE — zostaje czas na wejście do muzeów.`
@@ -547,6 +566,7 @@ Te informacje są potrzebne do wygenerowania trasy. NIE odpytuj z nich po kolei 
 - Zależnie od POJAZDU:
   a) Dla "hiking" (pieszo) lub "city" (spacer miejski): potrzebna ILOŚĆ DNI i POZIOM TRUDNOŚCI. Jeśli dni nie padły — zapytaj. Trudności NIE pytaj osobno: wynika z wybranego wariantu (każdy wariant ma podaną trudność w "subtitle").
   b) Dla rowerów/motocykli/aut: potrzebny DYSTANS lub CZAS. Jeśli nie padł — zapytaj w fazie "discovery" razem z pytaniem o strukturę.
+  c) DLA MIASTA PYTAJ O CZAS, NIE O KILOMETRY. Nikt nie wie, ile to jest 8 km po mieście — za to każdy wie, że ma "3 godziny" albo "cały dzień". Pytaj: "ile czasu masz na zwiedzanie?" i proponuj karty: 2-3 godziny / pół dnia (4 h) / cały dzień (7-8 h). Kilometry wylicz sam i podawaj co najwyżej jako informację dodatkową.
 - PĘTLA czy LINIOWA — wynika z odpowiedzi na pytanie o strukturę w fazie "discovery", nie pytaj osobno.
 - PREFERENCJE terenu — jeśli to gravel/mtb, nie pytaj, bo wiemy.
 - POPULARNOŚĆ — nie pytaj osobno. Warianty w fazie "variant_choice" mają się różnić charakterem, w tym stopniem oblegania.
@@ -667,6 +687,7 @@ Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez 
    - LICZY SIĘ CZAS, NIE KILOMETRY. Dzień zwiedzania to 6-10 km marszu i 6-10 przystanków — reszta dnia schodzi na zwiedzanie wnętrz, kawę i jedzenie. Nie nadrabiaj kilometrów dorzucaniem odległych dzielnic.
    - KOLEJNOŚĆ WEDŁUG SĄSIEDZTWA: prowadź trasę dzielnicami, zwiedzając każdą do końca, zanim przejdziesz dalej (np. w Krakowie: całe Stare Miasto → Wawel → Kazimierz → Podgórze). Skakanie tam i z powrotem między dzielnicami to najgorszy możliwy układ.
    - Jeśli dzień wychodzi zbyt napakowany, LEPIEJ USUNĄĆ punkt niż wydłużyć marsz.
+   - NIE TWÓRZ TRASY NA SIŁĘ. Dystans i liczba punktów to sufit, nie norma do wyrobienia. Jeśli w okolicy jest 5 naprawdę dobrych miejsc, daj 5 — dorzucanie słabych punktów tylko po to, żeby "wyszły kilometry", psuje trasę. Krótsza i dobra bije dłuższą i rozwodnioną.
    - Przy kilku dniach rozbij miasto na dni TEMATYCZNE/DZIELNICOWE (dzień 1 Stare Miasto, dzień 2 Kazimierz i Podgórze), a nie na jedną wielką pętlę.
    - Uwzględniaj godziny otwarcia i dni zamknięcia muzeów — wspomnij o nich w opisie, jeśli mają znaczenie dla kolejności.
    
