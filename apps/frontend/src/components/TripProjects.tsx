@@ -26,6 +26,7 @@ interface PinnedPlace {
   name: string;
   category: string;
   priority: Priority;
+  sort_order: number;
   description: string | null;
   opening_hours: string | null;
   visit_minutes: number | null;
@@ -89,6 +90,7 @@ export default function TripProjects() {
   const [shareEmail, setShareEmail] = useState('');
   const [sharing, setSharing] = useState(false);
   const [editingType, setEditingType] = useState(false);
+  const [grouped, setGrouped] = useState(true);
   const [planning, setPlanning] = useState(false);
   const [plan, setPlan] = useState<any | null>(null);
   const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
@@ -124,8 +126,9 @@ export default function TripProjects() {
     (async () => {
       const { data } = await (supabase as any)
         .from('trip_project_places')
-        .select('id, name, category, priority, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+        .select('id, name, category, priority, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
         .eq('project_id', activeId)
+        .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
       setPlaces(data || []);
       const { data: plans } = await (supabase as any)
@@ -210,7 +213,7 @@ export default function TripProjects() {
         image_url: place.image_url,
         wiki_extract: place.wiki_extract
       })
-      .select('id, name, category, priority, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+      .select('id, name, category, priority, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
       .single();
     if (error) return toast.error(error.message);
     setPlaces((prev) => [...prev, data]);
@@ -223,10 +226,39 @@ export default function TripProjects() {
     setPlaces((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const movePlace = async (id: string, priority: Priority) => {
-    setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, priority } : p)));
-    const { error } = await (supabase as any).from('trip_project_places').update({ priority }).eq('id', id);
-    if (error) toast.error(error.message);
+  const movePlace = async (id: string, priority: Priority, beforeId?: string) => {
+    // Kolejność liczymy lokalnie i zapisujemy tylko przesunięte kartki —
+    // tablica rośnie tygodniami, więc użytkownik chce nad nią panować.
+    const moved = places.find((p) => p.id === id);
+    if (!moved) return;
+    const rest = places.filter((p) => p.id !== id);
+    const zonePlaces = rest.filter((p) => p.priority === priority);
+    const idx = beforeId ? zonePlaces.findIndex((p) => p.id === beforeId) : zonePlaces.length;
+    const target = idx < 0 ? zonePlaces.length : idx;
+    const reordered = [...zonePlaces.slice(0, target), { ...moved, priority }, ...zonePlaces.slice(target)];
+    const withOrder = reordered.map((p, i) => ({ ...p, sort_order: i }));
+    setPlaces([...rest.filter((p) => p.priority !== priority), ...withOrder]);
+    const changed = withOrder.filter((p) => {
+      const before = places.find((x) => x.id === p.id);
+      return !before || before.sort_order !== p.sort_order || before.priority !== p.priority;
+    });
+    for (const p of changed) {
+      const { error } = await (supabase as any)
+        .from('trip_project_places')
+        .update({ priority: p.priority, sort_order: p.sort_order })
+        .eq('id', p.id);
+      if (error) return toast.error(error.message);
+    }
+  };
+
+  const groupByCategory = (list: PinnedPlace[]) => {
+    const order = ['attraction', 'food', 'nightlife', 'hotel', 'other'];
+    const labels: Record<string, string> = {
+      attraction: 'Atrakcje', food: 'Jedzenie', nightlife: 'Wieczory', hotel: 'Nocleg', other: 'Inne'
+    };
+    return order
+      .map((cat) => ({ cat, label: labels[cat], items: list.filter((p) => (p.category || 'other') === cat) }))
+      .filter((g) => g.items.length > 0);
   };
 
   const changeTripType = async (presetId: string) => {
@@ -589,7 +621,13 @@ export default function TripProjects() {
 
             {places.length > 0 && (
               <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold mb-2">Tablica miejsc</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold">Tablica miejsc</h3>
+                  <button onClick={() => setGrouped((v) => !v)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    {grouped ? 'Pokaż jako jedną listę' : 'Grupuj wg kategorii'}
+                  </button>
+                </div>
                 <div className="grid gap-3 md:grid-cols-3">
                   {ZONES.map((zone) => {
                     const zonePlaces = places.filter((p) => p.priority === zone.id);
@@ -611,13 +649,30 @@ export default function TripProjects() {
                           <span className="text-[11px] text-muted-foreground">{zonePlaces.length}</span>
                         </div>
                         <div className="space-y-2">
-                          {zonePlaces.map((p) => {
+                          {(grouped ? groupByCategory(zonePlaces) : [{ cat: 'all', label: '', items: zonePlaces }]).map((group) => (
+                          <div key={group.cat} className="space-y-2">
+                            {grouped && group.label && (
+                              <div className="flex items-center justify-between px-1 pt-1">
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  {group.label}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">{group.items.length}</span>
+                              </div>
+                            )}
+                          {group.items.map((p) => {
                             const Icon = CATEGORY_ICON[p.category] || MapPin;
                             return (
                               <div
                                 key={p.id}
                                 draggable
                                 onDragStart={(e) => e.dataTransfer.setData('text/plain', p.id)}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const id = e.dataTransfer.getData('text/plain');
+                                  if (id && id !== p.id) movePlace(id, zone.id, p.id);
+                                }}
                                 className={`rounded-lg border bg-background overflow-hidden cursor-grab active:cursor-grabbing ${
                                   zone.id === 'rejected' ? 'opacity-60' : ''
                                 }`}
@@ -653,6 +708,8 @@ export default function TripProjects() {
                               </div>
                             );
                           })}
+                          </div>
+                          ))}
                           {zonePlaces.length === 0 && (
                             <p className="text-[11px] text-muted-foreground px-1 py-3 text-center">
                               {zone.hint}
@@ -664,7 +721,7 @@ export default function TripProjects() {
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-2">
-                  Przeciągnij kartkę między kolumnami, żeby zmienić jej wagę.
+                  Przeciągnij kartkę między kolumnami, żeby zmienić jej wagę, albo upuść na inną kartkę, żeby ustawić kolejność.
                 </p>
               </div>
             )}

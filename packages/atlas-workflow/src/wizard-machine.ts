@@ -75,6 +75,7 @@ export type WizardEvent =
   | { type: 'UPDATE_WAYPOINT'; index: number; waypoint: Waypoint }
   | { type: 'CLEAR_ROUTE' }
   | { type: 'SEND_MESSAGE'; text: string }
+  | { type: 'REWIND_TO_PHASE'; phase: string }
   | { type: 'CALCULATE_ROUTE' }
   | { type: 'SAVE_PROJECT' }
   | { type: 'PUBLISH' };
@@ -148,6 +149,34 @@ export const wizardMachine = setup({
         }
         return context.chatMessages;
       }
+    }),
+    rewindToPhase: assign(({ context, event }) => {
+      if (event.type !== 'REWIND_TO_PHASE') return {};
+      // Cofamy rozmowę do pytania z danego etapu: zostawiamy je jako ostatnie,
+      // żeby jego karty znów były aktywne, i zapominamy decyzje podjęte później.
+      const idx = context.chatMessages.findIndex(
+        (m) => m.role === 'agent' && m.phase === event.phase
+      );
+      if (idx < 0) return {};
+      const ORDER = ['start_point', 'discovery', 'variant_choice', 'refine', 'confirm'];
+      const keysByPhase: Record<string, string[]> = {
+        start_point: ['start_point'],
+        discovery: ['structure'],
+        variant_choice: ['region', 'difficulty', 'pattern', 'variant'],
+        refine: ['accommodation', 'pace', 'interests']
+      };
+      const cutFrom = ORDER.indexOf(event.phase);
+      const profile = { ...context.tripProfile };
+      ORDER.slice(cutFrom).forEach((ph) => (keysByPhase[ph] || []).forEach((k) => delete profile[k]));
+      return {
+        chatMessages: context.chatMessages.slice(0, idx + 1),
+        tripProfile: profile,
+        phase: event.phase,
+        // Trasa wyliczona na porzuconych ustaleniach przestaje obowiązywać
+        waypoints: [],
+        geometry: null,
+        gpxData: null
+      };
     }),
     assignPhase: assign({
       phase: ({ context, event }) => {
@@ -268,6 +297,7 @@ export const wizardMachine = setup({
   states: {
     idle: {
       on: {
+        REWIND_TO_PHASE: { actions: 'rewindToPhase' },
         SET_FIELD: { actions: 'assignField' },
         CLEAR_ROUTE: { actions: 'clearRoute' },
         ADD_WAYPOINT: { actions: 'addWaypoint' },
@@ -375,6 +405,7 @@ export const wizardMachine = setup({
     },
     error: {
       on: {
+        REWIND_TO_PHASE: { actions: 'rewindToPhase' },
         SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
         CALCULATE_ROUTE: { target: 'generating_route', actions: 'resetRetries' },
         SET_FIELD: { actions: 'assignField' },

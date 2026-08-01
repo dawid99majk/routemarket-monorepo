@@ -156,7 +156,12 @@ export function useWizardMachine(initialProjectId: string | null = null) {
             gpxData: context.gpxData,
             guideText: context.guideText,
             vehicleType: context.vehicleType,
-            bikeSubtype: context.bikeSubtype
+            bikeSubtype: context.bikeSubtype,
+            // Bez tego wznowiony projekt otwierał się mapą: warstwa wywiadu nie
+            // wiedziała, na którym etapie rozmowa została przerwana.
+            phase: context.phase,
+            tripProfile: context.tripProfile,
+            distanceTargetKm: context.distanceTargetKm
         };
 
         if (!projectId) {

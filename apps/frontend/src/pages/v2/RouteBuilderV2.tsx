@@ -107,6 +107,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const isSaving = state.matches('saving_project');
   // Status pracy agenta — bez tego użytkownik nie wie, czy system liczy, czy zamarł.
   const [overlayDismissed, setOverlayDismissed] = useState(false);
+  // Warstwę pokazujemy też po wznowieniu — faza jest teraz zapisywana z projektem
   const busyLabel = isTyping
     ? 'Agent myśli…'
     : isGenerating
@@ -294,6 +295,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               const reqs = data.requirements;
               console.log("[RouteBuilderV2] Restoring requirements:", reqs);
               if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
+              if (reqs.phase) setField('phase', reqs.phase);
+              if (reqs.tripProfile) setField('tripProfile', reqs.tripProfile);
+              if (reqs.distanceTargetKm) setField('distanceTargetKm', reqs.distanceTargetKm);
               if (reqs.gpxData) setField('gpxData', reqs.gpxData);
               if (reqs.guideText) setField('guideText', reqs.guideText);
               if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
@@ -357,6 +361,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     const reqs = project.requirements || {};
     setField('projectId', project.id);
     if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
+    if (reqs.phase) setField('phase', reqs.phase);
+    if (reqs.tripProfile) setField('tripProfile', reqs.tripProfile);
+    if (reqs.distanceTargetKm) setField('distanceTargetKm', reqs.distanceTargetKm);
     if (reqs.gpxData) setField('gpxData', reqs.gpxData);
     if (reqs.guideText) setField('guideText', reqs.guideText);
     if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
@@ -548,6 +555,7 @@ ${points}
           onVehicleChange={handleVehicleChange}
           onRoutingPreferenceChange={(pref) => setField('routingPreference', pref)}
           onChoose={chooseOption}
+          onRewind={(phase) => send({ type: 'REWIND_TO_PHASE', phase })}
           onSend={(text) => {
             // Pierwsza wypowiedź jest briefem wyjazdu — zapisujemy ją jako założenia,
             // żeby była widoczna w panelu i trafiała do agenta przy kolejnych turach.

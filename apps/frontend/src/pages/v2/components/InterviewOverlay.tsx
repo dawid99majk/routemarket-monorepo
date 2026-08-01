@@ -32,6 +32,7 @@ interface InterviewOverlayProps {
   onRoutingPreferenceChange: (pref: 'popular' | 'wild') => void;
   onChoose: (option: RouteOption) => void;
   onSend: (text: string) => void;
+  onRewind: (phase: string) => void;
   onClose: () => void;
 }
 
@@ -46,6 +47,7 @@ export default function InterviewOverlay({
   onRoutingPreferenceChange,
   onChoose,
   onSend,
+  onRewind,
   onClose
 }: InterviewOverlayProps) {
   const [draft, setDraft] = useState('');
@@ -113,13 +115,17 @@ export default function InterviewOverlay({
             const active = i === activeIdx;
             return (
               <div key={step.id} className="flex items-center gap-1 shrink-0">
-                <div
+                <button
+                  type="button"
+                  disabled={!done || !!busyLabel}
+                  onClick={() => onRewind(step.id)}
+                  title={done ? 'Wróć do tego kroku i wybierz inaczej' : undefined}
                   className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active
                       ? 'bg-emerald-500 text-white font-medium'
                       : done
-                        ? 'bg-white/15 text-white/80'
-                        : 'bg-white/5 text-white/40'
+                        ? 'bg-white/15 text-white/80 hover:bg-white/30 cursor-pointer'
+                        : 'bg-white/5 text-white/40 cursor-default'
                   }`}
                 >
                   {done ? (
@@ -128,7 +134,7 @@ export default function InterviewOverlay({
                     <span className={`text-xs ${active ? 'opacity-90' : 'opacity-50'}`}>{i + 1}</span>
                   )}
                   {step.label}
-                </div>
+                </button>
                 {i < STEPS.length - 1 && <ChevronRight className="w-4 h-4 text-white/20 shrink-0" />}
               </div>
             );
