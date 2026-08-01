@@ -1,5 +1,5 @@
 import { useMachine } from '@xstate/react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { wizardMachine, WizardContext } from '@routemarket/atlas-workflow/wizard-machine';
@@ -32,7 +32,30 @@ function generateGpxString(coordinates: number[][], title: string): string {
   return gpx;
 }
 
+/** Preferencje z profilu — wczytane raz i dołączane do każdej tury wywiadu. */
+function useRoutePreferences() {
+  const [prefs, setPrefs] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      const { data } = await (supabase as any)
+        .from('route_preferences')
+        .select('pace, popularity, wandering, dining, effort, crowds')
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+      if (!cancelled && data) setPrefs(data);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return prefs;
+}
+
 export function useWizardMachine(initialProjectId: string | null = null) {
+  const preferences = useRoutePreferences();
+  const preferencesRef = useRef<Record<string, number> | null>(null);
+  preferencesRef.current = preferences;
   // Memoize the machine to avoid recreation and restarts on every render
   const machine = useMemo(() => {
     return wizardMachine.provide({
@@ -51,7 +74,8 @@ export function useWizardMachine(initialProjectId: string | null = null) {
               vehicle_type: input.context.vehicleType,
               bike_subtype: input.context.bikeSubtype,
               routing_preference: input.context.routingPreference,
-              trip_profile: input.context.tripProfile
+              trip_profile: input.context.tripProfile,
+              creator_preferences: preferencesRef.current
             })
           });
           if (!res.ok) throw new Error('Chat failed');

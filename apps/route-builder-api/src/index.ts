@@ -355,7 +355,7 @@ app.get('/route-projects', async (c) => {
 // Chat AI Interview
 app.post('/chat-interview', async (c) => {
   try {
-    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype, routing_preference, trip_profile } = await c.req.json() as { 
+    const { messages, project_id, input_notes, current_waypoints, vehicle_type, bike_subtype, routing_preference, trip_profile, creator_preferences } = await c.req.json() as { 
       messages: {role: string, text: string}[], 
       project_id?: string, 
       input_notes?: string,
@@ -363,7 +363,8 @@ app.post('/chat-interview', async (c) => {
       vehicle_type?: string,
       bike_subtype?: string,
       routing_preference?: string,
-      trip_profile?: Record<string, any>
+      trip_profile?: Record<string, any>,
+      creator_preferences?: Record<string, number>
     };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
@@ -389,6 +390,39 @@ app.post('/chat-interview', async (c) => {
     if (routing_preference) {
       const prefText = routing_preference === 'popular' ? 'KLASYKI REGIONU (wybieraj najbardziej znane, turystyczne, popularne i sprawdzone punkty)' : 'POZA UTARTYM SZLAKIEM (szukaj ukrytych perełek, unikaj tłumów, wybieraj boczne dróżki i dzikie zakątki)';
       projectContext += `\n\n[PREFERENCJA TRASY] Użytkownik wybrał styl: **${prefText}**. Dopasuj do tego swoje rekomendacje!`;
+    }
+
+    // Preferencje z profilu twórcy — suwak 0-100, 50 to brak preferencji.
+    // Przekładamy je na konkretne wytyczne, bo sama liczba nic modelowi nie mówi.
+    if (creator_preferences && Object.keys(creator_preferences).length > 0) {
+      const axis = (v: number | undefined, low: string, high: string): string | null => {
+        if (v == null || (v >= 40 && v <= 60)) return null;
+        const strong = v <= 20 || v >= 80;
+        return `${v < 50 ? low : high}${strong ? ' (wyraźnie)' : ''}`;
+      };
+      const lines = [
+        axis(creator_preferences.pace,
+          'Tempo: zobaczyć jak najwięcej — planuj więcej krótszych przystanków',
+          'Tempo: spokojnie — mniej punktów, za to z czasem na dokładne zwiedzenie każdego'),
+        axis(creator_preferences.popularity,
+          'Miejsca: klasyki i must-see regionu',
+          'Miejsca: niszowe i nieoczywiste, omijaj najbardziej oblegane ikony'),
+        axis(creator_preferences.wandering,
+          'Charakter: prowadź sprawdzonymi, uczęszczanymi trasami',
+          'Charakter: prowadź bocznymi uliczkami, podwórkami i deptakami zamiast najkrótszą drogą — po drodze ma być co odkrywać'),
+        axis(creator_preferences.dining,
+          'Gastronomia: eleganckie restauracje i kawiarnie z półki',
+          'Gastronomia: lokalny street food, bary mleczne, przydrożna kawa'),
+        axis(creator_preferences.effort,
+          'Wysiłek: spokojnie i płasko, unikaj stromych podejść i schodów',
+          'Wysiłek: podejścia mile widziane — wzgórza, tarasy widokowe, przewyższenia'),
+        axis(creator_preferences.crowds,
+          'Tłumy: nie stanowią problemu',
+          'Tłumy: unikaj zatłoczonych miejsc, sugeruj mniej oblegane pory dnia')
+      ].filter(Boolean);
+      if (lines.length > 0) {
+        projectContext += `\n\n=== STAŁE PREFERENCJE TEGO TWÓRCY (z jego profilu) ===\n${lines.map((l) => `- ${l}`).join('\n')}\nUwzględniaj je bez pytania. Jeśli w tej rozmowie użytkownik powie coś przeciwnego, jego bieżąca prośba ma pierwszeństwo.`;
+      }
     }
 
     // Decyzje podjęte przez kliknięcie kart w poprzednich fazach — to ustalenia,
