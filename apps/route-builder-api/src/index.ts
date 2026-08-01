@@ -216,6 +216,64 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
   return Array.isArray(parsed.waypoints) ? parsed.waypoints : null;
 }
 
+/**
+ * Awaryjne wygenerowanie samej listy punktów. Model potrafi ogłosić gotową trasę
+ * ("Oto Twoja przemyślana trasa...") i nie dołączyć add_waypoints — użytkownik
+ * dostaje wtedy komunikat o sukcesie i pustą mapę.
+ */
+async function generateWaypointList(
+  apiKey: string,
+  conversationText: string,
+  tripProfile: Record<string, any> | undefined,
+  candidates: PoiCandidate[],
+  routeType: string,
+  targetKm: number | null
+): Promise<string[] | null> {
+  const decided = tripProfile && Object.keys(tripProfile).length > 0
+    ? `Ustalenia: ${JSON.stringify(tripProfile)}`
+    : '';
+  const poiList = candidates.slice(0, 40)
+    .map((c) => `- "${c.name}"${c.distanceKm != null ? ` (${c.distanceKm} km od startu)` : ''}`)
+    .join('\n');
+
+  const prompt = `Na podstawie rozmowy ułóż KONKRETNĄ listę punktów trasy (${routeType}).
+${decided}
+${targetKm ? `Docelowy dystans: ok. ${targetKm} km.` : ''}
+
+Rozmowa:
+"""
+${conversationText.slice(0, 6000)}
+"""
+
+${poiList ? `Zweryfikowane miejsca w okolicy (kopiuj nazwy DOKŁADNIE stąd):\n${poiList}` : ''}
+
+Zasady: pierwszy i ostatni punkt to start/meta, kolejność geograficzna bez zawracania, 6-12 punktów.
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: { waypoints: { type: 'array', items: { type: 'string' } } },
+          required: ['waypoints']
+        },
+        maxOutputTokens: 2048
+      }
+    })
+  });
+  if (!res.ok) throw new Error(`Gemini waypoint list error ${res.status}`);
+  const data = await res.json() as any;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return null;
+  const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+  return Array.isArray(parsed.waypoints) ? parsed.waypoints : null;
+}
+
 // Healthcheck
 app.get('/health', (c) => {
   return c.json({ status: 'ok', version: '2.0.0', service: 'route-builder-api' });
@@ -557,6 +615,8 @@ SKRÓT DLA ZNAWCÓW — wyłącznie w dwóch przypadkach:
 Sama nazwa miejscowości, liczba dni, dystans, trudność ani typ pojazdu NIE są takim sygnałem.
 2. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
 3. Zadawaj JEDNO pytanie naraz, max 2-3 zdania tekstu. Konkrety wrzucaj w "options", nie w ścianę tekstu.
+3a. NIGDY NIE POWTARZAJ TEJ SAMEJ FAZY. Jeśli ostatnia wypowiedź użytkownika odpowiada tytułowi karty, którą właśnie zaproponowałeś, to znaczy, że DOKONAŁ WYBORU — przejdź do NASTĘPNEJ fazy, nie pokazuj tych samych wariantów jeszcze raz. Ponowne wyświetlenie tego samego wyboru jest błędem.
+3b. Każda karta wariantu MUSI mieć wypełnione "implies" (np. {"variant": "<tytuł>", "region": "...", "difficulty": "..."}), żeby wybór został zapamiętany.
 4. UKRYTY DYSTANS: przy done: true wylicz sumaryczny dystans z liczby dni i trudności. UWAGA — miasto i góry mają ZUPEŁNIE inne tempo:
    Wędrówka górska/terenowa (hiking):
    - Lekki: 15 km/dzień (np. 3 dni = 45)
@@ -827,6 +887,28 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         ? directResult
         : JSON.parse((generatedText as string).replace(/```json/g, '').replace(/```/g, '').trim());
       
+      // Zapowiedź gotowej trasy bez listy punktów kończyła się komunikatem o sukcesie
+      // i pustą mapą — w takim wypadku dogenerowujemy samą listę.
+      if (resultObj.done === true && (!Array.isArray(resultObj.add_waypoints) || resultObj.add_waypoints.length < 2)) {
+        console.warn('[chat-interview] done=true without waypoints — generating the list explicitly.');
+        try {
+          const list = await generateWaypointList(
+            GEMINI_API_KEY, conversationText, trip_profile, poiCandidates, poiRouteType, conversationDistanceKm
+          );
+          if (list && list.length >= 2) {
+            resultObj.add_waypoints = list;
+            console.log(`[chat-interview] Recovered ${list.length} waypoints.`);
+          } else {
+            resultObj.done = false;
+            resultObj.reply = `${resultObj.reply}\n\n⚠️ Nie udało mi się ułożyć listy punktów. Napisz proszę, co koniecznie ma się znaleźć na trasie.`;
+          }
+        } catch (err) {
+          console.error('[chat-interview] Waypoint recovery failed:', err);
+          resultObj.done = false;
+          resultObj.reply = `${resultObj.reply}\n\n⚠️ Nie udało mi się ułożyć listy punktów. Spróbuj ponownie albo doprecyzuj oczekiwania.`;
+        }
+      }
+
       // Jeśli agent zasugerował dodanie waypointów, geokodujemy je przed zwróceniem na frontend
       if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
         const suggested_waypoints = [];
