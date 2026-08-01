@@ -132,6 +132,12 @@ function kindOf(tags: Record<string, string>): string {
 }
 
 export class PoiService {
+  /** Promień używany, gdy dystans trasy nie jest jeszcze znany. */
+  defaultRadiusKm(routeType: string): number {
+    const typeKey = ROUTE_TYPE_ALIASES[routeType] || 'hiking';
+    return DEFAULT_RADIUS_KM[typeKey];
+  }
+
   private buildQuery(bbox: string, typeKey: string, notableOnly: boolean): string {
     // notableOnly: tylko obiekty z wpisem w Wikidata — czyli miejsca faktycznie znane,
     // te, których użytkownik oczekuje w trybie "Klasyk".
@@ -201,9 +207,11 @@ export class PoiService {
     // regionu (np. Praděd) mogłyby w ogóle nie trafić do listy.
     // Każde zapytanie samodzielnie znosi awarię — wynik jednego jest wart więcej
     // niż nic, a Overpass potrafi obsłużyć jedno, a wywrócić się na drugim.
+    let degraded = false;
     const queries: Promise<OverpassElement[]>[] = [
       this.runQuery(this.buildQuery(bbox, typeKey, true), `${cacheKey}/notable`).catch((err) => {
         console.warn(`[POI] Notable query failed: ${err.message}`);
+        degraded = true;
         return [] as OverpassElement[];
       })
     ];
@@ -211,6 +219,7 @@ export class PoiService {
       queries.push(
         this.runQuery(this.buildQuery(bbox, typeKey, false), `${cacheKey}/all`).catch((err) => {
           console.warn(`[POI] Broad query failed: ${err.message}`);
+          degraded = true;
           return [] as OverpassElement[];
         })
       );
@@ -258,7 +267,14 @@ export class PoiService {
       c.rank = c.score - (distKm / radiusKm) * 2.5;
     }
     candidates.sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0));
-    cache.set(cacheKey, { at: Date.now(), data: candidates });
+    // Niepełnego wyniku nie utrwalamy: gdy szersze zapytanie padnie, zostają same
+    // obiekty z Wikidaty — znikają zwykłe parki i place (krakowskie Planty), a taka
+    // okrojona lista siedziałaby w cache godzinę i psuła kolejne trasy.
+    if (degraded) {
+      console.warn(`[POI] Incomplete result (${candidates.length} POI) — not caching.`);
+    } else {
+      cache.set(cacheKey, { at: Date.now(), data: candidates });
+    }
     return candidates.slice(0, limit);
   }
 
@@ -266,7 +282,11 @@ export class PoiService {
    * Dopasowuje nazwę waypointu z LLM do kandydata OSM (zwraca współrzędne z OSM
    * zamiast zgadywania geokoderem). Porównanie bez diakrytyków i wielkości liter.
    */
-  matchCandidate(waypointName: string, candidates: PoiCandidate[]): PoiCandidate | null {
+  matchCandidate(
+    waypointName: string,
+    candidates: PoiCandidate[],
+    reference?: { lat: number; lng: number }
+  ): PoiCandidate | null {
     const normalize = (s: string) =>
       s
         .toLowerCase()
@@ -282,7 +302,9 @@ export class PoiService {
     const target = primaryOf(waypointName, /,/);
     if (!target || target.length < 4) return null;
 
-    let best: PoiCandidate | null = null;
+    // Zbieramy WSZYSTKIE trafienia, bo w mieście te same wezwania powtarzają się
+    // po kilka razy ("Bazylika Wniebowzięcia NMP" jest i przy Rynku, i w Mogile).
+    const hits: PoiCandidate[] = [];
     let bestLen = 0;
     for (const cand of candidates) {
       const candName = primaryOf(cand.name, /[/(]/);
@@ -294,9 +316,26 @@ export class PoiService {
         target === candName ||
         (candName.length >= 6 && target.includes(candName)) ||
         (candName.includes(target) && (targetWords >= 2 || candName.startsWith(target)));
-      if (hit && candName.length > bestLen) {
+      if (!hit) continue;
+      if (candName.length > bestLen) bestLen = candName.length;
+      hits.push(cand);
+    }
+    if (hits.length === 0) return null;
+
+    // Spośród równie dobrych dopasowań nazwy wybieramy najbliższe punktowi
+    // odniesienia. Bez tego trasa po Starym Mieście potrafiła skoczyć 8 km
+    // na drugi koniec miasta do kościoła o tym samym wezwaniu.
+    const equallyGood = hits.filter((c) => primaryOf(c.name, /[/(]/).length === bestLen);
+    const pool = equallyGood.length > 0 ? equallyGood : hits;
+    if (!reference || pool.length === 1) return pool[0];
+
+    let best = pool[0];
+    let bestDist = haversineKm(reference.lat, reference.lng, best.lat, best.lng);
+    for (const cand of pool.slice(1)) {
+      const dist = haversineKm(reference.lat, reference.lng, cand.lat, cand.lng);
+      if (dist < bestDist) {
         best = cand;
-        bestLen = candName.length;
+        bestDist = dist;
       }
     }
     return best;

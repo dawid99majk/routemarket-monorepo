@@ -30,6 +30,11 @@ const CORRIDOR_M: Record<string, number> = {
 };
 
 export class RouteValidatorService {
+  /** Odległość w linii prostej między dwoma punktami [km]. */
+  distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+    return haversineKm(a.lat, a.lng, b.lat, b.lng);
+  }
+
   /**
    * Sprawdza, czy wyznaczony ślad faktycznie realizuje obietnice:
    * przechodzi przy zadanych waypointach, ma sensowny dystans, domyka pętlę.
@@ -114,7 +119,7 @@ export class RouteValidatorService {
     routeType: string
   ): { kept: T[]; dropped: T[] } {
     const maxKm: Record<string, number> = {
-      hiking: 30, city_walk: 20, city: 20,
+      hiking: 30, city_walk: 8, city: 8,
       cycling: 80, gravel: 80, mtb: 80,
       motorcycle: 250, car: 250
     };

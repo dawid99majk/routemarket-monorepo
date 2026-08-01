@@ -135,7 +135,7 @@ export class GeocodingService {
     return this.geocodeSinglePoint(query);
   }
 
-  async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}): Promise<GeocodedPlace> {
+  async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number): Promise<GeocodedPlace> {
     const parts = query.split(',').map((p) => p.trim()).filter(Boolean);
     const variants: string[] = [query];
     // "A, B, C" -> "A, B" -> "A"
@@ -151,7 +151,7 @@ export class GeocodingService {
     for (const bounded of passes) {
       for (const variant of variants) {
         try {
-          return await this.geocodeExact(variant, biasPoint, variant !== query ? query : undefined, bounded);
+          return await this.geocodeExact(variant, biasPoint, variant !== query ? query : undefined, bounded, maxRadiusKm);
         } catch (err) {
           lastError = err;
         }
@@ -163,7 +163,7 @@ export class GeocodingService {
     throw lastError;
   }
 
-  private async geocodeExact(query: string, biasPoint?: {lat: number, lng: number}, originalName?: string, boundedToRegion = false): Promise<GeocodedPlace> {
+  private async geocodeExact(query: string, biasPoint?: {lat: number, lng: number}, originalName?: string, boundedToRegion = false, maxRadiusKm?: number): Promise<GeocodedPlace> {
     const apiKey = process.env.GRAPHHOPPER_API_KEY || '';
 
     // 1. Główne geokodowanie - OpenStreetMap Nominatim (świetny do POI, dzielnic, zabytków)
@@ -176,8 +176,11 @@ export class GeocodingService {
         // występują w Polsce dziesiątki razy i sortowanie wyników po odległości nie
         // pomaga, jeśli Nominatim w ogóle nie zwróci tego właściwego w pierwszej
         // dziesiątce. bounded=1 odcina resztę kraju.
-        const dLat = 0.45;
-        const dLng = 0.45 / Math.max(0.2, Math.cos((biasPoint.lat * Math.PI) / 180));
+        // Okno skalowane do zasięgu trasy: dla spaceru po mieście 50 km promienia
+        // wpuszczało imienników z drugiego końca aglomeracji.
+        const spanKm = Math.min(50, Math.max(3, (maxRadiusKm ?? 50) * 1.5));
+        const dLat = spanKm / 111;
+        const dLng = dLat / Math.max(0.2, Math.cos((biasPoint.lat * Math.PI) / 180));
         const left = (biasPoint.lng - dLng).toFixed(4);
         const right = (biasPoint.lng + dLng).toFixed(4);
         const top = (biasPoint.lat + dLat).toFixed(4);

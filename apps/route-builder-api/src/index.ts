@@ -83,7 +83,10 @@ async function extractLocationFromConversation(
    - mianownik, oficjalna pisownia w języku kraju, w którym leży to miejsce (np. z "ze Złotych Hor i okolicy" → "Zlaté Hory", z "spod Zakopanego" → "Zakopane", z "w Krakowie" → "Kraków");
    - SAMA nazwa miejscowości — bez słów "okolice", "i okolicy", "rejon", bez przyimków i bez opisów;
    - jeśli w rozmowie nie padła żadna konkretna miejscowość, zwróć null.
-2. "distance_km" — docelowy dystans trasy w km jako liczbę. Dla wędrówek pieszych określonych w dniach przelicz: lekki 15 km/dzień, umiarkowany 20 km/dzień, wymagający 25 km/dzień. Jeśli padła liczba dni, ale nie padła trudność — przyjmij umiarkowaną (20 km/dzień). Zwróć null tylko wtedy, gdy nie padł ani dystans, ani liczba dni.
+2. "distance_km" — docelowy dystans trasy w km jako liczbę.
+   Dla wędrówek GÓRSKICH/terenowych w dniach: lekki 15 km/dzień, umiarkowany 20, wymagający 25 (bez podanej trudności przyjmij 20).
+   Dla ZWIEDZANIA MIASTA w dniach: spokojnie 5 km/dzień, normalnie 8, intensywnie 12 (bez podanej trudności przyjmij 8) — w mieście czas schodzi na zwiedzanie, nie na marsz.
+   Zwróć null tylko wtedy, gdy nie padł ani dystans, ani liczba dni.
 3. "is_loop" — true jeśli trasa ma być pętlą (powrót do startu), false jeśli liniowa. Domyślnie true.
 4. "days" — liczba dni wędrówki, jeśli padła w rozmowie (np. "2 dni" → 2). Jeśli nie padła, zwróć null.
 
@@ -125,7 +128,8 @@ function poiRadiusForRoute(
   distanceKm: number | null,
   isLoop: boolean,
   days?: number | null,
-  structure?: string
+  structure?: string,
+  routeType?: string
 ): number | undefined {
   const dayCount = days ?? 1;
   // Gdy padła liczba dni, ale nie trudność, dystans bywa nieustalony — zamiast
@@ -146,6 +150,13 @@ function poiRadiusForRoute(
   // od startu. Traktowanie jej jak pętli (D/2π) zawężało obszar tak, że główny
   // szczyt pasma wypadał poza zasięg (Śnieżka 22 km od Szklarskiej Poręby przy
   // promieniu 8 km).
+  // Spacer po mieście jest pętlą po dzielnicach — punkty leżą blisko siebie,
+  // a szeroki promień wpuszcza imienników z drugiego końca aglomeracji.
+  if (routeType === 'city' || routeType === 'city_walk') {
+    const perDay = distanceKm / Math.max(1, dayCount);
+    return Math.min(12, Math.max(2, Math.round(perDay / 2)));
+  }
+
   const isMultiDay = dayCount >= 2 || structure === 'traverse';
   const raw = isMultiDay
     ? distanceKm / 2
@@ -398,7 +409,7 @@ app.post('/chat-interview', async (c) => {
       }
     }
 
-    const poiRadiusKm = poiRadiusForRoute(conversationDistanceKm, conversationIsLoop, conversationDays, trip_profile?.structure);
+    const poiRadiusKm = poiRadiusForRoute(conversationDistanceKm, conversationIsLoop, conversationDays, trip_profile?.structure, poiRouteType);
     if (poiCenter) {
       try {
         poiCandidates = await poiService.fetchCandidates(
@@ -415,16 +426,24 @@ app.post('/chat-interview', async (c) => {
           poiRouteType,
           poiRadiusKm ? { radiusKm: poiRadiusKm, limit: 800 } : { limit: 800 }
         );
+        console.log(`[chat-interview] Match pool: ${poiMatchPool.length} POI`);
       } catch (err) {
         console.warn('[chat-interview] POI candidates fetch failed, continuing without:', err);
       }
+      if (poiMatchPool.length === 0) poiMatchPool = poiCandidates;
     }
     if (poiCandidates.length > 0) {
       projectContext += poiService.buildPromptSection(poiCandidates, routing_preference);
       if (conversationDistanceKm && poiRadiusKm) {
         projectContext += `\n\n=== BUDŻET GEOGRAFICZNY (twarde ograniczenie) ===
 Trasa ma mieć ok. ${conversationDistanceKm} km${conversationDays && conversationDays >= 2 ? ` i zająć ${conversationDays} dni` : conversationIsLoop ? ' i być PĘTLĄ' : ''}. Przy każdej atrakcji podana jest jej odległość od startu w linii prostej.
-${conversationDays && conversationDays >= 2
+${poiRouteType === 'city' || poiRouteType === 'city_walk'
+  ? `Zwiedzanie miasta — NIE UKŁADAJ PUNKTÓW W PIERŚCIEŃ:
+- ${conversationDistanceKm} km to GÓRNY LIMIT marszu na dzień, a nie cel do wyrobienia. Krótsza trasa z lepszymi miejscami jest lepsza niż dłuższa z gorszymi.
+- Wybierz 6-10 NAJWAŻNIEJSZYCH punktów z listy powyżej — te najwyżej na liście są najbardziej znane. Nie pomijaj ikon miasta na rzecz mniej znanych obiektów tylko po to, żeby rozciągnąć trasę.
+- Punkty mają leżeć BLISKO SIEBIE i układać się dzielnicami: zwiedź jedną okolicę do końca, dopiero potem przejdź do sąsiedniej. Rozrzucanie punktów na wszystkie strony od startu to błąd — turysta spędzi dzień na chodzeniu między nimi zamiast na zwiedzaniu.
+- Jeśli suma odległości wychodzi wyraźnie poniżej ${conversationDistanceKm} km, to DOBRZE — zostaje czas na wejście do muzeów.`
+  : conversationDays && conversationDays >= 2
   ? `Wędrówka ${conversationDays}-dniowa — turysta ma DOJŚĆ DO CELU, nie krążyć wokół startu:
 - Główny cel (najważniejszy szczyt/obiekt pasma) powinien leżeć ok. ${poiRadiusKm} km od startu w linii prostej. Punkty w promieniu 2-3 km od startu to strata dnia — wybieraj je tylko jako początek i koniec trasy.
 - Ułóż punkty jako ciąg: start → kolejne punkty w stronę celu → NOCLEG (schronisko) ok. połowy trasy → cel → powrót INNĄ drogą do startu.
@@ -536,11 +555,17 @@ SKRÓT DLA ZNAWCÓW — wyłącznie w dwóch przypadkach:
 Sama nazwa miejscowości, liczba dni, dystans, trudność ani typ pojazdu NIE są takim sygnałem.
 2. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
 3. Zadawaj JEDNO pytanie naraz, max 2-3 zdania tekstu. Konkrety wrzucaj w "options", nie w ścianę tekstu.
-4. UKRYTY DYSTANS: dla trasy pieszej/miejskiej (hiking/city) przy done: true wylicz sumaryczny dystans z liczby dni i trudności:
+4. UKRYTY DYSTANS: przy done: true wylicz sumaryczny dystans z liczby dni i trudności. UWAGA — miasto i góry mają ZUPEŁNIE inne tempo:
+   Wędrówka górska/terenowa (hiking):
    - Lekki: 15 km/dzień (np. 3 dni = 45)
    - Umiarkowany: 20 km/dzień (np. 3 dni = 60)
    - Wymagający: 25 km/dzień (np. 3 dni = 75)
-   Wpisz go jako liczbę w polu "distance", a liczbę dni w polu "days".
+   Zwiedzanie miasta (city / city_walk) — dzień wypełnia ZWIEDZANIE, nie marsz:
+   - Spokojnie: 5 km/dzień
+   - Normalnie: 8 km/dzień
+   - Intensywnie: 12 km/dzień
+   Więcej niż 12 km marszu dziennie po mieście oznacza, że turysta nie wejdzie do żadnego muzeum — to błąd, nie ambitny plan.
+   Wpisz wynik jako liczbę w polu "distance", a liczbę dni w polu "days".
 5. KOLEJNOŚĆ PUNKTÓW (BARDZO WAŻNE!): Zwrócona tablica \`suggested_waypoints\` MUSI być ułożona w logicznej, geograficznej kolejności, tworząc płynną ścieżkę lub pętlę BEZ KRZYŻOWANIA SIĘ (tzw. pajęczyn). Upewnij się, że punkty następują po sobie chronologicznie w taki sposób, jak przebiegałaby prawdziwa podróż.
 
 
@@ -576,8 +601,12 @@ Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez 
    - BEZWZGLĘDNY zakaz dróg gruntowych i piaszczystych.
    
 5. spacer miejski (city_walk / route_type = city_walk):
-   - Szukaj: rynków, zabytków architektonicznych, parków miejskich, tarasów widokowych, bulwarów, znanych kawiarni.
-   - BARDZO WAŻNE: Pilnuj dystansu! Jeśli użytkownik poprosił o wycieczkę "1 dniową", to trasa z samego ścisłego centrum (np. Rynek -> Ratusz -> Most) będzie miała zaledwie 3-4 kilometry! Aby ułożyć pełnowymiarową trasę na cały dzień (ok 15 km), MUSISZ rozciągnąć wycieczkę, dodając klasyki również z bardziej oddalonych dzielnic (np. we Wrocławiu koniecznie dodaj Halę Stulecia i ZOO, które są daleko od Rynku). Używaj rozumu przestrzennego.
+   - Szukaj: rynków, zabytków architektonicznych, muzeów, parków miejskich, tarasów widokowych, bulwarów, znanych kawiarni.
+   - LICZY SIĘ CZAS, NIE KILOMETRY. Dzień zwiedzania to 6-10 km marszu i 6-10 przystanków — reszta dnia schodzi na zwiedzanie wnętrz, kawę i jedzenie. Nie nadrabiaj kilometrów dorzucaniem odległych dzielnic.
+   - KOLEJNOŚĆ WEDŁUG SĄSIEDZTWA: prowadź trasę dzielnicami, zwiedzając każdą do końca, zanim przejdziesz dalej (np. w Krakowie: całe Stare Miasto → Wawel → Kazimierz → Podgórze). Skakanie tam i z powrotem między dzielnicami to najgorszy możliwy układ.
+   - Jeśli dzień wychodzi zbyt napakowany, LEPIEJ USUNĄĆ punkt niż wydłużyć marsz.
+   - Przy kilku dniach rozbij miasto na dni TEMATYCZNE/DZIELNICOWE (dzień 1 Stare Miasto, dzień 2 Kazimierz i Podgórze), a nie na jedną wielką pętlę.
+   - Uwzględniaj godziny otwarcia i dni zamknięcia muzeów — wspomnij o nich w opisie, jeśli mają znaczenie dla kolejności.
    
 === WAŻNE: FORMATOWANIE PUNKTÓW DLA GEOKODERA ===
 Aby geokoder bezbłędnie zlokalizował punkty pośrednie, każdy punkt w tablicy "add_waypoints" MUSI być podany w formacie:
@@ -810,14 +839,14 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         const failed_waypoints: string[] = [];
         for (const placeName of resultObj.add_waypoints) {
           // Najpierw dopasowanie do zweryfikowanych POI z OSM — dokładne współrzędne bez geokodera
-          const matched = poiService.matchCandidate(placeName, poiMatchPool);
+          const matched = poiService.matchCandidate(placeName, poiMatchPool, poiCenter || biasPoint);
           if (matched) {
             suggested_waypoints.push({ lat: matched.lat, lng: matched.lng, name: placeName });
             if (!biasPoint) biasPoint = { lat: matched.lat, lng: matched.lng };
             continue;
           }
           try {
-            const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint);
+            const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint, poiRadiusKm);
             if (place) {
               suggested_waypoints.push({
                 lat: place.lat,
@@ -834,6 +863,31 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
             failed_waypoints.push(placeName);
           }
         }
+        // Walidacja 0: punkt o właściwej nazwie, ale złych współrzędnych.
+        // Geokoder potrafi odesłać imiennika z drugiego końca aglomeracji ("Planty"
+        // 7 km od Rynku). Zanim uznamy punkt za odległy, próbujemy odzyskać jego
+        // prawdziwą lokalizację z listy zweryfikowanych POI.
+        // Bez podanego dystansu poiRadiusKm zostaje nieustawiony, a POI i tak są
+        // pobierane w promieniu domyślnym — kontrola musi używać tej samej wartości,
+        // inaczej cały mechanizm jest po cichu pomijany.
+        const anchorRadiusKm = poiRadiusKm ?? poiService.defaultRadiusKm(poiRouteType);
+        if (poiCenter && poiMatchPool.length > 0) {
+          const maxReasonableKm = anchorRadiusKm * 1.5;
+          for (const wp of suggested_waypoints) {
+            const distKm = routeValidatorService.distanceKm(poiCenter, wp);
+            if (distKm <= maxReasonableKm) continue;
+            const nearby = poiMatchPool.find((c) => {
+              if (routeValidatorService.distanceKm(poiCenter!, c) > maxReasonableKm) return false;
+              return poiService.matchCandidate(wp.name, [c], poiCenter!) !== null;
+            });
+            if (nearby) {
+              console.warn(`[chat-interview] Re-anchored "${wp.name}" from ${distKm.toFixed(1)} km to OSM match at ${routeValidatorService.distanceKm(poiCenter, nearby).toFixed(1)} km`);
+              wp.lat = nearby.lat;
+              wp.lng = nearby.lng;
+            }
+          }
+        }
+
         // Walidacja 1: odrzuć punkty absurdalnie oddalone od startu (pomyłki geokodera)
         const routeTypeForValidation = resultObj.extracted?.route_type || (vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking'));
         let finalWaypoints = suggested_waypoints;
@@ -890,7 +944,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
 
               const rebuilt: any[] = [];
               for (const name of corrected) {
-                const matched = poiService.matchCandidate(name, poiMatchPool);
+                const matched = poiService.matchCandidate(name, poiMatchPool, poiCenter || biasPoint);
                 if (matched) {
                   rebuilt.push({ lat: matched.lat, lng: matched.lng, name });
                   continue;
