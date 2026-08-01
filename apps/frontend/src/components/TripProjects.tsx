@@ -105,6 +105,9 @@ export default function TripProjects() {
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return setLoading(false);
+      // Zaproszenia wysłane na adres e-mail czekają, aż ktoś założy konto —
+      // po zalogowaniu podpinamy je pod użytkownika, żeby tablice się pojawiły.
+      await (supabase as any).rpc('claim_pending_trip_shares');
       const { data } = await (supabase as any)
         .from('trip_projects')
         .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
@@ -324,7 +327,7 @@ export default function TripProjects() {
       if (error) throw error;
       setShares((prev) => [...prev, data]);
       setShareEmail('');
-      toast.success('Tablica udostępniona — druga osoba zobaczy ją u siebie po zalogowaniu');
+      toast.success('Zaproszenie wysłane e-mailem — tablica czeka na tę osobę po zalogowaniu');
     } catch (err: any) {
       toast.error(err.message.includes('duplicate') ? 'Ta osoba już ma dostęp' : err.message);
     } finally {
