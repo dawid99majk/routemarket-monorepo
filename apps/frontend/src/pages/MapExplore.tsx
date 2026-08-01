@@ -224,7 +224,7 @@ export default function MapExplore() {
           <LanguageSwitcher />
           {authLoading ? <div className="h-8 w-8 animate-pulse rounded-full bg-muted" /> : user ? (
             <>
-              <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]" onClick={() => navigate('/create')}><Plus className="h-4 w-4 text-primary" /></Button>
+              <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]" onClick={() => navigate('/route-builder-v2')}><Plus className="h-4 w-4 text-primary" /></Button>
               <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]" onClick={() => navigate('/my-routes')}><ShoppingBag className="h-4 w-4 text-primary" /></Button>
               <Button variant="ghost" size="icon" className="hidden min-h-[44px] min-w-[44px] sm:flex" onClick={() => navigate('/creator-dashboard')}><LayoutDashboard className="h-4 w-4 text-primary" /></Button>
               <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]" onClick={() => navigate('/profile')}>

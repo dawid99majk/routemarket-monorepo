@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -23,7 +23,11 @@ const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const RouteDetail = lazy(() => import("./pages/RouteDetail"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
-const CreateRoute = lazy(() => import("./pages/CreateRoute"));
+
+function LegacyCreateRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/route-builder-v2${location.search}`} replace />;
+}
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const AuthError = lazy(() => import("./pages/AuthError"));
@@ -99,7 +103,9 @@ const App = () => (
                   <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
                   {/* Creator routes */}
-                  <Route path="/create" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><CreateRoute /></ProtectedRoute>} />
+                  {/* Stary kreator formularzowy zastąpiony wywiadem w /route-builder-v2.
+                      Przekierowanie zachowuje działanie starych linków, w tym ?projectId=. */}
+                  <Route path="/create" element={<LegacyCreateRedirect />} />
                   <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
 
                   {/* Admin routes */}

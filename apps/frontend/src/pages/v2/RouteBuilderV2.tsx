@@ -481,7 +481,7 @@ ${points}
     setField('gpxData', null);
     setField('guideText', null);
     setField('projectId', null);
-    navigate('/create', { replace: true });
+    navigate('/route-builder-v2', { replace: true });
   };
 
   const handleDownloadPdf = async () => {
