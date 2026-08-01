@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  AlertTriangle, Bed, CalendarDays, Clock, Coins, Loader2, MapPin, Music, Pin, Plus, Search, Star, Trash2, Utensils
+  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, Loader2, MapPin, Music, Pin, Plus, Search, Star, Trash2, Utensils
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,8 @@ export default function TripProjects() {
   const [form, setForm] = useState({ name: '', destination: '', days: '', hours: '', tripType: '' });
   const [userPrefs, setUserPrefs] = useState<Record<string, number> | null>(null);
 
+  const [savedPlans, setSavedPlans] = useState<any[]>([]);
+  const [editingType, setEditingType] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [plan, setPlan] = useState<any | null>(null);
   const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
@@ -108,6 +110,13 @@ export default function TripProjects() {
         .eq('project_id', activeId)
         .order('created_at', { ascending: true });
       setPlaces(data || []);
+      const { data: plans } = await (supabase as any)
+        .from('trip_plans')
+        .select('id, name, window_start, window_end, start_date, plan, created_at')
+        .eq('project_id', activeId)
+        .order('created_at', { ascending: false });
+      setSavedPlans(plans || []);
+      setPlan(null);
     })();
   }, [activeId]);
 
@@ -194,6 +203,62 @@ export default function TripProjects() {
     setPlaces((prev) => prev.map((p) => (p.id === place.id ? { ...p, priority: next } : p)));
   };
 
+  const changeTripType = async (presetId: string) => {
+    if (!active) return;
+    const preset = TRIP_PRESETS.find((t) => t.id === presetId);
+    const patch = presetId
+      ? { trip_type: presetId, ...(preset?.axes ?? EMPTY_AXES) }
+      : { trip_type: null, ...EMPTY_AXES };
+    const { error } = await (supabase as any)
+      .from('trip_projects')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', active.id);
+    if (error) return toast.error(error.message);
+    setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, ...patch } : p)));
+    setEditingType(false);
+    toast.success(preset ? `Charakter: ${preset.label}` : 'Charakter wyczyszczony — wracają Twoje domyślne preferencje');
+  };
+
+  const duplicateProject = async () => {
+    if (!active) return;
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    const { data: copy, error } = await (supabase as any)
+      .from('trip_projects')
+      .insert({
+        user_id: userData.user.id,
+        name: `${active.name} (kopia)`,
+        destination: active.destination,
+        days: active.days,
+        hours_per_day: active.hours_per_day,
+        trip_type: active.trip_type,
+        pace: active.pace ?? null, popularity: active.popularity ?? null,
+        wandering: active.wandering ?? null, dining: active.dining ?? null,
+        effort: active.effort ?? null, crowds: active.crowds ?? null
+      })
+      .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
+      .single();
+    if (error) return toast.error(error.message);
+    if (places.length > 0) {
+      const { data: full } = await (supabase as any)
+        .from('trip_project_places')
+        .select('name, category, priority, lat, lng, description, opening_hours, visit_minutes, source')
+        .eq('project_id', active.id);
+      if (full?.length) {
+        await (supabase as any).from('trip_project_places')
+          .insert(full.map((f: any) => ({ ...f, project_id: copy.id })));
+      }
+    }
+    setProjects((prev) => [copy, ...prev]);
+    setActiveId(copy.id);
+    toast.success('Skopiowano tablicę razem z miejscami — zmień charakter i planuj po swojemu');
+  };
+
+  const deletePlan = async (id: string) => {
+    await (supabase as any).from('trip_plans').delete().eq('id', id);
+    setSavedPlans((prev) => prev.filter((p) => p.id !== id));
+  };
+
   const buildPlan = async () => {
     if (!active || places.length === 0) return;
     setPlanning(true);
@@ -221,6 +286,20 @@ export default function TripProjects() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Planowanie nie powiodło się');
       setPlan(data);
+      // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
+      const { data: saved } = await (supabase as any)
+        .from('trip_plans')
+        .insert({
+          project_id: active.id,
+          name: `${planForm.start}-${planForm.end}${active.trip_type ? ` · ${TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label ?? ''}` : ''}`,
+          window_start: planForm.start,
+          window_end: planForm.end,
+          start_date: planForm.date || null,
+          plan: data
+        })
+        .select('id, name, window_start, window_end, start_date, plan, created_at')
+        .single();
+      if (saved) setSavedPlans((prev) => [saved, ...prev]);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -331,16 +410,45 @@ export default function TripProjects() {
                   <Clock className="w-4 h-4" />{active.days} × {active.hours_per_day} h
                 </span>
               )}
-              {active.trip_type && (
-                <Badge variant="secondary" className="font-normal">
-                  {TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label || active.trip_type}
-                </Badge>
-              )}
+              <button onClick={() => setEditingType((v) => !v)}
+                className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted transition-colors">
+                {active.trip_type
+                  ? (TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label || active.trip_type)
+                  : 'Ustaw charakter'}
+              </button>
+              <button onClick={duplicateProject}
+                className="text-xs flex items-center gap-1 hover:text-foreground transition-colors">
+                <Copy className="w-3.5 h-3.5" /> Kopiuj tablicę
+              </button>
               <span>Przypięte: <strong className="text-foreground">{places.length}</strong> ({mustCount} koniecznie)</span>
               {totalMinutes > 0 && (
                 <span>Zwiedzanie łącznie: <strong className="text-foreground">{Math.round(totalMinutes / 60)} h</strong></span>
               )}
             </div>
+
+            {editingType && (
+              <div className="rounded-xl bg-muted/50 p-3 space-y-2">
+                <span className="text-xs text-muted-foreground">
+                  Charakter można zmieniać do woli — liczy się dopiero przy wyszukiwaniu i planowaniu.
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {TRIP_PRESETS.map((preset) => (
+                    <button key={preset.id} title={preset.hint} onClick={() => changeTripType(preset.id)}
+                      className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
+                        active.trip_type === preset.id
+                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          : 'bg-background hover:bg-muted'
+                      }`}>
+                      {preset.label}
+                    </button>
+                  ))}
+                  <button onClick={() => changeTripType('')}
+                    className="rounded-full px-3 py-1.5 text-xs border bg-background hover:bg-muted text-muted-foreground">
+                    Bez charakteru
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <div className="relative flex items-center">
@@ -439,6 +547,26 @@ export default function TripProjects() {
                 })}
               </div>
             )}
+            {savedPlans.length > 0 && (
+              <div className="border-t pt-4 space-y-2">
+                <h3 className="text-sm font-semibold">Zapisane plany ({savedPlans.length})</h3>
+                {savedPlans.map((sp) => (
+                  <div key={sp.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-sm">
+                    <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <button onClick={() => setPlan(sp.plan)} className="flex-1 text-left hover:underline truncate">
+                      {sp.name}
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {new Date(sp.created_at).toLocaleDateString('pl-PL')}
+                      </span>
+                    </button>
+                    <button onClick={() => deletePlan(sp.id)} className="text-muted-foreground hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {places.length > 0 && (
               <div className="border-t pt-4 space-y-3">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
