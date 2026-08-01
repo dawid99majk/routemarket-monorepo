@@ -296,8 +296,9 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
  */
 app.post('/discover-places', async (c) => {
   try {
-    const { query, destination, category, limit } = await c.req.json() as {
+    const { query, destination, category, limit, creator_preferences } = await c.req.json() as {
       query: string; destination: string; category?: string; limit?: number;
+      creator_preferences?: Record<string, number>;
     };
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
@@ -318,7 +319,27 @@ app.post('/discover-places', async (c) => {
       .map((p) => `- "${p.name}"${p.openingHours ? ` [godziny: ${p.openingHours}]` : ''}`)
       .join('\n');
 
+    // Obowiązujące preferencje: profil wyjazdu nadpisał już profil użytkownika po
+    // stronie klienta, więc tutaj dostajemy gotową, jedną prawdę.
+    const prefHints = creator_preferences ? [
+      creator_preferences.popularity != null && creator_preferences.popularity > 60
+        ? 'Użytkownik woli miejsca niszowe i nieoczywiste niż największe ikony.' : null,
+      creator_preferences.popularity != null && creator_preferences.popularity < 40
+        ? 'Użytkownik chce przede wszystkim klasyków i miejsc must-see.' : null,
+      creator_preferences.dining != null && creator_preferences.dining > 60
+        ? 'W gastronomii preferuje lokalny street food i tanie, autentyczne miejsca.' : null,
+      creator_preferences.dining != null && creator_preferences.dining < 40
+        ? 'W gastronomii preferuje eleganckie restauracje i kawiarnie z górnej półki.' : null,
+      creator_preferences.crowds != null && creator_preferences.crowds > 60
+        ? 'Unika tłumów — doceni miejsca mniej oblegane.' : null,
+      creator_preferences.pace != null && creator_preferences.pace > 60
+        ? 'Woli mniej miejsc, ale spędzić w każdym więcej czasu.' : null,
+      creator_preferences.effort != null && creator_preferences.effort < 40
+        ? 'Unikaj miejsc wymagających długiego chodzenia, stromych podejść i schodów.' : null
+    ].filter(Boolean) : [];
+
     const prompt = `Jesteś przewodnikiem po mieście ${destination}. Użytkownik szuka: "${query}".
+${prefHints.length ? `\nZNANE PREFERENCJE TEGO UŻYTKOWNIKA (uwzględnij przy doborze i kolejności):\n${prefHints.map((h) => `- ${h}`).join('\n')}\n` : ''}
 Użyj wyszukiwarki Google, aby znaleźć REALNE, istniejące miejsca odpowiadające temu zapytaniu.
 
 ${poiList ? `Miejsca potwierdzone w OpenStreetMap (jeśli któreś pasuje, użyj DOKŁADNIE tej nazwy):\n${poiList}` : ''}

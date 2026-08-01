@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 
-interface TripProject {
+interface TripProject extends Partial<AxisValues> {
   id: string;
   name: string;
   destination: string;
   days: number | null;
   hours_per_day: number | null;
+  trip_type: string | null;
 }
 
 interface PinnedPlace {
@@ -64,7 +66,8 @@ export default function TripProjects() {
   const [loading, setLoading] = useState(true);
 
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: '', destination: '', days: '', hours: '' });
+  const [form, setForm] = useState({ name: '', destination: '', days: '', hours: '', tripType: '' });
+  const [userPrefs, setUserPrefs] = useState<Record<string, number> | null>(null);
 
   const [planning, setPlanning] = useState(false);
   const [plan, setPlan] = useState<any | null>(null);
@@ -82,10 +85,16 @@ export default function TripProjects() {
       if (!userData.user) return setLoading(false);
       const { data } = await (supabase as any)
         .from('trip_projects')
-        .select('id, name, destination, days, hours_per_day')
+        .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
       if (data?.length) setActiveId(data[0].id);
+      const { data: prefs } = await (supabase as any)
+        .from('route_preferences')
+        .select('pace, popularity, wandering, dining, effort, crowds')
+        .eq('user_id', userData.user.id)
+        .maybeSingle();
+      setUserPrefs(prefs || null);
       setLoading(false);
     })();
   }, []);
@@ -113,15 +122,17 @@ export default function TripProjects() {
         name: form.name,
         destination: form.destination,
         days: form.days ? Number(form.days) : null,
-        hours_per_day: form.hours ? Number(form.hours) : null
+        hours_per_day: form.hours ? Number(form.hours) : null,
+        trip_type: form.tripType || null,
+        ...(TRIP_PRESETS.find((t) => t.id === form.tripType)?.axes ?? EMPTY_AXES)
       })
-      .select('id, name, destination, days, hours_per_day')
+      .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
       .single();
     if (error) return toast.error(error.message);
     setProjects((prev) => [data, ...prev]);
     setActiveId(data.id);
     setCreating(false);
-    setForm({ name: '', destination: '', days: '', hours: '' });
+    setForm({ name: '', destination: '', days: '', hours: '', tripType: '' });
   };
 
   const search = async (q: string) => {
@@ -133,7 +144,11 @@ export default function TripProjects() {
       const res = await fetch(`${apiUrl}/discover-places`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, destination: active.destination })
+        body: JSON.stringify({
+          query: q,
+          destination: active.destination,
+          creator_preferences: mergePreferences(userPrefs, active)
+        })
       });
       if (!res.ok) throw new Error('Wyszukiwanie nie powiodło się');
       const data = await res.json();
@@ -199,7 +214,8 @@ export default function TripProjects() {
           places: places.map((p) => ({
             name: p.name, category: p.category, priority: p.priority,
             opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
-          }))
+          })),
+          creator_preferences: mergePreferences(userPrefs, active)
         })
       });
       const data = await res.json();
@@ -255,6 +271,26 @@ export default function TripProjects() {
               <Input placeholder="h/dzień" type="number" value={form.hours}
                 onChange={(e) => setForm({ ...form, hours: e.target.value })} />
             </div>
+            <div className="sm:col-span-4 space-y-1.5">
+              <span className="text-xs text-muted-foreground">Charakter wyjazdu — nadpisze Twoje domyślne preferencje na czas tego planu</span>
+              <div className="flex flex-wrap gap-1.5">
+                {TRIP_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    title={preset.hint}
+                    onClick={() => setForm({ ...form, tripType: form.tripType === preset.id ? '' : preset.id })}
+                    className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
+                      form.tripType === preset.id
+                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                        : 'bg-background hover:bg-muted'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Button onClick={createProject} className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-500">
               Utwórz plan
             </Button>
@@ -294,6 +330,11 @@ export default function TripProjects() {
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />{active.days} × {active.hours_per_day} h
                 </span>
+              )}
+              {active.trip_type && (
+                <Badge variant="secondary" className="font-normal">
+                  {TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label || active.trip_type}
+                </Badge>
               )}
               <span>Przypięte: <strong className="text-foreground">{places.length}</strong> ({mustCount} koniecznie)</span>
               {totalMinutes > 0 && (
