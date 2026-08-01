@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { LANGUAGES } from '@/lib/languages';
 import RoutePreferences from '@/components/RoutePreferences';
+import TripProjects from '@/components/TripProjects';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, User, Mail, Shield, Loader2, Package, CreditCard, DollarSign, Sparkles, Pencil, Check, X, LogOut, Globe, Link2, ExternalLink, CheckCircle2, AlertCircle,
@@ -319,6 +320,8 @@ export default function UserProfile() {
             </div>
           </div>
         )}
+
+        <TripProjects />
 
         <RoutePreferences />
 
