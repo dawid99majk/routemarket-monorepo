@@ -8,6 +8,8 @@ export interface PoiCandidate {
   wikipedia?: string;
   distanceKm?: number;
   rank?: number;
+  openingHours?: string;
+  website?: string;
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -41,6 +43,18 @@ const OVERPASS_ENDPOINTS = [
 // Działają w globalnym bbox (ustawianym w nagłówku zapytania), bez filtrów around,
 // bo te są zbyt kosztowne dla publicznych serwerów Overpass.
 const CATEGORY_SELECTORS: Record<string, string[]> = {
+  // Wyszukiwarka projektów: jedzenie, wieczory i noclegi
+  food: [
+    'nwr["amenity"~"^(restaurant|cafe|fast_food|bar|pub|ice_cream)$"]["name"]',
+    'nwr["shop"~"^(bakery|pastry|deli)$"]["name"]'
+  ],
+  nightlife: [
+    'nwr["amenity"~"^(bar|pub|nightclub|biergarten|theatre|cinema)$"]["name"]',
+    'nwr["leisure"="dance"]["name"]'
+  ],
+  hotel: [
+    'nwr["tourism"~"^(hotel|hostel|guest_house|apartment)$"]["name"]'
+  ],
   hiking: [
     'node["natural"~"^(peak|saddle|waterfall|cave_entrance)$"]["name"]',
     'node["tourism"="viewpoint"]["name"]',
@@ -84,6 +98,9 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
 };
 
 const ROUTE_TYPE_ALIASES: Record<string, string> = {
+  food: 'food',
+  nightlife: 'nightlife',
+  hotel: 'hotel',
   hiking: 'hiking',
   city: 'city_walk',
   city_walk: 'city_walk',
@@ -98,6 +115,9 @@ const ROUTE_TYPE_ALIASES: Record<string, string> = {
 
 // Domyślny promień poszukiwań POI wokół startu [km]
 const DEFAULT_RADIUS_KM: Record<string, number> = {
+  food: 6,
+  nightlife: 6,
+  hotel: 8,
   hiking: 15,
   city_walk: 8,
   cycling: 35,
@@ -255,7 +275,9 @@ export class PoiService {
         lng,
         kind: kindOf(tags),
         score: scoreElement(tags),
-        wikipedia: tags.wikipedia || tags['wikipedia:pl']
+        wikipedia: tags.wikipedia || tags['wikipedia:pl'],
+        openingHours: tags.opening_hours,
+        website: tags.website || tags['contact:website']
       });
     }
 

@@ -286,6 +286,126 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
   return Array.isArray(parsed.waypoints) ? parsed.waypoints : null;
 }
 
+
+/**
+ * Wyszukiwarka miejsc dla projektu wyjazdowego. Zapytanie w języku naturalnym
+ * ("najciekawsze muzea", "street food, nie turystyczne pułapki") zamienia się na
+ * karty do przypięcia. Nazwy są dopasowywane do OpenStreetMap, więc karta niesie
+ * realne współrzędne i godziny otwarcia, a nie tylko opis od modelu.
+ */
+app.post('/discover-places', async (c) => {
+  try {
+    const { query, destination, category, limit } = await c.req.json() as {
+      query: string; destination: string; category?: string; limit?: number;
+    };
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+    if (!query || !destination) return c.json({ error: 'query i destination są wymagane' }, 400);
+
+    const center = await geocodingService.geocodeSettlement(destination);
+    const poiCategory = category && ['food', 'nightlife', 'hotel'].includes(category) ? category : 'city_walk';
+    let candidates: PoiCandidate[] = [];
+    try {
+      candidates = await poiService.fetchCandidates(
+        { lat: center.lat, lng: center.lng }, poiCategory, { limit: 300 }
+      );
+    } catch (err) {
+      console.warn('[discover] POI fetch failed, continuing with search only:', err);
+    }
+
+    const poiList = candidates.slice(0, 60)
+      .map((p) => `- "${p.name}"${p.openingHours ? ` [godziny: ${p.openingHours}]` : ''}`)
+      .join('\n');
+
+    const prompt = `Jesteś przewodnikiem po mieście ${destination}. Użytkownik szuka: "${query}".
+Użyj wyszukiwarki Google, aby znaleźć REALNE, istniejące miejsca odpowiadające temu zapytaniu.
+
+${poiList ? `Miejsca potwierdzone w OpenStreetMap (jeśli któreś pasuje, użyj DOKŁADNIE tej nazwy):\n${poiList}` : ''}
+
+Zwróć 6-10 propozycji. Dla każdej podaj:
+- "name": dokładna nazwa (jeśli jest na liście powyżej — skopiuj stamtąd znak w znak)
+- "category": jedna z: attraction, food, nightlife, hotel, other
+- "description": 1-2 zdania, czym to miejsce jest i dlaczego warto — konkrety, nie ogólniki
+- "why": jedno zdanie, dlaczego pasuje akurat do zapytania użytkownika
+- "visit_minutes": ile realnie zajmuje zwiedzenie/pobyt (liczba minut)
+- "price_hint": orientacyjny koszt wstępu lub przedział cenowy, jeśli istotny (krótki tekst, inaczej null)
+
+Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}.`;
+
+    const searchRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] })
+    });
+    if (!searchRes.ok) throw new Error('Gemini search error ' + await searchRes.text());
+    const searchData = await searchRes.json() as any;
+    const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    let places: any[] | null = null;
+    try {
+      const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      if (stripped.startsWith('{')) places = JSON.parse(stripped).places;
+    } catch { /* poniżej wymuszamy strukturę */ }
+
+    if (!Array.isArray(places)) {
+      const jsonRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Przekonwertuj na JSON {"places":[...]}:\n${rawText}` }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'object',
+              properties: {
+                places: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' }, category: { type: 'string' },
+                      description: { type: 'string' }, why: { type: 'string' },
+                      visit_minutes: { type: 'integer' }, price_hint: { type: 'string' }
+                    },
+                    required: ['name']
+                  }
+                }
+              },
+              required: ['places']
+            },
+            maxOutputTokens: 4096
+          }
+        })
+      });
+      const jsonData = await jsonRes.json() as any;
+      const text = jsonData.candidates?.[0]?.content?.parts?.[0]?.text;
+      places = text ? JSON.parse(text).places : [];
+    }
+
+    // Dowiązanie do OSM: współrzędne i godziny otwarcia biorą się z bazy, nie z modelu
+    const results = (places || []).slice(0, limit || 10).map((pl: any) => {
+      const matched = poiService.matchCandidate(pl.name, candidates, { lat: center.lat, lng: center.lng });
+      return {
+        name: pl.name,
+        category: pl.category || 'attraction',
+        description: pl.description || '',
+        why: pl.why || '',
+        visit_minutes: pl.visit_minutes || null,
+        price_hint: pl.price_hint || null,
+        lat: matched?.lat ?? null,
+        lng: matched?.lng ?? null,
+        opening_hours: matched?.openingHours ?? null,
+        verified: !!matched
+      };
+    });
+
+    return c.json({ destination, center: { lat: center.lat, lng: center.lng }, places: results });
+  } catch (err: any) {
+    console.error('[discover-places] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Healthcheck
 app.get('/health', (c) => {
   return c.json({ status: 'ok', version: '2.0.0', service: 'route-builder-api' });
