@@ -1384,8 +1384,11 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         const routeTypeForValidation = resultObj.extracted?.route_type || (vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking'));
         let finalWaypoints = suggested_waypoints;
         if (suggested_waypoints.length > 1) {
+          // Punktem odniesienia jest centrum ustalone z miejscowości, a nie pierwszy
+          // punkt trasy. Gdy start zgeokodował się źle (Lipsk w Polsce zamiast
+          // Leipzig), wszystkie poprawne punkty wypadały jako "zły region".
           const { kept, dropped } = routeValidatorService.filterOutliers(
-            suggested_waypoints[0],
+            poiCenter || suggested_waypoints[0],
             suggested_waypoints,
             routeTypeForValidation
           );

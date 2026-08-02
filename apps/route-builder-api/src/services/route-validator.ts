@@ -124,13 +124,27 @@ export class RouteValidatorService {
       motorcycle: 250, car: 250
     };
     const limit = maxKm[routeType] || 60;
-    const kept: T[] = [];
-    const dropped: T[] = [];
-    for (const wp of waypoints) {
-      if (haversineKm(start.lat, start.lng, wp.lat, wp.lng) <= limit) kept.push(wp);
-      else dropped.push(wp);
+    const split = (ref: { lat: number; lng: number }) => {
+      const kept: T[] = [];
+      const dropped: T[] = [];
+      for (const wp of waypoints) {
+        if (haversineKm(ref.lat, ref.lng, wp.lat, wp.lng) <= limit) kept.push(wp);
+        else dropped.push(wp);
+      }
+      return { kept, dropped };
+    };
+
+    const first = split(start);
+    // Gdy odpada większość punktów, to zwykle punkt odniesienia jest zły, a nie
+    // one. Wtedy mierzymy od środka samego skupiska — jeden błędny start nie może
+    // unieważnić całej trasy.
+    if (waypoints.length >= 3 && first.dropped.length > waypoints.length / 2) {
+      const lats = [...waypoints.map((w) => w.lat)].sort((a, b) => a - b);
+      const lngs = [...waypoints.map((w) => w.lng)].sort((a, b) => a - b);
+      const mid = Math.floor(waypoints.length / 2);
+      return split({ lat: lats[mid], lng: lngs[mid] });
     }
-    return { kept, dropped };
+    return first;
   }
 }
 
