@@ -68,6 +68,8 @@ const CHAT_RESPONSE_SCHEMA = {
             type: 'object',
             properties: {
               structure: { type: 'string' },
+              mode: { type: 'string' },
+              theme: { type: 'string' },
               start_point: { type: 'string' },
               region: { type: 'string' },
               pace: { type: 'string' },
@@ -907,6 +909,8 @@ app.post('/chat-interview', async (c) => {
         structure: 'Struktura wyjazdu',
         start_point: 'Punkt startu',
         pace: 'Tempo',
+        mode: 'Tryb',
+        theme: 'Motyw spaceru',
         interests: 'Zainteresowania',
         region: 'Wybrany rejon',
         difficulty: 'Trudność',
@@ -920,6 +924,9 @@ app.post('/chat-interview', async (c) => {
         .join('\n');
       if (decided) {
         projectContext += `\n\n=== USTALENIA Z POPRZEDNICH FAZ (użytkownik już to wybrał — NIE PYTAJ PONOWNIE) ===\n${decided}`;
+        if (trip_profile.mode === 'stroll') {
+          projectContext += `\nTryb "stroll" oznacza LUŹNY SPACER: punkty są mijane (5-15 min), a nie zwiedzane od środka. Godziny otwarcia nie decydują o doborze — obiekt zamknięty nadal można obejrzeć z zewnątrz. Prowadź deptakami, placami i uliczkami, nie najkrótszą drogą.`;
+        }
         if (trip_profile.structure === 'radial') {
           projectContext += `\nStruktura "radial" oznacza nocleg w bazie: zaplanuj kilka niezależnych jednodniowych pętli startujących i kończących się w miejscowości bazowej. Punkty trzymaj blisko bazy.`;
         } else if (trip_profile.structure === 'traverse') {
@@ -965,7 +972,11 @@ app.post('/chat-interview', async (c) => {
     // ustalamy je z treści rozmowy — inaczej cała warstwa POI by nie zadziałała.
     let poiCandidates: PoiCandidate[] = [];
     let poiMatchPool: PoiCandidate[] = [];
-    const poiRouteType = vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking');
+    let poiRouteType = vehicle_type === 'bicycle' ? (bike_subtype || 'cycling') : (vehicle_type || 'hiking');
+    // Spacer zieloną stroną szuka zupełnie innych obiektów niż zwiedzanie zabytków
+    if (trip_profile?.mode === 'stroll' && trip_profile?.theme === 'green') {
+      poiRouteType = 'green';
+    }
     let poiCenter: { lat: number; lng: number } | null =
       current_waypoints && current_waypoints.length > 0
         ? { lat: current_waypoints[0].lat, lng: current_waypoints[0].lng }
@@ -1192,6 +1203,24 @@ Nie wybieraj przypadkowych punktów geometrycznych ani losowych małych wsi bez 
    - BEZWZGLĘDNY zakaz dróg gruntowych i piaszczystych.
    
 5. spacer miejski (city_walk / route_type = city_walk):
+
+   DWA TRYBY ZWIEDZANIA — ZAWSZE DAJ WYBÓR PRZY MIEŚCIE:
+   Niektórzy chcą wejść do muzeów, inni po prostu POWŁÓCZYĆ SIĘ po mieście. To
+   zupełnie inne trasy i nie wolno zakładać pierwszego. W fazie "variant_choice"
+   dla miasta zaproponuj warianty z OBU rodzin:
+   a) ZWIEDZANIE Z WEJŚCIAMI — muzea, wnętrza, bilety, godziny otwarcia mają znaczenie.
+   b) LUŹNY SPACER — idziesz i patrzysz, wnętrza opcjonalnie. Warianty tematyczne:
+      • „Luźny spacer po klasykach" — kultowe miejsca widziane z zewnątrz, place, deptaki
+      • „Luźny spacer po miejscach na uboczu" — boczne uliczki, podwórka, dzielnice bez turystów
+      • „Luźny spacer zieloną stroną" — parki, bulwary, nabrzeża, aleje
+   W karcie trybu spacerowego ustaw "implies": {"mode": "stroll", "theme": "classic" | "niche" | "green"}.
+
+   GDY WYBRANO TRYB SPACERU (mode: stroll):
+   - Punkty to rzeczy MIJANE, nie zwiedzane. Czas przy punkcie 5-15 minut, nie 60-90.
+   - Godziny otwarcia przestają rządzić trasą — obiekt zamknięty nadal można obejrzeć z zewnątrz. Wspomnij o tym w opisie zamiast wyrzucać punkt.
+   - Liczy się DROGA MIĘDZY punktami: prowadź deptakami, przez place, parki i uliczki, a nie najkrótszym przejściem.
+   - Możesz dać więcej punktów niż przy zwiedzaniu, bo każdy zabiera mniej czasu.
+
    - Szukaj: rynków, zabytków architektonicznych, muzeów, parków miejskich, tarasów widokowych, bulwarów, znanych kawiarni.
    - LICZY SIĘ CZAS, NIE KILOMETRY. Dzień zwiedzania to 6-10 km marszu i 6-10 przystanków — reszta dnia schodzi na zwiedzanie wnętrz, kawę i jedzenie. Nie nadrabiaj kilometrów dorzucaniem odległych dzielnic.
    - KOLEJNOŚĆ WEDŁUG SĄSIEDZTWA: prowadź trasę dzielnicami, zwiedzając każdą do końca, zanim przejdziesz dalej (np. w Krakowie: całe Stare Miasto → Wawel → Kazimierz → Podgórze). Skakanie tam i z powrotem między dzielnicami to najgorszy możliwy układ.

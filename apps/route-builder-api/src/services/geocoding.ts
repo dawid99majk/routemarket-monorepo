@@ -10,60 +10,6 @@ export interface GeocodedPlace {
   provider: string;
 }
 
-/**
- * Nominatim wymaga nagłówka, po którym da się zidentyfikować aplikację i
- * skontaktować z jej autorem — anonimowy ruch bywa blokowany bez ostrzeżenia.
- */
-const USER_AGENT =
-  process.env.NOMINATIM_USER_AGENT || 'RouteMarket/1.0 (+https://routemarket.io; kontakt@routemarket.io)';
-
-/**
- * Cache wyników geokodowania. Jedna rozmowa potrafi pytać o te same nazwy
- * wielokrotnie (korekta dystansu geokoduje punkty od nowa), a kolejne trasy w
- * tym samym regionie trafiają w ten sam zestaw miejsc. Pojedyncze zapytanie o
- * punkt to nawet kilka wywołań HTTP (warianty nazwy × przebieg zawężony i
- * globalny), więc trafienie w cache oszczędza sporo czasu i limitów.
- *
- * Nieudane wyszukiwania też zapamiętujemy, ale krócej: nazwa zmyślona przez
- * model nie zacznie istnieć w OSM w ciągu kwadransa, a bez tego każdy taki
- * punkt kosztuje pełną serię prób.
- */
-interface CacheEntry {
-  at: number;
-  place?: GeocodedPlace;
-  error?: string;
-}
-
-const geocodeCache = new Map<string, CacheEntry>();
-const HIT_TTL_MS = 24 * 60 * 60 * 1000;
-const MISS_TTL_MS = 15 * 60 * 1000;
-const MAX_CACHE_ENTRIES = 5000;
-
-function cacheKey(query: string, biasPoint?: { lat: number; lng: number }, maxRadiusKm?: number): string {
-  const bias = biasPoint ? `${biasPoint.lat.toFixed(2)},${biasPoint.lng.toFixed(2)}` : '-';
-  return `${query.trim().toLowerCase()}|${bias}|${maxRadiusKm ?? '-'}`;
-}
-
-function readCache(key: string): CacheEntry | null {
-  const entry = geocodeCache.get(key);
-  if (!entry) return null;
-  const ttl = entry.place ? HIT_TTL_MS : MISS_TTL_MS;
-  if (Date.now() - entry.at > ttl) {
-    geocodeCache.delete(key);
-    return null;
-  }
-  return entry;
-}
-
-function writeCache(key: string, entry: CacheEntry) {
-  // Najstarszy klucz wypada pierwszy — Map zachowuje kolejność wstawiania.
-  if (geocodeCache.size >= MAX_CACHE_ENTRIES) {
-    const oldest = geocodeCache.keys().next().value;
-    if (oldest !== undefined) geocodeCache.delete(oldest);
-  }
-  geocodeCache.set(key, entry);
-}
-
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Radius of the earth in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -168,7 +114,7 @@ export class GeocodingService {
   async geocodeSettlement(query: string): Promise<GeocodedPlace> {
     try {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&featuretype=settlement&addressdetails=1`;
-      const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+      const res = await fetch(url, { headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0' } });
       if (res.ok) {
         const data = await res.json() as any;
         if (data && data.length > 0) {
@@ -190,24 +136,6 @@ export class GeocodingService {
   }
 
   async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number): Promise<GeocodedPlace> {
-    const key = cacheKey(query, biasPoint, maxRadiusKm);
-    const cached = readCache(key);
-    if (cached) {
-      if (cached.place) return cached.place;
-      throw new Error(cached.error);
-    }
-
-    try {
-      const place = await this.geocodeSinglePointUncached(query, biasPoint, maxRadiusKm);
-      writeCache(key, { at: Date.now(), place });
-      return place;
-    } catch (err: any) {
-      writeCache(key, { at: Date.now(), error: err?.message || `Nie udało się odnaleźć punktu "${query}".` });
-      throw err;
-    }
-  }
-
-  private async geocodeSinglePointUncached(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number): Promise<GeocodedPlace> {
     const parts = query.split(',').map((p) => p.trim()).filter(Boolean);
     const variants: string[] = [query];
     // "A, B, C" -> "A, B" -> "A"
@@ -260,7 +188,7 @@ export class GeocodingService {
         url += `&viewbox=${left},${top},${right},${bottom}&bounded=1`;
       }
       const res = await fetch(url, {
-        headers: { 'User-Agent': USER_AGENT }
+        headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0' }
       });
       if (res.ok) {
         const data = await res.json() as any;

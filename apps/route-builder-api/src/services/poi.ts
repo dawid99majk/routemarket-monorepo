@@ -43,6 +43,16 @@ const OVERPASS_ENDPOINTS = [
 // Działają w globalnym bbox (ustawianym w nagłówku zapytania), bez filtrów around,
 // bo te są zbyt kosztowne dla publicznych serwerów Overpass.
 const CATEGORY_SELECTORS: Record<string, string[]> = {
+  // Spacer zielony: parki, bulwary, nabrzeża — miejsca, przez które się idzie,
+  // a nie do których się wchodzi.
+  green: [
+    'nwr["leisure"~"^(park|garden|nature_reserve)$"]["name"]',
+    'nwr["landuse"~"^(forest|village_green)$"]["name"]',
+    'node["tourism"="viewpoint"]["name"]',
+    'nwr["natural"~"^(water|beach|wood)$"]["name"]',
+    'nwr["waterway"="riverbank"]["name"]',
+    'nwr["highway"="pedestrian"]["name"]'
+  ],
   // Wyszukiwarka projektów: jedzenie, wieczory i noclegi
   food: [
     'nwr["amenity"~"^(restaurant|cafe|fast_food|bar|pub|ice_cream)$"]["name"]',
@@ -98,6 +108,7 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
 };
 
 const ROUTE_TYPE_ALIASES: Record<string, string> = {
+  green: 'green',
   food: 'food',
   nightlife: 'nightlife',
   hotel: 'hotel',
@@ -115,6 +126,7 @@ const ROUTE_TYPE_ALIASES: Record<string, string> = {
 
 // Domyślny promień poszukiwań POI wokół startu [km]
 const DEFAULT_RADIUS_KM: Record<string, number> = {
+  green: 8,
   food: 6,
   nightlife: 6,
   hotel: 8,
