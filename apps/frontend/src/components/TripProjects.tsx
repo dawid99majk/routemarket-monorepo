@@ -399,6 +399,27 @@ export default function TripProjects() {
     navigate(`/route-builder-v2?projectId=${data.id}`);
   };
 
+  /** Propozycja agenta, która się spodobała, trafia na tablicę jak każde inne miejsce. */
+  const pinSuggestion = async (item: any) => {
+    if (!active) return;
+    const { data, error } = await (supabase as any)
+      .from('trip_project_places')
+      .insert({
+        project_id: active.id,
+        name: item.name,
+        category: 'attraction',
+        priority: 'nice',
+        visit_minutes: item.minutes || null,
+        description: item.note || '',
+        source: 'plan'
+      })
+      .select('id, name, category, priority, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+      .single();
+    if (error) return toast.error(error.message);
+    setPlaces((prev) => [...prev, data]);
+    toast.success(`Dodano do tablicy: ${item.name}`);
+  };
+
   const deletePlan = async (id: string) => {
     await (supabase as any).from('trip_plans').delete().eq('id', id);
     setSavedPlans((prev) => prev.filter((p) => p.id !== id));
@@ -896,18 +917,38 @@ export default function TripProjects() {
                       </button>
                     </div>
                     <div className="divide-y">
-                      {(day.items || []).map((it: any, i: number) => (
-                        <div key={i} className="flex gap-3 px-4 py-2 text-sm">
-                          <span className="font-mono text-xs text-muted-foreground pt-0.5 w-12 shrink-0">{it.time}</span>
-                          <div className="min-w-0">
-                            <div className="font-medium">{it.name}</div>
-                            {it.note && <div className="text-xs text-muted-foreground">{it.note}</div>}
+                      {(day.items || []).map((it: any, i: number) => {
+                        const suggested = it.source === 'suggested';
+                        const alreadyPinned = places.some((p) => p.name === it.name);
+                        return (
+                          <div key={i} className="flex gap-3 px-4 py-2 text-sm items-start">
+                            <span className="font-mono text-xs text-muted-foreground pt-0.5 w-12 shrink-0">{it.time}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium flex items-center gap-2 flex-wrap">
+                                {it.name}
+                                {suggested && (
+                                  <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 rounded-full px-1.5 py-0.5">
+                                    propozycja agenta
+                                  </span>
+                                )}
+                              </div>
+                              {it.note && <div className="text-xs text-muted-foreground">{it.note}</div>}
+                            </div>
+                            {suggested && !alreadyPinned && (
+                              <button
+                                onClick={() => pinSuggestion(it)}
+                                title="Dodaj do tablicy"
+                                className="text-muted-foreground hover:text-emerald-600 shrink-0 mt-0.5"
+                              >
+                                <Pin className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {it.minutes && (
+                              <span className="text-xs text-muted-foreground shrink-0 mt-0.5">{it.minutes} min</span>
+                            )}
                           </div>
-                          {it.minutes && (
-                            <span className="ml-auto text-xs text-muted-foreground shrink-0">{it.minutes} min</span>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

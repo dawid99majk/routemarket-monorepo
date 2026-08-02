@@ -499,6 +499,27 @@ app.post('/plan-trip', async (c) => {
       .reduce((sum, p) => sum + (p.visit_minutes || 60), 0);
     const budget = minutesPerDay * dayCount;
 
+    // Tablica użytkownika jest inspiracją, nie ramą — ktoś może przypiąć jedno
+    // miejsce i oczekiwać, że resztę dnia agent zaproponuje sam. Bez puli
+    // kandydatów planer nie miałby czym wypełnić czasu poza "spacerem".
+    let fillerPois: PoiCandidate[] = [];
+    try {
+      const center = await geocodingService.geocodeSettlement(body.destination);
+      const [sights, food] = await Promise.all([
+        poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'city_walk', { limit: 40 }),
+        poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 15 }).catch(() => [])
+      ]);
+      const pinnedNames = new Set(body.places.map((p) => p.name.toLowerCase()));
+      fillerPois = [...sights, ...food].filter((c) => !pinnedNames.has(c.name.toLowerCase()));
+      console.log(`[plan-trip] ${fillerPois.length} propozycji do wypełnienia dnia`);
+    } catch (err) {
+      console.warn('[plan-trip] Nie udało się pobrać propozycji:', err);
+    }
+
+    const fillerLines = fillerPois.slice(0, 35)
+      .map((c) => `- "${c.name}" (${c.kind}${c.openingHours ? `, godziny: ${c.openingHours}` : ''})`)
+      .join('\n');
+
     const prefLines = body.creator_preferences
       ? Object.entries(body.creator_preferences)
           .filter(([, v]) => v < 40 || v > 60)
@@ -515,8 +536,13 @@ ${body.hotel?.name ? `BAZA: ${body.hotel.name} — każdy dzień zaczyna się i 
 ${fixedLines ? `STAŁE PUNKTY DNIA (nie do przesunięcia):\n${fixedLines}` : ''}
 ${prefLines ? `PREFERENCJE UŻYTKOWNIKA (0-100, 50 to środek): ${prefLines}` : ''}
 
-MIEJSCA DO ROZPLANOWANIA (dostępność policzona dla Twoich okien czasowych):
+MIEJSCA PRZYPIĘTE PRZEZ UŻYTKOWNIKA — to KOTWICE planu, nie cały plan
+(dostępność policzona dla Twoich okien czasowych):
 ${placeLines}
+
+${fillerLines ? `ZWERYFIKOWANE MIEJSCA W TYM MIEŚCIE, KTÓRYCH UŻYTKOWNIK NIE PRZYPIĄŁ
+(możesz i POWINIENEŚ nimi wypełnić resztę dnia — kopiuj nazwy dokładnie):
+${fillerLines}` : ''}
 
 BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a budżet to ${Math.round(budget / 60)} h. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
 
@@ -526,7 +552,8 @@ ZASADY:
 3. Grupuj miejsca leżące blisko siebie w ten sam dzień — dzień ma być spójny geograficznie, bez biegania przez miasto.
 4. NIGDY NIE ZOSTAWIAJ PUSTEGO DNIA. "Czas wolny" na kilka godzin przy niewykorzystanych miejscach to błąd planu, nie wynik.
 5. KRÓTSZA WIZYTA ZAMIAST REZYGNACJI. Jeśli miejsce jest otwarte, ale zostało mniej czasu, niż wynosi pełne zwiedzanie, ZAPLANUJ JE NA TYLE, ILE ZOSTAŁO, i napisz to wprost w "note", np. "zamykają o 18:00 — masz 60 z 90 min, wejdź od razu". Turysta sam zdecyduje, czy mu to wystarczy. Do "not_scheduled" trafia tylko to, co jest ZAMKNIĘTE danego dnia albo czego naprawdę nie da się wcisnąć.
-6. WYPEŁNIJ LUKI KONKRETEM. Zamiast "czas wolny" zaproponuj coś sensownego w tej okolicy: spacer wskazaną ulicą lub dzielnicą, konkretny plac, park, kawiarnię, punkt widokowy. Nazwij to miejsce — "spacer po Starym Mieście: Rynek, Katharinenstraße, Nikolaikirchhof" jest planem, "czas wolny" nie jest.
+6. TABLICA TO INSPIRACJA, NIE RAMA. Użytkownik mógł przypiąć jedno miejsce i oczekuje, że resztę dnia ZAPROPONUJESZ TY. Wypełnij wolny czas konkretnymi miejscami z listy powyżej, dobranymi do jego preferencji i leżącymi blisko kotwic tego dnia. W polu "source" wpisz "pinned" dla miejsc przypiętych przez użytkownika i "suggested" dla Twoich propozycji, żeby wiedział, co jest czyje.
+   Gdy w okolicy naprawdę nie ma czego dodać, dopiero wtedy zaproponuj nazwany spacer ("spacer po Starym Mieście: Rynek, Katharinenstraße"). Samo "czas wolny" jest zawsze błędem.
 7. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
 8. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
 9. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
@@ -560,7 +587,8 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
                           name: { type: 'string' },
                           kind: { type: 'string' },
                           minutes: { type: 'integer' },
-                          note: { type: 'string' }
+                          note: { type: 'string' },
+                          source: { type: 'string', enum: ['pinned', 'suggested'] }
                         },
                         required: ['time', 'name']
                       }
