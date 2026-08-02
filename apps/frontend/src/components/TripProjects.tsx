@@ -357,17 +357,57 @@ export default function TripProjects() {
    */
   const buildRouteFrom = async (items: any[], label: string) => {
     if (!active) return;
-    // Pozycje harmonogramu to nazwy — współrzędne mają dopiero przypięte miejsca
-    const waypoints = items
-      .map((it) => {
-        const place = places.find(
-          (p) => p.name === it.name || it.name?.includes(p.name) || p.name.includes(it.name)
-        );
-        return place?.lat && place?.lng
-          ? { lat: place.lat, lng: place.lng, name: place.name, type: 'waypoint' as const }
-          : null;
-      })
-      .filter(Boolean) as { lat: number; lng: number; name: string; type: string }[];
+    // Pozycje organizacyjne nie są przystankami trasy
+    const isVenue = (it: any) => {
+      const name = String(it.name || '');
+      if (['walk', 'transit', 'break'].includes(it.kind)) return false;
+      return !/^(przej[śs]cie|przerwa|czas wolny|powr[óo]t|dojazd|transfer)/i.test(name.trim());
+    };
+
+    const venues = items.filter(isVenue);
+    const resolved: { lat: number; lng: number; name: string; type: string }[] = [];
+    const unresolved: string[] = [];
+
+    for (const it of venues) {
+      const place = places.find(
+        (p) => p.name === it.name || it.name?.includes(p.name) || p.name.includes(it.name)
+      );
+      if (place?.lat && place?.lng) {
+        resolved.push({ lat: place.lat, lng: place.lng, name: place.name, type: 'waypoint' });
+      } else {
+        unresolved.push(it.name);
+        resolved.push(null as any);
+      }
+    }
+
+    // Propozycje agenta mają tylko nazwy — dogeokodowujemy je, żeby nie wypadały
+    // z trasy tylko dlatego, że nie zostały wcześniej przypięte.
+    if (unresolved.length > 0) {
+      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
+      try {
+        const res = await fetch(`${apiUrl}/geocode-points`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ names: unresolved, near: active.destination })
+        });
+        const data = await res.json();
+        const found = new Map<string, { lat: number; lng: number }>();
+        for (const pt of data.points || []) {
+          if (pt.lat != null && pt.lng != null) found.set(pt.name, { lat: pt.lat, lng: pt.lng });
+        }
+        let cursor = 0;
+        for (let i = 0; i < resolved.length; i++) {
+          if (resolved[i] !== null) continue;
+          const name = unresolved[cursor++];
+          const hit = found.get(name);
+          resolved[i] = hit ? { ...hit, name, type: 'waypoint' } : (null as any);
+        }
+      } catch {
+        toast.error('Nie udało się ustalić położenia części miejsc');
+      }
+    }
+
+    const waypoints = resolved.filter(Boolean) as { lat: number; lng: number; name: string; type: string }[];
 
     if (waypoints.length < 2) {
       toast.error('Za mało miejsc ze współrzędnymi, żeby wyznaczyć trasę');
@@ -396,6 +436,8 @@ export default function TripProjects() {
       .select('id')
       .single();
     if (error) return toast.error(error.message);
+    const skipped = venues.length - waypoints.length;
+    if (skipped > 0) toast.info(`Pominięto ${skipped} miejsc, których nie udało się zlokalizować`);
     navigate(`/route-builder-v2?projectId=${data.id}`);
   };
 

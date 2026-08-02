@@ -671,6 +671,48 @@ async function fetchWikiCard(wikipediaTag: string | undefined): Promise<{ image?
   }
 }
 
+
+/**
+ * Geokodowanie listy nazw w obrębie jednego miasta. Potrzebne, gdy z planu dnia
+ * robimy trasę: pozycje dołożone przez agenta mają tylko nazwy, a bez
+ * współrzędnych nie da się wyznaczyć przebiegu.
+ */
+app.post('/geocode-points', async (c) => {
+  try {
+    const { names, near } = await c.req.json() as { names: string[]; near: string };
+    if (!Array.isArray(names) || names.length === 0) return c.json({ points: [] });
+
+    let bias: { lat: number; lng: number } | undefined;
+    let radiusKm: number | undefined;
+    if (near) {
+      try {
+        const center = await geocodingService.geocodeSettlement(near);
+        bias = { lat: center.lat, lng: center.lng };
+        radiusKm = 15;
+      } catch {
+        // Bez miasta nadal spróbujemy, tylko mniej celnie
+      }
+    }
+
+    const points = await Promise.all(
+      names.slice(0, 30).map(async (name) => {
+        try {
+          const query = near && !name.toLowerCase().includes(near.toLowerCase()) ? `${name}, ${near}` : name;
+          const place = await geocodingService.geocodeSinglePoint(query, bias, radiusKm);
+          return { name, lat: place.lat, lng: place.lng };
+        } catch {
+          return { name, lat: null, lng: null };
+        }
+      })
+    );
+
+    return c.json({ points });
+  } catch (err: any) {
+    console.error('[geocode-points] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Healthcheck
 app.get('/health', (c) => {
   return c.json({ status: 'ok', version: '2.0.0', service: 'route-builder-api' });
