@@ -75,6 +75,7 @@ export default function MyRoutes() {
             </Button>
             <Logo />
           </div>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/plany')} className="mr-2">Plany</Button>
           <Button size="sm" onClick={() => navigate('/route-builder-v2')} className="bg-emerald-600 hover:bg-emerald-500">
             <Plus className="w-4 h-4 mr-1.5" /> Nowa trasa
           </Button>

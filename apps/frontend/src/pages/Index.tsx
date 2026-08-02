@@ -27,6 +27,7 @@ export default function Index() {
           <div className="flex items-center gap-2">
             {loggedIn ? (
               <>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/plany')}>Plany</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/my-routes')}>Moje trasy</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>Profil</Button>
               </>
@@ -53,7 +54,7 @@ export default function Index() {
             <Button size="lg" onClick={start} className="bg-emerald-600 hover:bg-emerald-500">
               <Wand2 className="w-4 h-4 mr-2" /> Zaplanuj trasę
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/profile' : '/auth')}>
+            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/plany' : '/auth')}>
               <CalendarDays className="w-4 h-4 mr-2" /> Zbierz miejsca na wyjazd
             </Button>
           </div>

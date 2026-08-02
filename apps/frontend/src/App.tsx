@@ -20,6 +20,7 @@ const GaTracker = () => {
 // Lazy-loaded pages
 const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
+const TripPlans = lazy(() => import("./pages/TripPlans"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
 
 function LegacyCreateRedirect() {
@@ -90,6 +91,7 @@ const App = () => (
 
                   {/* Authenticated routes */}
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
+                  <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
                   {/* Creator routes */}

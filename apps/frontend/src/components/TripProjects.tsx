@@ -126,6 +126,14 @@ export default function TripProjects() {
 
   useEffect(() => {
     if (!activeId) return setPlaces([]);
+    // Zmiana planu musi wyczyścić WSZYSTKO, co dotyczyło poprzedniego. Wyniki
+    // wyszukiwania dla Lipska wiszące nad tablicą Bukaresztu wyglądały jak
+    // niedziałające przełączanie, choć miejsca ładowały się poprawnie.
+    setResults([]);
+    setQuery('');
+    setPlan(null);
+    setEditingType(false);
+    setShareEmail('');
     (async () => {
       const { data } = await (supabase as any)
         .from('trip_project_places')
@@ -481,7 +489,10 @@ export default function TripProjects() {
                 }`}
               >
                 {p.name}
-                {p.days ? <span className="opacity-70"> · {p.days} dni</span> : null}
+                <span className="opacity-70">
+                  {p.destination ? ` · ${p.destination}` : ''}
+                  {p.days ? ` · ${p.days} dni` : ''}
+                </span>
               </button>
             ))}
           </div>
