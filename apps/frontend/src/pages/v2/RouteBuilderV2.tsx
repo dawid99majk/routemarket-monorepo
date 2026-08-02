@@ -310,6 +310,14 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               }
               if (reqs.waypoints) {
                   setField('waypoints', reqs.waypoints);
+                  // Trasa przyniesiona z planu wyjazdu ma komplet punktów i nie
+                  // potrzebuje wywiadu — liczymy przebieg od razu, zamiast
+                  // pokazywać pusty ekran rozmowy.
+                  if (reqs.autoCalculate && reqs.waypoints.length >= 2 && !reqs.geometry) {
+                    setTimeout(() => {
+                      if (stateRef.current.matches('idle')) send({ type: 'CALCULATE_ROUTE' });
+                    }, 300);
+                  }
               }
               if (reqs.gpxData || reqs.guideText) {
                 setActiveTab('details');
@@ -378,7 +386,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     } else {
        setField('waypoints', []);
     }
-    navigate(`/create?projectId=${project.id}`, { replace: true });
+    navigate(`/route-builder-v2?projectId=${project.id}`, { replace: true });
     setActiveTab('details');
     toast.success(`Wczytano trasę: ${reqs.title || 'Moja trasa AI'}`);
   };

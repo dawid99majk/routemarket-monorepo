@@ -430,7 +430,13 @@ export default function TripProjects() {
           inputNotes: brief,
           routingPreference: (active.popularity ?? 50) > 60 ? 'wild' : 'popular',
           tripProfile: { start_point: waypoints[0].name },
-          chatMessages: [{ role: 'user', text: brief }]
+          // Punkty są ustalone — kreator ma policzyć przebieg, a nie zaczynać wywiad
+          autoCalculate: true,
+          phase: 'generate',
+          chatMessages: [
+            { role: 'user', text: brief },
+            { role: 'agent', text: `Przeniosłem ${waypoints.length} miejsc z planu. Wyznaczam przebieg — możesz go potem zmienić, przesuwając punkty albo pisząc, co poprawić.` }
+          ]
         }
       })
       .select('id')
