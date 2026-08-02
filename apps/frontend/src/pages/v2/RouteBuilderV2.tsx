@@ -39,11 +39,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// A green icon for start, red for end, blue for intermediate
+// A green icon for start, red for end, blue for intermediate.
+// Ikony idą z jsDelivr, nie z raw.githubusercontent.com — ten drugi nie jest
+// hostingiem zasobów, bywa dławiony i potrafi po cichu zniknąć z mapy.
 const createIcon = (color: string) => {
   return new L.Icon({
-    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconUrl: `https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-${color}.png`,
+    shadowUrl: 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/images/marker-shadow.png',
     iconSize: [25, 41],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
@@ -75,6 +77,7 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 }
 
 import { ElevationProfile } from '@/components/ElevationProfile';
+import { apiPost } from '@/lib/api';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
 import RouteOptionCards from '@/pages/v2/components/RouteOptionCards';
 import InterviewOverlay from '@/pages/v2/components/InterviewOverlay';
@@ -88,7 +91,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const { state, context, send, setField, chooseOption } = useWizardMachine(searchParams.get('projectId'));
+  const { state, context, send, setField, chooseOption, retryLastAction } = useWizardMachine(searchParams.get('projectId'));
   
   const projectId = context.projectId;
   const chatMessages = context.chatMessages;
@@ -107,6 +110,10 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const isSaving = state.matches('saving_project');
   // Status pracy agenta — bez tego użytkownik nie wie, czy system liczy, czy zamarł.
   const [overlayDismissed, setOverlayDismissed] = useState(false);
+  // Na wąskim ekranie panel przykrywa mapę tylko na żądanie — wcześniej zajmował
+  // stałe 400 px i przy 375 px szerokości wypychał mapę całkowicie poza kadr.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const hasError = state.matches('error');
   // Warstwę pokazujemy też po wznowieniu — faza jest teraz zapisywana z projektem
   const busyLabel = isTyping
     ? 'Agent myśli…'
@@ -117,15 +124,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         : null;
 
   const lastLoadedId = useRef<string | null>(null);
-
-  console.log("[RouteBuilderV2] Render details:", {
-    projectId,
-    lastLoadedId: lastLoadedId.current,
-    stateValue: state.value,
-    waypointsCount: waypoints.length,
-    vehicleType,
-    bikeSubtype
-  });
 
   useEffect(() => {
     if (initialData && !projectId && context.chatMessages.length === 0) {
@@ -174,18 +172,11 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     }));
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
-      const res = await fetch(`${apiUrl}/point-details`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: pointKey,
-          lat: wp.lat,
-          lng: wp.lng
-        })
-      });
-      if (!res.ok) throw new Error('Failed to fetch details');
-      const data = await res.json();
+      const data = await apiPost<any>('/point-details', {
+        name: pointKey,
+        lat: wp.lat,
+        lng: wp.lng
+      }, { timeoutMs: 30_000 });
       setPoiDetails(prev => ({
         ...prev,
         [pointKey]: {
@@ -271,29 +262,18 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   // (this happens when save assigns a new projectId — we already have the fresh route)
 
   useEffect(() => {
-    console.log("[RouteBuilderV2] useEffect load project checks:", {
-      projectId,
-      lastLoadedId: lastLoadedId.current,
-      hasGeometry: !!geometry
-    });
     if (projectId && lastLoadedId.current !== projectId) {
       // If we already have geometry in state, it means we just generated a route
       // and saveProjectActor assigned a new projectId. Skip reload to prevent overwriting.
       const alreadyHasRoute = !!geometry;
-      console.log("[RouteBuilderV2] useEffect load project starting FETCH for:", projectId, "alreadyHasRoute:", alreadyHasRoute);
       lastLoadedId.current = projectId;
 
-      if (alreadyHasRoute) {
-        console.log("[RouteBuilderV2] Skipping Supabase reload — we already have a fresh route in state.");
-        return;
-      }
+      if (alreadyHasRoute) return;
 
       (supabase as any).from('route_builder_projects').select('*').eq('id', projectId).single()
         .then(({ data }) => {
-           console.log("[RouteBuilderV2] Supabase loaded project data:", data);
            if (data && data.requirements) {
               const reqs = data.requirements;
-              console.log("[RouteBuilderV2] Restoring requirements:", reqs);
               if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
               if (reqs.phase) setField('phase', reqs.phase);
               if (reqs.tripProfile) setField('tripProfile', reqs.tripProfile);
@@ -331,7 +311,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   // Sync browser URL search params with the current projectId from machine context
   useEffect(() => {
     if (projectId && searchParams.get('projectId') !== projectId) {
-      navigate(`/create?projectId=${projectId}`, { replace: true });
+      navigate(`/route-builder-v2?projectId=${projectId}`, { replace: true });
     }
   }, [projectId, navigate, searchParams]);
 
@@ -428,11 +408,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   // Event-driven recalculation handlers triggered ONLY on user clicking UI selector buttons.
   // This completely removes the reactive useEffect and prevents any automatic/mount-time loop.
   const handleVehicleChange = (type: any) => {
-    console.log("[RouteBuilderV2] handleVehicleChange called with:", type);
     setField('vehicleType', type);
     if (waypoints.length >= 2) {
       setTimeout(() => {
-        console.log("[RouteBuilderV2] handleVehicleChange sending CALCULATE_ROUTE. Current state matches idle?", stateRef.current.matches('idle'));
         if (stateRef.current.matches('idle')) {
           send({ type: 'CALCULATE_ROUTE' });
         }
@@ -441,11 +419,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   };
 
   const handleBikeSubtypeChange = (subtype: any) => {
-    console.log("[RouteBuilderV2] handleBikeSubtypeChange called with:", subtype);
     setField('bikeSubtype', subtype);
     if (waypoints.length >= 2) {
       setTimeout(() => {
-        console.log("[RouteBuilderV2] handleBikeSubtypeChange sending CALCULATE_ROUTE. Current state matches idle?", stateRef.current.matches('idle'));
         if (stateRef.current.matches('idle')) {
           send({ type: 'CALCULATE_ROUTE' });
         }
@@ -551,13 +527,15 @@ ${points}
   const interviewActive = !overlayDismissed && !geometry && context.phase !== 'generate';
 
   return (
-    <div className="relative flex h-screen w-full bg-slate-50 font-sans overflow-hidden">
+    <div className="relative flex h-[100dvh] w-full bg-slate-50 font-sans overflow-hidden">
       {interviewActive && (
         <InterviewOverlay
           messages={chatMessages}
           phase={context.phase}
           tripProfile={context.tripProfile}
           busyLabel={busyLabel}
+          errorMessage={hasError ? context.errorMessage : null}
+          onRetry={retryLastAction}
           vehicleType={vehicleType}
           routingPreference={routingPreference}
           onVehicleChange={handleVehicleChange}
@@ -575,7 +553,7 @@ ${points}
       )}
       
       {/* Left Panel - Control & Chat */}
-      <div className="w-[400px] flex flex-col bg-white border-r border-slate-200 shadow-xl z-10 shrink-0">
+      <div className={`${panelOpen ? 'flex' : 'hidden'} md:flex absolute md:static inset-x-0 bottom-0 z-[1100] md:z-10 max-h-[78dvh] md:max-h-none w-full md:w-[400px] flex-col bg-white border-t md:border-t-0 md:border-r border-slate-200 shadow-xl md:shrink-0 rounded-t-2xl md:rounded-none`}>
         
         {/* Header */}
         <div className="p-5 border-b border-slate-100 bg-white">
@@ -584,11 +562,29 @@ ${points}
               ← Zmień tryb
             </button>
           )}
-          <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-emerald-500" />
-            Atlas Builder Live
-          </h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-emerald-500" />
+              Atlas Builder Live
+            </h2>
+            <button
+              type="button"
+              onClick={() => setPanelOpen(false)}
+              className="md:hidden text-slate-400 hover:text-slate-600 p-1 -mr-1"
+              aria-label="Zwiń panel"
+            >
+              <ChevronDown className="w-5 h-5" />
+            </button>
+          </div>
           <p className="text-xs text-slate-500 font-medium mt-1">Dodawaj punkty na mapie lub rozmawiaj z Agentem.</p>
+          {/* Kreator był ślepym zaułkiem — pełny ekran bez wyjścia do reszty aplikacji. */}
+          <div className="flex items-center gap-3 mt-3 text-xs font-semibold">
+            <button onClick={() => navigate('/plany')} className="text-slate-500 hover:text-emerald-700">Plany</button>
+            <span className="text-slate-300">·</span>
+            <button onClick={() => navigate('/my-routes')} className="text-slate-500 hover:text-emerald-700">Moje trasy</button>
+            <span className="text-slate-300">·</span>
+            <button onClick={() => navigate('/')} className="text-slate-500 hover:text-emerald-700">Start</button>
+          </div>
         </div>
 
         {/* Tabs Switcher */}
@@ -734,6 +730,21 @@ ${points}
                   </div>
                 </div>
               ))}
+              {hasError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 space-y-2.5">
+                  <div className="text-sm font-semibold text-rose-900">Nie udało się dokończyć operacji</div>
+                  <p className="text-xs text-rose-800 leading-relaxed">
+                    {context.errorMessage || 'Nieznany błąd.'}
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={retryLastAction}
+                    className="w-full bg-rose-600 hover:bg-rose-500 text-white h-8 text-xs font-semibold"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Spróbuj ponownie
+                  </Button>
+                </div>
+              )}
               {busyLabel && (
                 <div className="flex justify-start">
                   <div className="bg-white text-slate-800 rounded-2xl rounded-bl-sm border border-slate-200/50 p-4 shadow-sm flex items-center gap-2">
@@ -1114,6 +1125,16 @@ ${points}
           <MapResizer geometry={geometry} />
         </MapContainer>
         
+        {/* Na wąskim ekranie panel jest zwinięty — to jedyne wejście do rozmowy i szczegółów. */}
+        {!panelOpen && (
+          <Button
+            onClick={() => setPanelOpen(true)}
+            className="md:hidden absolute bottom-6 right-6 z-[1050] rounded-full bg-white text-slate-800 hover:bg-slate-50 shadow-lg h-12 px-5 font-bold border border-slate-200"
+          >
+            <Bot className="w-4 h-4 mr-2 text-emerald-600" /> Kreator
+          </Button>
+        )}
+
         <div className="absolute bottom-6 left-6 z-[1000] flex gap-2">
           {waypoints.length >= 2 && (
             <Button 
@@ -1123,8 +1144,8 @@ ${points}
               <RefreshCw className="w-4 h-4 mr-2" /> Przelicz trasę
             </Button>
           )}
-          <Badge variant="outline" className="bg-white/90 border-emerald-500/30 text-emerald-600 backdrop-blur-md py-1.5 px-4 rounded-full shadow-lg h-10 flex items-center">
-            <MapPin className="w-3 h-3 mr-2" /> GraphHopper
+          <Badge variant="outline" className="bg-white/90 border-emerald-500/30 text-emerald-600 backdrop-blur-md py-1.5 px-4 rounded-full shadow-lg h-10 hidden sm:flex items-center">
+            <MapPin className="w-3 h-3 mr-2" /> OpenStreetMap
           </Badge>
         </div>
 

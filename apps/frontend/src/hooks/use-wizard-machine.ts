@@ -2,6 +2,7 @@ import { useMachine } from '@xstate/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { apiPost } from '@/lib/api';
 import { wizardMachine, WizardContext } from '@routemarket/atlas-workflow/wizard-machine';
 import { fromPromise } from 'xstate';
 
@@ -62,24 +63,21 @@ export function useWizardMachine(initialProjectId: string | null = null) {
       // Override machine actors with our actual logic
       actors: {
         chatActor: fromPromise(async ({ input }: any) => {
-          const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
-          const res = await fetch(`${apiUrl}/chat-interview`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messages: [...input.context.chatMessages, { role: 'user', text: input.text }],
-              project_id: input.context.projectId,
-              input_notes: input.context.inputNotes,
-              current_waypoints: input.context.waypoints,
-              vehicle_type: input.context.vehicleType,
-              bike_subtype: input.context.bikeSubtype,
-              routing_preference: input.context.routingPreference,
-              trip_profile: input.context.tripProfile,
-              creator_preferences: preferencesRef.current
-            })
+          const data = await apiPost<any>('/chat-interview', {
+            // Przy ponowieniu (RETRY) tekst jest pusty — ostatnia wypowiedź
+            // użytkownika siedzi już w transkrypcie i nie wolno jej dublować.
+            messages: input.text
+              ? [...input.context.chatMessages, { role: 'user', text: input.text }]
+              : input.context.chatMessages,
+            project_id: input.context.projectId,
+            input_notes: input.context.inputNotes,
+            current_waypoints: input.context.waypoints,
+            vehicle_type: input.context.vehicleType,
+            bike_subtype: input.context.bikeSubtype,
+            routing_preference: input.context.routingPreference,
+            trip_profile: input.context.tripProfile,
+            creator_preferences: preferencesRef.current
           });
-          if (!res.ok) throw new Error('Chat failed');
-          const data = await res.json();
           return {
             message: data.reply || data.message || data.text,
             done: data.done,
@@ -103,21 +101,13 @@ export function useWizardMachine(initialProjectId: string | null = null) {
            };
         }
         
-        const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
-        const res = await fetch(`${apiUrl}/live-route`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            points: context.waypoints,
-            route_type: context.vehicleType === 'bicycle' ? context.bikeSubtype : context.vehicleType,
-            intent: context.routingPreference,
-            distance_target_km: context.distanceTargetKm
-          })
+        const data = await apiPost<any>('/live-route', {
+          points: context.waypoints,
+          route_type: context.vehicleType === 'bicycle' ? context.bikeSubtype : context.vehicleType,
+          intent: context.routingPreference,
+          distance_target_km: context.distanceTargetKm
         });
 
-        if (!res.ok) throw new Error('Live route generation failed: ' + res.status);
-        const data = await res.json();
-        
         if (!data.geometry || !data.trackPoints) {
             throw new Error("Brak geometrii w odpowiedzi routingu.");
         }
@@ -204,9 +194,25 @@ const context = state.context;
 
   useEffect(() => {
     if (state.matches('error')) {
-       toast.error("Wystąpił błąd w procesie AI. Możesz spróbować ponownie.");
+      // Konkret zamiast "wystąpił błąd": wygasła sesja, limit zapytań i padnięty
+      // routing wymagają od użytkownika zupełnie różnych reakcji.
+      toast.error(context.errorMessage || 'Nie udało się wykonać operacji.');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.value]);
+
+  /**
+   * Ponowienie ostatniej operacji. Jeśli mamy komplet punktów, wracamy do
+   * liczenia trasy; w przeciwnym razie powtarzamy ostatnią wypowiedź użytkownika,
+   * bo to ona nie doczekała się odpowiedzi.
+   */
+  const retryLastAction = useCallback(() => {
+    if (context.waypoints.length >= 2) {
+      send({ type: 'CALCULATE_ROUTE' });
+      return;
+    }
+    send({ type: 'RETRY' });
+  }, [send, context.waypoints.length]);
 
   // Wybór karty: ustalenia z karty wchodzą do profilu wyjazdu, a jej tytuł leci
   // do agenta jako odpowiedź użytkownika — dzięki temu rozmowa czyta się naturalnie,
@@ -218,11 +224,12 @@ const context = state.context;
     send({ type: 'SEND_MESSAGE', text: option.title });
   }, [send, context.tripProfile]);
 
-  return { 
+  return {
     state,
-    context, 
-    send, 
+    context,
+    send,
     setField,
-    chooseOption
+    chooseOption,
+    retryLastAction
   };
 }

@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { CalendarDays, Compass, MapPin, Route as RouteIcon, Sparkles, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Logo from '@/components/Logo';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Strona główna planera. Poprzednia wersja była witryną sklepu z trasami —
@@ -11,13 +10,16 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export default function Index() {
   const navigate = useNavigate();
-  const [loggedIn, setLoggedIn] = useState(false);
+  // Wcześniej strona pytała Supabase samodzielnie, a stan startowy brzmiał
+  // „niezalogowany". Przez moment po wejściu zalogowany użytkownik widział
+  // przycisk logowania, a kliknięcie CTA w tym oknie wyrzucało go na /auth.
+  const { user, loading } = useAuth();
+  const loggedIn = !!user;
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setLoggedIn(!!data.user));
-  }, []);
-
-  const start = () => navigate(loggedIn ? '/route-builder-v2' : '/auth');
+  const start = () => {
+    if (loading) return;
+    navigate(loggedIn ? '/route-builder-v2' : '/auth');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,7 +27,9 @@ export default function Index() {
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-2">
-            {loggedIn ? (
+            {/* Dopóki sesja się nie rozstrzygnie, nie pokazujemy żadnego z wariantów —
+                mignięcie „Zaloguj się" u zalogowanego wyglądało jak wylogowanie. */}
+            {loading ? null : loggedIn ? (
               <>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/plany')}>Plany</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/my-routes')}>Moje trasy</Button>

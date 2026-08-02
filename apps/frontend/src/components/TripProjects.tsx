@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 
 interface TripProject extends Partial<AxisValues> {
@@ -188,18 +189,11 @@ export default function TripProjects() {
     setSearching(true);
     setResults([]);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
-      const res = await fetch(`${apiUrl}/discover-places`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: q,
-          destination: active.destination,
-          creator_preferences: mergePreferences(userPrefs, active)
-        })
+      const data = await apiPost<any>('/discover-places', {
+        query: q,
+        destination: active.destination,
+        creator_preferences: mergePreferences(userPrefs, active)
       });
-      if (!res.ok) throw new Error('Wyszukiwanie nie powiodło się');
-      const data = await res.json();
       setResults(data.places || []);
     } catch (err: any) {
       toast.error(err.message);
@@ -383,14 +377,8 @@ export default function TripProjects() {
     // Propozycje agenta mają tylko nazwy — dogeokodowujemy je, żeby nie wypadały
     // z trasy tylko dlatego, że nie zostały wcześniej przypięte.
     if (unresolved.length > 0) {
-      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
       try {
-        const res = await fetch(`${apiUrl}/geocode-points`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ names: unresolved, near: active.destination })
-        });
-        const data = await res.json();
+        const data = await apiPost<any>('/geocode-points', { names: unresolved, near: active.destination });
         const found = new Map<string, { lat: number; lng: number }>();
         for (const pt of data.points || []) {
           if (pt.lat != null && pt.lng != null) found.set(pt.name, { lat: pt.lat, lng: pt.lng });
@@ -479,26 +467,19 @@ export default function TripProjects() {
     setPlan(null);
     try {
       const hotel = places.find((p) => p.category === 'hotel');
-      const apiUrl = import.meta.env.VITE_API_URL || '/route-builder-api';
-      const res = await fetch(`${apiUrl}/plan-trip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          destination: active.destination,
-          days: active.days || 1,
-          window: { start: planForm.start, end: planForm.end },
-          start_date: planForm.date || undefined,
-          hotel: hotel ? { name: hotel.name } : null,
-          fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
-          places: places.map((p) => ({
-            name: p.name, category: p.category, priority: p.priority,
-            opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
-          })),
-          creator_preferences: mergePreferences(userPrefs, active)
-        })
+      const data = await apiPost<any>('/plan-trip', {
+        destination: active.destination,
+        days: active.days || 1,
+        window: { start: planForm.start, end: planForm.end },
+        start_date: planForm.date || undefined,
+        hotel: hotel ? { name: hotel.name } : null,
+        fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
+        places: places.map((p) => ({
+          name: p.name, category: p.category, priority: p.priority,
+          opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
+        })),
+        creator_preferences: mergePreferences(userPrefs, active)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Planowanie nie powiodło się');
       setPlan(data);
       // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
       const { data: saved } = await (supabase as any)

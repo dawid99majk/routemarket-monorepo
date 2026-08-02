@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bike, Building2, Car, Check, ChevronRight, Footprints, MapPin, Mountain, Send, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Bike, Building2, Car, Check, ChevronRight, Footprints, MapPin, Mountain, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ChatMessage, RouteOption } from '@routemarket/atlas-workflow/wizard-machine';
@@ -26,6 +26,9 @@ interface InterviewOverlayProps {
   phase: string | null;
   tripProfile: Record<string, any>;
   busyLabel: string | null;
+  /** Treść błędu z maszyny stanów. Bez tego nieudana tura wyglądała jak cisza. */
+  errorMessage?: string | null;
+  onRetry?: () => void;
   vehicleType: string;
   routingPreference: string;
   onVehicleChange: (type: string) => void;
@@ -41,6 +44,8 @@ export default function InterviewOverlay({
   phase,
   tripProfile,
   busyLabel,
+  errorMessage,
+  onRetry,
   vehicleType,
   routingPreference,
   onVehicleChange,
@@ -218,6 +223,27 @@ export default function InterviewOverlay({
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce delay-75" />
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce delay-150" />
               {busyLabel}
+            </div>
+          )}
+
+          {!busyLabel && errorMessage && (
+            <div className="mb-6 rounded-2xl border border-rose-400/40 bg-rose-500/10 backdrop-blur-md p-4 max-w-3xl">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-white font-medium">Nie udało się dokończyć tego kroku</div>
+                  <p className="text-white/70 text-sm mt-1 leading-relaxed">{errorMessage}</p>
+                </div>
+                {onRetry && (
+                  <Button
+                    type="button"
+                    onClick={onRetry}
+                    className="rounded-full bg-white/15 hover:bg-white/25 text-white shrink-0"
+                  >
+                    <RotateCw className="w-4 h-4 mr-1.5" /> Ponów
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

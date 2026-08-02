@@ -48,6 +48,8 @@ export interface WizardContext {
   tripProfile: Record<string, any>;
   /** Aktualny etap wywiadu — steruje paskiem kroków w warstwie wywiadu. */
   phase: string | null;
+  /** Treść ostatniego błędu. Bez niej stan error był niemy i wyglądał jak zawieszenie. */
+  errorMessage: string | null;
 
   // Stats
   routeStats: {
@@ -75,6 +77,7 @@ export type WizardEvent =
   | { type: 'UPDATE_WAYPOINT'; index: number; waypoint: Waypoint }
   | { type: 'CLEAR_ROUTE' }
   | { type: 'SEND_MESSAGE'; text: string }
+  | { type: 'RETRY' }
   | { type: 'REWIND_TO_PHASE'; phase: string }
   | { type: 'CALCULATE_ROUTE' }
   | { type: 'SAVE_PROJECT' }
@@ -96,6 +99,7 @@ export const initialWizardContext: WizardContext = {
   distanceTargetKm: null,
   tripProfile: {},
   phase: null,
+  errorMessage: null,
   routeStats: { distance: 0, ascent: 0, descent: 0 },
 
   title: 'Nowa Trasa AI',
@@ -178,6 +182,14 @@ export const wizardMachine = setup({
         gpxData: null
       };
     }),
+    assignError: assign({
+      errorMessage: ({ event }) => {
+        // @ts-ignore — xstate nie typuje pola error w zdarzeniu onError
+        const err = event.error;
+        return (err && err.message) || 'Nie udało się wykonać operacji.';
+      }
+    }),
+    clearError: assign({ errorMessage: null }),
     assignPhase: assign({
       phase: ({ context, event }) => {
         // @ts-ignore
@@ -305,15 +317,15 @@ export const wizardMachine = setup({
         UPDATE_WAYPOINT: { actions: 'updateWaypoint' },
         SEND_MESSAGE: {
           target: 'chatting',
-          actions: ['appendMessage', 'resetRetries']
+          actions: ['appendMessage', 'resetRetries', 'clearError']
         },
         CALCULATE_ROUTE: {
           target: 'generating_route',
-          actions: 'resetRetries'
+          actions: ['resetRetries', 'clearError']
         },
         SAVE_PROJECT: {
           target: 'saving_project',
-          actions: 'resetRetries'
+          actions: ['resetRetries', 'clearError']
         }
       }
     },
@@ -321,7 +333,7 @@ export const wizardMachine = setup({
       // Kliknięcie karty w trakcie odpowiedzi agenta było cicho porzucane przez
       // xstate i wyglądało jak zawieszenie — nowa wiadomość zastępuje bieżące zapytanie.
       on: {
-        SEND_MESSAGE: { target: 'chatting', reenter: true, actions: ['appendMessage', 'resetRetries'] },
+        SEND_MESSAGE: { target: 'chatting', reenter: true, actions: ['appendMessage', 'resetRetries', 'clearError'] },
         SET_FIELD: { actions: 'assignField' }
       },
       invoke: {
@@ -346,7 +358,8 @@ export const wizardMachine = setup({
             actions: 'incrementRetries'
           },
           {
-            target: 'error'
+            target: 'error',
+            actions: 'assignError'
           }
         ]
       }
@@ -355,7 +368,7 @@ export const wizardMachine = setup({
       // Bez tego zdarzenie jest cicho porzucane przez xstate: użytkownik pisze
       // "zmień trasę" w trakcie liczenia, wiadomość znika i wygląda to na zawieszenie.
       on: {
-        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
+        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries', 'clearError'] },
         SET_FIELD: { actions: 'assignField' }
       },
       invoke: {
@@ -372,7 +385,8 @@ export const wizardMachine = setup({
             actions: 'incrementRetries'
           },
           {
-            target: 'error'
+            target: 'error',
+            actions: 'assignError'
           }
         ]
       }
@@ -381,7 +395,7 @@ export const wizardMachine = setup({
       // Zapis jest upsertem, więc przerwanie go nową wiadomością nic nie psuje —
       // kolejny zapis i tak utrwali stan projektu.
       on: {
-        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
+        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries', 'clearError'] },
         SET_FIELD: { actions: 'assignField' }
       },
       invoke: {
@@ -398,16 +412,18 @@ export const wizardMachine = setup({
             actions: 'incrementRetries'
           },
           {
-            target: 'error'
+            target: 'error',
+            actions: 'assignError'
           }
         ]
       }
     },
     error: {
       on: {
+        RETRY: { target: 'chatting', actions: ['resetRetries', 'clearError'] },
         REWIND_TO_PHASE: { actions: 'rewindToPhase' },
-        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries'] },
-        CALCULATE_ROUTE: { target: 'generating_route', actions: 'resetRetries' },
+        SEND_MESSAGE: { target: 'chatting', actions: ['appendMessage', 'resetRetries', 'clearError'] },
+        CALCULATE_ROUTE: { target: 'generating_route', actions: ['resetRetries', 'clearError'] },
         SET_FIELD: { actions: 'assignField' },
         ADD_WAYPOINT: { actions: 'addWaypoint' },
         REMOVE_WAYPOINT: { actions: 'removeWaypoint' },

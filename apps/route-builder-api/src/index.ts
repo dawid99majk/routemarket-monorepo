@@ -10,12 +10,39 @@ import { reportService } from './services/report.js';
 import { gpxParserService } from './services/gpx-parser.js';
 
 import { authMiddleware } from './middleware/auth.js';
+import { rateLimit } from './middleware/rate-limit.js';
 import { poiService, PoiCandidate } from './services/poi.js';
 import { routeValidatorService } from './services/route-validator.js';
 import { describeAvailability, isOpenDuring } from './services/opening-hours.js';
 import { callGeminiTracked } from './services/ai-usage.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
+
+/**
+ * Endpointy, które przy każdym wywołaniu płacą u dostawcy (Gemini, Google Maps,
+ * GraphHopper, Overpass). Do niedawna były dostępne bez żadnej autoryzacji —
+ * dowolny adres w internecie mógł zamawiać generowanie tras na nasz rachunek,
+ * a `ai_usage_log` nie miał komu przypisać kosztu.
+ *
+ * Hono dopasowuje trasy w kolejności rejestracji, więc te wpisy MUSZĄ stać
+ * przed definicjami handlerów. Przeniesienie ich niżej po cichu wyłącza ochronę.
+ *
+ * Limity dobrane tak, by nie przeszkadzać normalnej pracy (wywiad to kilkanaście
+ * tur, klikanie w markery bywa częstsze), a jednocześnie ucinać pętlę.
+ */
+const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
+  '/chat-interview': { windowMs: 5 * 60_000, max: 20 },
+  '/live-route': { windowMs: 5 * 60_000, max: 30 },
+  '/point-details': { windowMs: 5 * 60_000, max: 60 },
+  '/discover-places': { windowMs: 5 * 60_000, max: 20 },
+  '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
+  '/geocode-points': { windowMs: 5 * 60_000, max: 60 }
+};
+
+for (const [path, limit] of Object.entries(AI_ENDPOINTS)) {
+  app.use(path, authMiddleware);
+  app.use(path, rateLimit({ name: path, ...limit }));
+}
 
 /** Kształt odpowiedzi agenta wywiadu, wymuszany na Gemini (OpenAPI subset). */
 const CHAT_RESPONSE_SCHEMA = {
@@ -358,7 +385,7 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
     const searchData = await callGeminiTracked(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       { contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] },
-      { operation: 'discover-places', model: 'gemini-2.5-flash' }
+      { operation: 'discover-places', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
     );
     const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
@@ -615,7 +642,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
           maxOutputTokens: 32768
         }
       },
-      { operation: 'plan-trip', model: 'gemini-2.5-flash' }
+      { operation: 'plan-trip', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
     );
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const finish = data.candidates?.[0]?.finishReason;
@@ -719,15 +746,36 @@ app.get('/health', (c) => {
 });
 
 // Get short description and recommendations for a waypoint/POI
+/**
+ * Opis pojedynczego punktu, pobierany po kliknięciu markera. Opisy miejsc się
+ * nie zmieniają, a użytkownicy klikają te same klasyki, więc trzymamy je w
+ * pamięci — bez tego każde kliknięcie to osobne płatne zapytanie do modelu.
+ */
+const pointDetailsCache = new Map<string, { at: number; data: any }>();
+const POINT_DETAILS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const POINT_DETAILS_MAX = 2000;
+
 app.post('/point-details', async (c) => {
   try {
-    const { name, lat, lng } = await c.req.json() as { name: string, lat?: number, lng?: number };
+    const body = await c.req.json().catch(() => ({})) as { name?: unknown, lat?: unknown, lng?: unknown };
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const lat = typeof body.lat === 'number' ? body.lat : undefined;
+    const lng = typeof body.lng === 'number' ? body.lng : undefined;
+    // Bez tego pusty request szedł do modelu z nazwą "undefined" i i tak był płatny.
+    if (!name) return c.json({ error: 'Pole "name" jest wymagane.' }, 400);
+
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY");
     }
 
-    const prompt = `Jesteś profesjonalnym przewodnikiem turystycznym i ekspertem od atrakcji turystycznych. 
+    const cacheKey = `${name.toLowerCase()}|${lat?.toFixed(3) ?? '-'}|${lng?.toFixed(3) ?? '-'}`;
+    const cached = pointDetailsCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < POINT_DETAILS_TTL_MS) {
+      return c.json(cached.data);
+    }
+
+    const prompt = `Jesteś profesjonalnym przewodnikiem turystycznym i ekspertem od atrakcji turystycznych.
 Zbuduj krótki, interesujący opis (2-3 zdania) i jedną praktyczną wskazówkę/rekomendację dla miejsca o nazwie: "${name}".
 Współrzędne geograficzne tego punktu to: lat: ${lat || 'nieznane'}, lng: ${lng || 'nieznane'}.
 
@@ -738,25 +786,25 @@ Nie dodawaj żadnych tagów markdown, po prostu czysty obiekt JSON, np.:
   "recommendation": "..."
 }`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json" }
-      })
-    });
+      },
+      { operation: 'point-details', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+    );
 
-    if (!response.ok) {
-      throw new Error("Gemini API error " + await response.text());
-    }
-
-    const data = await response.json() as any;
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+
     if (generatedText) {
       const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
       const resultObj = JSON.parse(cleanText);
+      if (pointDetailsCache.size >= POINT_DETAILS_MAX) {
+        const oldest = pointDetailsCache.keys().next().value;
+        if (oldest !== undefined) pointDetailsCache.delete(oldest);
+      }
+      pointDetailsCache.set(cacheKey, { at: Date.now(), data: resultObj });
       return c.json(resultObj);
     }
     throw new Error("No text from Gemini");
@@ -1402,31 +1450,74 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         }
 
         const failed_waypoints: string[] = [];
-        for (const placeName of resultObj.add_waypoints) {
-          // Najpierw dopasowanie do zweryfikowanych POI z OSM — dokładne współrzędne bez geokodera
+        // Punkty były rozwiązywane jeden po drugim, choć zależą od siebie tylko
+        // przez biasPoint — a ten ustala się na pierwszym trafieniu i dalej się
+        // nie zmienia. Dlatego: sekwencyjnie tylko do momentu ustalenia biasu,
+        // reszta równolegle. Pojedyncze zapytanie o punkt to nawet kilka wywołań
+        // HTTP (warianty nazwy × przebieg zawężony i globalny), więc przy
+        // kilkunastu punktach to była większość czasu odpowiedzi.
+        const placeNames: string[] = resultObj.add_waypoints;
+        const resolved: Array<{ lat: number; lng: number; name: string } | null> =
+          new Array(placeNames.length).fill(null);
+
+        let cursor = 0;
+        while (cursor < placeNames.length && !biasPoint) {
+          const placeName = placeNames[cursor];
           const matched = poiService.matchCandidate(placeName, poiMatchPool, poiCenter || biasPoint);
           if (matched) {
-            suggested_waypoints.push({ lat: matched.lat, lng: matched.lng, name: placeName });
-            if (!biasPoint) biasPoint = { lat: matched.lat, lng: matched.lng };
-            continue;
-          }
-          try {
-            const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint, poiRadiusKm);
-            if (place) {
-              suggested_waypoints.push({
-                lat: place.lat,
-                lng: place.lng,
-                name: placeName
-              });
-              // Aktualizujemy biasPoint na ostatnio znaleziony punkt, by kolejne punkty pętli były blisko siebie
-              if (!biasPoint) {
+            resolved[cursor] = { lat: matched.lat, lng: matched.lng, name: placeName };
+            biasPoint = { lat: matched.lat, lng: matched.lng };
+          } else {
+            try {
+              const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint, poiRadiusKm);
+              if (place) {
+                resolved[cursor] = { lat: place.lat, lng: place.lng, name: placeName };
                 biasPoint = { lat: place.lat, lng: place.lng };
               }
+            } catch (e) {
+              console.error("Geocoding failed for place:", placeName, e);
+              failed_waypoints.push(placeName);
             }
-          } catch (e) {
-            console.error("Geocoding failed for place:", placeName, e);
-            failed_waypoints.push(placeName);
           }
+          cursor++;
+        }
+
+        // Dopasowania do POI są darmowe i natychmiastowe — odsiewamy je najpierw,
+        // żeby do geokodera trafiło jak najmniej nazw.
+        const needGeocoding: number[] = [];
+        for (let i = cursor; i < placeNames.length; i++) {
+          const placeName = placeNames[i];
+          const matched = poiService.matchCandidate(placeName, poiMatchPool, poiCenter || biasPoint);
+          if (matched) {
+            resolved[i] = { lat: matched.lat, lng: matched.lng, name: placeName };
+          } else {
+            needGeocoding.push(i);
+          }
+        }
+
+        // Współbieżność ograniczona: Nominatim prosi o umiar, a i tak zwykle
+        // zostaje kilka nazw, bo większość punktów pochodzi już z OSM.
+        const GEOCODE_CONCURRENCY = 3;
+        for (let from = 0; from < needGeocoding.length; from += GEOCODE_CONCURRENCY) {
+          const batch = needGeocoding.slice(from, from + GEOCODE_CONCURRENCY);
+          await Promise.all(batch.map(async (i) => {
+            const placeName = placeNames[i];
+            try {
+              const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint, poiRadiusKm);
+              if (place) {
+                resolved[i] = { lat: place.lat, lng: place.lng, name: placeName };
+              }
+            } catch (e) {
+              console.error("Geocoding failed for place:", placeName, e);
+              failed_waypoints.push(placeName);
+            }
+          }));
+        }
+
+        // Kolejność punktów decyduje o przebiegu trasy, więc odtwarzamy ją
+        // z oryginalnej listy, a nie z kolejności, w jakiej wróciły odpowiedzi.
+        for (const wp of resolved) {
+          if (wp) suggested_waypoints.push(wp);
         }
         // Walidacja 0: punkt o właściwej nazwie, ale złych współrzędnych.
         // Geokoder potrafi odesłać imiennika z drugiego końca aglomeracji ("Planty"
