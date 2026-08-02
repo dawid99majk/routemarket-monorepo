@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, Search, Share2, Star, Trash2, Users, Utensils
+  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, Search, Share2, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,7 @@ const SUGGESTIONS = [
 ];
 
 export default function TripProjects() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<TripProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [places, setPlaces] = useState<PinnedPlace[]>([]);
@@ -346,6 +348,55 @@ export default function TripProjects() {
   const revokeShare = async (id: string) => {
     await (supabase as any).from('trip_project_shares').delete().eq('id', id);
     setShares((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  /**
+   * Most do kreatora: z harmonogramu robimy projekt trasy z prawdziwymi
+   * współrzędnymi przypiętych miejsc, charakterem wyjazdu i historią rozmowy,
+   * po czym otwieramy kreator. Bez tego plan kończył się tekstem.
+   */
+  const buildRouteFrom = async (items: any[], label: string) => {
+    if (!active) return;
+    // Pozycje harmonogramu to nazwy — współrzędne mają dopiero przypięte miejsca
+    const waypoints = items
+      .map((it) => {
+        const place = places.find(
+          (p) => p.name === it.name || it.name?.includes(p.name) || p.name.includes(it.name)
+        );
+        return place?.lat && place?.lng
+          ? { lat: place.lat, lng: place.lng, name: place.name, type: 'waypoint' as const }
+          : null;
+      })
+      .filter(Boolean) as { lat: number; lng: number; name: string; type: string }[];
+
+    if (waypoints.length < 2) {
+      toast.error('Za mało miejsc ze współrzędnymi, żeby wyznaczyć trasę');
+      return;
+    }
+    waypoints[0].type = 'start';
+    waypoints[waypoints.length - 1].type = 'end';
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+    const brief = `${active.destination}: ${label}. Miejsca: ${waypoints.map((w) => w.name).join(', ')}.`;
+    const { data, error } = await (supabase as any)
+      .from('route_builder_projects')
+      .insert({
+        user_id: userData.user.id,
+        requirements: {
+          title: `${active.name} — ${label}`,
+          waypoints,
+          vehicleType: 'city',
+          inputNotes: brief,
+          routingPreference: (active.popularity ?? 50) > 60 ? 'wild' : 'popular',
+          tripProfile: { start_point: waypoints[0].name },
+          chatMessages: [{ role: 'user', text: brief }]
+        }
+      })
+      .select('id')
+      .single();
+    if (error) return toast.error(error.message);
+    navigate(`/route-builder-v2?projectId=${data.id}`);
   };
 
   const deletePlan = async (id: string) => {
@@ -832,9 +883,17 @@ export default function TripProjects() {
               <div className="space-y-4">
                 {(plan.days || []).map((day: any) => (
                   <div key={day.day} className="rounded-xl border overflow-hidden">
-                    <div className="bg-muted/60 px-4 py-2 text-sm font-semibold">
-                      Dzień {day.day}
-                      {day.weekday && <span className="font-normal text-muted-foreground"> · {day.weekday} {day.date}</span>}
+                    <div className="bg-muted/60 px-4 py-2 text-sm font-semibold flex items-center justify-between gap-2">
+                      <span>
+                        Dzień {day.day}
+                        {day.weekday && <span className="font-normal text-muted-foreground"> · {day.weekday} {day.date}</span>}
+                      </span>
+                      <button
+                        onClick={() => buildRouteFrom(day.items || [], `dzień ${day.day}`)}
+                        className="text-xs font-normal text-emerald-700 hover:underline flex items-center gap-1"
+                      >
+                        <Wand2 className="w-3.5 h-3.5" /> Zrób trasę z tego dnia
+                      </button>
                     </div>
                     <div className="divide-y">
                       {(day.items || []).map((it: any, i: number) => (
@@ -874,6 +933,14 @@ export default function TripProjects() {
                     ))}
                   </div>
                 )}
+
+                <Button
+                  variant="outline"
+                  onClick={() => buildRouteFrom((plan.days || []).flatMap((d: any) => d.items || []), 'cały wyjazd')}
+                  className="w-full"
+                >
+                  <Wand2 className="w-4 h-4 mr-2" /> Zrób jedną trasę z całego wyjazdu
+                </Button>
 
                 {plan.question && (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-900">

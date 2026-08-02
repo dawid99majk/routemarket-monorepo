@@ -524,9 +524,12 @@ ZASADY:
 1. Miejsca oznaczone KONIECZNIE mają pierwszeństwo — wstaw je najpierw, w dniach, w których są otwarte.
 2. NIGDY nie planuj wizyty w miejscu oznaczonym jako ZAMKNIĘTE danego dnia ani takiego, które NIE MIEŚCI SIĘ W OKNIE.
 3. Grupuj miejsca leżące blisko siebie w ten sam dzień — dzień ma być spójny geograficznie, bez biegania przez miasto.
-4. Nie upychaj na siłę. Jeśli coś się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
-5. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
-6. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
+4. NIGDY NIE ZOSTAWIAJ PUSTEGO DNIA. "Czas wolny" na kilka godzin przy niewykorzystanych miejscach to błąd planu, nie wynik.
+5. KRÓTSZA WIZYTA ZAMIAST REZYGNACJI. Jeśli miejsce jest otwarte, ale zostało mniej czasu, niż wynosi pełne zwiedzanie, ZAPLANUJ JE NA TYLE, ILE ZOSTAŁO, i napisz to wprost w "note", np. "zamykają o 18:00 — masz 60 z 90 min, wejdź od razu". Turysta sam zdecyduje, czy mu to wystarczy. Do "not_scheduled" trafia tylko to, co jest ZAMKNIĘTE danego dnia albo czego naprawdę nie da się wcisnąć.
+6. WYPEŁNIJ LUKI KONKRETEM. Zamiast "czas wolny" zaproponuj coś sensownego w tej okolicy: spacer wskazaną ulicą lub dzielnicą, konkretny plac, park, kawiarnię, punkt widokowy. Nazwij to miejsce — "spacer po Starym Mieście: Rynek, Katharinenstraße, Nikolaikirchhof" jest planem, "czas wolny" nie jest.
+7. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
+8. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
+9. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
 
 ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
 
