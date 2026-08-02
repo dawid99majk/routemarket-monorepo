@@ -723,14 +723,31 @@ app.post('/geocode-points', async (c) => {
       }
     }
 
+    // Pozycje organizacyjne nie są miejscami — próba ich geokodowania kończyła się
+    // trafieniem w przypadkową miejscowość (wpis "Przejazd/Czas wolny" wylądował
+    // pod Częstochową w trasie po Bukareszcie).
+    const NON_PLACE = /^(przejazd|przej[śs]cie|przerwa|czas wolny|wolny czas|powr[óo]t|dojazd|transfer|lunch|obiad|kolacja|\u015bniadanie|odpoczynek|spacer(\s|$)|nocleg)/i;
+
     const points = await Promise.all(
       names.slice(0, 30).map(async (name) => {
+        if (NON_PLACE.test(String(name).trim())) {
+          return { name, lat: null, lng: null, reason: 'not_a_place' };
+        }
         try {
           const query = near && !name.toLowerCase().includes(near.toLowerCase()) ? `${name}, ${near}` : name;
           const place = await geocodingService.geocodeSinglePoint(query, bias, radiusKm);
+          // Twarda bariera: punkt oddalony od miasta o więcej niż 40 km nie należy
+          // do tej trasy, choćby geokoder był z siebie zadowolony.
+          if (bias) {
+            const away = routeValidatorService.distanceKm(bias, { lat: place.lat, lng: place.lng });
+            if (away > 40) {
+              console.warn(`[geocode-points] "${name}" odrzucone: ${away.toFixed(0)} km od ${near}`);
+              return { name, lat: null, lng: null, reason: 'wrong_region' };
+            }
+          }
           return { name, lat: place.lat, lng: place.lng };
         } catch {
-          return { name, lat: null, lng: null };
+          return { name, lat: null, lng: null, reason: 'not_found' };
         }
       })
     );

@@ -354,8 +354,12 @@ export default function TripProjects() {
     // Pozycje organizacyjne nie są przystankami trasy
     const isVenue = (it: any) => {
       const name = String(it.name || '');
-      if (['walk', 'transit', 'break'].includes(it.kind)) return false;
-      return !/^(przej[śs]cie|przerwa|czas wolny|powr[óo]t|dojazd|transfer)/i.test(name.trim());
+      if (['walk', 'transit', 'break', 'meal'].includes(it.kind)) return false;
+      // Lista musi obejmować też "Przejazd" i posiłki — bez tego pozycja
+      // organizacyjna szła do geokodera i lądowała w przypadkowym mieście.
+      return !/^(przejazd|przej[śs]cie|przerwa|czas wolny|wolny czas|powr[óo]t|dojazd|transfer|lunch|obiad|kolacja|śniadanie|odpoczynek|spacer(\s|$)|nocleg)/i.test(
+        name.trim()
+      );
     };
 
     const venues = items.filter(isVenue);
@@ -396,6 +400,26 @@ export default function TripProjects() {
     }
 
     const waypoints = resolved.filter(Boolean) as { lat: number; lng: number; name: string; type: string }[];
+
+    // Ostatnia bariera po stronie klienta: jeśli mimo wszystko któryś punkt
+    // wypadł daleko poza skupisko, nie wpuszczamy go do trasy.
+    if (waypoints.length >= 3) {
+      const lats = [...waypoints.map((w) => w.lat)].sort((a, b) => a - b);
+      const lngs = [...waypoints.map((w) => w.lng)].sort((a, b) => a - b);
+      const mid = Math.floor(waypoints.length / 2);
+      const cLat = lats[mid];
+      const cLng = lngs[mid];
+      const kmFrom = (w: { lat: number; lng: number }) => {
+        const dLat = (w.lat - cLat) * 111;
+        const dLng = (w.lng - cLng) * 111 * Math.cos((cLat * Math.PI) / 180);
+        return Math.sqrt(dLat * dLat + dLng * dLng);
+      };
+      const far = waypoints.filter((w) => kmFrom(w) > 40);
+      if (far.length > 0) {
+        for (const w of far) waypoints.splice(waypoints.indexOf(w), 1);
+        toast.warning(`Pominięto ${far.length} punktów poza obszarem wyjazdu: ${far.map((w) => w.name).join(', ')}`);
+      }
+    }
 
     if (waypoints.length < 2) {
       toast.error('Za mało miejsc ze współrzędnymi, żeby wyznaczyć trasę');
