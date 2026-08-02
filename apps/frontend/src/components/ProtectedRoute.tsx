@@ -4,7 +4,9 @@ import { hasRole } from '@/lib/auth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: string[];
+  /** Pominięte = wystarczy zalogowanie. Po usunięciu podziału na typy kont
+   *  większość stron nie potrzebuje już żadnej roli. */
+  allowedRoles?: string[];
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
@@ -19,7 +21,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   }
 
   if (!user) return <Navigate to="/auth" replace />;
-  if (!hasRole(user, allowedRoles)) {
+  if (allowedRoles && allowedRoles.length > 0 && !hasRole(user, allowedRoles)) {
     // If it was a creator-only route, send them to become-creator instead of home
     if (allowedRoles.includes('creator')) {
       return <Navigate to="/become-creator" replace />;

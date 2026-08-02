@@ -98,7 +98,7 @@ const App = () => (
                   {/* Stary kreator formularzowy zastąpiony wywiadem w /route-builder-v2.
                       Przekierowanie zachowuje działanie starych linków, w tym ?projectId=. */}
                   <Route path="/create" element={<LegacyCreateRedirect />} />
-                  <Route path="/route-builder-v2" element={<ProtectedRoute allowedRoles={CREATOR_AND_ADMIN}><RouteBuilderV2 /></ProtectedRoute>} />
+                  <Route path="/route-builder-v2" element={<ProtectedRoute><RouteBuilderV2 /></ProtectedRoute>} />
 
                   {/* Admin routes */}
                   <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
