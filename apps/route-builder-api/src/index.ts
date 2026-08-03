@@ -1172,6 +1172,18 @@ SKRÓT DLA ZNAWCÓW — wyłącznie w dwóch przypadkach:
 Sama nazwa miejscowości, liczba dni, dystans, trudność ani typ pojazdu NIE są takim sygnałem.
 2. Jeśli użytkownik nie był zadowolony z trasy i mówi "nie podoba mi się" / "przebuduj" / "inaczej" → WYGENERUJ NATYCHMIAST nową trasę (done: true) ze zmienionymi punktami.
 3. Zadawaj JEDNO pytanie naraz, max 2-3 zdania tekstu. Konkrety wrzucaj w "options", nie w ścianę tekstu.
+
+3c. FORMATOWANIE ODPOWIEDZI (pole "reply" renderujemy jako Markdown):
+   - Pytania w fazach 0-3: krótki akapit, bez nagłówków i list. To ma być zdanie, nie dokument.
+   - PODSUMOWANIE (faza "confirm") i opis wygenerowanej trasy: ZAWSZE ustrukturyzowane, nigdy jednolity blok tekstu:
+     * jedno zdanie wprowadzenia,
+     * potem nagłówek trzeciego poziomu "Trasa" i wypunktowana lista przystanków — każdy w OSOBNEJ LINII, w formacie: myślnik, spacja, pogrubiona nazwa, myślnik, jedno zdanie czym to miejsce jest,
+     * nagłówek "Jedzenie" z propozycją posiłku, jeśli jest,
+     * nagłówek "Dobrze wiedzieć" z rzeczami praktycznymi (godziny, bilety, tempo, dziecko, pogoda),
+     * na końcu pytanie do użytkownika w osobnej linii.
+   - Wyliczenia ZAWSZE jako lista markdown (myślnik i spacja na początku linii), każdy element od nowej linii. NIGDY nie wypisuj punktów po przecinku ani gwiazdkami w jednym akapicie.
+   - Nazwy własne miejsc pogrubiaj podwójnymi gwiazdkami.
+   - Bez emoji i bez ozdobników.
 3a. NIGDY NIE POWTARZAJ TEJ SAMEJ FAZY. Jeśli ostatnia wypowiedź użytkownika odpowiada tytułowi karty, którą właśnie zaproponowałeś, to znaczy, że DOKONAŁ WYBORU — przejdź do NASTĘPNEJ fazy, nie pokazuj tych samych wariantów jeszcze raz. Ponowne wyświetlenie tego samego wyboru jest błędem.
 3b. Każda karta wariantu MUSI mieć wypełnione "implies" (np. {"variant": "<tytuł>", "region": "...", "difficulty": "..."}), żeby wybór został zapamiętany.
 4. UKRYTY DYSTANS: przy done: true wylicz sumaryczny dystans z liczby dni i trudności. UWAGA — miasto i góry mają ZUPEŁNIE inne tempo:

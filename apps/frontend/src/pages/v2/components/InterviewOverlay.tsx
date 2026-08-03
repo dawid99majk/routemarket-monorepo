@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { AlertTriangle, Bike, Building2, Car, Check, ChevronRight, Footprints, MapPin, Mountain, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -212,9 +214,24 @@ export default function InterviewOverlay({
           )}
 
           {started && lastAgent && (
-            <p className="text-white text-lg leading-relaxed mb-6 max-w-3xl">
-              {lastAgent.text.replace(/\s*\[[^\]]+\]/g, '')}
-            </p>
+            /* Agent pisze markdownem — podsumowania mają akapity, wypunktowania
+               i wyróżnienia. Renderowanie ich jako gołego tekstu dawało ścianę
+               liter, której nikt nie chce czytać. */
+            <div className="text-white/95 text-base leading-relaxed mb-6 max-w-3xl space-y-3
+                            [&_strong]:text-white [&_strong]:font-semibold
+                            [&_ul]:space-y-1.5 [&_ul]:mt-2 [&_ol]:space-y-1.5 [&_ol]:mt-2
+                            [&_li]:relative [&_li]:pl-5
+                            [&_ul>li]:before:content-['•'] [&_ul>li]:before:absolute
+                            [&_ul>li]:before:left-1 [&_ul>li]:before:text-emerald-400
+                            [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:mt-4
+                            [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-4
+                            [&_h3]:font-semibold [&_h3]:mt-3
+                            [&_p]:leading-relaxed
+                            [&_a]:text-emerald-300 [&_a]:underline">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {lastAgent.text.replace(/\s*\[[^\]]+\]/g, '')}
+              </ReactMarkdown>
+            </div>
           )}
 
           {busyLabel && (
