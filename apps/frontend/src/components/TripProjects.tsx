@@ -161,7 +161,9 @@ export default function TripProjects() {
   }, [activeId]);
 
   const createProject = async () => {
-    if (!form.name.trim() || !form.destination.trim()) return;
+    // Ciche wyjście zostawiało użytkownika z wrażeniem, że przycisk nie działa
+    if (!form.name.trim()) return toast.error('Podaj nazwę planu, np. „Bukareszt — delegacja”');
+    if (!form.destination.trim()) return toast.error('Podaj miasto, w którym planujesz wyjazd');
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return toast.error('Zaloguj się, aby tworzyć projekty');
     const { data, error } = await (supabase as any)
@@ -195,6 +197,9 @@ export default function TripProjects() {
         creator_preferences: mergePreferences(userPrefs, active)
       });
       setResults(data.places || []);
+      if (!data.places || data.places.length === 0) {
+        toast.info('Nic nie znalazłem dla tego zapytania — spróbuj inaczej je sformułować');
+      }
     } catch (err: any) {
       toast.error(err.message);
     } finally {
