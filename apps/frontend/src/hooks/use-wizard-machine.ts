@@ -17,8 +17,11 @@ function generateGpxString(coordinates: number[][], title: string): string {
     <trkseg>`;
   
   for (const coord of coordinates) {
-    const lat = coord[1];
-    const lon = coord[0];
+    // trackPoints przychodzą jako [lat, lng, ele]. Czytanie ich w kolejności
+    // GeoJSON zamieniało osie i zapisywało trasę z Durrës na pustyni w Arabii
+    // Saudyjskiej — plik wyglądał poprawnie aż do otwarcia w nawigacji.
+    const lat = coord[0];
+    const lon = coord[1];
     const ele = coord[2] || 0;
     gpx += `
       <trkpt lat="${lat}" lon="${lon}">
