@@ -64,6 +64,25 @@ export class RoutingService {
       }
     }
 
+    // Spacer po mieście: GraphHopper zna infrastrukturę pieszą — chodniki,
+    // przejścia, deptaki i strefy ruchu pieszego. BRouter dostawał tu profil
+    // `shortest`, który liczy wyłącznie metry, więc prowadził tą samą ulicą tam
+    // i z powrotem, omijając nadmorski bulwar o kilkadziesiąt metrów dłuższy.
+    if (routeType === 'city_walk' || routeType === 'city') {
+      try {
+        const result = await this.ghProvider.getRoute(optimizedPlaces, 'hiking');
+        return {
+          distance_km: result.distanceKm,
+          duration_h: result.estimatedTimeH,
+          trackPoints: result.points.map(p => [p.lat, p.lng, (p as any).ele || 0]),
+          geometry: result.geometryGeoJson,
+          waypoints: optimizedPlaces
+        };
+      } catch (err: any) {
+        console.warn(`[Routing] GraphHopper foot failed, falling back to BRouter: ${err.message}`);
+      }
+    }
+
     // PRIMARY dla tras niemotorowych: BRouter — profile pod szlaki piesze/rowerowe
     // i brak limitu punktów pośrednich (GraphHopper free tier tnie trasę na kawałki po 5).
     if (brouterProvider.supportsRouteType(routeType)) {
