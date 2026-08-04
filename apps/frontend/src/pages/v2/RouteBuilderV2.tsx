@@ -15,7 +15,7 @@ function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: nu
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, RefreshCw, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -150,7 +150,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const [tempMarker, setTempMarker] = useState<L.LatLng | null>(null);
 
   // State to store AI-generated descriptions and recommendations for clicked waypoints
-  const [poiDetails, setPoiDetails] = useState<Record<string, { description: string, recommendation: string, loading?: boolean }>>({});
+  const [poiDetails, setPoiDetails] = useState<Record<string, { description: string, recommendation: string, photos?: string[], loading?: boolean }>>({});
+  // Karta startuje zwinięta — rozwijamy tylko ten punkt, który kogoś zainteresował
+  const [expandedPoints, setExpandedPoints] = useState<Record<string, boolean>>({});
+  const [photoIndex, setPhotoIndex] = useState<Record<string, number>>({});
+  // Bez tego każde przeliczenie trasy strzelałoby po opisy tych samych punktów od nowa
+  const prefetchedRef = useRef<Set<string>>(new Set());
 
   // Helper to prevent clicks and double clicks inside leaflet popups from bubbling up to map click events
   const disablePropagation = (el: HTMLElement | null) => {
@@ -159,11 +164,66 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     }
   };
 
+  const pointKeyOf = (wp: any, index: number) => wp.name || `Punkt ${index + 1}`;
+
+  /**
+   * Opisy i zdjęcia pobierane od razu po wyznaczeniu trasy, jednym zapytaniem dla
+   * wszystkich punktów. Wcześniej każdy marker ładował się dopiero po kliknięciu —
+   * użytkownik czekał przy każdym punkcie z osobna, zamiast dostać gotową trasę.
+   */
+  useEffect(() => {
+    if (!geometry || waypoints.length === 0) return;
+
+    const missing = waypoints
+      .map((wp: any, i: number) => ({ name: pointKeyOf(wp, i), lat: wp.lat, lng: wp.lng }))
+      .filter((p) => !prefetchedRef.current.has(p.name));
+    if (missing.length === 0) return;
+
+    missing.forEach((p) => prefetchedRef.current.add(p.name));
+    setPoiDetails((prev) => {
+      const next = { ...prev };
+      for (const p of missing) {
+        if (!next[p.name]) next[p.name] = { description: '', recommendation: '', loading: true };
+      }
+      return next;
+    });
+
+    (async () => {
+      try {
+        const data = await apiPost<any>('/points-details', { points: missing }, { timeoutMs: 90_000 });
+        setPoiDetails((prev) => {
+          const next = { ...prev };
+          for (const p of missing) {
+            const d = data.details?.[p.name];
+            next[p.name] = {
+              description: d?.description || 'Brak opisu dla tego miejsca.',
+              recommendation: d?.recommendation || '',
+              photos: d?.photos || [],
+              loading: false
+            };
+          }
+          return next;
+        });
+      } catch (err) {
+        console.error('Nie udało się pobrać opisów punktów:', err);
+        // Punkty wracają do puli — klikniecie w marker spróbuje pojedynczo
+        missing.forEach((p) => prefetchedRef.current.delete(p.name));
+        setPoiDetails((prev) => {
+          const next = { ...prev };
+          for (const p of missing) if (next[p.name]?.loading) delete next[p.name];
+          return next;
+        });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geometry, waypoints.length]);
+
   const handleMarkerClick = async (wp: any, index: number) => {
     const pointKey = wp.name || `Punkt ${index + 1}`;
     
     // Skip if already loading or loaded
     if (poiDetails[pointKey]) return;
+    prefetchedRef.current.add(pointKey);
     
     // Set loading state
     setPoiDetails(prev => ({
@@ -182,6 +242,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         [pointKey]: {
           description: data.description || 'Brak opisu dla tego miejsca.',
           recommendation: data.recommendation || 'Brak dodatkowych rekomendacji.',
+          photos: data.photos || [],
           loading: false
         }
       }));
@@ -1047,36 +1108,108 @@ ${points}
                 click: () => handleMarkerClick(wp, i)
               }}
             >
-              <Popup>
+              <Popup maxWidth={400} minWidth={340} autoPan autoPanPadding={[24, 24]}>
+                {(() => {
+                  const key = pointKeyOf(wp, i);
+                  const details = poiDetails[key];
+                  const photos = details?.photos || [];
+                  const idx = Math.min(photoIndex[key] || 0, Math.max(photos.length - 1, 0));
+                  const expanded = !!expandedPoints[key];
+                  const movePhoto = (delta: number) => setPhotoIndex((prev) => ({
+                    ...prev,
+                    [key]: (idx + delta + photos.length) % photos.length
+                  }));
+                  return (
                 <div 
                   ref={disablePropagation}
-                  className="w-[260px] text-left p-1 text-slate-800 font-sans"
+                  className="w-[340px] max-w-[calc(100vw-4rem)] text-left p-1 text-slate-800 font-sans"
                 >
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                    <span className="font-bold text-sm text-slate-800 truncate block pr-2 max-w-[180px]" title={wp.name || `Punkt ${i + 1}`}>
-                      {wp.name || `Punkt ${i + 1}`}
+                    <span className="font-bold text-sm text-slate-800 truncate block pr-2" title={key}>
+                      {key}
                     </span>
                     <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded tracking-wider shrink-0">
                       {wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Stop ${i}`)}
                     </span>
                   </div>
-                  
-                  <div className="text-xs leading-relaxed min-h-[50px] mb-3">
-                    {poiDetails[wp.name || `Punkt ${i + 1}`]?.loading ? (
+
+                  {/* Galeria: zdjęcia z Wikimedia Commons, przeklikiwane w bok */}
+                  {photos.length > 0 && (
+                    <div className="relative mb-2.5 rounded-lg overflow-hidden bg-slate-100 group">
+                      <img
+                        src={photos[idx]}
+                        alt={key}
+                        loading="lazy"
+                        className={`w-full object-cover transition-all duration-200 ${expanded ? 'h-48' : 'h-32'}`}
+                        onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                      />
+                      {photos.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Poprzednie zdjęcie"
+                            onClick={(e) => { e.stopPropagation(); movePhoto(-1); }}
+                            className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Następne zdjęcie"
+                            onClick={(e) => { e.stopPropagation(); movePhoto(1); }}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 hover:bg-black/70 text-white flex items-center justify-center transition-colors"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1.5">
+                            {photos.map((_, pi) => (
+                              <button
+                                key={pi}
+                                type="button"
+                                aria-label={`Zdjęcie ${pi + 1}`}
+                                onClick={(e) => { e.stopPropagation(); setPhotoIndex((prev) => ({ ...prev, [key]: pi })); }}
+                                className={`w-1.5 h-1.5 rounded-full transition-colors ${pi === idx ? 'bg-white' : 'bg-white/45'}`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="text-xs leading-relaxed mb-3">
+                    {details?.loading ? (
                       <div className="flex flex-col items-center justify-center py-4 text-emerald-600 font-semibold gap-2">
                         <Loader2 className="w-5 h-5 animate-spin" />
                         <span className="text-[10px] text-slate-400">Pobieram informacje z AI...</span>
                       </div>
-                    ) : poiDetails[wp.name || `Punkt ${i + 1}`] ? (
+                    ) : details ? (
                       <div className="space-y-2.5 animate-in fade-in duration-200">
-                        <p className="text-slate-600 font-medium">{poiDetails[wp.name || `Punkt ${i + 1}`].description}</p>
-                        {poiDetails[wp.name || `Punkt ${i + 1}`].recommendation && (
+                        {/* Zwinięta karta pokazuje zajawkę — pełny opis dopiero na życzenie */}
+                        <p className={`text-slate-600 font-medium m-0 ${expanded ? '' : 'line-clamp-3'}`}>
+                          {details.description}
+                        </p>
+                        {(details.description?.length > 150 || details.recommendation) && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setExpandedPoints((prev) => ({ ...prev, [key]: !expanded })); }}
+                            className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700"
+                          >
+                            {expanded ? <><ChevronUp className="w-3 h-3" /> Zwiń</> : <><ChevronDown className="w-3 h-3" /> Rozwiń</>}
+                          </button>
+                        )}
+                        {expanded && details.recommendation && (
                           <div className="bg-emerald-50/50 border border-emerald-100/70 rounded-lg p-2 flex items-start gap-1.5">
                             <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                             <div className="text-[11px] text-emerald-800 font-medium leading-normal m-0">
                               <strong className="text-emerald-950 block text-[10px] uppercase tracking-wider mb-0.5 font-bold">Wskazówka AI</strong>
-                              {poiDetails[wp.name || `Punkt ${i + 1}`].recommendation}
+                              {details.recommendation}
                             </div>
+                          </div>
+                        )}
+                        {expanded && photos.length === 0 && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                            <ImageIcon className="w-3 h-3" /> Brak zdjęć dla tego miejsca
                           </div>
                         )}
                       </div>
@@ -1101,6 +1234,8 @@ ${points}
                     </Button>
                   </div>
                 </div>
+                  );
+                })()}
               </Popup>
             </Marker>
           ))}

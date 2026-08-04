@@ -34,6 +34,7 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/chat-interview': { windowMs: 5 * 60_000, max: 20 },
   '/live-route': { windowMs: 5 * 60_000, max: 30 },
   '/point-details': { windowMs: 5 * 60_000, max: 60 },
+  '/points-details': { windowMs: 5 * 60_000, max: 20 },
   '/discover-places': { windowMs: 5 * 60_000, max: 20 },
   '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
   '/geocode-points': { windowMs: 5 * 60_000, max: 60 }
@@ -755,6 +756,112 @@ app.post('/geocode-points', async (c) => {
     return c.json({ points });
   } catch (err: any) {
     console.error('[geocode-points] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Zdjęcia miejsca z Wikimedia Commons po współrzędnych. Wikipedia daje jedno,
+ * a karta punktu ma pokazywać kilka do przeklikania.
+ */
+async function fetchNearbyPhotos(lat: number, lng: number, limit = 4): Promise<string[]> {
+  try {
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat}%7C${lng}` +
+      `&ggsradius=250&ggslimit=${limit + 4}&ggsnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0 (routemarket.io)' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) return [];
+    const data = await res.json() as any;
+    const pages = Object.values(data?.query?.pages || {}) as any[];
+    return pages
+      .map((p) => p?.imageinfo?.[0]?.thumburl)
+      .filter((u: string | undefined): u is string => !!u && /\.(jpg|jpeg|png)$/i.test(u.split('?')[0]))
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Opisy wszystkich punktów trasy naraz. Wcześniej każdy marker wołał Gemini
+ * osobno po kliknięciu — użytkownik czekał przy każdym punkcie, a koszt rósł
+ * liniowo z liczbą kliknięć. Jedno zapytanie na trasę jest szybsze i tańsze.
+ */
+app.post('/points-details', async (c) => {
+  try {
+    const { points } = await c.req.json() as { points: { name: string; lat?: number; lng?: number }[] };
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+    if (!Array.isArray(points) || points.length === 0) return c.json({ details: {} });
+
+    const list = points.slice(0, 20);
+    const prompt = `Jesteś przewodnikiem turystycznym. Dla każdego z poniższych miejsc napisz krótki opis i jedną praktyczną wskazówkę.
+
+Miejsca:
+${list.map((p, i) => `${i + 1}. ${p.name}${p.lat ? ` (${p.lat.toFixed(4)}, ${p.lng?.toFixed(4)})` : ''}`).join('\n')}
+
+Dla każdego zwróć obiekt z polami:
+- "name": nazwa DOKŁADNIE tak, jak podano wyżej
+- "description": 2-3 zdania, czym to miejsce jest i co w nim ciekawego. Konkrety, nie ogólniki.
+- "recommendation": jedno zdanie praktycznej wskazówki (co zobaczyć, kiedy przyjść, na co uważać)
+
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
+
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              places: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    recommendation: { type: 'string' }
+                  },
+                  required: ['name']
+                }
+              }
+            },
+            required: ['places']
+          },
+          maxOutputTokens: 8192
+        }
+      },
+      { operation: 'points-details', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+    );
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parsed = text ? JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) : { places: [] };
+
+    // Zdjęcia lecą równolegle — nie wydłużają odpowiedzi o sumę pojedynczych czasów
+    const photos = await Promise.all(
+      list.map((p) => (p.lat != null && p.lng != null ? fetchNearbyPhotos(p.lat, p.lng) : Promise.resolve([])))
+    );
+
+    const details: Record<string, any> = {};
+    list.forEach((p, i) => {
+      const found = (parsed.places || []).find((x: any) => x.name === p.name)
+        || (parsed.places || [])[i];
+      details[p.name] = {
+        description: found?.description || '',
+        recommendation: found?.recommendation || '',
+        photos: photos[i] || []
+      };
+    });
+
+    return c.json({ details });
+  } catch (err: any) {
+    console.error('[points-details] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });
