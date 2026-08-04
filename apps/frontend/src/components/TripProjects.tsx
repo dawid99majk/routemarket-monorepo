@@ -11,6 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format, parse, isValid } from 'date-fns';
+import { pl } from 'date-fns/locale';
 
 interface TripProject extends Partial<AxisValues> {
   id: string;
@@ -97,6 +101,12 @@ export default function TripProjects() {
   const [planning, setPlanning] = useState(false);
   const [plan, setPlan] = useState<any | null>(null);
   const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
+  // Data w formularzu zostaje stringiem 'yyyy-MM-dd' — kalendarz potrzebuje obiektu Date
+  const planDate = (() => {
+    if (!planForm.date) return undefined;
+    const d = parse(planForm.date, 'yyyy-MM-dd', new Date());
+    return isValid(d) ? d : undefined;
+  })();
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -937,9 +947,32 @@ export default function TripProjects() {
                     <Input type="time" value={planForm.end}
                       onChange={(e) => setPlanForm({ ...planForm, end: e.target.value })} className="mt-1" />
                   </label>
+                  {/* Natywny picker otwierał się w dół i chował się pod krawędzią okna —
+                      formularz siedzi na samym dole strony. Radix sam odwraca panel do góry,
+                      gdy pod spodem nie ma miejsca. */}
                   <label className="text-xs text-muted-foreground">Pierwszy dzień
-                    <Input type="date" value={planForm.date}
-                      onChange={(e) => setPlanForm({ ...planForm, date: e.target.value })} className="mt-1" />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="mt-1 w-full justify-start font-normal text-sm h-10"
+                        >
+                          <CalendarDays className="w-4 h-4 mr-2 text-emerald-600 shrink-0" />
+                          {planDate ? format(planDate, 'd MMMM yyyy', { locale: pl }) : 'Wybierz datę'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start" side="top" sideOffset={8} collisionPadding={16}>
+                        <Calendar
+                          mode="single"
+                          locale={pl}
+                          weekStartsOn={1}
+                          selected={planDate}
+                          defaultMonth={planDate}
+                          onSelect={(d) => d && setPlanForm({ ...planForm, date: format(d, 'yyyy-MM-dd') })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </label>
                   <label className="text-xs text-muted-foreground">Kolacja o
                     <Input type="time" value={planForm.dinner}
