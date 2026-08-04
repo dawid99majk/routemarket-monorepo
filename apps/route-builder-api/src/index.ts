@@ -585,6 +585,7 @@ ZASADY:
 6. TABLICA TO INSPIRACJA, NIE RAMA. Użytkownik mógł przypiąć jedno miejsce i oczekuje, że resztę dnia ZAPROPONUJESZ TY. Wypełnij wolny czas konkretnymi miejscami z listy powyżej, dobranymi do jego preferencji i leżącymi blisko kotwic tego dnia. W polu "source" wpisz "pinned" dla miejsc przypiętych przez użytkownika i "suggested" dla Twoich propozycji, żeby wiedział, co jest czyje.
    Gdy w okolicy naprawdę nie ma czego dodać, dopiero wtedy zaproponuj nazwany spacer ("spacer po Starym Mieście: Rynek, Katharinenstraße"). Samo "czas wolny" jest zawsze błędem.
 7. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
+   "not_scheduled" DOTYCZY WYŁĄCZNIE MIEJSC Z TABLICY UŻYTKOWNIKA. Twoich niewykorzystanych propozycji NIE WYPISUJ TAM — użytkownik ich nie wybierał i nie interesuje go, że nie weszły. Lista propozycji to Twoja pula do wypełniania dnia, nie zobowiązanie.
 8. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
 9. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
 
@@ -660,6 +661,16 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
       console.error(`[plan-trip] Niepoprawny JSON (${text.length} zn., finishReason=${finish}). Początek: ${text.slice(0, 220)}`);
       throw new Error(`Planer zwrócił niekompletną odpowiedź (${finish || 'nieznany powód'}). Spróbuj ponownie lub zmniejsz liczbę miejsc.`);
     }
+
+    // "Nie zmieściło się" ma mówić o tym, co użytkownik przypiął. Model dostaje
+    // pulę kilkudziesięciu propozycji do wypełniania dnia i raportował każdą
+    // niewykorzystaną — plan na 4 miejsca kończył się listą 35 "pominiętych"
+    // pomników i barów, których nikt nie wybierał.
+    const pinnedNames = new Set(body.places.map((p) => p.name.trim().toLowerCase()));
+    plan.not_scheduled = (plan.not_scheduled || [])
+      .filter((n: any) => n?.name && pinnedNames.has(String(n.name).trim().toLowerCase()))
+      .filter((n: any, i: number, arr: any[]) =>
+        arr.findIndex((x) => String(x.name).trim().toLowerCase() === String(n.name).trim().toLowerCase()) === i);
 
     // Daty i nazwy dni dokładamy po stronie serwera, żeby nie zależały od modelu
     plan.days = (plan.days || []).map((d: any) => {
