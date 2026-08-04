@@ -248,8 +248,10 @@ export default function InterviewOverlay({
               <label className="text-white/50 text-xs uppercase tracking-wider font-semibold">
                 Jak nazwać tę trasę?
               </label>
+              {/* Domyślne "Nowa Trasa AI" to wartość techniczna, nie propozycja —
+                  w polu wyglądałaby jak nazwa, którą ktoś świadomie wybrał. */}
               <input
-                value={title}
+                value={title === 'Nowa Trasa AI' ? '' : title}
                 onChange={(e) => onTitleChange(e.target.value)}
                 placeholder="np. Durrës z dziećmi"
                 className="mt-2 w-full bg-white/10 border border-white/15 rounded-xl px-4 py-3

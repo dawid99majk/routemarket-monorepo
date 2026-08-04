@@ -923,7 +923,13 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                           const url = URL.createObjectURL(blob);
                           const a = document.createElement('a');
                           a.href = url;
-                          a.download = 'trasa_routemarket.gpx';
+                          // Każde pobranie nazywało się tak samo, więc przeglądarka
+                          // dopisywała "(1)", "(2)" — a w nawigacji łatwo było otworzyć
+                          // plik sprzed tygodnia, myśląc że to świeża trasa.
+                          const slug = (context.title || 'trasa')
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                            .replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'trasa';
+                          a.download = `${slug}-${new Date().toISOString().slice(0, 10)}.gpx`;
                           a.click();
                           URL.revokeObjectURL(url);
                         }}

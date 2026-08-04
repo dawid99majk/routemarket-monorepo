@@ -60,7 +60,11 @@ export default function MyRoutes() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(project.requirements?.title || 'trasa').replace(/[^\w-]+/g, '_')}.gpx`;
+    // Data w nazwie: bez niej kolejne pobrania tej samej trasy nie do odróżnienia
+    const slug = (project.requirements?.title || 'trasa')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50) || 'trasa';
+    a.download = `${slug}-${new Date().toISOString().slice(0, 10)}.gpx`;
     a.click();
     URL.revokeObjectURL(url);
   };

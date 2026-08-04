@@ -590,8 +590,6 @@ ZASADY:
 8. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
 9. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
 
-NAZWA TRASY: w KAŻDEJ turze zwróć "suggested_title" — krótką nazwę oddającą to, o co prosi użytkownik: miejsce plus charakter, 2-5 słów, bez cudzysłowów i bez słowa "trasa" na siłę. Dla "chcę coś dla dzieci w Durrës" to np. "Durrës z dziećmi", dla przejażdżki po Beskidach "Pętla beskidzka na motocykl". Aktualizuj ją, gdy rozmowa doprecyzuje charakter wyjazdu. Nigdy nie zostawiaj jej pustej.
-
 ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
 
 Odpowiedz WYŁĄCZNIE obiektem JSON.`;
@@ -1493,12 +1491,18 @@ Dla TRASY LINIOWEJ (loop: false):
 Oto historia czatu:
 ${conversationText}
 
+NAZWA TRASY — POLE OBOWIĄZKOWE W KAŻDEJ ODPOWIEDZI:
+Do każdego obiektu JSON dokładaj "suggested_title": krótką nazwę oddającą to, o co prosi użytkownik — miejsce plus charakter, 2-5 słów, bez cudzysłowów i bez doklejania słowa "trasa" na siłę.
+Dla "chcę coś dla dzieci w Durrës" → "Durrës z dziećmi". Dla przejażdżki po Beskidach → "Pętla beskidzka na motocykl". Dla wieczornego spaceru w Krakowie → "Kraków wieczorem".
+Aktualizuj ją, gdy rozmowa doprecyzuje charakter wyjazdu. Nigdy nie zostawiaj jej pustej ani nie pomijaj.
+
 Odpowiedz WYŁĄCZNIE W FORMACIE JSON (bez markdown, czysty JSON):
 
 Przykład 1 — FAZA "discovery": otwierasz rozeznaniem i pytasz o strukturę wyjazdu:
 {
   "done": false,
   "phase": "discovery",
+  "suggested_title": "Karkonosze w 2 dni",
   "reply": "Szklarska Poręba to świetna baza — w 2 dni masz w zasięgu główny grzbiet Karkonoszy ze Śnieżką albo spokojniejsze Góry Izerskie. Najpierw jedna rzecz, bo przesądza kształt trasy: nocujesz w Szklarskiej, czy śpisz na trasie?",
   "options": [
     {
