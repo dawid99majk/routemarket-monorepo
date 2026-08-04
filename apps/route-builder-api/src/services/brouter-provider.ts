@@ -1,8 +1,11 @@
+import { readFile } from 'node:fs/promises';
 /**
  * BRouter (brouter.de) — darmowy routing OSM bez limitu punktów pośrednich,
  * z profilami zoptymalizowanymi pod szlaki piesze i rowerowe (w przeciwieństwie
  * do "najkrótszej drogi" z darmowego GraphHoppera).
  */
+
+const USER_AGENT = 'RouteMarketBuilderV3/1.0 (routemarket.io)';
 
 export interface BRouterWaypoint {
   lat: number;
@@ -21,6 +24,46 @@ export interface BRouterResult {
 
 const BROUTER_BASE_URL = process.env.BROUTER_BASE_URL || 'https://brouter.de/brouter';
 
+/**
+ * Motocykl to jedyny typ trasy, dla którego żaden gotowy profil BRoutera nie
+ * pasuje: wszystkie samochodowe minimalizują czas, więc prowadzą krajową zamiast
+ * wojewódzką przez przełęcz. Własny profil (car-eco + kara za klasę drogi)
+ * wgrywamy na serwer przy pierwszym użyciu i trzymamy zwrócony identyfikator.
+ * BRouter kasuje wgrane profile po pewnym czasie, więc przy odmowie wgrywamy
+ * ponownie, zamiast raz na zawsze uznać motocykl za zepsuty.
+ */
+const MOTO_PROFILE_FILE = new URL('../../profiles/moto-twisty.brf', import.meta.url);
+let motoProfileId: string | null = null;
+let motoProfilePromise: Promise<string> | null = null;
+
+async function uploadMotoProfile(): Promise<string> {
+  const body = await readFile(MOTO_PROFILE_FILE, 'utf8');
+  const res = await fetch(`${BROUTER_BASE_URL}/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', 'User-Agent': USER_AGENT },
+    body,
+    signal: AbortSignal.timeout(20000)
+  });
+  const data = await res.json() as { profileid?: string; error?: string };
+  if (!res.ok || data.error || !data.profileid) {
+    throw new Error(`BRouter profile upload failed: ${data.error || res.status}`);
+  }
+  console.log(`[BRouter] Profil motocyklowy wgrany jako ${data.profileid}`);
+  return data.profileid;
+}
+
+/** Jedno wgranie na proces — równoległe trasy nie mnożą kopii profilu na serwerze. */
+async function getMotoProfileId(force = false): Promise<string> {
+  if (force) { motoProfileId = null; motoProfilePromise = null; }
+  if (motoProfileId) return motoProfileId;
+  if (!motoProfilePromise) {
+    motoProfilePromise = uploadMotoProfile()
+      .then((id) => { motoProfileId = id; return id; })
+      .catch((err) => { motoProfilePromise = null; throw err; });
+  }
+  return motoProfilePromise;
+}
+
 // Mapowanie typów tras aplikacji na profile BRouter
 const PROFILE_MAP: Record<string, string> = {
   hiking: 'hiking-mountain',
@@ -30,7 +73,8 @@ const PROFILE_MAP: Record<string, string> = {
   road: 'fastbike',
   gravel: 'trekking',
   mtb: 'trekking',
-  bicycle: 'trekking'
+  bicycle: 'trekking',
+  motorcycle: 'moto-twisty'
 };
 
 // Awaryjne profile, gdyby serwer nie znał podstawowego
@@ -50,6 +94,16 @@ export class BRouterProvider {
     }
 
     const profile = PROFILE_MAP[routeType] || 'trekking';
+
+    if (profile === 'moto-twisty') {
+      try {
+        return await this.request(waypoints, await getMotoProfileId());
+      } catch (err: any) {
+        console.warn(`[BRouter] Profil motocyklowy odrzucony (${err.message}) — wgrywam ponownie.`);
+        return await this.request(waypoints, await getMotoProfileId(true));
+      }
+    }
+
     try {
       return await this.request(waypoints, profile);
     } catch (err: any) {
@@ -67,7 +121,7 @@ export class BRouterProvider {
     const url = `${BROUTER_BASE_URL}?lonlats=${lonlats}&profile=${profile}&alternativeidx=0&format=geojson`;
 
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0 (routemarket.io)' },
+      headers: { 'User-Agent': USER_AGENT },
       signal: AbortSignal.timeout(45000)
     });
     const text = await res.text();

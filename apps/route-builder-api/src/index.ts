@@ -777,28 +777,87 @@ function pointCacheKey(name: string, lat?: number, lng?: number): string {
   return `${name.toLowerCase()}|${lat?.toFixed(3) ?? '-'}|${lng?.toFixed(3) ?? '-'}`;
 }
 
+const COMMONS_UA = 'RouteMarket/1.0 (+https://routemarket.io)';
+
+/** Pliki, które nigdy nie są zdjęciem miejsca: herby, flagi, mapy, schematy. */
+const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite)/i;
+
 /**
- * Zdjęcia miejsca z Wikimedia Commons po współrzędnych. Wikipedia daje jedno,
- * a karta punktu ma pokazywać kilka do przeklikania.
+ * Słowa, które same z siebie nie identyfikują miejsca. Nazwa złożona wyłącznie
+ * z nich ("Sandy beach", "Stary rynek") pasuje w Commons do czegokolwiek na
+ * świecie, więc takiego trafienia nie wolno przyjąć bez potwierdzenia położeniem.
  */
-async function fetchNearbyPhotos(lat: number, lng: number, limit = 4): Promise<string[]> {
-  try {
-    const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat}%7C${lng}` +
-      `&ggsradius=250&ggslimit=${limit + 4}&ggsnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=800&format=json&origin=*`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'RouteMarketBuilderV3/1.0 (routemarket.io)' },
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as any;
-    const pages = Object.values(data?.query?.pages || {}) as any[];
-    return pages
-      .map((p) => p?.imageinfo?.[0]?.thumburl)
-      .filter((u: string | undefined): u is string => !!u && /\.(jpg|jpeg|png)$/i.test(u.split('?')[0]))
-      .slice(0, limit);
-  } catch {
-    return [];
-  }
+const GENERIC_PLACE_WORD = /^(sandy|beach|plaza|rynek|market|square|castle|church|museum|garden|view|old|new|town|city|centre|center|street|bridge|lake|river|hill|park|porto|grill|restaurant|cafe|hotel|zamek|kościół|kosciol|muzeum|stare|stary|nowe|nowy|miasto|ulica|most|jezioro|rzeka|plaża|plaza)$/i;
+
+function distinctiveTokens(name: string): string[] {
+  return (name || '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((t) => t.length >= 5 && !GENERIC_PLACE_WORD.test(t));
+}
+
+function kmApart(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const dLat = (a.lat - b.lat) * 111;
+  const dLng = (a.lng - b.lng) * 111 * Math.cos((a.lat * Math.PI) / 180);
+  return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
+async function commonsQuery(params: Record<string, string>): Promise<any[]> {
+  const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({ format: 'json', ...params });
+  const res = await fetch(url, {
+    headers: { 'User-Agent': COMMONS_UA },
+    signal: AbortSignal.timeout(9000)
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as any;
+  return Object.values(data?.query?.pages || {});
+}
+
+function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null, nameTokens: string[] | null): string[] {
+  return pages
+    .sort((a, b) => (a.index ?? 99) - (b.index ?? 99))
+    .filter((p) => !PHOTO_JUNK.test(p.title || ''))
+    .filter((p) => {
+      const c = p.coordinates?.[0];
+      if (c) return !origin || kmApart(origin, { lat: c.lat, lng: c.lon }) < 25;
+      // Plik bez geotagu przyjmujemy tylko wtedy, gdy w tytule siedzi wyróżniające
+      // słowo z nazwy miejsca — inaczej "Sandy beach" zwracało pirogę na Karaibach,
+      // a dobre zdjęcia zamku w Durrës geotagu po prostu nie mają.
+      if (!nameTokens) return true;
+      const title = String(p.title || '').toLowerCase();
+      return nameTokens.some((t) => title.includes(t.toLowerCase()));
+    })
+    .map((p) => p.imageinfo?.[0]?.thumburl)
+    .filter((u: string | undefined): u is string => !!u && /\.(jpg|jpeg|png)$/i.test(u.split('?')[0]));
+}
+
+/**
+ * Zdjęcia miejsca z Wikimedia Commons. Samo szukanie po współrzędnych łapało
+ * cokolwiek w promieniu 250 m — przy opisie amfiteatru pokazywało sąsiedni mur.
+ * Dlatego najpierw pytamy o nazwę (to daje zdjęcia właściwego obiektu), a dopiero
+ * potem uzupełniamy tym, co leży obok.
+ */
+async function fetchNearbyPhotos(name: string, lat?: number, lng?: number, limit = 4): Promise<string[]> {
+  const origin = lat != null && lng != null ? { lat, lng } : null;
+  const tokens = distinctiveTokens(name);
+
+  const [byName, byGeo] = await Promise.all([
+    tokens.length > 0
+      ? commonsQuery({
+          action: 'query', generator: 'search', gsrsearch: name, gsrnamespace: '6',
+          gsrlimit: String(limit + 4), prop: 'imageinfo|coordinates',
+          iiprop: 'url', iiurlwidth: '800'
+        }).then((p) => usablePhotos(p, origin, tokens)).catch(() => [])
+      : Promise.resolve([]),
+    origin
+      ? commonsQuery({
+          action: 'query', generator: 'geosearch', ggscoord: `${lat}|${lng}`,
+          ggsradius: '250', ggslimit: String(limit + 4), ggsnamespace: '6',
+          prop: 'imageinfo', iiprop: 'url', iiurlwidth: '800'
+        }).then((p) => usablePhotos(p, null, null)).catch(() => [])
+      : Promise.resolve([])
+  ]);
+
+  return [...new Set([...byName, ...byGeo])].slice(0, limit);
 }
 
 /**
@@ -877,7 +936,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
     // Zdjęcia lecą równolegle — nie wydłużają odpowiedzi o sumę pojedynczych czasów
     const photos = await Promise.all(
-      list.map((p) => (p.lat != null && p.lng != null ? fetchNearbyPhotos(p.lat, p.lng) : Promise.resolve([])))
+      list.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng))
     );
 
     list.forEach((p, i) => {
@@ -966,7 +1025,7 @@ Nie dodawaj żadnych tagów markdown, po prostu czysty obiekt JSON, np.:
       const resultObj = JSON.parse(cleanText);
       // Ta sama galeria co w wariancie zbiorczym — inaczej punkt dociągnięty
       // kliknięciem (gdy batch padnie) zostawał bez zdjęć
-      resultObj.photos = (lat != null && lng != null) ? await fetchNearbyPhotos(lat, lng) : [];
+      resultObj.photos = await fetchNearbyPhotos(name, lat, lng);
       if (pointDetailsCache.size >= POINT_DETAILS_MAX) {
         const oldest = pointDetailsCache.keys().next().value;
         if (oldest !== undefined) pointDetailsCache.delete(oldest);

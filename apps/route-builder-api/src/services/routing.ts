@@ -45,6 +45,26 @@ export class RoutingService {
     };
     const profile = profileMap[routeType] || 'bike';
 
+    // Motocykl: najpierw BRouter z własnym profilem. Google z avoidHighways tylko
+    // omija autostrady — dalej prowadzi krajową, bo liczy czas. Kręta wojewódzka
+    // przez przełęcz wymaga kary za klasę drogi, a tę da się wyrazić wyłącznie
+    // w profilu BRoutera. Na testowym odcinku w Beskidach: 36 km/47 min główną
+    // drogą kontra 48 km/66 min trasą widokową.
+    if (routeType === 'motorcycle') {
+      try {
+        const result = await brouterProvider.getRoute(optimizedPlaces, routeType);
+        return {
+          distance_km: result.distanceKm,
+          duration_h: result.estimatedTimeH,
+          trackPoints: result.points.map(p => [p.lat, p.lng, p.ele || 0]),
+          geometry: result.geometryGeoJson,
+          waypoints: optimizedPlaces
+        };
+      } catch (err: any) {
+        console.warn(`[Routing] Profil motocyklowy BRoutera zawiódł, przechodzę na Google: ${err.message}`);
+      }
+    }
+
     // PRIMARY: Google Maps for car and motorcycle.
     // Motocykl: unikamy autostrad/ekspresówek — motocyklista chce krętych, malowniczych dróg.
     if (routeType === 'car' || routeType === 'motorcycle') {
