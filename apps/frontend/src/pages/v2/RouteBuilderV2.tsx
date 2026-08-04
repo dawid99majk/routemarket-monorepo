@@ -505,26 +505,6 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     send({ type: 'REMOVE_WAYPOINT', index });
   };
 
-  const generateGpxString = (coords: number[][], title: string = 'Trasa RouteMarket') => {
-    const points = coords.map(([lng, lat, ele]) => {
-      const eleTag = ele !== undefined ? `\n        <ele>${ele.toFixed(1)}</ele>` : '';
-      return `      <trkpt lat="${lat}" lon="${lng}">${eleTag}\n      </trkpt>`;
-    }).join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="RouteMarket" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>${title}</name>
-    <trkseg>
-${points}
-    </trkseg>
-  </trk>
-</gpx>`;
-  };
-
-  
-
-  
-
   const calculateLiveRoute = async () => {
     send({ type: 'CALCULATE_ROUTE' });
   };

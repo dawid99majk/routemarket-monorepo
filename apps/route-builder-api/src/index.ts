@@ -772,6 +772,11 @@ app.post('/geocode-points', async (c) => {
 });
 
 
+/** Wspólny klucz dla obu wariantów opisu punktu — bez tego cache się nie widzą. */
+function pointCacheKey(name: string, lat?: number, lng?: number): string {
+  return `${name.toLowerCase()}|${lat?.toFixed(3) ?? '-'}|${lng?.toFixed(3) ?? '-'}`;
+}
+
 /**
  * Zdjęcia miejsca z Wikimedia Commons po współrzędnych. Wikipedia daje jedno,
  * a karta punktu ma pokazywać kilka do przeklikania.
@@ -808,7 +813,23 @@ app.post('/points-details', async (c) => {
     if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
     if (!Array.isArray(points) || points.length === 0) return c.json({ details: {} });
 
-    const list = points.slice(0, 20);
+    const all = points.slice(0, 20);
+
+    // Ten sam wariant odpala się teraz po każdej wygenerowanej trasie, a klasyki
+    // regionu powtarzają się między trasami — bez wspólnego cache'u opisywaliśmy
+    // Wawel od nowa przy każdym przeliczeniu.
+    const details: Record<string, any> = {};
+    const list: typeof all = [];
+    for (const p of all) {
+      const hit = pointDetailsCache.get(pointCacheKey(p.name, p.lat, p.lng));
+      if (hit && Date.now() - hit.at < POINT_DETAILS_TTL_MS) details[p.name] = hit.data;
+      else list.push(p);
+    }
+    if (list.length === 0) {
+      console.log(`[points-details] ${all.length} pkt w całości z cache'u`);
+      return c.json({ details });
+    }
+
     const prompt = `Jesteś przewodnikiem turystycznym. Dla każdego z poniższych miejsc napisz krótki opis i jedną praktyczną wskazówkę.
 
 Miejsca:
@@ -859,18 +880,23 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
       list.map((p) => (p.lat != null && p.lng != null ? fetchNearbyPhotos(p.lat, p.lng) : Promise.resolve([])))
     );
 
-    const details: Record<string, any> = {};
     list.forEach((p, i) => {
       const found = (parsed.places || []).find((x: any) => x.name === p.name)
         || (parsed.places || [])[i];
-      details[p.name] = {
+      const entry = {
         description: found?.description || '',
         recommendation: found?.recommendation || '',
         photos: photos[i] || []
       };
+      details[p.name] = entry;
+      if (pointDetailsCache.size >= POINT_DETAILS_MAX) {
+        const oldest = pointDetailsCache.keys().next().value;
+        if (oldest !== undefined) pointDetailsCache.delete(oldest);
+      }
+      pointDetailsCache.set(pointCacheKey(p.name, p.lat, p.lng), { at: Date.now(), data: entry });
     });
 
-    console.log(`[points-details] ${list.length} pkt, zdjęcia: ${list.map((p, i) => `${p.name}=${photos[i]?.length ?? 0}`).join(', ')}`);
+    console.log(`[points-details] ${list.length} z ${all.length} pkt z modelu, zdjęcia: ${list.map((p, i) => `${p.name}=${photos[i]?.length ?? 0}`).join(', ')}`);
     return c.json({ details });
   } catch (err: any) {
     console.error('[points-details] Error:', err);
@@ -907,7 +933,7 @@ app.post('/point-details', async (c) => {
       throw new Error("Missing GEMINI_API_KEY");
     }
 
-    const cacheKey = `${name.toLowerCase()}|${lat?.toFixed(3) ?? '-'}|${lng?.toFixed(3) ?? '-'}`;
+    const cacheKey = pointCacheKey(name, lat, lng);
     const cached = pointDetailsCache.get(cacheKey);
     if (cached && Date.now() - cached.at < POINT_DETAILS_TTL_MS) {
       return c.json(cached.data);

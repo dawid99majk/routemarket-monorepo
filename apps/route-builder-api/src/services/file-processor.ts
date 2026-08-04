@@ -1,4 +1,5 @@
 import { repo } from '../db/repository.js';
+import { callGeminiTracked } from './ai-usage.js';
 
 export class FileProcessorService {
   async processFile(projectId: string, fileName: string, fileContent: Buffer, contentType: string) {
@@ -53,10 +54,9 @@ export class FileProcessorService {
         ? "Jesteś ekspertem GIS. Wyodrębnij z tego pliku PDF wszystkie nazwy miejscowości, szczytów, schronisk, szlaków oraz opis przebiegu trasy. Zwróć tylko czysty tekst notatek."
         : "Jesteś ekspertem GIS. Zrób OCR tego zdjęcia. Wyodrębnij nazwy geograficzne, drogowskazy, opisy szlaków lub mapy. Zwróć tylko wyodrębniony tekst.";
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await callGeminiTracked(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
           contents: [{
             parts: [
               { text: prompt },
@@ -68,11 +68,9 @@ export class FileProcessorService {
               }
             ]
           }]
-        })
-      });
-
-      if (!response.ok) throw new Error(`Gemini Multimodal Error: ${response.status}`);
-      const data = await response.json() as any;
+        },
+        { operation: 'file-extract', model: 'gemini-2.0-flash' }
+      );
       return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (err: any) {
       console.error('Multimodal extraction failed:', err);

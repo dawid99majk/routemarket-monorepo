@@ -1,5 +1,6 @@
 import { RouteResult } from './routing.js';
 import { RouteRequirements } from '../types/index.js';
+import { callGeminiTracked } from './ai-usage.js';
 
 export interface ReportOutput {
   text: string;
@@ -42,24 +43,19 @@ Przykład, gdy nie podano lokalizacji:
   "duration_pref": "short"
 }`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        // Ekstrakcja założeń szła obok licznika — raport potrafi być najdroższą
+        // operacją w aplikacji, a w koszcie w ogóle się nie pojawiał.
+        const data = await callGeminiTracked(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
           },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: prompt }]
-            }],
-            generationConfig: {
-              responseMimeType: "application/json"
-            }
-          })
-        });
+          { operation: 'report-extract', model: 'gemini-2.5-flash' }
+        );
 
-        if (response.ok) {
-          const data = (await response.json()) as any;
-          const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        {
           if (generatedText) {
             const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleanText);
@@ -73,8 +69,6 @@ Przykład, gdy nie podano lokalizacji:
               };
             }
           }
-        } else {
-          console.warn(`[ReportService] Gemini API extraction failed with status: ${response.status}`);
         }
       } catch (error) {
         console.error('[ReportService] Error extracting locations via Gemini, falling back:', error);
@@ -141,26 +135,14 @@ ZASADY:
    - ## Wskazówki sezonowe i bezpieczeństwo
 4. Dodaj przypisy/odnośniki do znalezionych źródeł, jeśli to możliwe.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const data = await callGeminiTracked(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ googleSearch: {} }]
           },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: prompt }]
-            }],
-            tools: [{
-              googleSearch: {}
-            }]
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = (await response.json()) as any;
+          { operation: 'report-guide', model: 'gemini-2.5-flash' }
+        );
         const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         
         // Parse Grounding Metadata

@@ -1,5 +1,6 @@
 import { repo } from '../db/repository.js';
 import { RouteRequirements } from '../types/index.js';
+import { callGeminiTracked } from './ai-usage.js';
 
 export interface Claim {
   id: string;
@@ -68,17 +69,14 @@ Zwróć JSON z polami:
 
 Bądź bardzo krytyczny i precyzyjny. Nie zmyślaj danych.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await callGeminiTracked(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { response_mime_type: "application/json" }
-        })
-      });
-
-      if (!response.ok) throw new Error(`Gemini Analysis Error: ${response.status}`);
-      const data = await response.json() as any;
+        },
+        { operation: 'analysis-claims', model: 'gemini-2.0-flash' }
+      );
       const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text) as ExtractedClaims;
 
       // Add IDs and verification status to claims
