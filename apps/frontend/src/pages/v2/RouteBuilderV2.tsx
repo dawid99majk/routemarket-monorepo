@@ -599,6 +599,7 @@ ${points}
           busyLabel={busyLabel}
           errorMessage={hasError ? context.errorMessage : null}
           onRetry={retryLastAction}
+          onTripCharacterChange={(label) => setField('tripProfile', { ...context.tripProfile, charakter: label })}
           vehicleType={vehicleType}
           routingPreference={routingPreference}
           onVehicleChange={handleVehicleChange}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { TRIP_PRESETS } from '@/lib/tripPresets';
 import remarkGfm from 'remark-gfm';
 import { AlertTriangle, Bike, Building2, Car, Check, ChevronRight, Footprints, MapPin, Mountain, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ interface InterviewOverlayProps {
   routingPreference: string;
   onVehicleChange: (type: string) => void;
   onRoutingPreferenceChange: (pref: 'popular' | 'wild') => void;
+  onTripCharacterChange: (label: string) => void;
   onChoose: (option: RouteOption) => void;
   onSend: (text: string) => void;
   onRewind: (phase: string) => void;
@@ -52,6 +54,7 @@ export default function InterviewOverlay({
   routingPreference,
   onVehicleChange,
   onRoutingPreferenceChange,
+  onTripCharacterChange,
   onChoose,
   onSend,
   onRewind,
@@ -207,6 +210,27 @@ export default function InterviewOverlay({
                   >
                     <Icon className="w-4 h-4" />
                     {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Charakter wyjazdu jak w planach — delegacja potrzebuje czego innego
+                  niż weekend z dziećmi, a agent bez tego pyta o to samo od zera. */}
+              <p className="mt-7 text-white/50 text-xs uppercase tracking-wider font-semibold">Charakter wyjazdu</p>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {TRIP_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    title={preset.hint}
+                    onClick={() => onTripCharacterChange(preset.label)}
+                    className={`rounded-full px-4 py-2.5 text-sm transition-all border ${
+                      tripProfile?.charakter === preset.label
+                        ? 'bg-white/25 border-white/40 text-white font-medium'
+                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/15'
+                    }`}
+                  >
+                    {preset.label}
                   </button>
                 ))}
               </div>

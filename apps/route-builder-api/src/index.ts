@@ -1523,8 +1523,13 @@ Przykład 5 — użytkownik zatwierdził → generujesz trasę (done: true):
     let directResult: any = null;
     try {
       const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      if (stripped.startsWith('{')) {
-        const parsed = JSON.parse(stripped);
+      // Model z Google Search lubi poprzedzić obiekt zdaniem wstępu ("Witaj! Punkt
+      // startu jest doskonały..."). Sam startsWith('{') odrzucał wtedy poprawny
+      // JSON i spychał rozmowę do konwersji, która potrafiła urwać się w połowie.
+      const firstBrace = stripped.indexOf('{');
+      const lastBrace = stripped.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        const parsed = JSON.parse(stripped.slice(firstBrace, lastBrace + 1));
         if (parsed && typeof parsed.reply === 'string') {
           directResult = parsed;
           console.log('[chat-interview] Stage 1 output parsed directly, skipping conversion pass.');
@@ -1568,9 +1573,10 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
             // kartach wyboru swobodne generowanie JSON-a potrafiło zwrócić składnię
             // nie do sparsowania i wywalić całą rozmowę.
             responseSchema: CHAT_RESPONSE_SCHEMA,
-            // Twardy limit: bez niego model potrafił wpaść w pętlę i wygenerować
-            // 138 tys. znaków uciętych w połowie.
-            maxOutputTokens: 8192
+            // Limit chroni przed pętlą generowania, ale 8192 nie mieściło tury
+            // z dwoma wariantami trasy w kartach — JSON urywał się w połowie
+            // stringa i wywalał całą rozmowę.
+            maxOutputTokens: 24576
           }
         })
       });
@@ -1581,12 +1587,35 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
 
       const jsonData = await jsonResponse.json() as any;
       generatedText = jsonData.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      const finish = jsonData.candidates?.[0]?.finishReason;
+      if (finish && finish !== 'STOP') {
+        console.warn(`[chat-interview] Konwersja niekompletna, finishReason=${finish}, długość=${generatedText?.length ?? 0}`);
+      }
     }
 
     if (directResult || generatedText) {
-      const resultObj = directResult
-        ? directResult
-        : JSON.parse((generatedText as string).replace(/```json/g, '').replace(/```/g, '').trim());
+      let resultObj: any;
+      if (directResult) {
+        resultObj = directResult;
+      } else {
+        // Urwana odpowiedź kończyła się błędem 500 i pustym ekranem — rozmowa
+        // umierała bez śladu. Lepiej oddać treść z etapu 1 i pozwolić pytać dalej.
+        const cleaned = (generatedText as string).replace(/```json/g, '').replace(/```/g, '').trim();
+        try {
+          resultObj = JSON.parse(cleaned);
+        } catch (parseErr: any) {
+          console.error(`[chat-interview] Niepoprawny JSON konwersji (${cleaned.length} zn.): ${parseErr.message}`);
+          resultObj = {
+            done: false,
+            phase: 'discovery',
+            reply: rawText.trim()
+              ? rawText.replace(/```json[\s\S]*$/i, '').trim()
+              : 'Coś mi się urwało po drodze. Powtórz proszę ostatnią wiadomość albo doprecyzuj, czego szukasz.',
+            options: [],
+            allow_custom: true
+          };
+        }
+      }
       
       // Zapowiedź gotowej trasy bez listy punktów kończyła się komunikatem o sukcesie
       // i pustą mapą — w takim wypadku dogenerowujemy samą listę.

@@ -150,7 +150,7 @@ export default function TripProjects() {
     (async () => {
       const { data } = await (supabase as any)
         .from('trip_project_places')
-        .select('id, name, category, priority, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
         .eq('project_id', activeId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
@@ -235,7 +235,7 @@ export default function TripProjects() {
         image_url: place.image_url,
         wiki_extract: place.wiki_extract
       })
-      .select('id, name, category, priority, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
       .single();
     if (error) return toast.error(error.message);
     setPlaces((prev) => [...prev, data]);
@@ -488,7 +488,7 @@ export default function TripProjects() {
         description: item.note || '',
         source: 'plan'
       })
-      .select('id, name, category, priority, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
       .single();
     if (error) return toast.error(error.message);
     setPlaces((prev) => [...prev, data]);

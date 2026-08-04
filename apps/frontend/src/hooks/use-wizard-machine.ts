@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { wizardMachine, WizardContext } from '@routemarket/atlas-workflow/wizard-machine';
+import { TRIP_PRESETS, mergePreferences } from '@/lib/tripPresets';
 import { fromPromise } from 'xstate';
 
 function generateGpxString(coordinates: number[][], title: string): string {
@@ -79,7 +80,12 @@ export function useWizardMachine(initialProjectId: string | null = null) {
             bike_subtype: input.context.bikeSubtype,
             routing_preference: input.context.routingPreference,
             trip_profile: input.context.tripProfile,
-            creator_preferences: preferencesRef.current
+            // Charakter wyjazdu nadpisuje osie z profilu — ten sam człowiek na
+            // delegacji chce czego innego niż na urlopie z dziećmi
+            creator_preferences: mergePreferences(
+              preferencesRef.current,
+              TRIP_PRESETS.find((p) => p.label === input.context.tripProfile?.charakter)?.axes
+            )
           });
           return {
             message: data.reply || data.message || data.text,
