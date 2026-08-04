@@ -52,6 +52,7 @@ const CHAT_RESPONSE_SCHEMA = {
     done: { type: 'boolean' },
     phase: { type: 'string', enum: ['start_point', 'discovery', 'variant_choice', 'refine', 'confirm', 'generate'] },
     reply: { type: 'string' },
+    suggested_title: { type: 'string' },
     allow_custom: { type: 'boolean' },
     options: {
       type: 'array',
@@ -588,6 +589,8 @@ ZASADY:
    "not_scheduled" DOTYCZY WYŁĄCZNIE MIEJSC Z TABLICY UŻYTKOWNIKA. Twoich niewykorzystanych propozycji NIE WYPISUJ TAM — użytkownik ich nie wybierał i nie interesuje go, że nie weszły. Lista propozycji to Twoja pula do wypełniania dnia, nie zobowiązanie.
 8. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
 9. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
+
+NAZWA TRASY: w KAŻDEJ turze zwróć "suggested_title" — krótką nazwę oddającą to, o co prosi użytkownik: miejsce plus charakter, 2-5 słów, bez cudzysłowów i bez słowa "trasa" na siłę. Dla "chcę coś dla dzieci w Durrës" to np. "Durrës z dziećmi", dla przejażdżki po Beskidach "Pętla beskidzka na motocykl". Aktualizuj ją, gdy rozmowa doprecyzuje charakter wyjazdu. Nigdy nie zostawiaj jej pustej.
 
 ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
 
@@ -1635,6 +1638,7 @@ Zwroc DOKLADNIE obiekt JSON z polami:
 - "done": boolean (true jesli agent zakonczyl zbieranie danych i podaje trase, false jesli jeszcze pyta)
 - "phase": string (jedna z: start_point, discovery, variant_choice, refine, confirm, generate)
 - "reply": string (odpowiedz agenta po polsku)
+- "suggested_title": string (krotka nazwa trasy, 2-5 slow, np. "Spacer po Durres z dziecmi")
 - "options": tablica kart wyboru, kazda z polami id, title, subtitle, description, highlights (tablica stringow), implies (obiekt), requires_input (boolean), input_placeholder (string) — TYLKO gdy tekst przedstawia warianty do wyboru
 - "allow_custom": boolean (czy uzytkownik moze wpisac wlasna odpowiedz zamiast wybrac karte)
 - "add_waypoints": tablica stringow z nazwami punktow (TYLKO gdy done=true)
@@ -1725,7 +1729,12 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
       }
 
       // Jeśli agent zasugerował dodanie waypointów, geokodujemy je przed zwróceniem na frontend
-      if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
+      // Domyślne "Nowa Trasa AI" nie mówiło nic ani na liście tras, ani w pliku GPX.
+    if (typeof resultObj.suggested_title === 'string') {
+      resultObj.suggested_title = resultObj.suggested_title.trim().replace(/^["'„”]+|["'„”]+$/g, '').slice(0, 80);
+    }
+
+    if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
         const suggested_waypoints = [];
         // poiCenter to pinezka z mapy albo start ustalony z rozmowy — w obu przypadkach
         // najlepszy punkt odniesienia dla geokodera.

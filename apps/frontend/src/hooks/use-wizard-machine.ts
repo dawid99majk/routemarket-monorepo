@@ -93,6 +93,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
             suggested_waypoints: data.suggested_waypoints,
             distance_target_km: data.distance_target_km,
             phase: data.phase,
+            suggested_title: data.suggested_title,
             options: data.options,
             allow_custom: data.allow_custom
           };

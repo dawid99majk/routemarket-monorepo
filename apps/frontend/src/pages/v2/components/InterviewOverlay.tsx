@@ -37,6 +37,8 @@ interface InterviewOverlayProps {
   onVehicleChange: (type: string) => void;
   onRoutingPreferenceChange: (pref: 'popular' | 'wild') => void;
   onTripCharacterChange: (label: string) => void;
+  title: string;
+  onTitleChange: (title: string) => void;
   onChoose: (option: RouteOption) => void;
   onSend: (text: string) => void;
   onRewind: (phase: string) => void;
@@ -55,6 +57,8 @@ export default function InterviewOverlay({
   onVehicleChange,
   onRoutingPreferenceChange,
   onTripCharacterChange,
+  title,
+  onTitleChange,
   onChoose,
   onSend,
   onRewind,
@@ -234,6 +238,24 @@ export default function InterviewOverlay({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Nazwa trasy: agent proponuje ją od pierwszej tury, użytkownik poprawia
+              w miejscu. Bez tego wszystko lądowało na liście jako "Nowa Trasa AI". */}
+          {started && (
+            <div className="pt-6 pb-5 max-w-2xl">
+              <label className="text-white/50 text-xs uppercase tracking-wider font-semibold">
+                Jak nazwać tę trasę?
+              </label>
+              <input
+                value={title}
+                onChange={(e) => onTitleChange(e.target.value)}
+                placeholder="np. Durrës z dziećmi"
+                className="mt-2 w-full bg-white/10 border border-white/15 rounded-xl px-4 py-3
+                           text-white text-lg font-medium placeholder:text-white/30
+                           focus:outline-none focus:border-emerald-400/60 focus:bg-white/15 transition-colors"
+              />
             </div>
           )}
 

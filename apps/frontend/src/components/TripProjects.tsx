@@ -126,7 +126,12 @@ export default function TripProjects() {
         .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
-      if (data?.length) setActiveId(data[0].id);
+      // Wejście z kreatora (?project=...) ma otworzyć świeżo utworzoną tablicę,
+      // a nie ostatnio modyfikowaną — inaczej "Zapisz jako projekt" wyglądałoby
+      // jakby nic nie zrobiło.
+      const requested = new URLSearchParams(window.location.search).get('project');
+      const target = requested && data?.some((p: any) => p.id === requested) ? requested : data?.[0]?.id;
+      if (target) setActiveId(target);
       const { data: prefs } = await (supabase as any)
         .from('route_preferences')
         .select('pace, popularity, wandering, dining, effort, crowds')

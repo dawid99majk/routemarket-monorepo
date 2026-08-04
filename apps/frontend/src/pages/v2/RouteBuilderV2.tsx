@@ -15,7 +15,7 @@ function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: nu
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, RefreshCw, ImageIcon } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Send, Bot, Trash2, Navigation, Bike, Route as RouteIcon, Building2, Car, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, RefreshCw, ImageIcon, FolderPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -79,6 +79,7 @@ function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }
 import { ElevationProfile } from '@/components/ElevationProfile';
 import { apiPost } from '@/lib/api';
 import { useWizardMachine } from '@/hooks/use-wizard-machine';
+import { TRIP_PRESETS, EMPTY_AXES } from '@/lib/tripPresets';
 import RouteOptionCards from '@/pages/v2/components/RouteOptionCards';
 import InterviewOverlay from '@/pages/v2/components/InterviewOverlay';
 
@@ -258,6 +259,63 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           loading: false
         }
       }));
+    }
+  };
+
+  /**
+   * Trasa → tablica wyjazdu. Gotowy przebieg bywa dopiero punktem wyjścia:
+   * użytkownik chce potem dokładać miejsca, zmieniać priorytety i układać dni,
+   * a to wszystko żyje w projekcie, nie w kreatorze. Punkty trafiają jako
+   * "koniecznie", bo skoro są na trasie, to zostały już świadomie wybrane.
+   */
+  const [savingProject, setSavingProject] = useState(false);
+  const saveAsProject = async () => {
+    if (waypoints.length === 0) return;
+    setSavingProject(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Zaloguj się, żeby zapisać projekt');
+
+      // Kierunek bierzemy z nazwy startu — to najbliższe miastu, co mamy pod ręką
+      const destination = (waypoints[0]?.name || context.title || 'Wyjazd').split(',')[0].trim();
+      const preset = TRIP_PRESETS.find((t) => t.label === context.tripProfile?.charakter);
+
+      const { data: project, error } = await (supabase as any)
+        .from('trip_projects')
+        .insert({
+          user_id: userData.user.id,
+          name: context.title && context.title !== 'Nowa Trasa AI' ? context.title : `Wyjazd: ${destination}`,
+          destination,
+          destination_lat: waypoints[0]?.lat ?? null,
+          destination_lng: waypoints[0]?.lng ?? null,
+          days: 1,
+          trip_type: preset?.id ?? null,
+          ...(preset?.axes ?? EMPTY_AXES)
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+
+      const rows = waypoints.map((wp: any, i: number) => ({
+        project_id: project.id,
+        name: wp.name || `Punkt ${i + 1}`,
+        category: 'attraction',
+        priority: 'must',
+        lat: wp.lat,
+        lng: wp.lng,
+        sort_order: i,
+        description: poiDetails[wp.name || `Punkt ${i + 1}`]?.description || '',
+        source: 'route'
+      }));
+      const { error: placesError } = await (supabase as any).from('trip_project_places').insert(rows);
+      if (placesError) throw placesError;
+
+      toast.success(`Utworzono projekt z ${rows.length} miejscami`);
+      navigate(`/plany?project=${project.id}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Nie udało się utworzyć projektu');
+    } finally {
+      setSavingProject(false);
     }
   };
 
@@ -580,6 +638,8 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           errorMessage={hasError ? context.errorMessage : null}
           onRetry={retryLastAction}
           onTripCharacterChange={(label) => setField('tripProfile', { ...context.tripProfile, charakter: label })}
+          title={context.title}
+          onTitleChange={(value) => { setField('title', value); setField('titleTouched' as any, true); }}
           vehicleType={vehicleType}
           routingPreference={routingPreference}
           onVehicleChange={handleVehicleChange}
@@ -879,6 +939,19 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                         </Button>
                       )}
                     </div>
+                    <Button
+                      variant="outline"
+                      disabled={savingProject}
+                      onClick={saveAsProject}
+                      className="w-full h-9 text-xs font-semibold border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    >
+                      {savingProject
+                        ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Tworzę projekt…</>
+                        : <><FolderPlus className="w-3.5 h-3.5 mr-1.5" /> Zapisz jako projekt</>}
+                    </Button>
+                    <p className="text-[10px] text-slate-400 leading-snug -mt-1">
+                      Punkty trafią na tablicę jako „koniecznie". Dołożysz kolejne miejsca, zmienisz wagi i ułożysz plan dni.
+                    </p>
                   </Card>
                 )}
 

@@ -3,6 +3,7 @@ import { setup, assign, fromPromise } from 'xstate';
 export interface RouteOption {
   id: string;
   title: string;
+  titleTouched?: boolean;
   subtitle?: string;
   description?: string;
   highlights?: string[];
@@ -103,6 +104,8 @@ export const initialWizardContext: WizardContext = {
   routeStats: { distance: 0, ascent: 0, descent: 0 },
 
   title: 'Nowa Trasa AI',
+  /** Ustawiane, gdy użytkownik sam poprawi nazwę — od tej chwili agent jej nie rusza. */
+  titleTouched: false,
   description: '',
   price: '',
   isFree: true,
@@ -230,6 +233,16 @@ export const wizardMachine = setup({
       }
       return {};
     }),
+    assignSuggestedTitle: assign(({ context, event }) => {
+      // @ts-ignore
+      const suggested = event.output?.suggested_title;
+      // Nazwa idzie od agenta tylko dopóki użytkownik jej nie przejął — inaczej
+      // każda kolejna tura kasowałaby to, co wpisał.
+      if (typeof suggested === 'string' && suggested.trim() && !context.titleTouched) {
+        return { title: suggested.trim() };
+      }
+      return {};
+    }),
     assignSuggestedWaypoints: assign(({ context, event }) => {
       // @ts-ignore
       const output = event.output;
@@ -344,7 +357,7 @@ export const wizardMachine = setup({
             target: 'generating_route',
             // @ts-ignore
             guard: ({ event }) => event.output && event.output.done === true,
-            actions: ['appendAgentResponse', 'assignPhase', 'assignSuggestedWaypoints', 'resetRetries']
+            actions: ['appendAgentResponse', 'assignPhase', 'assignSuggestedTitle', 'assignSuggestedWaypoints', 'resetRetries']
           },
           {
             target: 'idle',
