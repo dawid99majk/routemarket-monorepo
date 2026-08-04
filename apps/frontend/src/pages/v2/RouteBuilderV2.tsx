@@ -154,6 +154,8 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   // Karta startuje zwinięta — rozwijamy tylko ten punkt, który kogoś zainteresował
   const [expandedPoints, setExpandedPoints] = useState<Record<string, boolean>>({});
   const [photoIndex, setPhotoIndex] = useState<Record<string, number>>({});
+  // Zdjęcia, których przeglądarka nie wczytała — wypadają z galerii zamiast chować cały pasek
+  const [brokenPhotos, setBrokenPhotos] = useState<Set<string>>(new Set());
   // Bez tego każde przeliczenie trasy strzelałoby po opisy tych samych punktów od nowa
   const prefetchedRef = useRef<Set<string>>(new Set());
 
@@ -1112,7 +1114,7 @@ ${points}
                 {(() => {
                   const key = pointKeyOf(wp, i);
                   const details = poiDetails[key];
-                  const photos = details?.photos || [];
+                  const photos = (details?.photos || []).filter((u: string) => !brokenPhotos.has(u));
                   const idx = Math.min(photoIndex[key] || 0, Math.max(photos.length - 1, 0));
                   const expanded = !!expandedPoints[key];
                   const movePhoto = (delta: number) => setPhotoIndex((prev) => ({
@@ -1141,7 +1143,7 @@ ${points}
                         alt={key}
                         loading="lazy"
                         className={`w-full object-cover transition-all duration-200 ${expanded ? 'h-48' : 'h-32'}`}
-                        onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                        onError={() => setBrokenPhotos((prev) => new Set(prev).add(photos[idx]))}
                       />
                       {photos.length > 1 && (
                         <>

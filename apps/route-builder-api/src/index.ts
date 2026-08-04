@@ -870,6 +870,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
       };
     });
 
+    console.log(`[points-details] ${list.length} pkt, zdjęcia: ${list.map((p, i) => `${p.name}=${photos[i]?.length ?? 0}`).join(', ')}`);
     return c.json({ details });
   } catch (err: any) {
     console.error('[points-details] Error:', err);
@@ -937,6 +938,9 @@ Nie dodawaj żadnych tagów markdown, po prostu czysty obiekt JSON, np.:
     if (generatedText) {
       const cleanText = generatedText.replace(/```json/g, '').replace(/```/g, '').trim();
       const resultObj = JSON.parse(cleanText);
+      // Ta sama galeria co w wariancie zbiorczym — inaczej punkt dociągnięty
+      // kliknięciem (gdy batch padnie) zostawał bez zdjęć
+      resultObj.photos = (lat != null && lng != null) ? await fetchNearbyPhotos(lat, lng) : [];
       if (pointDetailsCache.size >= POINT_DETAILS_MAX) {
         const oldest = pointDetailsCache.keys().next().value;
         if (oldest !== undefined) pointDetailsCache.delete(oldest);
