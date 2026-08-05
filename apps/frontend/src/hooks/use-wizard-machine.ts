@@ -229,7 +229,15 @@ const context = state.context;
   // a backend dostaje twarde parametry zamiast domyślać się ich z tekstu.
   const chooseOption = useCallback((option: { title: string; implies?: Record<string, any> }) => {
     if (option.implies && Object.keys(option.implies).length > 0) {
-      send({ type: 'SET_FIELD', field: 'tripProfile', value: { ...context.tripProfile, ...option.implies } });
+      // Dystans z karty jest twardym parametrem, nie opisem — bez niego walidacja
+      // mierzyła trasę względem innego celu niż ten pokazany użytkownikowi.
+      const { distance_km, ...profileFields } = option.implies;
+      if (typeof distance_km === 'number' && distance_km > 0) {
+        send({ type: 'SET_FIELD', field: 'distanceTargetKm', value: distance_km });
+      }
+      if (Object.keys(profileFields).length > 0) {
+        send({ type: 'SET_FIELD', field: 'tripProfile', value: { ...context.tripProfile, ...profileFields } });
+      }
     }
     send({ type: 'SEND_MESSAGE', text: option.title });
   }, [send, context.tripProfile]);

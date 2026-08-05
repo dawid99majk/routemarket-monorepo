@@ -163,7 +163,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   // Helper to prevent clicks and double clicks inside leaflet popups from bubbling up to map click events
   const disablePropagation = (el: HTMLElement | null) => {
     if (el) {
+      // React 17+ podpina listenery w korzeniu aplikacji, więc natywne zdarzenie
+      // dociera do kontenera mapy ZANIM zadziała e.stopPropagation() z handlera.
+      // Klik w strzałkę galerii lądował na mapie i otwierał "dodaj punkt".
       L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+      L.DomEvent.on(el, 'mousedown dblclick pointerdown touchstart', L.DomEvent.stopPropagation);
     }
   };
 
@@ -568,6 +573,11 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   };
 
   const clearRoute = () => {
+    // Nazwa poprzedniej trasy zostawała na kolejnej: użytkownik raz ją poprawił,
+    // flaga titleTouched blokowała podpowiedzi agenta i nowy spacer po Kruji
+    // nazywał się dalej "Durrës z dziećmi".
+    setField('title', 'Nowa Trasa AI');
+    setField('titleTouched' as any, false);
     setField('waypoints', []);
     setField('geometry', null);
     setField('gpxData', null);

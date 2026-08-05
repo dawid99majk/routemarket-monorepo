@@ -79,7 +79,8 @@ const CHAT_RESPONSE_SCHEMA = {
               difficulty: { type: 'string' },
               pattern: { type: 'string' },
               accommodation: { type: 'string' },
-              variant: { type: 'string' }
+              variant: { type: 'string' },
+              distance_km: { type: 'number' }
             }
           }
         },
@@ -1491,6 +1492,8 @@ Dla TRASY LINIOWEJ (loop: false):
 Oto historia czatu:
 ${conversationText}
 
+DYSTANS WARIANTU: jeśli karta wyboru podaje długość trasy (np. "3.5 km" w subtitle), MUSISZ powtórzyć tę liczbę w jej "implies": {"distance_km": 3.5}. Bez tego sprawdzamy trasę względem innego celu niż ten, który obiecałeś użytkownikowi.
+
 NAZWA TRASY — POLE OBOWIĄZKOWE W KAŻDEJ ODPOWIEDZI:
 Do każdego obiektu JSON dokładaj "suggested_title": krótką nazwę oddającą to, o co prosi użytkownik — miejsce plus charakter, 2-5 słów, bez cudzysłowów i bez doklejania słowa "trasa" na siłę.
 Dla "chcę coś dla dzieci w Durrës" → "Durrës z dziećmi". Dla przejażdżki po Beskidach → "Pętla beskidzka na motocykl". Dla wieczornego spaceru w Krakowie → "Kraków wieczorem".
@@ -1891,10 +1894,12 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
           }
         };
 
+        let finalKm: number | null = null;
         if (targetKm && finalWaypoints.length >= 3 && poiCandidates.length > 0) {
           for (let pass = 0; pass < 2; pass++) {
             const measuredKm = await measureRouteKm(finalWaypoints);
             const estimatedKm = measuredKm ?? routeValidatorService.estimateChainKm(finalWaypoints, routeTypeForValidation);
+            finalKm = estimatedKm;
             const deviation = Math.abs(estimatedKm - targetKm) / targetKm;
             if (deviation <= 0.25) {
               if (pass > 0) console.log(`[chat-interview] Route within tolerance: ${estimatedKm.toFixed(1)} km (target ${targetKm} km).`);
@@ -1939,6 +1944,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
               }
               console.log(`[chat-interview] Correction accepted: ${newEstimate.toFixed(1)} km (was ${estimatedKm.toFixed(1)} km)`);
               finalWaypoints = rebuilt;
+              finalKm = newEstimate;
             } catch (corrErr) {
               console.warn('[chat-interview] Waypoint correction failed, keeping original:', corrErr);
               break;
@@ -1947,6 +1953,21 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         }
 
         resultObj.suggested_waypoints = finalWaypoints;
+
+        // Gdy korekta nie dowiozła obiecanej długości, użytkownik dowiadywał się
+        // o tym dopiero z mapy: agent pisał o 3,5 km, a trasa miała 1,3 km.
+        // Zamiast udawać, że wszystko się zgadza, mówimy to wprost i podpowiadamy
+        // najbliższy ruch — sam rozjazd zwykle znaczy, że w okolicy nie ma z czego
+        // ułożyć dłuższej pętli.
+        if (targetKm && finalKm && Math.abs(finalKm - targetKm) / targetKm > 0.25) {
+          resultObj.route_distance_km = Math.round(finalKm * 10) / 10;
+          const shorter = finalKm < targetKm;
+          resultObj.reply = `${resultObj.reply}\n\n---\n\n**Trasa wyszła ${finalKm.toFixed(1)} km**, a celowaliśmy w ok. ${targetKm} km. ` +
+            (shorter
+              ? 'W tej okolicy nie ma więcej sensownych punktów w zasięgu spaceru — napisz, czy dorzucić coś dalej od centrum, czy zostawiamy krócej i spokojniej.'
+              : 'Wyszło dłużej, niż zakładaliśmy — napisz, czy skracamy, czy zostawiamy w tej formie.');
+        }
+
         if (failed_waypoints.length > 0) {
           // Nie gubimy punktów po cichu — informujemy użytkownika, których miejsc nie udało się zlokalizować
           resultObj.failed_waypoints = failed_waypoints;
