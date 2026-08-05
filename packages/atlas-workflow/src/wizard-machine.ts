@@ -361,7 +361,9 @@ export const wizardMachine = setup({
           },
           {
             target: 'idle',
-            actions: ['appendAgentResponse', 'assignPhase', 'resetRetries']
+            // Nazwa musi się aktualizować w TRAKCIE wywiadu, nie dopiero przy
+            // generowaniu trasy — to wtedy użytkownik patrzy na pole z nazwą.
+            actions: ['appendAgentResponse', 'assignPhase', 'assignSuggestedTitle', 'resetRetries']
           }
         ],
         onError: [
