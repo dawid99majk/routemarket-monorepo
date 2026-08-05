@@ -124,6 +124,25 @@ export function useWizardMachine(initialProjectId: string | null = null) {
 
         let finalGpx = generateGpxString(data.trackPoints, context.title || 'Nowa Trasa');
 
+        // Bezpiecznik na zamianę osi. Kiedyś eksport lądował na pustyni w Arabii
+        // Saudyjskiej, bo współrzędne czytane były w kolejności GeoJSON. Plik
+        // wygląda wtedy poprawnie aż do otwarcia w nawigacji, więc porównujemy
+        // pierwszy punkt śladu z pierwszym punktem trasy, zanim ktokolwiek go pobierze.
+        const firstTrack = data.trackPoints?.[0];
+        const firstWp = (data.waypoints || context.waypoints)?.[0];
+        if (firstTrack && firstWp?.lat != null) {
+          const dLat = Math.abs(firstTrack[0] - firstWp.lat);
+          const dLng = Math.abs(firstTrack[1] - firstWp.lng);
+          if (dLat > 0.5 || dLng > 0.5) {
+            console.error('[GPX] Ślad nie zgadza się z punktami trasy', { firstTrack, firstWp });
+            toast.error(
+              `Plik GPX nie zgadza się z trasą (ślad zaczyna się w ${firstTrack[0].toFixed(2)}, ${firstTrack[1].toFixed(2)}, ` +
+              `a trasa w ${firstWp.lat.toFixed(2)}, ${firstWp.lng.toFixed(2)}). Nie pobieraj tego pliku i zgłoś to.`,
+              { duration: 20000 }
+            );
+          }
+        }
+
         if (data.validation?.warnings?.length) {
           for (const warning of data.validation.warnings) {
             toast.warning(warning, { duration: 8000 });
