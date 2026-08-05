@@ -1805,17 +1805,32 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
           }
         }
 
+        // Pętla ma ten sam punkt na starcie i na mecie, więc ta sama nazwa
+        // trafiała do geokodera dwa razy — równolegle, czyli obie próby ruszały
+        // przed zapisem do cache'u. Jedna nierozpoznana nazwa to nawet sześć
+        // wywołań HTTP, a cała tura wpadała przez to w limit czasu bramy.
+        const byName = new Map<string, number[]>();
+        for (const i of needGeocoding) {
+          const key = placeNames[i].trim().toLowerCase();
+          const list = byName.get(key);
+          if (list) list.push(i);
+          else byName.set(key, [i]);
+        }
+        const uniqueGroups = [...byName.values()];
+
         // Współbieżność ograniczona: Nominatim prosi o umiar, a i tak zwykle
         // zostaje kilka nazw, bo większość punktów pochodzi już z OSM.
         const GEOCODE_CONCURRENCY = 3;
-        for (let from = 0; from < needGeocoding.length; from += GEOCODE_CONCURRENCY) {
-          const batch = needGeocoding.slice(from, from + GEOCODE_CONCURRENCY);
-          await Promise.all(batch.map(async (i) => {
-            const placeName = placeNames[i];
+        for (let from = 0; from < uniqueGroups.length; from += GEOCODE_CONCURRENCY) {
+          const batch = uniqueGroups.slice(from, from + GEOCODE_CONCURRENCY);
+          await Promise.all(batch.map(async (indices) => {
+            const placeName = placeNames[indices[0]];
             try {
               const place = await geocodingService.geocodeSinglePoint(placeName, biasPoint, poiRadiusKm);
               if (place) {
-                resolved[i] = { lat: place.lat, lng: place.lng, name: placeName };
+                for (const i of indices) {
+                  resolved[i] = { lat: place.lat, lng: place.lng, name: placeNames[i] };
+                }
               }
             } catch (e) {
               console.error("Geocoding failed for place:", placeName, e);
