@@ -1492,6 +1492,8 @@ Dla TRASY LINIOWEJ (loop: false):
 Oto historia czatu:
 ${conversationText}
 
+NAZWY PUNKTÓW: w "add_waypoints" podawaj nazwy W ORYGINALNYM JĘZYKU, tak jak figurują na mapie i w OpenStreetMap — "Kalaja e Krujës", nie "Zamek w Krujë"; "Pazari i Vjetër", nie "Stary Bazar". Nie tłumacz nazw własnych na polski i nie wymyślaj opisowych określeń w rodzaju "Parking przy Starym Bazarze" — takie nazwy nie istnieją w bazie map i trafiają w przypadkowe miejsca na świecie. Polskie tłumaczenie możesz podać w "reply", ale nigdy w nazwie punktu.
+
 DYSTANS WARIANTU: jeśli karta wyboru podaje długość trasy (np. "3.5 km" w subtitle), MUSISZ powtórzyć tę liczbę w jej "implies": {"distance_km": 3.5}. Bez tego sprawdzamy trasę względem innego celu niż ten, który obiecałeś użytkownikowi.
 
 NAZWA TRASY — POLE OBOWIĄZKOWE W KAŻDEJ ODPOWIEDZI:
@@ -1741,13 +1743,52 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
       resultObj.suggested_title = resultObj.suggested_title.trim().replace(/^["'„”]+|["'„”]+$/g, '').slice(0, 80);
     }
 
+    // Reguła "nigdy nie generuj trasy w pierwszej odpowiedzi" siedzi w prompcie
+    // od dawna, ale model potrafi ją zignorować — zwłaszcza odkąd dostaje z
+    // ekranu startowego pojazd, styl i charakter wyjazdu i uznaje, że wie już
+    // wszystko. Wtedy użytkownik zamiast rozmowy dostaje od razu mapę z trasą,
+    // której nikt z nim nie ustalił. Prompt to prośba, to jest warunek.
+    const userTurnCount = messages.filter((m: any) => m.role === 'user').length;
+    const lastUserText = [...messages].reverse().find((m: any) => m.role === 'user')?.text || '';
+    const explicitGenerate = /(generuj|zrób|rób\b|nie pytaj|bez pyta|od razu|natychmiast)/i.test(lastUserText);
+    if (resultObj.done === true && userTurnCount <= 1 && !explicitGenerate && !knowStart) {
+      console.log('[chat-interview] Trasa w pierwszej turze bez polecenia — cofam do pytania o start.');
+      resultObj.done = false;
+      resultObj.phase = 'start_point';
+      delete resultObj.add_waypoints;
+      delete resultObj.extracted;
+      resultObj.allow_custom = true;
+      resultObj.reply = 'Zanim wyznaczę przebieg — skąd dokładnie zaczynacie? Start przesądza o kształcie całej trasy, więc wolę o niego zapytać, zamiast zgadywać.';
+    }
+
     if (resultObj.add_waypoints && Array.isArray(resultObj.add_waypoints)) {
         const suggested_waypoints = [];
         // poiCenter to pinezka z mapy albo start ustalony z rozmowy — w obu przypadkach
         // najlepszy punkt odniesienia dla geokodera.
         let biasPoint: {lat: number, lng: number} | undefined = poiCenter || undefined;
 
-        // Jeśli nie mamy biasPoint z UI, spróbujmy geokodować pierwszy sugerowany punkt bez biasu i użyć go jako bias
+        // Kotwica regionu z tego, co agent sam podał w "extracted". Bez niej
+        // punktem odniesienia stawał się pierwszy waypoint geokodowany na ślepo,
+        // a agent nazywa miejsca po polsku ("Parking przy Starym Bazarze").
+        // Nominatim dopasowywał takie nazwy do polskich miejscowości: cała trasa
+        // po Krujë dostała kotwicę w Nowym Sączu i wszystkie punkty wypadły
+        // jako odstające.
+        if (!biasPoint) {
+          const anchorName = resultObj.extracted?.region || resultObj.extracted?.start_point;
+          if (anchorName) {
+            try {
+              const anchor = await geocodingService.geocodeSettlement(String(anchorName));
+              if (anchor) {
+                biasPoint = { lat: anchor.lat, lng: anchor.lng };
+                console.log(`[chat-interview] Kotwica regionu: "${anchorName}" -> ${anchor.lat},${anchor.lng}`);
+              }
+            } catch (e) {
+              console.warn(`[chat-interview] Nie udało się zakotwiczyć regionu "${anchorName}"`);
+            }
+          }
+        }
+
+        // Dopiero gdy nie ma ani pinezki, ani regionu: pierwszy punkt na ślepo.
         if (!biasPoint && resultObj.add_waypoints.length > 0) {
           try {
             const firstPlace = await geocodingService.geocodeSinglePoint(resultObj.add_waypoints[0]);
