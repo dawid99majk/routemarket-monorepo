@@ -39,6 +39,32 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+/**
+ * Geometria zapisanej trasy wraca w formacie GeoJSON, czyli [lng, lat] — tak
+ * samo, jak została zapisana. Wczytywanie przestawiało ją na [lat, lng], a
+ * warstwa rysująca robi własną konwersję GeoJSON → Leaflet, więc współrzędne
+ * zamieniały się DWA RAZY: trasa z Durrës lądowała na mapie w Arabii Saudyjskiej.
+ * Świeżo policzona trasa wyglądała dobrze, bo nie przechodziła przez wczytywanie.
+ *
+ * Heurystyka na starsze rekordy: jeśli zapis powstał jeszcze przed poprawką i
+ * siedzi w kolejności [lat, lng], poznamy to po tym, że pierwszy punkt leży
+ * bliżej odwróconej pary niż prostej.
+ */
+const toGeoJsonCoords = (stored: any[], waypoints?: any[]): number[][] => {
+  const coords = stored.map((p: any) => [p[0], p[1], p[2] || 0]);
+  const wp = waypoints?.[0];
+  const first = coords[0];
+  if (wp?.lat != null && first) {
+    const asGeoJson = Math.abs(first[0] - wp.lng) + Math.abs(first[1] - wp.lat);
+    const asSwapped = Math.abs(first[1] - wp.lng) + Math.abs(first[0] - wp.lat);
+    if (asSwapped < asGeoJson) {
+      console.warn('[Geometria] Zapis w starej kolejności [lat, lng] — prostuję.');
+      return coords.map((p) => [p[1], p[0], p[2]]);
+    }
+  }
+  return coords;
+};
+
 // A green icon for start, red for end, blue for intermediate.
 // Ikony idą z jsDelivr, nie z raw.githubusercontent.com — ten drugi nie jest
 // hostingiem zasobów, bywa dławiony i potrafi po cichu zniknąć z mapy.
@@ -409,9 +435,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
               if (reqs.bikeSubtype) setField('bikeSubtype', reqs.bikeSubtype);
               if (reqs.geometry) {
-                setField('geometry', { 
-                  type: 'LineString', 
-                  coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) 
+                setField('geometry', {
+                  type: 'LineString',
+                  coordinates: toGeoJsonCoords(reqs.geometry, reqs.waypoints)
                 });
               }
               if (reqs.waypoints) {
@@ -483,7 +509,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     if (reqs.vehicleType) setField('vehicleType', reqs.vehicleType);
     if (reqs.bikeSubtype) setField('bikeSubtype', reqs.bikeSubtype);
     if (reqs.geometry) {
-       setField('geometry', { type: 'LineString', coordinates: reqs.geometry.map((p: any) => [p[1], p[0], p[2] || 0]) });
+       setField('geometry', { type: 'LineString', coordinates: toGeoJsonCoords(reqs.geometry, reqs.waypoints) });
     } else {
        setField('geometry', null);
     }
