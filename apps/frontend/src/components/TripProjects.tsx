@@ -437,6 +437,14 @@ export default function TripProjects() {
     const unresolved: string[] = [];
 
     for (const it of venues) {
+      // Planer dokleja współrzędne do każdej pozycji, którą potrafi umiejscowić —
+      // także do własnych propozycji. Korzystamy z nich w pierwszej kolejności,
+      // żeby nie odsyłać nazwy do geokodera: to ten krok wysyłał trasy w
+      // przypadkowe miasta.
+      if (it.lat != null && it.lng != null) {
+        resolved.push({ lat: it.lat, lng: it.lng, name: it.name, type: 'waypoint' });
+        continue;
+      }
       const place = places.find(
         (p) => p.name === it.name || it.name?.includes(p.name) || p.name.includes(it.name)
       );

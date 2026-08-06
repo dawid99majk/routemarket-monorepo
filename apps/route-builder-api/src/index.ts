@@ -511,6 +511,63 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
  * (godziny otwarcia, czasy przejść), a modelowi zostawiamy kolejność i narrację —
  * odwrotnie byłoby zgadywaniem: model nie policzy rzetelnie, czy zdążysz.
  */
+
+/**
+ * Podział miejsc na dni po położeniu. Model potrafi napisać, że grupuje punkty
+ * blisko siebie, ale geometrii nie liczy — i wychodziły dni skaczące przez całe
+ * miasto. Prościej policzyć to tutaj i podać mu gotową podpowiedź, którą wciąż
+ * może nadpisać, gdy godziny otwarcia każą inaczej.
+ *
+ * Algorytm: k najdalszych od siebie zalążków, potem przypisanie każdego miejsca
+ * do najbliższego z nich. Bez iteracji — przy kilkunastu punktach i 2-4 dniach
+ * wynik jest stabilny, a wynik ma być podpowiedzią, nie wyrocznią.
+ */
+function clusterPlacesByProximity<T extends { name: string; lat?: number | null; lng?: number | null }>(
+  places: T[],
+  groups: number
+): T[][] {
+  const located = places.filter((p) => p.lat != null && p.lng != null);
+  if (groups <= 1 || located.length <= groups) return [places];
+
+  const km = (a: any, b: any) => {
+    const dLat = (a.lat - b.lat) * 111;
+    const dLng = (a.lng - b.lng) * 111 * Math.cos((a.lat * Math.PI) / 180);
+    return Math.sqrt(dLat * dLat + dLng * dLng);
+  };
+
+  const seeds: T[] = [located[0]];
+  while (seeds.length < groups) {
+    let best: T | null = null;
+    let bestDist = -1;
+    for (const p of located) {
+      if (seeds.includes(p)) continue;
+      const nearest = Math.min(...seeds.map((sd) => km(p, sd)));
+      if (nearest > bestDist) { bestDist = nearest; best = p; }
+    }
+    if (!best) break;
+    seeds.push(best);
+  }
+
+  const buckets: T[][] = seeds.map(() => []);
+  for (const p of located) {
+    let idx = 0;
+    let bestDist = Infinity;
+    seeds.forEach((sd, i) => {
+      const d = km(p, sd);
+      if (d < bestDist) { bestDist = d; idx = i; }
+    });
+    buckets[idx].push(p);
+  }
+  // Miejsca bez współrzędnych trafiają do najliczniejszej grupy — nie mamy czym
+  // ich przypisać, a gubienie ich po cichu byłoby gorsze.
+  const unlocated = places.filter((p) => p.lat == null || p.lng == null);
+  if (unlocated.length) {
+    const biggest = buckets.reduce((a, b) => (b.length > a.length ? b : a), buckets[0]);
+    biggest.push(...unlocated);
+  }
+  return buckets.filter((b) => b.length > 0);
+}
+
 app.post('/plan-trip', async (c) => {
   try {
     const body = await c.req.json() as {
@@ -574,6 +631,13 @@ app.post('/plan-trip', async (c) => {
     // Suwak "ile czasu zaplanować": reszta okna ma zostać pusta z rozmysłu.
     // Dzień wypełniony co do minuty to lista zadań, nie plan wyjazdu.
     const fillPercent = Math.min(100, Math.max(0, body.fill_percent ?? 70));
+
+    // Podział geograficzny liczony tutaj, nie zlecany modelowi
+    const clusters = dayCount > 1 ? clusterPlacesByProximity(body.places, dayCount) : [];
+    const clusterHint = clusters.length > 1
+      ? `\n\nSKUPISKA GEOGRAFICZNE (policzone z współrzędnych — trzymaj się ich, chyba że godziny otwarcia każą inaczej; wtedy napisz o tym w "warnings"):\n`
+        + clusters.map((g, i) => `Grupa ${i + 1}: ${g.map((p) => p.name).join(', ')}`).join('\n')
+      : '';
     const plannedBudget = Math.round(budget * fillPercent / 100);
 
     // Tablica użytkownika jest inspiracją, nie ramą — ktoś może przypiąć jedno
@@ -623,6 +687,8 @@ ${fillerLines}` : ''}
 
 BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a całe okno to ${Math.round(budget / 60)} h.
 
+${clusterHint}
+
 WYPEŁNIENIE DNIA: ${fillPercent}%. Zaplanuj ok. ${Math.round(plannedBudget / 60 * 10) / 10} h konkretnych punktów na cały wyjazd, a POZOSTAŁE ${Math.round((budget - plannedBudget) / 60 * 10) / 10} h ZOSTAW PUSTE Z ROZMYSŁU. To nie jest czas do zapełnienia — użytkownik świadomie poprosił o luz na włóczenie się, przypadkowe przystanki i dłuższe siedzenie tam, gdzie mu się spodoba.${fillPercent <= 40 ? ' Przy tak niskim wypełnieniu wybierz TYLKO najważniejsze kotwice i nie dokładaj propozycji z listy poniżej.' : ''}${fillPercent >= 90 ? ' Przy tak wysokim wypełnieniu możesz zagęścić dzień i dołożyć propozycje z listy.' : ''}
 W polu "summary" każdego dnia napisz jednym zdaniem, ile czasu zostaje wolnego i co można w nim zrobić w tej okolicy. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
 
@@ -669,7 +735,9 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
                           kind: { type: 'string' },
                           minutes: { type: 'integer' },
                           note: { type: 'string' },
-                          source: { type: 'string', enum: ['pinned', 'suggested'] }
+                          source: { type: 'string', enum: ['pinned', 'suggested'] },
+                          lat: { type: 'number' },
+                          lng: { type: 'number' }
                         },
                         required: ['time', 'name']
                       }
@@ -711,6 +779,37 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
       console.error(`[plan-trip] Niepoprawny JSON (${text.length} zn., finishReason=${finish}). Początek: ${text.slice(0, 220)}`);
       throw new Error(`Planer zwrócił niekompletną odpowiedź (${finish || 'nieznany powód'}). Spróbuj ponownie lub zmniejsz liczbę miejsc.`);
     }
+
+    // Każda pozycja planu dostaje współrzędne, jeśli tylko da się je ustalić.
+    // Propozycje agenta niosły dotąd samą nazwę, więc przy robieniu trasy z dnia
+    // wracały do geokodera — a to jest ten krok, przez który trasy lądowały w
+    // przypadkowych miastach. Pinezki użytkownika i pula POI mają współrzędne z
+    // OSM, wystarczy je przenieść.
+    const coordPool = [
+      ...body.places.map((pl) => ({ name: pl.name, lat: (pl as any).lat, lng: (pl as any).lng })),
+      ...fillerPois.map((f) => ({ name: f.name, lat: f.lat, lng: f.lng }))
+    ].filter((x) => x.lat != null && x.lng != null);
+
+    const byNormalizedName = new Map<string, { lat: number; lng: number }>();
+    for (const x of coordPool) {
+      byNormalizedName.set(x.name.trim().toLowerCase(), { lat: x.lat as number, lng: x.lng as number });
+    }
+
+    let located = 0;
+    let unlocated = 0;
+    for (const day of plan.days || []) {
+      for (const item of day.items || []) {
+        const hit = byNormalizedName.get(String(item.name || '').trim().toLowerCase());
+        if (hit) {
+          item.lat = hit.lat;
+          item.lng = hit.lng;
+          located++;
+        } else {
+          unlocated++;
+        }
+      }
+    }
+    console.log(`[plan-trip] Współrzędne: ${located} pozycji ma, ${unlocated} bez`);
 
     // "Nie zmieściło się" ma mówić o tym, co użytkownik przypiął. Model dostaje
     // pulę kilkudziesięciu propozycji do wypełniania dnia i raportował każdą
