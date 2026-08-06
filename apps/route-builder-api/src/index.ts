@@ -11,7 +11,7 @@ import { gpxParserService } from './services/gpx-parser.js';
 
 import { authMiddleware } from './middleware/auth.js';
 import { rateLimit } from './middleware/rate-limit.js';
-import { poiService, PoiCandidate } from './services/poi.js';
+import { poiService, poiClusterCenter, PoiCandidate } from './services/poi.js';
 import { routeValidatorService } from './services/route-validator.js';
 import { describeAvailability, isOpenDuring } from './services/opening-hours.js';
 import { callGeminiTracked } from './services/ai-usage.js';
@@ -1243,6 +1243,29 @@ app.post('/chat-interview', async (c) => {
           poiRadiusKm ? { radiusKm: poiRadiusKm, limit: 45 } : { limit: 45 }
         );
         console.log(`[chat-interview] Loaded ${poiCandidates.length} OSM POI candidates (${poiRouteType}, radius ${poiRadiusKm || 'default'} km)`);
+
+        // Geokoder dla rozległego miasta oddaje centroid granic administracyjnych.
+        // Dla Wrocławia wypadał w magazynie na Gądowie, 4,5 km od Rynku, więc
+        // promień szukania obejmował przedmieścia zamiast starówki i trasa
+        // układała się z rozrzuconych kościołów. Przy spacerze po mieście
+        // przesuwamy się na środek ciężkości atrakcji i pobieramy je ponownie.
+        if (poiRouteType === 'city_walk' || poiRouteType === 'green') {
+          const cluster = poiClusterCenter(poiCandidates);
+          if (cluster) {
+            const dLat = (cluster.lat - poiCenter.lat) * 111;
+            const dLng = (cluster.lng - poiCenter.lng) * 111 * Math.cos((poiCenter.lat * Math.PI) / 180);
+            const shiftKm = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (shiftKm > 1) {
+              console.log(`[chat-interview] Środek atrakcji przesunięty o ${shiftKm.toFixed(1)} km: ${poiCenter.lat.toFixed(4)},${poiCenter.lng.toFixed(4)} -> ${cluster.lat.toFixed(4)},${cluster.lng.toFixed(4)}`);
+              poiCenter = cluster;
+              poiCandidates = await poiService.fetchCandidates(
+                poiCenter,
+                poiRouteType,
+                poiRadiusKm ? { radiusKm: poiRadiusKm, limit: 45 } : { limit: 45 }
+              );
+            }
+          }
+        }
         // Do promptu idzie top 45, ale dopasowywać nazwy chcemy do pełnej puli —
         // punkt w rodzaju grani "Kępa" bywa poza czołówką rankingu, a to właśnie
         // jego współrzędne z OSM ratują go przed pomyłką geokodera.
@@ -1545,6 +1568,12 @@ Oto historia czatu:
 ${conversationText}
 
 NAZWY PUNKTÓW: w "add_waypoints" podawaj nazwy W ORYGINALNYM JĘZYKU, tak jak figurują na mapie i w OpenStreetMap — "Kalaja e Krujës", nie "Zamek w Krujë"; "Pazari i Vjetër", nie "Stary Bazar". Nie tłumacz nazw własnych na polski i nie wymyślaj opisowych określeń w rodzaju "Parking przy Starym Bazarze" — takie nazwy nie istnieją w bazie map i trafiają w przypadkowe miejsca na świecie. Polskie tłumaczenie możesz podać w "reply", ale nigdy w nazwie punktu.
+
+SPACER PO MIEŚCIE — ZWARTOŚĆ I RÓŻNORODNOŚĆ (obowiązuje przy pojeździe "city"/"spacer"):
+- Punkty mają leżeć BLISKO SIEBIE. Między sąsiednimi przystankami nie więcej niż ok. 1 km marszu; cała trasa ma mieścić się w podanym budżecie kilometrów, a nie w budżecie ambicji. 13 km na "4 godziny z dziećmi" to zepsuty plan, nie bogaty program.
+- NIE WIĘCEJ NIŻ DWA obiekty tego samego rodzaju w całej trasie. Sześć kościołów pod rząd to katalog, nie spacer. Przeplataj: zabytek, plac lub rynek, park albo bulwar, punkt widokowy, coś dla dzieci.
+- Z DZIEĆMI: między atrakcjami wpleć miejsca, gdzie można usiąść i odpocząć — park, plac zabaw, fontanna, deptak. Wnętrza muzeów i kościołów dawkuj, bo dziecko nie wytrzyma czterech z rzędu.
+- Trzymaj się okolicy, w której faktycznie coś jest. Punkt oddalony o kilka kilometrów od reszty wyrzuć, nawet jeśli jest znany — dojście zje czas przeznaczony na zwiedzanie.
 
 DYSTANS WARIANTU: jeśli karta wyboru podaje długość trasy (np. "3.5 km" w subtitle), MUSISZ powtórzyć tę liczbę w jej "implies": {"distance_km": 3.5}. Bez tego sprawdzamy trasę względem innego celu niż ten, który obiecałeś użytkownikowi.
 

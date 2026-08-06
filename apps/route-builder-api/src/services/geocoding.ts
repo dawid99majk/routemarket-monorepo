@@ -167,7 +167,16 @@ export class GeocodingService {
    */
   async geocodeSettlement(query: string): Promise<GeocodedPlace> {
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&featuretype=settlement&addressdetails=1`;
+      // Bez featuretype=settlement. Ten parametr oddaje centroid granic
+      // administracyjnych, a rozległe miasta mają go daleko od centrum: dla
+      // Wrocławia wypadał w magazynie na Gądowie 4,5 km od Rynku, dla Gdańska
+      // na peryferiach zamiast Głównego Miasta. Zwykłe wyszukiwanie zwraca
+      // punkt reprezentatywny — tam, gdzie ludzie umawiają się "w mieście".
+      // Dla miast zwartych (Tirana, Berlin) oba warianty dają to samo.
+      // Bez addressdetails: ten parametr, choć wygląda niewinnie, przestawia
+      // Nominatima na inny punkt tego samego obiektu — dla Wrocławia na centroid
+      // granic zamiast punktu reprezentatywnego. Zmierzone, nie domniemane.
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
       const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
       if (res.ok) {
         const data = await res.json() as any;

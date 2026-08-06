@@ -15,6 +15,25 @@ export interface PoiCandidate {
   capacity?: string;
 }
 
+
+/**
+ * Środek ciężkości atrakcji. Geokoder dla dużego miasta zwraca centroid granic
+ * administracyjnych: dla Wrocławia wypadał w magazynie na Gądowie, 4,5 km od
+ * Rynku, więc cała trasa układała się poza centrum. Mediana najlepiej ocenionych
+ * punktów trafia tam, gdzie faktycznie jest co zwiedzać, i jest odporna na
+ * pojedyncze atrakcje na obrzeżach.
+ */
+export function poiClusterCenter(candidates: PoiCandidate[], take = 20): { lat: number; lng: number } | null {
+  const top = [...candidates].sort((a, b) => b.score - a.score).slice(0, take);
+  if (top.length < 5) return null;
+  const median = (nums: number[]) => {
+    const sorted = [...nums].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  return { lat: median(top.map((c) => c.lat)), lng: median(top.map((c) => c.lng)) };
+}
+
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -106,11 +125,18 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
     'nwr["historic"="castle"]["name"]',
     'nwr["waterway"="dam"]["name"]'
   ],
+  // Spacer po mieście to nie objazd po kościołach. Sama lista zabytków sakralnych
+  // dawała trasy, na których z dzieckiem nie ma czego robić — stąd place, rynki,
+  // deptaki, place zabaw, fontanny i zoo obok muzeów i zabytków.
   city_walk: [
     'node["tourism"="viewpoint"]["name"]',
-    'nwr["tourism"~"^(attraction|museum|gallery)$"]["name"]',
-    'nwr["historic"~"^(castle|monument|memorial|city_gate|fort|church|cathedral)$"]["name"]',
-    'nwr["leisure"="park"]["name"]',
+    'nwr["tourism"~"^(attraction|museum|gallery|zoo|aquarium|theme_park)$"]["name"]',
+    'nwr["historic"~"^(castle|monument|memorial|city_gate|fort|church|cathedral|tower|bridge)$"]["name"]',
+    'nwr["leisure"~"^(park|garden|playground|water_park)$"]["name"]',
+    'nwr["place"~"^(square)$"]["name"]',
+    'nwr["highway"="pedestrian"]["area"="yes"]["name"]',
+    'node["amenity"="fountain"]["name"]',
+    'nwr["amenity"~"^(theatre|marketplace)$"]["name"]',
     'nwr["amenity"="place_of_worship"]["wikipedia"]["name"]'
   ]
 };
