@@ -608,6 +608,60 @@ export default function TripProjects() {
   const mustCount = places.filter((p) => p.priority === 'must').length;
   const totalMinutes = places.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
 
+  /**
+   * Ile z zaplanowanego czasu już zajęliśmy. Samo "zwiedzanie łącznie: 6 h" nic
+   * nie mówi, dopóki nie widać, ile tego czasu w ogóle jest — a przy dokładaniu
+   * miejsc to jedyna informacja, która powstrzymuje przed ułożeniem dnia, którego
+   * nie da się przejść. Do wizyt doliczamy przejścia, bo one też zjadają dzień.
+   */
+  const TRANSFER_MIN = 12;
+  const budget = (() => {
+    if (!active?.days || !active?.hours_per_day) return null;
+    const windowMin = Number(active.days) * Number(active.hours_per_day) * 60;
+    const planned = Math.round((windowMin * (active.fill_percent ?? 70)) / 100);
+    const used = totalMinutes + Math.max(0, places.length - 1) * TRANSFER_MIN;
+    return { windowMin, planned, used, ratio: planned > 0 ? used / planned : 0 };
+  })();
+
+  const medianOf = (nums: number[]) => {
+    const a = [...nums].sort((x, y) => x - y);
+    const m = Math.floor(a.length / 2);
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  };
+  const kmBetween = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+    const dLat = (aLat - bLat) * 111;
+    const dLng = (aLng - bLng) * 111 * Math.cos((aLat * Math.PI) / 180);
+    return Math.sqrt(dLat * dLat + dLng * dLng);
+  };
+
+  /**
+   * Punkt na uboczu psuje dzień skuteczniej niż jego brak: dojazd zjada czas
+   * przeznaczony na zwiedzanie. Mediana jako środek, bo jest odporna na to, że
+   * sam odstający punkt przeciąga średnią w swoją stronę.
+   */
+  const outliers = (() => {
+    const withCoords = places.filter((p) => p.lat != null && p.lng != null);
+    if (withCoords.length < 4) return [] as typeof places;
+    const cLat = medianOf(withCoords.map((p) => p.lat as number));
+    const cLng = medianOf(withCoords.map((p) => p.lng as number));
+    return withCoords.filter((p) => kmBetween(p.lat as number, p.lng as number, cLat, cLng) > 12);
+  })();
+
+  /** Ta sama rzecz dodana dwa razy pod nieco inną nazwą — częstsze, niż się wydaje. */
+  const duplicates = (() => {
+    const out: string[] = [];
+    for (let i = 0; i < places.length; i++) {
+      for (let j = i + 1; j < places.length; j++) {
+        const a = places[i], b = places[j];
+        if (a.lat == null || b.lat == null || a.lng == null || b.lng == null) continue;
+        if (kmBetween(a.lat as number, a.lng as number, b.lat as number, b.lng as number) < 0.05) {
+          out.push(`${a.name} / ${b.name}`);
+        }
+      }
+    }
+    return out;
+  })();
+
   return (
     <Card>
       <CardHeader>
@@ -741,6 +795,27 @@ export default function TripProjects() {
                   prev.map((p) => (p.id === active.id ? { ...p, fill_percent: v[0] } : p)))}
                 onValueCommit={(v) => saveFillPercent(v[0])}
               />
+              {/* Pasek zajętości: liczby same nie mówią nic, dopóki nie widać,
+                  ile czasu w ogóle jest do rozdysponowania. */}
+              {budget && (
+                <div className="mt-3">
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
+                    Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
+                    {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
+                    {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
+                    {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> — więcej, niż da się przejść</span>}
+                  </p>
+                </div>
+              )}
+
               <p className="text-[11px] leading-snug text-muted-foreground mt-2">
                 {(active.fill_percent ?? 70) >= 90
                   ? 'Dzień wypełniony po brzegi — zdążysz wszędzie, ale bez marginesu na przystanek, który sam się trafi.'
@@ -852,6 +927,22 @@ export default function TripProjects() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {(outliers.length > 0 || duplicates.length > 0) && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 space-y-1.5">
+                {outliers.length > 0 && (
+                  <p className="text-xs text-amber-900">
+                    <strong>Daleko od reszty:</strong> {outliers.map((p) => p.name).join(', ')}.
+                    {' '}Dojazd zje czas przeznaczony na zwiedzanie — rozważ osobny dzień albo odpuszczenie.
+                  </p>
+                )}
+                {duplicates.length > 0 && (
+                  <p className="text-xs text-amber-900">
+                    <strong>Możliwe duplikaty:</strong> {duplicates.join('; ')} — to samo miejsce pod dwiema nazwami.
+                  </p>
+                )}
               </div>
             )}
 
