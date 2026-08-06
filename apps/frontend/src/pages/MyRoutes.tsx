@@ -80,8 +80,8 @@ export default function MyRoutes() {
             <Logo />
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate('/plany')} className="mr-2">Plany</Button>
-          <Button size="sm" onClick={() => navigate('/route-builder-v2')} className="bg-emerald-600 hover:bg-emerald-500">
-            <Plus className="w-4 h-4 mr-1.5" /> Nowa trasa
+          <Button size="sm" onClick={() => navigate('/plany')} className="bg-emerald-600 hover:bg-emerald-500">
+            <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
           </Button>
         </div>
       </header>
@@ -98,9 +98,11 @@ export default function MyRoutes() {
         {!loading && projects.length === 0 && (
           <div className="text-center py-16 space-y-4">
             <Wand2 className="w-10 h-10 text-muted-foreground/40 mx-auto" />
-            <p className="text-muted-foreground">Nie masz jeszcze żadnej trasy.</p>
-            <Button onClick={() => navigate('/route-builder-v2')} className="bg-emerald-600 hover:bg-emerald-500">
-              Zaplanuj pierwszą
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Trasy powstają teraz z planu wyjazdu: zbierasz miejsca na tablicy, układasz dzień, a przebieg wyznaczamy z tego, co wybrałeś.
+            </p>
+            <Button onClick={() => navigate('/plany')} className="bg-emerald-600 hover:bg-emerald-500">
+              Zacznij od tablicy
             </Button>
           </div>
         )}

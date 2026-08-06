@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
@@ -23,6 +24,7 @@ interface TripProject extends Partial<AxisValues> {
   days: number | null;
   hours_per_day: number | null;
   trip_type: string | null;
+  fill_percent?: number | null;
 }
 
 type Priority = 'must' | 'nice' | 'rejected';
@@ -123,7 +125,7 @@ export default function TripProjects() {
       await (supabase as any).rpc('claim_pending_trip_shares');
       const { data } = await (supabase as any)
         .from('trip_projects')
-        .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
+        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
       // Wejście z kreatora (?project=...) ma otworzyć świeżo utworzoną tablicę,
@@ -192,7 +194,7 @@ export default function TripProjects() {
         trip_type: form.tripType || null,
         ...(TRIP_PRESETS.find((t) => t.id === form.tripType)?.axes ?? EMPTY_AXES)
       })
-      .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
+      .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds')
       .single();
     if (error) return toast.error(error.message);
     setProjects((prev) => [data, ...prev]);
@@ -288,6 +290,19 @@ export default function TripProjects() {
       .filter((g) => g.items.length > 0);
   };
 
+  /**
+   * Ile z dostępnego czasu ma być zaplanowane. Reszta to celowa pustka: dzień
+   * wypełniony atrakcjami co do minuty nie jest planem, tylko listą zadań, a
+   * najlepsze rzeczy w podróży zwykle zdarzają się w tych lukach.
+   */
+  const saveFillPercent = async (value: number) => {
+    if (!active) return;
+    setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, fill_percent: value } : p)));
+    const { error } = await (supabase as any)
+      .from('trip_projects').update({ fill_percent: value }).eq('id', active.id);
+    if (error) toast.error(error.message);
+  };
+
   const changeTripType = async (presetId: string) => {
     if (!active) return;
     const preset = TRIP_PRESETS.find((t) => t.id === presetId);
@@ -321,7 +336,7 @@ export default function TripProjects() {
         wandering: active.wandering ?? null, dining: active.dining ?? null,
         effort: active.effort ?? null, crowds: active.crowds ?? null
       })
-      .select('id, name, destination, days, hours_per_day, trip_type, pace, popularity, wandering, dining, effort, crowds')
+      .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds')
       .single();
     if (error) return toast.error(error.message);
     if (places.length > 0) {
@@ -517,6 +532,7 @@ export default function TripProjects() {
         window: { start: planForm.start, end: planForm.end },
         start_date: planForm.date || undefined,
         hotel: hotel ? { name: hotel.name } : null,
+        fill_percent: active.fill_percent ?? 70,
         fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
         places: places.map((p) => ({
           name: p.name, category: p.category, priority: p.priority,
@@ -671,6 +687,32 @@ export default function TripProjects() {
               {totalMinutes > 0 && (
                 <span>Zwiedzanie łącznie: <strong className="text-foreground">{Math.round(totalMinutes / 60)} h</strong></span>
               )}
+            </div>
+
+            {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
+            <div className="rounded-xl border bg-muted/30 px-4 py-3">
+              <div className="flex items-baseline justify-between gap-3 mb-2">
+                <span className="text-sm font-medium">Ile czasu zaplanować</span>
+                <span className="text-sm font-semibold text-emerald-700 tabular-nums">
+                  {active.fill_percent ?? 70}%
+                </span>
+              </div>
+              <Slider
+                value={[active.fill_percent ?? 70]}
+                min={0}
+                max={100}
+                step={5}
+                onValueChange={(v) => setProjects((prev) =>
+                  prev.map((p) => (p.id === active.id ? { ...p, fill_percent: v[0] } : p)))}
+                onValueCommit={(v) => saveFillPercent(v[0])}
+              />
+              <p className="text-[11px] leading-snug text-muted-foreground mt-2">
+                {(active.fill_percent ?? 70) >= 90
+                  ? 'Dzień wypełniony po brzegi — zdążysz wszędzie, ale bez marginesu na przystanek, który sam się trafi.'
+                  : (active.fill_percent ?? 70) <= 40
+                  ? 'Kilka kotwic i dużo swobody — reszta dnia na wałęsanie się po mieście bez planu.'
+                  : 'Zaplanowane atrakcje wypełnią tyle procent Twojego czasu, resztę zostawiamy na przerwy i włóczenie się po okolicy.'}
+              </p>
             </div>
 
             {editingType && (

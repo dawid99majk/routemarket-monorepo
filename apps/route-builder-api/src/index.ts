@@ -479,6 +479,7 @@ app.post('/plan-trip', async (c) => {
       window: { start: string; end: string };
       start_date?: string;
       hotel?: { name: string; lat?: number; lng?: number } | null;
+      fill_percent?: number;
       fixed?: { time: string; label: string; minutes?: number }[];
       places: {
         name: string; category?: string; priority?: 'must' | 'nice';
@@ -530,6 +531,10 @@ app.post('/plan-trip', async (c) => {
     const mustMinutes = body.places.filter((p) => p.priority === 'must')
       .reduce((sum, p) => sum + (p.visit_minutes || 60), 0);
     const budget = minutesPerDay * dayCount;
+    // Suwak "ile czasu zaplanować": reszta okna ma zostać pusta z rozmysłu.
+    // Dzień wypełniony co do minuty to lista zadań, nie plan wyjazdu.
+    const fillPercent = Math.min(100, Math.max(0, body.fill_percent ?? 70));
+    const plannedBudget = Math.round(budget * fillPercent / 100);
 
     // Tablica użytkownika jest inspiracją, nie ramą — ktoś może przypiąć jedno
     // miejsce i oczekiwać, że resztę dnia agent zaproponuje sam. Bez puli
@@ -576,7 +581,10 @@ ${fillerLines ? `ZWERYFIKOWANE MIEJSCA W TYM MIEŚCIE, KTÓRYCH UŻYTKOWNIK NIE 
 (możesz i POWINIENEŚ nimi wypełnić resztę dnia — kopiuj nazwy dokładnie):
 ${fillerLines}` : ''}
 
-BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a budżet to ${Math.round(budget / 60)} h. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
+BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a całe okno to ${Math.round(budget / 60)} h.
+
+WYPEŁNIENIE DNIA: ${fillPercent}%. Zaplanuj ok. ${Math.round(plannedBudget / 60 * 10) / 10} h konkretnych punktów na cały wyjazd, a POZOSTAŁE ${Math.round((budget - plannedBudget) / 60 * 10) / 10} h ZOSTAW PUSTE Z ROZMYSŁU. To nie jest czas do zapełnienia — użytkownik świadomie poprosił o luz na włóczenie się, przypadkowe przystanki i dłuższe siedzenie tam, gdzie mu się spodoba.${fillPercent <= 40 ? ' Przy tak niskim wypełnieniu wybierz TYLKO najważniejsze kotwice i nie dokładaj propozycji z listy poniżej.' : ''}${fillPercent >= 90 ? ' Przy tak wysokim wypełnieniu możesz zagęścić dzień i dołożyć propozycje z listy.' : ''}
+W polu "summary" każdego dnia napisz jednym zdaniem, ile czasu zostaje wolnego i co można w nim zrobić w tej okolicy. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
 
 ZASADY:
 1. Miejsca oznaczone KONIECZNIE mają pierwszeństwo — wstaw je najpierw, w dniach, w których są otwarte.

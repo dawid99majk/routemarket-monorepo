@@ -18,7 +18,7 @@ export default function Index() {
 
   const start = () => {
     if (loading) return;
-    navigate(loggedIn ? '/route-builder-v2' : '/auth');
+    navigate(loggedIn ? '/plany' : '/auth');
   };
 
   return (
@@ -39,7 +39,7 @@ export default function Index() {
               <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>Zaloguj się</Button>
             )}
             <Button size="sm" onClick={start} className="bg-emerald-600 hover:bg-emerald-500">
-              <Wand2 className="w-4 h-4 mr-1.5" /> Zaplanuj trasę
+              <Wand2 className="w-4 h-4 mr-1.5" /> Zaplanuj wyjazd
             </Button>
           </div>
         </div>
@@ -48,18 +48,18 @@ export default function Index() {
       <main>
         <section className="max-w-5xl mx-auto px-4 pt-20 pb-16 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight max-w-3xl mx-auto leading-tight">
-            Trasy układane pod Ciebie, nie pod średnią
+Wyjazdy układane pod Ciebie, nie pod średnią
           </h1>
           <p className="text-lg text-muted-foreground mt-5 max-w-2xl mx-auto leading-relaxed">
-            Powiedz, dokąd jedziesz i ile masz czasu. Agent rozezna teren, pokaże warianty
-            i ułoży trasę z prawdziwych miejsc — z plikiem GPX i przewodnikiem.
+            Zbieraj miejsca, które chcesz zobaczyć, tygodniami albo w jeden wieczór.
+            Kiedy będziesz gotowy, ułożymy z nich dni i wyznaczymy przebieg — z plikiem GPX i przewodnikiem.
           </p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Button size="lg" onClick={start} className="bg-emerald-600 hover:bg-emerald-500">
-              <Wand2 className="w-4 h-4 mr-2" /> Zaplanuj trasę
+              <CalendarDays className="w-4 h-4 mr-2" /> Zacznij zbierać miejsca
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/plany' : '/auth')}>
-              <CalendarDays className="w-4 h-4 mr-2" /> Zbierz miejsca na wyjazd
+            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/my-routes' : '/auth')}>
+              <Wand2 className="w-4 h-4 mr-2" /> Twoje trasy
             </Button>
           </div>
         </section>
@@ -93,12 +93,13 @@ export default function Index() {
         <section className="border-t bg-muted/30">
           <div className="max-w-5xl mx-auto px-4 py-16 text-center">
             <Sparkles className="w-8 h-8 text-emerald-600 mx-auto" />
-            <h2 className="text-2xl font-bold mt-4">Zacznij od jednego zdania</h2>
+            <h2 className="text-2xl font-bold mt-4">Zacznij od jednego miejsca</h2>
             <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
-              „Tirana, trzy godziny wieczorem, miejsca związane ze sztuką" wystarczy, żeby ruszyć.
+              Wpisz „Tirana" i dorzuć pierwszą rzecz, którą chcesz zobaczyć. Resztę możesz dokładać tygodniami —
+              tablica poczeka, a plan powstanie wtedy, kiedy będziesz gotowy.
             </p>
             <Button size="lg" onClick={start} className="mt-6 bg-emerald-600 hover:bg-emerald-500">
-              Zaplanuj trasę
+              Zacznij zbierać miejsca
             </Button>
           </div>
         </section>
