@@ -93,6 +93,26 @@ function MapResizer({ geometry }: { geometry: any }) {
   return null;
 }
 
+/**
+ * Karta punktu rośnie już po otwarciu — najpierw pojawia się opis, potem zdjęcia.
+ * Leaflet przesuwa mapę tylko w momencie otwierania dymka, więc rozrośnięta karta
+ * wychodziła poza kadr i nikt jej nie dosuwał. Po każdej zmianie treści prosimy
+ * dymek o przeliczenie układu, co uruchamia wbudowane autoPan.
+ */
+function PopupAutoFit({ dep }: { dep: string }) {
+  const map = useMap();
+  useEffect(() => {
+    const popup = (map as any)._popup;
+    if (!popup) return;
+    // Dwie klatki: pierwsza na przeliczenie wysokości przez przeglądarkę
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      try { popup.update(); } catch { /* dymek zamknięty w międzyczasie */ }
+    }));
+    return () => cancelAnimationFrame(id);
+  }, [dep, map]);
+  return null;
+}
+
 function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
   useMapEvents({
     click(e) {
@@ -194,7 +214,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       // Klik w strzałkę galerii lądował na mapie i otwierał "dodaj punkt".
       L.DomEvent.disableClickPropagation(el);
       L.DomEvent.disableScrollPropagation(el);
-      L.DomEvent.on(el, 'mousedown dblclick pointerdown touchstart', L.DomEvent.stopPropagation);
+      // disableClickPropagation nie zatrzymuje samego 'click' — polega na fladze,
+      // po której Leaflet ma go pominąć. Gdy ta ścieżka zawiedzie, klik w strzałkę
+      // galerii dociera do mapy: karta się zamyka i wyskakuje "dodaj punkt".
+      // Natywny stopPropagation w fazie bąbelkowania kończy sprawę: przycisk swój
+      // handler już wykonał, a do kontenera mapy zdarzenie po prostu nie dochodzi.
+      L.DomEvent.on(el, 'click mousedown dblclick pointerdown touchstart', L.DomEvent.stopPropagation);
     }
   };
 
@@ -1206,7 +1231,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 click: () => handleMarkerClick(wp, i)
               }}
             >
-              <Popup maxWidth={400} minWidth={340} autoPan autoPanPadding={[24, 24]}>
+              <Popup maxWidth={400} minWidth={340} autoPan keepInView autoPanPaddingTopLeft={[28, 28]} autoPanPaddingBottomRight={[28, 60]}>
                 {(() => {
                   const key = pointKeyOf(wp, i);
                   const details = poiDetails[key];
@@ -1222,6 +1247,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   ref={disablePropagation}
                   className="w-[340px] max-w-[calc(100vw-4rem)] text-left p-1 text-slate-800 font-sans"
                 >
+                  <PopupAutoFit dep={`${key}|${photos.length}|${idx}|${expanded}|${details?.loading ? 'l' : 'g'}`} />
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
                     <span className="font-bold text-sm text-slate-800 truncate block pr-2" title={key}>
                       {key}
