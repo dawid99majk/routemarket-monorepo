@@ -250,13 +250,23 @@ export class PoiService {
     // Każde zapytanie samodzielnie znosi awarię — wynik jednego jest wart więcej
     // niż nic, a Overpass potrafi obsłużyć jedno, a wywrócić się na drugim.
     let degraded = false;
-    const queries: Promise<OverpassElement[]>[] = [
-      this.runQuery(this.buildQuery(bbox, typeKey, true), `${cacheKey}/notable`).catch((err) => {
-        console.warn(`[POI] Notable query failed: ${err.message}`);
-        degraded = true;
-        return [] as OverpassElement[];
-      })
-    ];
+
+    // Zapytanie "notable" szuka obiektów z wpisem w Wikidata. Dla restauracji i
+    // parkingów takich po prostu nie ma, więc query zawsze wracało puste albo z
+    // timeoutem — a to oznaczało wynik "niepełny", którego nie wolno zapisać w
+    // cache'u. Każda tura wywiadu płaciła więc pełny timeout Overpassa za listę,
+    // która i tak nigdy nic nie wnosiła.
+    const NO_NOTABLE = new Set(['food', 'parking', 'hotel', 'nightlife']);
+    const queries: Promise<OverpassElement[]>[] = [];
+    if (!NO_NOTABLE.has(typeKey)) {
+      queries.push(
+        this.runQuery(this.buildQuery(bbox, typeKey, true), `${cacheKey}/notable`).catch((err) => {
+          console.warn(`[POI] Notable query failed: ${err.message}`);
+          degraded = true;
+          return [] as OverpassElement[];
+        })
+      );
+    }
     if (options.includeMinor !== false) {
       queries.push(
         this.runQuery(this.buildQuery(bbox, typeKey, false), `${cacheKey}/all`).catch((err) => {
