@@ -1256,6 +1256,49 @@ app.post('/chat-interview', async (c) => {
         console.warn('[chat-interview] POI candidates fetch failed, continuing without:', err);
       }
       if (poiMatchPool.length === 0) poiMatchPool = poiCandidates;
+
+      // Parkingi: tylko dla przyjeżdżających autem. Wymyślony przez model
+      // "Parking przy Starym Bazarze" zakotwiczył kiedyś całą trasę po Krujë
+      // w Nowym Sączu — dlatego parking musi pochodzić z OSM razem ze
+      // współrzędnymi, a nie z nazwy oddanej geokoderowi.
+      const arrivesByCar = vehicle_type === 'car' || vehicle_type === 'motorcycle'
+        || trip_profile?.arrival === 'car';
+      if (arrivesByCar) {
+        try {
+          const parkings = await poiService.fetchCandidates(poiCenter, 'parking', { radiusKm: 3, limit: 8 });
+          if (parkings.length > 0) {
+            poiMatchPool = [...poiMatchPool, ...parkings];
+            projectContext += `\n\nPARKINGI W OKOLICY (prawdziwe, z OpenStreetMap — kopiuj nazwy DOKŁADNIE):\n`
+              + parkings.map((p) => {
+                  const oplata = p.fee === 'yes' ? 'płatny' : (p.fee === 'no' ? 'bezpłatny' : 'opłata nieznana');
+                  const miejsca = p.capacity ? `, ${p.capacity} miejsc` : '';
+                  return `- "${p.name}" (${oplata}${miejsca})`;
+                }).join('\n')
+              + `\nGdy pytasz o punkt startu, zaproponuj 2-3 z tej listy jako karty wyboru: w "subtitle" podaj opłatę i liczbę miejsc, w "description" napisz, ile stąd idzie się do pierwszej atrakcji. NIGDY nie wymyślaj parkingu spoza listy.`;
+            console.log(`[chat-interview] ${parkings.length} parkingów w puli`);
+          }
+        } catch (err) {
+          console.warn('[chat-interview] Nie udało się pobrać parkingów:', err);
+        }
+      }
+
+      // Jedzenie: przy spacerze po mieście temat wraca zawsze, bo miasto zwiedza
+      // się między posiłkami. Na szlaku czy w trasie rowerowej to szum.
+      const isCityWalk = poiRouteType === 'city_walk' || poiRouteType === 'city';
+      if (isCityWalk) {
+        try {
+          const food = await poiService.fetchCandidates(poiCenter, 'food', { radiusKm: 3, limit: 12 });
+          if (food.length > 0) {
+            poiMatchPool = [...poiMatchPool, ...food];
+            projectContext += `\n\nLOKALE W OKOLICY (prawdziwe, z OpenStreetMap — kopiuj nazwy DOKŁADNIE):\n`
+              + food.map((f) => `- "${f.name}" (${f.kind}${f.openingHours ? `, godziny: ${f.openingHours}` : ''})`).join('\n')
+              + `\nW spacerze po mieście ZAWSZE zapytaj raz o przerwę na jedzenie — najlepiej po ustaleniu charakteru trasy, a przed jej wygenerowaniem (faza "refine"). Daj 2-3 karty z tej listy plus kartę "bez przerwy". Na karcie napisz typ lokalu i godziny otwarcia. Wybrane miejsce wstaw w trasę TAM, GDZIE WYPADA PORA POSIŁKU — między punktami, a nie na końcu listy. NIGDY nie wymyślaj lokalu spoza listy.`;
+            console.log(`[chat-interview] ${food.length} lokali w puli`);
+          }
+        } catch (err) {
+          console.warn('[chat-interview] Nie udało się pobrać lokali:', err);
+        }
+      }
     }
     if (poiCandidates.length > 0) {
       projectContext += poiService.buildPromptSection(poiCandidates, routing_preference);
@@ -1808,7 +1851,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
         // HTTP (warianty nazwy × przebieg zawężony i globalny), więc przy
         // kilkunastu punktach to była większość czasu odpowiedzi.
         const placeNames: string[] = resultObj.add_waypoints;
-        const resolved: Array<{ lat: number; lng: number; name: string } | null> =
+        const resolved: Array<{ lat: number; lng: number; name: string; kind?: string } | null> =
           new Array(placeNames.length).fill(null);
 
         let cursor = 0;
@@ -1816,7 +1859,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
           const placeName = placeNames[cursor];
           const matched = poiService.matchCandidate(placeName, poiMatchPool, poiCenter || biasPoint);
           if (matched) {
-            resolved[cursor] = { lat: matched.lat, lng: matched.lng, name: placeName };
+            resolved[cursor] = { lat: matched.lat, lng: matched.lng, name: placeName, kind: matched.kind };
             biasPoint = { lat: matched.lat, lng: matched.lng };
           } else {
             try {
@@ -1840,7 +1883,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
           const placeName = placeNames[i];
           const matched = poiService.matchCandidate(placeName, poiMatchPool, poiCenter || biasPoint);
           if (matched) {
-            resolved[i] = { lat: matched.lat, lng: matched.lng, name: placeName };
+            resolved[i] = { lat: matched.lat, lng: matched.lng, name: placeName, kind: matched.kind };
           } else {
             needGeocoding.push(i);
           }
@@ -1973,7 +2016,7 @@ WAZNE: nazwy punktow w add_waypoints kopiuj DOKLADNIE, znak w znak, tak jak wyst
               for (const name of corrected) {
                 const matched = poiService.matchCandidate(name, poiMatchPool, poiCenter || biasPoint);
                 if (matched) {
-                  rebuilt.push({ lat: matched.lat, lng: matched.lng, name });
+                  rebuilt.push({ lat: matched.lat, lng: matched.lng, name, kind: matched.kind });
                   continue;
                 }
                 const prev = finalWaypoints.find((w: any) => w.name === name);

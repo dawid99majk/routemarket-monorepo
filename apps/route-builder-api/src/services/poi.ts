@@ -10,6 +10,9 @@ export interface PoiCandidate {
   rank?: number;
   openingHours?: string;
   website?: string;
+  /** Parkingi: opłata i pojemność decydują o wyborze bardziej niż nazwa. */
+  fee?: string;
+  capacity?: string;
 }
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -65,6 +68,11 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
   hotel: [
     'nwr["tourism"~"^(hotel|hostel|guest_house|apartment)$"]["name"]'
   ],
+  // Parkingi: punkt startu dla przyjeżdżających autem. Prywatnych nie pokazujemy,
+  // bo nie da się na nich stanąć.
+  parking: [
+    'nwr["amenity"="parking"]["access"!~"^(private|no|customers)$"]'
+  ],
   hiking: [
     'node["natural"~"^(peak|saddle|waterfall|cave_entrance)$"]["name"]',
     'node["tourism"="viewpoint"]["name"]',
@@ -110,6 +118,7 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
 const ROUTE_TYPE_ALIASES: Record<string, string> = {
   green: 'green',
   food: 'food',
+  parking: 'parking',
   nightlife: 'nightlife',
   hotel: 'hotel',
   hiking: 'hiking',
@@ -128,6 +137,7 @@ const ROUTE_TYPE_ALIASES: Record<string, string> = {
 const DEFAULT_RADIUS_KM: Record<string, number> = {
   green: 8,
   food: 6,
+  parking: 5,
   nightlife: 6,
   hotel: 8,
   hiking: 15,
@@ -273,11 +283,20 @@ export class PoiService {
     const candidates: PoiCandidate[] = [];
     for (const el of elements) {
       const tags = el.tags || {};
-      const name = tags.name;
+      const isParking = tags.amenity === 'parking';
+      // Większość parkingów w OSM nie ma nazwy własnej. Etykietę składamy z tego,
+      // co jest — operatora albo ulicy — bo to tylko podpis: o położeniu decydują
+      // współrzędne prosto z OSM, więc nic tu nie trzeba geokodować ani zgadywać.
+      const name = tags.name || (isParking
+        ? ['Parking', tags.operator || tags['addr:street'] || ''].filter(Boolean).join(' — ')
+        : undefined);
       const lat = el.lat ?? el.center?.lat;
       const lng = el.lon ?? el.center?.lon;
       if (!name || lat == null || lng == null) continue;
-      const dedupeKey = name.toLowerCase();
+      // Bezimienne parkingi mają tę samą etykietę, więc odsiewamy je po położeniu
+      const dedupeKey = tags.name
+        ? name.toLowerCase()
+        : `${name.toLowerCase()}|${lat.toFixed(4)},${lng.toFixed(4)}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
       candidates.push({
@@ -289,7 +308,9 @@ export class PoiService {
         score: scoreElement(tags),
         wikipedia: tags.wikipedia || tags['wikipedia:pl'],
         openingHours: tags.opening_hours,
-        website: tags.website || tags['contact:website']
+        website: tags.website || tags['contact:website'],
+        fee: tags.fee,
+        capacity: tags.capacity
       });
     }
 

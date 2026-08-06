@@ -68,6 +68,19 @@ const toGeoJsonCoords = (stored: any[], waypoints?: any[]): number[][] => {
 // A green icon for start, red for end, blue for intermediate.
 // Ikony idą z jsDelivr, nie z raw.githubusercontent.com — ten drugi nie jest
 // hostingiem zasobów, bywa dławiony i potrafi po cichu zniknąć z mapy.
+/**
+ * Parking i lokal gastronomiczny czyta się z mapy inaczej niż zabytek: jeden jest
+ * miejscem, gdzie zostawiasz auto, drugi przerwą w zwiedzaniu. Kolor pinezki
+ * mówi to bez otwierania karty.
+ */
+const iconColorForKind = (kind?: string, type?: string): string => {
+  if (type === 'start') return 'green';
+  if (type === 'end') return 'red';
+  if (kind === 'parking') return 'grey';
+  if (kind === 'food') return 'orange';
+  return 'blue';
+};
+
 const createIcon = (color: string) => {
   return new L.Icon({
     iconUrl: `https://cdn.jsdelivr.net/gh/pointhi/leaflet-color-markers@master/img/marker-icon-2x-${color}.png`,
@@ -1238,7 +1251,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             <Marker 
               key={`${i}-${wp.lat}-${wp.lng}`} 
               position={[wp.lat, wp.lng]} 
-              icon={wp.type === 'start' ? startIcon : (wp.type === 'end' ? endIcon : wpIcon)}
+              icon={createIcon(iconColorForKind(wp.kind, wp.type))}
               draggable={true}
               eventHandlers={{
                 dragend: (e) => handleMarkerDrag(i, e),
@@ -1267,7 +1280,11 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                       {key}
                     </span>
                     <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded tracking-wider shrink-0">
-                      {wp.type === 'start' ? 'Start' : (wp.type === 'end' ? 'Meta' : `Stop ${i}`)}
+                      {wp.type === 'start' ? 'Start'
+                        : wp.type === 'end' ? 'Meta'
+                        : wp.kind === 'parking' ? 'Parking'
+                        : wp.kind === 'food' ? 'Przerwa'
+                        : `Stop ${i}`}
                     </span>
                   </div>
 
