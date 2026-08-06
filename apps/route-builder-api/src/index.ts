@@ -397,7 +397,9 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
     let places: any[] | null = null;
     try {
       const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      if (stripped.startsWith('{')) places = JSON.parse(stripped).places;
+      const first = stripped.indexOf('{');
+      const last = stripped.lastIndexOf('}');
+      if (first >= 0 && last > first) places = JSON.parse(stripped.slice(first, last + 1)).places;
     } catch { /* poniżej wymuszamy strukturę */ }
 
     if (!Array.isArray(places)) {
@@ -435,11 +437,44 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
       places = text ? JSON.parse(text).places : [];
     }
 
-    // Dowiązanie do OSM: współrzędne i godziny otwarcia biorą się z bazy, nie z modelu
-    const results = await Promise.all(
+    // Cała wartość planera stoi na tym, że miejsce wchodzi na tablicę ZE
+    // WSPÓŁRZĘDNYMI. Propozycja bez nich zmusiłaby później planer albo routing do
+    // geokodowania po nazwie — a to jest dokładnie ten krok, przez który trasa po
+    // Krujë wylądowała w Nowym Sączu. Dlatego: najpierw dopasowanie do OSM, potem
+    // geokodowanie ograniczone do okolicy celu, a jeśli i to zawiedzie —
+    // propozycja wypada z wyników.
+    const KM_LIMIT = 40;
+    const kmFromCenter = (lat: number, lng: number) => {
+      const dLat = (lat - center.lat) * 111;
+      const dLng = (lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
+
+    const resolved = await Promise.all(
       (places || []).slice(0, limit || 10).map(async (pl: any) => {
         const matched = poiService.matchCandidate(pl.name, candidates, { lat: center.lat, lng: center.lng });
-        const wiki = await fetchWikiCard(matched?.wikipedia);
+        let lat = matched?.lat ?? null;
+        let lng = matched?.lng ?? null;
+
+        if (lat == null) {
+          try {
+            const geo = await geocodingService.geocodeSinglePoint(pl.name, { lat: center.lat, lng: center.lng }, KM_LIMIT);
+            if (geo && kmFromCenter(geo.lat, geo.lng) <= KM_LIMIT) {
+              lat = geo.lat;
+              lng = geo.lng;
+            }
+          } catch { /* nierozpoznana nazwa — odsiewamy niżej */ }
+        }
+        if (lat == null || lng == null) {
+          console.log(`[discover] Odrzucone (brak położenia): "${pl.name}"`);
+          return null;
+        }
+
+        const [wiki, photos] = await Promise.all([
+          fetchWikiCard(matched?.wikipedia),
+          fetchNearbyPhotos(pl.name, lat, lng, 3)
+        ]);
+
         return {
           name: pl.name,
           category: pl.category || 'attraction',
@@ -447,16 +482,21 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
           why: pl.why || '',
           visit_minutes: pl.visit_minutes || null,
           price_hint: pl.price_hint || null,
-          lat: matched?.lat ?? null,
-          lng: matched?.lng ?? null,
+          lat,
+          lng,
+          distance_km: Math.round(kmFromCenter(lat, lng) * 10) / 10,
           opening_hours: matched?.openingHours ?? null,
           website: matched?.website ?? null,
-          image_url: wiki.image ?? null,
+          image_url: wiki.image ?? photos[0] ?? null,
+          photos,
           wiki_extract: wiki.extract ?? null,
           verified: !!matched
         };
       })
     );
+
+    const results = resolved.filter(Boolean);
+    console.log(`[discover] "${query}" w ${destination}: ${results.length} z ${(places || []).length} propozycji ma położenie`);
 
     return c.json({ destination, center: { lat: center.lat, lng: center.lng }, places: results });
   } catch (err: any) {

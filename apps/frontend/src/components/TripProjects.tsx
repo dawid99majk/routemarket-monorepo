@@ -75,13 +75,48 @@ const CATEGORY_ICON: Record<string, any> = {
 };
 
 /** Podpowiedzi zapytań — pokazują, że można pytać naturalnie, a nie słowami kluczowymi. */
-const SUGGESTIONS = [
-  'najciekawsze muzea',
-  'lokalny street food, nie turystyczne pułapki',
-  'klimatyczne kawiarnie',
-  'co robić wieczorem',
-  'hotel blisko centrum'
-];
+/**
+ * Pusta tablica jest gorsza niż puste pole czatu: czat sam coś proponuje, tablica
+ * każe wymyślić zapytanie. Gotowe tropy zdejmują ten pierwszy opór, a ich dobór
+ * idzie za charakterem wyjazdu — na delegacji i z dziećmi szuka się czego innego.
+ */
+const SUGGESTION_SETS: Record<string, string[]> = {
+  default: [
+    'klasyki, których nie wypada pominąć',
+    'miejsca nieoczywiste, z dala od tłumów',
+    'parki, bulwary i zieleń',
+    'lokalny street food, nie turystyczne pułapki',
+    'klimatyczne kawiarnie',
+    'co robić wieczorem'
+  ],
+  family: [
+    'atrakcje dla dzieci',
+    'parki i place zabaw',
+    'muzea, w których można czegoś dotknąć',
+    'gdzie zjeść z dzieckiem',
+    'klasyki, których nie wypada pominąć',
+    'miejsce na przerwę i lody'
+  ],
+  business: [
+    'jedna rzecz, którą trzeba zobaczyć',
+    'dobra kolacja blisko centrum',
+    'kawiarnia do pracy',
+    'krótki spacer na godzinę'
+  ],
+  couple: [
+    'klimatyczne kawiarnie',
+    'punkty widokowe o zachodzie',
+    'kolacja na wieczór',
+    'miejsca nieoczywiste, z dala od tłumów',
+    'spacer wzdłuż wody'
+  ],
+  solo: [
+    'miejsca nieoczywiste, z dala od tłumów',
+    'najlepsze kadry w mieście',
+    'targi, bazary i codzienne życie',
+    'sztuka współczesna i galerie'
+  ]
+};
 
 export default function TripProjects() {
   const navigate = useNavigate();
@@ -755,7 +790,7 @@ export default function TripProjects() {
                 </Button>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {SUGGESTIONS.map((sug) => (
+                {(SUGGESTION_SETS[active.trip_type || ''] ?? SUGGESTION_SETS.default).map((sug) => (
                   <button key={sug} onClick={() => { setQuery(sug); search(sug); }}
                     className="text-xs bg-muted hover:bg-muted/70 rounded-full px-2.5 py-1 text-muted-foreground">
                     {sug}
