@@ -113,10 +113,24 @@ function PopupAutoFit({ dep }: { dep: string }) {
   return null;
 }
 
-function ClickableMap({ onMapClick }: { onMapClick: (latlng: L.LatLng) => void }) {
+/**
+ * Dodawanie punktów siedzi na prawym przycisku, nie na zwykłym kliknięciu.
+ * Wcześniej każde tknięcie mapy otwierało menu "ustaw jako start / dodaj do
+ * trasy" — także to, którym zamyka się kartę punktu. Zamknięcie karty musi być
+ * ruchem bez konsekwencji, a dodanie przystanku to decyzja, więc należy jej się
+ * osobny gest. Na dotyku Leaflet zgłasza dłuższe przytrzymanie jako to samo
+ * zdarzenie, więc gest działa i tam.
+ */
+function ClickableMap({ onMapClick, onDismiss }: {
+  onMapClick: (latlng: L.LatLng) => void;
+  onDismiss: () => void;
+}) {
   useMapEvents({
-    click(e) {
+    contextmenu(e) {
       onMapClick(e.latlng);
+    },
+    click() {
+      onDismiss();
     },
   });
   return null;
@@ -1205,7 +1219,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             maxZoom={18}
           />
           
-          <ClickableMap onMapClick={handleMapClick} />
+          <ClickableMap onMapClick={handleMapClick} onDismiss={() => setTempMarker(null)} />
 
           {geometry && geometry.coordinates && (
             <Polyline 
@@ -1367,7 +1381,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           {tempMarker && (
             <Popup position={[tempMarker.lat, tempMarker.lng]}>
               <div ref={disablePropagation} className="flex flex-col gap-2 min-w-[140px] p-1">
-                <p className="text-xs font-bold text-slate-700 mb-1 text-center">Opcje punktu</p>
+                <p className="text-xs font-bold text-slate-700 mb-1 text-center">Nowy punkt w tym miejscu</p>
                 <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('start')}>
                   <div className="w-2 h-2 rounded-full bg-green-500 mr-2" /> Ustaw jako Start
                 </Button>
@@ -1383,6 +1397,13 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           
           <MapResizer geometry={geometry} />
         </MapContainer>
+
+        {/* Gest niewidoczny to gest nieistniejący — mówimy o nim wprost */}
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000]
+                        bg-slate-900/70 text-white/90 text-[11px] px-3 py-1.5 rounded-full
+                        backdrop-blur-sm whitespace-nowrap">
+          Prawy przycisk myszy na mapie (lub przytrzymanie) — dodaj punkt do trasy
+        </div>
         
         {/* Na wąskim ekranie panel jest zwinięty — to jedyne wejście do rozmowy i szczegółów. */}
         {!panelOpen && (
