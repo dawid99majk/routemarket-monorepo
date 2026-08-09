@@ -44,6 +44,7 @@ export default function PlacePage() {
   const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
   const [myBoards, setMyBoards] = useState<{ id: string; name: string }[]>([]);
   const [similar, setSimilar] = useState<CatalogPlace[]>([]);
+  const [myCollections, setMyCollections] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (!slug) return;
@@ -60,17 +61,19 @@ export default function PlacePage() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
-      const [{ data: fav }, { data: pinned }, { data: mine }] = await Promise.all([
+      const [{ data: fav }, { data: pinned }, { data: mine }, { data: cols }] = await Promise.all([
         (supabase as any).from('place_favorites').select('place_id')
           .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
         (supabase as any).from('trip_project_places').select('project_id, trip_projects(id, name)')
           .eq('catalog_id', data.id),
-        (supabase as any).from('trip_projects').select('id, name').order('updated_at', { ascending: false })
+        (supabase as any).from('trip_projects').select('id, name').order('updated_at', { ascending: false }),
+        (supabase as any).from('collections').select('id, name').eq('user_id', userData.user.id).order('created_at', { ascending: false })
       ]);
       if (cancelled) return;
       setFavorite(!!fav);
       setBoards(((pinned ?? []) as any[]).map((r) => r.trip_projects).filter(Boolean));
       setMyBoards(mine ?? []);
+      setMyCollections(cols ?? []);
 
       // Podobne w klimacie: część wspólna znaczników nastroju, a przy ich braku
       // to samo miasto. Sortowanie po liczbie przypięć, bo to jedyny sygnał
@@ -117,6 +120,18 @@ export default function PlacePage() {
       setFavorite(true);
       toast.success('Dodano do ulubionych');
     }
+  };
+
+  const addToCollection = async (collectionId: string) => {
+    if (!place) return;
+    const { error } = await (supabase as any).from('collection_places')
+      .insert({ collection_id: collectionId, place_id: place.id });
+    if (error) {
+      // Duplikat to nie awaria — użytkownik chciał tam mieć to miejsce i ma je
+      if (error.code === '23505') return toast.info('To miejsce jest już w tej kolekcji');
+      return toast.error(error.message);
+    }
+    toast.success('Dodano do kolekcji');
   };
 
   const addToBoard = async (projectId: string) => {
@@ -267,6 +282,26 @@ export default function PlacePage() {
               {myBoards.map((b) => (
                 <Button key={b.id} variant="outline" size="sm" onClick={() => addToBoard(b.id)}>
                   <Plus className="w-3.5 h-3.5 mr-1.5" />{b.name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="p-4 space-y-3">
+          <h2 className="font-semibold text-sm">Dodaj do kolekcji</h2>
+          {myCollections.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Kolekcje to zbiory bez daty i celu — „kawiarnie, do których chcę kiedyś trafić”.{' '}
+              <button onClick={() => navigate('/kolekcje')} className="text-emerald-700 hover:underline">
+                Załóż pierwszą
+              </button>.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {myCollections.map((col) => (
+                <Button key={col.id} variant="outline" size="sm" onClick={() => addToCollection(col.id)}>
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />{col.name}
                 </Button>
               ))}
             </div>

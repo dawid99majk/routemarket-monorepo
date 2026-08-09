@@ -23,6 +23,7 @@ const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const PlacePage = lazy(() => import("./pages/PlacePage"));
 const Discover = lazy(() => import("./pages/Discover"));
 const Favorites = lazy(() => import("./pages/Favorites"));
+const Collections = lazy(() => import("./pages/Collections"));
 const TripPlans = lazy(() => import("./pages/TripPlans"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
 
@@ -93,6 +94,8 @@ const App = () => (
                   <Route path="/brand" element={<Brand />} />
 
                   {/* Authenticated routes */}
+                  <Route path="/kolekcje" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
+                  <Route path="/kolekcja/:slug" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/ulubione" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
                   <Route path="/miejsce/:slug" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />

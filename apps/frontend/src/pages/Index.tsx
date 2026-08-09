@@ -34,6 +34,7 @@ export default function Index() {
                 <Button variant="ghost" size="sm" onClick={() => navigate('/plany')}>Plany</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/odkrywaj')}>Odkrywaj</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/ulubione')}>Ulubione</Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/kolekcje')}>Kolekcje</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/my-routes')}>Moje trasy</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>Profil</Button>
               </>
