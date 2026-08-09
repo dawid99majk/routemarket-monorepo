@@ -47,29 +47,25 @@
 - Podglądy autorskie żyją w `.design-sync/previews/` i są w repozytorium — konwerter ich
   nie nadpisuje. Karty podstawowe (floor cards) to świadomy stan wyjściowy, nie awaria.
 
-## Stan wysyłki (sesja z 9 sierpnia)
+## Stan wysyłki
 
-Wysłane do projektu `a2a8e391-1182-467d-881f-903f0f158524`: sentinel, README z
-nagłówkiem konwencji, `styles.css`, `_ds_bundle.js`, `_ds_bundle.css`, `_vendor/`,
-17 skompilowanych podglądów oraz komponenty grup `actions` i `feedback` — łącznie 89 plików.
+Wysyłka **zakończona**: 999 plików w projekcie `a2a8e391-1182-467d-881f-903f0f158524`,
+kotwica `_ds_sync.json` zapisana jako ostatnia. Kwietniowa zawartość ręczna (`ui_kits/`,
+`assets/`, `preview/`, `video/`, `colors_and_type.css`, `SKILL.md`) nietknięta — lista
+kasowań była pusta. Dokument marki nie zginął: jego treść jest nagłówkiem README, więc
+trafia wprost do promptu agenta projektowego.
 
-**Kotwica `_ds_sync.json` NIE została zapisana i to jest celowe.** Kotwica poświadcza
-kompletność; zapisana nad częściową wysyłką sprawiłaby, że kolejna synchronizacja nigdy
-by tych braków nie naprawiła. Projekt jest w udokumentowanym stanie bezpiecznym: bez
-kotwicy następny przebieg weryfikuje i wysyła wszystko od nowa.
-
-Do dokończenia: grupy `forms`, `layout`, `navigation`, `overlays` (~910 plików).
-
-Wznowienie — z katalogu głównego kopii lokalnej:
+Kolejna synchronizacja jest przyrostowa — kotwica pozwala pominąć komponenty, które się
+nie zmieniły. Jedna komenda z katalogu głównego kopii lokalnej:
 
     ln -sfn ../.. apps/frontend/node_modules/@routemarket/frontend
     npx tailwindcss -c apps/frontend/tailwind.ds.config.cjs \
       -i apps/frontend/src/index.css -o apps/frontend/ds-styles.css --minify
     node .ds-sync/resync.mjs --config .design-sync/config.json \
-      --node-modules apps/frontend/node_modules --out ./ds-bundle
+      --node-modules apps/frontend/node_modules --out ./ds-bundle \
+      --remote .design-sync/.cache/remote-sync.json
 
-Potem `finalize_plan` z tym samym zestawem zapisów i wysyłka `ds-bundle/` w paczkach
-po 250 plików, na końcu `_ds_sync.json` jako ostatni zapis.
+Wcześniej pobierz kotwicę z projektu do `.design-sync/.cache/remote-sync.json`.
 
 **Arkusz `ds-styles.css` jest artefaktem budowania** — powstaje z `tailwind.ds.config.cjs`,
 którego zawartość obejmuje `src/components/ui/**` ORAZ `.design-sync/previews/**`. Bez tej
