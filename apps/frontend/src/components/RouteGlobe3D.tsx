@@ -390,15 +390,15 @@ export default function RouteGlobe3D({ track, className = '' }: RouteGlobe3DProp
   if (track.length < 2) return null;
 
   return (
-    <div className={`relative h-full w-full overflow-hidden rounded-xl bg-slate-950 ${className}`}>
+    <div className={`relative h-full w-full overflow-hidden rounded-xl bg-ink ${className}`}>
       <div ref={hostRef} className="h-full w-full" />
 
-      <div className="absolute left-3 top-3 rounded-full bg-slate-950/70 px-3 py-1 text-xs font-medium text-white backdrop-blur">
+      <div className="absolute left-3 top-3 rounded-full bg-ink/70 px-3 py-1 text-xs font-medium text-white backdrop-blur">
         {provider === 'google-3d' ? 'Google 3D' : 'Open Globe'}
       </div>
 
       {status !== 'ready' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/75">
+        <div className="absolute inset-0 flex items-center justify-center bg-ink/75">
           <div className="flex max-w-xs flex-col items-center gap-3 px-4 text-center text-white">
             {status === 'loading' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Globe className="h-6 w-6" />}
             <p className="text-sm text-white/85">

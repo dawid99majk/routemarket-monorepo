@@ -80,7 +80,7 @@ export default function MyRoutes() {
             <Logo />
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate('/plany')} className="mr-2">Plany</Button>
-          <Button size="sm" onClick={() => navigate('/plany')} className="bg-emerald-600 hover:bg-emerald-500">
+          <Button size="sm" onClick={() => navigate('/plany')} className="bg-primary hover:bg-primary/90">
             <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
           </Button>
         </div>
@@ -101,7 +101,7 @@ export default function MyRoutes() {
             <p className="text-muted-foreground max-w-md mx-auto">
               Trasy powstają teraz z planu wyjazdu: zbierasz miejsca na tablicy, układasz dzień, a przebieg wyznaczamy z tego, co wybrałeś.
             </p>
-            <Button onClick={() => navigate('/plany')} className="bg-emerald-600 hover:bg-emerald-500">
+            <Button onClick={() => navigate('/plany')} className="bg-primary hover:bg-primary/90">
               Zacznij od tablicy
             </Button>
           </div>
@@ -112,7 +112,7 @@ export default function MyRoutes() {
           const points = Array.isArray(reqs.waypoints) ? reqs.waypoints.length : 0;
           return (
             <div key={project.id} className="rounded-xl border p-4 flex items-center gap-4">
-              <MapPin className="w-5 h-5 text-emerald-600 shrink-0" />
+              <MapPin className="w-5 h-5 text-primary shrink-0" />
               <div className="flex-1 min-w-0">
                 <button
                   onClick={() => navigate(`/route-builder-v2?projectId=${project.id}`)}

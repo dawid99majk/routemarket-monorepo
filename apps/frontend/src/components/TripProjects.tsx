@@ -837,7 +837,7 @@ export default function TripProjects() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Pin className="w-5 h-5 text-emerald-600" />
+              <Pin className="w-5 h-5 text-primary" />
               Plany wyjazdów
             </CardTitle>
             <CardDescription>
@@ -874,7 +874,7 @@ export default function TripProjects() {
                     onClick={() => setForm({ ...form, tripType: form.tripType === preset.id ? '' : preset.id })}
                     className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
                       form.tripType === preset.id
-                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                        ? 'bg-primary border-primary text-white'
                         : 'bg-background hover:bg-muted'
                     }`}
                   >
@@ -883,7 +883,7 @@ export default function TripProjects() {
                 ))}
               </div>
             </div>
-            <Button onClick={createProject} className="sm:col-span-4 bg-emerald-600 hover:bg-emerald-500">
+            <Button onClick={createProject} className="sm:col-span-4 bg-primary hover:bg-primary/90">
               Utwórz plan
             </Button>
           </div>
@@ -903,7 +903,7 @@ export default function TripProjects() {
                 onClick={() => setActiveId(p.id)}
                 className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
                   p.id === activeId
-                    ? 'bg-emerald-600 border-emerald-600 text-white'
+                    ? 'bg-primary border-primary text-white'
                     : 'bg-background hover:bg-muted'
                 }`}
               >
@@ -926,7 +926,7 @@ export default function TripProjects() {
             <div className="flex items-center justify-between gap-3 border-t pt-4 flex-wrap">
               <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1.5 font-medium text-foreground">
-                  <MapPin className="w-4 h-4 text-emerald-600" />{active.destination}
+                  <MapPin className="w-4 h-4 text-primary" />{active.destination}
                 </span>
                 {active.days && active.hours_per_day && (
                   <>
@@ -940,7 +940,7 @@ export default function TripProjects() {
                 <button onClick={() => setEditingType((v) => !v)}
                   className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                     active.trip_type
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
                       : 'hover:bg-muted'
                   }`}>
                   {active.trip_type
@@ -953,7 +953,7 @@ export default function TripProjects() {
                 {tokens && (
                   <span
                     className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full ${
-                      tokens.balance < 10 ? 'bg-amber-50 text-amber-800' : 'text-muted-foreground'
+                      tokens.balance < 10 ? 'bg-warning/15 text-warning-foreground' : 'text-muted-foreground'
                     }`}
                     title={`Plan dni: ${tokens.prices?.['plan-trip'] ?? '?'} tokenów, wyznaczenie trasy: ${tokens.prices?.['live-route'] ?? '?'}`}
                   >
@@ -976,7 +976,7 @@ export default function TripProjects() {
             <div className="rounded-xl border bg-muted/30 px-4 py-3">
               <div className="flex items-baseline justify-between gap-3 mb-2">
                 <span className="text-sm font-medium">Ile czasu zaplanować</span>
-                <span className="text-sm font-semibold text-emerald-700 tabular-nums">
+                <span className="text-sm font-semibold text-primary tabular-nums">
                   {active.fill_percent ?? 70}%
                 </span>
               </div>
@@ -996,7 +996,7 @@ export default function TripProjects() {
                   <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-amber-500' : 'bg-emerald-500'
+                        budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
                       }`}
                       style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
                     />
@@ -1030,7 +1030,7 @@ export default function TripProjects() {
                     <button key={preset.id} title={preset.hint} onClick={() => changeTripType(preset.id)}
                       className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
                         active.trip_type === preset.id
-                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          ? 'bg-primary border-primary text-white'
                           : 'bg-background hover:bg-muted'
                       }`}>
                       {preset.label}
@@ -1055,7 +1055,7 @@ export default function TripProjects() {
                   className="pl-9 pr-24"
                 />
                 <Button size="sm" onClick={() => search(query)} disabled={searching || !query.trim()}
-                  className="absolute right-1 bg-emerald-600 hover:bg-emerald-500">
+                  className="absolute right-1 bg-primary hover:bg-primary/90">
                   {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Szukaj'}
                 </Button>
               </div>
@@ -1087,10 +1087,10 @@ export default function TripProjects() {
                       )}
                       <div className="p-3 space-y-2 flex-1 flex flex-col">
                         <div className="flex items-start gap-2">
-                          <Icon className="w-4 h-4 mt-0.5 text-emerald-600 shrink-0" />
+                          <Icon className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-sm leading-snug">{r.name}</div>
-                            {r.why && <div className="text-xs text-emerald-700 mt-0.5">{r.why}</div>}
+                            {r.why && <div className="text-xs text-primary mt-0.5">{r.why}</div>}
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed flex-1">
@@ -1105,12 +1105,12 @@ export default function TripProjects() {
                         </div>
                         {r.website && (
                           <a href={r.website} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-emerald-700 hover:underline inline-flex items-center gap-1">
+                            className="text-xs text-primary hover:underline inline-flex items-center gap-1">
                             <ExternalLink className="w-3 h-3" /> Strona miejsca
                           </a>
                         )}
                         <div className="flex gap-2 pt-1">
-                          <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-500 h-8"
+                          <Button size="sm" className="flex-1 bg-primary hover:bg-primary/90 h-8"
                             onClick={() => pin(r, 'must')}>
                             <Star className="w-3.5 h-3.5 mr-1" /> Chcę
                           </Button>
@@ -1154,7 +1154,7 @@ export default function TripProjects() {
                     )}
 
                     {placeCard.source === 'suggested' && (
-                      <span className="inline-block text-[10px] text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+                      <span className="inline-block text-[10px] text-primary bg-primary/10 rounded-full px-2 py-0.5">
                         propozycja agenta — nie ma jej jeszcze na Twojej tablicy
                       </span>
                     )}
@@ -1166,8 +1166,8 @@ export default function TripProjects() {
                     )}
                     {placeCard.description && <p className="text-sm leading-relaxed">{placeCard.description}</p>}
                     {placeCard.recommendation && (
-                      <p className="text-xs bg-emerald-50/70 border border-emerald-100 rounded-lg p-2.5 leading-relaxed">
-                        <strong className="block text-[10px] uppercase tracking-wider text-emerald-800 mb-0.5">Wskazówka</strong>
+                      <p className="text-xs bg-primary/10/70 border border-primary/30 rounded-lg p-2.5 leading-relaxed">
+                        <strong className="block text-[10px] uppercase tracking-wider text-primary mb-0.5">Wskazówka</strong>
                         {placeCard.recommendation}
                       </p>
                     )}
@@ -1177,7 +1177,7 @@ export default function TripProjects() {
                       {placeCard.minutes && <span>Czas: <strong className="text-foreground">{placeCard.minutes} min</strong></span>}
                       {placeCard.opening_hours && <span>Godziny: <strong className="text-foreground">{placeCard.opening_hours}</strong></span>}
                       {placeCard.website && (
-                        <a href={placeCard.website} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                        <a href={placeCard.website} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                           strona miejsca
                         </a>
                       )}
@@ -1192,11 +1192,11 @@ export default function TripProjects() {
             <div className="rounded-xl border bg-card">
               <div className="flex items-center justify-between px-4 py-2.5 border-b">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-emerald-600" />
+                  <CalendarDays className="w-4 h-4 text-primary" />
                   Co się dzieje w: {active.destination}
                 </h3>
                 <button onClick={refreshEvents} disabled={eventsBusy}
-                  className="text-xs text-emerald-700 hover:underline disabled:opacity-60 flex items-center gap-1">
+                  className="text-xs text-primary hover:underline disabled:opacity-60 flex items-center gap-1">
                   {eventsBusy
                     ? <><Loader2 className="w-3 h-3 animate-spin" /> Szukam…</>
                     : <>{events.length > 0 ? 'Odśwież' : 'Sprawdź wydarzenia'}</>}
@@ -1222,7 +1222,7 @@ export default function TripProjects() {
                       </div>
                       {ev.url && (
                         <a href={ev.url} target="_blank" rel="noreferrer"
-                          className="text-muted-foreground hover:text-emerald-600 shrink-0 mt-0.5" title="Strona wydarzenia">
+                          className="text-muted-foreground hover:text-primary shrink-0 mt-0.5" title="Strona wydarzenia">
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       )}
@@ -1233,15 +1233,15 @@ export default function TripProjects() {
             </div>
 
             {(outliers.length > 0 || duplicates.length > 0) && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 space-y-1.5">
+              <div className="rounded-xl border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">
                 {outliers.length > 0 && (
-                  <p className="text-xs text-amber-900">
+                  <p className="text-xs text-warning-foreground">
                     <strong>Daleko od reszty:</strong> {outliers.map((p) => p.name).join(', ')}.
                     {' '}Dojazd zje czas przeznaczony na zwiedzanie — rozważ osobny dzień albo odpuszczenie.
                   </p>
                 )}
                 {duplicates.length > 0 && (
-                  <p className="text-xs text-amber-900">
+                  <p className="text-xs text-warning-foreground">
                     <strong>Możliwe duplikaty:</strong> {duplicates.join('; ')} — to samo miejsce pod dwiema nazwami.
                   </p>
                 )}
@@ -1328,7 +1328,7 @@ export default function TripProjects() {
                                     )}
                                     {p.website && (
                                       <a href={p.website} target="_blank" rel="noopener noreferrer"
-                                        className="text-[10px] text-emerald-700 hover:underline inline-flex items-center gap-0.5">
+                                        className="text-[10px] text-primary hover:underline inline-flex items-center gap-0.5">
                                         <ExternalLink className="w-2.5 h-2.5" /> strona
                                       </a>
                                     )}
@@ -1357,7 +1357,7 @@ export default function TripProjects() {
 
             <div className="border-t pt-4 space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-emerald-600" /> Udostępnij tablicę
+                <Share2 className="w-4 h-4 text-primary" /> Udostępnij tablicę
               </h3>
               <div className="flex gap-2">
                 <Input
@@ -1411,7 +1411,7 @@ export default function TripProjects() {
             {places.length > 0 && (
               <div className="border-t pt-4 space-y-3">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-emerald-600" /> Ułóż plan dni
+                  <CalendarDays className="w-4 h-4 text-primary" /> Ułóż plan dni
                 </h3>
                 <div className="grid gap-2 sm:grid-cols-5">
                   <label className="text-xs text-muted-foreground">Od
@@ -1432,7 +1432,7 @@ export default function TripProjects() {
                           variant="outline"
                           className="mt-1 w-full justify-start font-normal text-sm h-10"
                         >
-                          <CalendarDays className="w-4 h-4 mr-2 text-emerald-600 shrink-0" />
+                          <CalendarDays className="w-4 h-4 mr-2 text-primary shrink-0" />
                           {planDate ? format(planDate, 'd MMMM yyyy', { locale: pl }) : 'Wybierz datę'}
                         </Button>
                       </PopoverTrigger>
@@ -1454,7 +1454,7 @@ export default function TripProjects() {
                       onChange={(e) => setPlanForm({ ...planForm, dinner: e.target.value })} className="mt-1" />
                   </label>
                   <Button onClick={buildPlan} disabled={planning}
-                    className="self-end bg-emerald-600 hover:bg-emerald-500">
+                    className="self-end bg-primary hover:bg-primary/90">
                     {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Zaplanuj'}
                   </Button>
                 </div>
@@ -1477,7 +1477,7 @@ export default function TripProjects() {
                       </span>
                       <button
                         onClick={() => buildRouteFrom(day.items || [], `dzień ${day.day}`)}
-                        className="text-xs font-normal text-emerald-700 hover:underline flex items-center gap-1"
+                        className="text-xs font-normal text-primary hover:underline flex items-center gap-1"
                       >
                         <Wand2 className="w-3.5 h-3.5" /> Zrób trasę z tego dnia
                       </button>
@@ -1514,7 +1514,7 @@ export default function TripProjects() {
                               <>
                                 <span>Do przejścia: <strong className="text-foreground">{measured.km.toFixed(1)} km</strong></span>
                                 <span>Marsz: <strong className="text-foreground">{Math.round(measured.h * 60)} min</strong></span>
-                                <span className="text-emerald-700">przeliczone po chodnikach</span>
+                                <span className="text-primary">przeliczone po chodnikach</span>
                               </>
                             ) : (
                               <>
@@ -1527,7 +1527,7 @@ export default function TripProjects() {
                               <button
                                 onClick={() => recalcDay(day)}
                                 disabled={exact === 'loading'}
-                                className="ml-auto flex items-center gap-1 text-emerald-700 hover:text-emerald-800 hover:underline disabled:opacity-60"
+                                className="ml-auto flex items-center gap-1 text-primary hover:text-primary hover:underline disabled:opacity-60"
                               >
                                 {exact === 'loading'
                                   ? <><Loader2 className="w-3 h-3 animate-spin" /> Liczę przebieg…</>
@@ -1548,12 +1548,12 @@ export default function TripProjects() {
                               <div className="font-medium flex items-center gap-2 flex-wrap">
                                 <button
                                   onClick={() => openPlaceCard(it)}
-                                  className="text-left hover:text-emerald-700 hover:underline decoration-dotted underline-offset-2"
+                                  className="text-left hover:text-primary hover:underline decoration-dotted underline-offset-2"
                                 >
                                   {it.name}
                                 </button>
                                 {suggested && (
-                                  <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 rounded-full px-1.5 py-0.5">
+                                  <span className="text-[10px] font-normal text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
                                     propozycja agenta
                                   </span>
                                 )}
@@ -1564,7 +1564,7 @@ export default function TripProjects() {
                               <button
                                 onClick={() => pinSuggestion(it)}
                                 title="Dodaj do tablicy"
-                                className="text-muted-foreground hover:text-emerald-600 shrink-0 mt-0.5"
+                                className="text-muted-foreground hover:text-primary shrink-0 mt-0.5"
                               >
                                 <Pin className="w-3.5 h-3.5" />
                               </button>
@@ -1580,10 +1580,10 @@ export default function TripProjects() {
                 ))}
 
                 {plan.not_scheduled?.length > 0 && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
-                    <div className="text-sm font-semibold text-amber-900 mb-1">Nie zmieściło się</div>
+                  <div className="rounded-xl border border-warning/40 bg-warning/60 p-3">
+                    <div className="text-sm font-semibold text-warning-foreground mb-1">Nie zmieściło się</div>
                     {plan.not_scheduled.map((n: any) => (
-                      <div key={n.name} className="text-xs text-amber-900/80">
+                      <div key={n.name} className="text-xs text-warning-foreground">
                         <strong>{n.name}</strong>{n.reason ? ` — ${n.reason}` : ''}
                       </div>
                     ))}
@@ -1594,7 +1594,7 @@ export default function TripProjects() {
                   <div className="space-y-1.5">
                     {plan.warnings.map((w: string, i: number) => (
                       <div key={i} className="flex gap-2 text-xs text-muted-foreground">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
                         <span>{w}</span>
                       </div>
                     ))}
@@ -1610,7 +1610,7 @@ export default function TripProjects() {
                 </Button>
 
                 {plan.question && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-900">
+                  <div className="rounded-xl border border-primary/30 bg-primary/10/60 p-3 text-sm text-primary">
                     {plan.question}
                   </div>
                 )}

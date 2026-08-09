@@ -59,7 +59,8 @@ function createPoiIcon(name: string, color: string = '#6366f1') {
   });
 }
 
-const startIcon = createCircleIcon('#10b981', 'S');
+// Szałwia z górnej części skali marki — czytelna na jasnym i ciemnym podkładzie
+const startIcon = createCircleIcon('#8FA376', 'S');
 const endIcon = createCircleIcon('#ef4444', 'E');
 
 function RouteDetailMapInner({ 
@@ -246,7 +247,7 @@ function RouteDetailMapInner({
       <div ref={containerRef} className="w-full h-full" />
       <button 
         onClick={handleLocateMe}
-        className="absolute top-4 right-4 z-[400] bg-white border border-slate-200 shadow-md text-slate-700 hover:text-emerald-600 rounded-full w-10 h-10 flex items-center justify-center transition-colors"
+        className="absolute top-4 right-4 z-[400] bg-white border border-border shadow-md text-foreground/80 hover:text-primary rounded-full w-10 h-10 flex items-center justify-center transition-colors"
         title="Centruj na mnie (Nawiguj)"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>

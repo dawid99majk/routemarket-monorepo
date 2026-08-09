@@ -55,14 +55,14 @@ export default function ReviewStep({ claims, onFinishReview, onBack }: ReviewSte
             localClaims.map((claim) => (
               <Card 
                 key={claim.id} 
-                className={`transition-all border-l-4 ${claim.verified ? 'bg-emerald-950/10 border-emerald-500 border-l-emerald-500' : 'bg-zinc-900/40 border-zinc-800 border-l-zinc-700'}`}
+                className={`transition-all border-l-4 ${claim.verified ? 'bg-ink border-primary border-l-primary' : 'bg-zinc-900/40 border-zinc-800 border-l-zinc-700'}`}
               >
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <Badge variant="outline" className="text-[9px] uppercase tracking-wider text-zinc-500 border-zinc-800 mb-1">
                       {claim.type || 'Fakt'}
                     </Badge>
-                    <p className={`text-sm font-medium ${claim.verified ? 'text-emerald-200' : 'text-zinc-300'}`}>
+                    <p className={`text-sm font-medium ${claim.verified ? 'text-primary-light' : 'text-zinc-300'}`}>
                       {claim.fact}
                     </p>
                   </div>
@@ -70,7 +70,7 @@ export default function ReviewStep({ claims, onFinishReview, onBack }: ReviewSte
                     variant={claim.verified ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => toggleVerify(claim.id)}
-                    className={claim.verified ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-zinc-800 text-zinc-400'}
+                    className={claim.verified ? 'bg-primary hover:bg-primary text-white' : 'border-zinc-800 text-zinc-400'}
                   >
                     {claim.verified ? <CheckCircle2 className="h-4 w-4 mr-2" /> : null}
                     {claim.verified ? 'Zatwierdzono' : 'Zatwierdź'}
@@ -99,14 +99,14 @@ export default function ReviewStep({ claims, onFinishReview, onBack }: ReviewSte
 
               <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-emerald-500 transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" 
+                  className="h-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" 
                   style={{ width: `${totalCount > 0 ? (verifiedCount / totalCount) * 100 : 100}%` }}
                 />
               </div>
 
               <div className="space-y-3 pt-4 border-t border-zinc-800">
                 <div className="flex items-start gap-2 text-[11px] text-zinc-400 leading-relaxed">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
                   <span>Zatwierdzone fakty zostaną użyte jako pewne źródło danych dla Gemini.</span>
                 </div>
                 <div className="flex items-start gap-2 text-[11px] text-zinc-400 leading-relaxed">

@@ -41,7 +41,7 @@ export default function Index() {
             ) : (
               <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>Zaloguj się</Button>
             )}
-            <Button size="sm" onClick={start} className="bg-emerald-600 hover:bg-emerald-500">
+            <Button size="sm" onClick={start} className="bg-primary hover:bg-primary/90">
               <Wand2 className="w-4 h-4 mr-1.5" /> Zaplanuj wyjazd
             </Button>
           </div>
@@ -58,7 +58,7 @@ Wyjazdy układane pod Ciebie, nie pod średnią
             Kiedy będziesz gotowy, ułożymy z nich dni i wyznaczymy przebieg — z plikiem GPX i przewodnikiem.
           </p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
-            <Button size="lg" onClick={start} className="bg-emerald-600 hover:bg-emerald-500">
+            <Button size="lg" onClick={start} className="bg-primary hover:bg-primary/90">
               <CalendarDays className="w-4 h-4 mr-2" /> Zacznij zbierać miejsca
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/odkrywaj' : '/auth')}>
@@ -86,7 +86,7 @@ Wyjazdy układane pod Ciebie, nie pod średnią
             }
           ].map(({ Icon, title, text }) => (
             <div key={title} className="rounded-2xl border p-6">
-              <Icon className="w-6 h-6 text-emerald-600" />
+              <Icon className="w-6 h-6 text-primary" />
               <h2 className="font-semibold mt-4">{title}</h2>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{text}</p>
             </div>
@@ -95,13 +95,13 @@ Wyjazdy układane pod Ciebie, nie pod średnią
 
         <section className="border-t bg-muted/30">
           <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-            <Sparkles className="w-8 h-8 text-emerald-600 mx-auto" />
+            <Sparkles className="w-8 h-8 text-primary mx-auto" />
             <h2 className="text-2xl font-bold mt-4">Zacznij od jednego miejsca</h2>
             <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
               Wpisz „Tirana" i dorzuć pierwszą rzecz, którą chcesz zobaczyć. Resztę możesz dokładać tygodniami —
               tablica poczeka, a plan powstanie wtedy, kiedy będziesz gotowy.
             </p>
-            <Button size="lg" onClick={start} className="mt-6 bg-emerald-600 hover:bg-emerald-500">
+            <Button size="lg" onClick={start} className="mt-6 bg-primary hover:bg-primary/90">
               Zacznij zbierać miejsca
             </Button>
           </div>

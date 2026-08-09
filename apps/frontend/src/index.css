@@ -23,6 +23,9 @@
     /* Forest sage — primary brand (deeper, more pine) */
     --primary: 158 28% 32%;            /* #3B6655 deep forest sage */
     --primary-foreground: 60 12% 97%;
+    /* Szałwia na ciemnym tle: --primary to głęboki #3B6655, nieczytelny na
+       ciemnym. Ta wartość pochodzi z górnej części skali systemu marki. */
+    --primary-light: 96 24% 65%;
 
     /* Mineral sunken surfaces */
     --secondary: 60 10% 94%;

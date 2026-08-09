@@ -72,7 +72,9 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
 
     const latLngs = track.map(([lat, lng]) => L.latLng(lat, lng));
     L.polyline(latLngs, {
-      color: '#10b981', // emerald-500: highly visible green on dark & light layers
+      // Jasna szałwia z górnej części skali marki. Ślad trasy musi być czytelny
+      // i na jasnym podkładzie mapy, i na ciemnym trybie nocnym.
+      color: '#8FA376',
       weight: 6,
       opacity: 0.9,
       lineCap: 'round',
@@ -110,7 +112,9 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
     const container = containerRef.current;
     if (container) {
       if (mapStyle === 'eko') {
-        container.style.backgroundColor = '#0b0f19'; // AMOLED slate-950
+        // Ciepła czerń zamiast niebieskawej: marka nie ma zimnych neutralnych,
+        // a na AMOLED i tak liczy się bliskość czerni, nie jej odcień.
+        container.style.backgroundColor = '#14130F';
       } else {
         container.style.backgroundColor = '';
       }

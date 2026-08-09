@@ -85,7 +85,7 @@ export default function Favorites() {
               Nic tu jeszcze nie ma. Ulubione to miejsca odłożone na później — bez decydowania,
               kiedy i czy w ogóle tam pojedziesz.
             </p>
-            <Button onClick={() => navigate('/odkrywaj')} className="bg-emerald-600 hover:bg-emerald-500">
+            <Button onClick={() => navigate('/odkrywaj')} className="bg-primary hover:bg-primary/90">
               Zacznij odkrywać
             </Button>
           </div>
@@ -107,7 +107,7 @@ export default function Favorites() {
                       aria-label="Usuń z ulubionych"
                       className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur flex items-center justify-center"
                     >
-                      <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+                      <Heart className="w-4 h-4 fill-accent text-accent" />
                     </button>
                   </div>
                   <div className="p-3">

@@ -103,7 +103,7 @@ export default function Brand() {
             </div>
             <div className="border-t border-border/60 pt-6">
               <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">Mono · JetBrains Mono</p>
-              <p className="font-mono text-xs uppercase tracking-[0.32em] text-muted-foreground">FIND · RIDE · EXPLORE</p>
+              <p className="font-mono text-xs uppercase tracking-[0.32em] text-muted-foreground">ZBIERAJ · UKŁADAJ · JEDŹ</p>
             </div>
           </div>
         </section>

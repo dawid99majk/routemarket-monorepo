@@ -38,7 +38,7 @@ export default function InterviewFlowStep({
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-zinc-800/80">
         <div>
           <CardTitle className="text-xl flex items-center gap-2">
-            <Compass className="text-amber-400 animate-spin-slow" /> 3. Szukam inspiracji (Wywiad)
+            <Compass className="text-warning animate-spin-slow" /> 3. Szukam inspiracji (Wywiad)
           </CardTitle>
           <CardDescription className="text-zinc-400">
             Krok {path3Step} z 5 — Zaplanujmy Twoją trasę marzeń.
@@ -53,7 +53,7 @@ export default function InterviewFlowStep({
         {/* Progress bar */}
         <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
           <div 
-            className="bg-amber-500 h-full transition-all duration-300"
+            className="bg-warning h-full transition-all duration-300"
             style={{ width: `${(path3Step / 5) * 100}%` }}
           />
         </div>
@@ -73,7 +73,7 @@ export default function InterviewFlowStep({
                   key={item.id}
                   onClick={() => setPath3Answers({...path3Answers, region: item.label})}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    path3Answers.region === item.label ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
+                    path3Answers.region === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
                   {item.label}
@@ -107,7 +107,7 @@ export default function InterviewFlowStep({
                   key={item.label}
                   onClick={() => setPath3Answers({...path3Answers, activity: item.label})}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    path3Answers.activity === item.label ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
+                    path3Answers.activity === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
                   {item.label}
@@ -140,7 +140,7 @@ export default function InterviewFlowStep({
                   key={item.label}
                   onClick={() => setPath3Answers({...path3Answers, parking: item.label})}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    path3Answers.parking === item.label ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
+                    path3Answers.parking === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
                   {item.label}
@@ -173,7 +173,7 @@ export default function InterviewFlowStep({
                   key={item.val}
                   onClick={() => setPath3Answers({...path3Answers, distance: item.val})}
                   className={`p-4 rounded-xl border cursor-pointer text-center flex flex-col items-center justify-center transition-all ${
-                    path3Answers.distance === item.val ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
+                    path3Answers.distance === item.val ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
                   <span className="text-lg font-bold mb-1">{item.val} km</span>
@@ -208,7 +208,7 @@ export default function InterviewFlowStep({
                   key={item.val}
                   onClick={() => setPath3Answers({...path3Answers, difficulty: item.val})}
                   className={`p-4 rounded-xl border text-center cursor-pointer transition-all ${
-                    path3Answers.difficulty === item.val ? 'border-amber-500 bg-amber-500/10 text-amber-300' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
+                    path3Answers.difficulty === item.val ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
                   <span className="block font-bold text-xs">{item.label}</span>

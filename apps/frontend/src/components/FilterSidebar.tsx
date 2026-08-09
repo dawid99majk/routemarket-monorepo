@@ -185,7 +185,7 @@ export default function FilterSidebar({ filters, onUpdate, onClearAll, activeFil
               checked={filters.freeOnly}
               onCheckedChange={(checked) => onUpdate('freeOnly', !!checked)}
             />
-            <span className="font-semibold text-emerald-600">🆓 Tylko darmowe</span>
+            <span className="font-semibold text-primary">🆓 Tylko darmowe</span>
           </label>
           <div className={`flex gap-1.5 ${filters.freeOnly ? 'opacity-40 pointer-events-none' : ''}`}>
             <Input type="number" placeholder={t('common.min')} value={filters.priceMin} onChange={(e) => onUpdate('priceMin', e.target.value)} className="h-8 text-xs" disabled={filters.freeOnly} />

@@ -494,12 +494,12 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
   if (track.length < 2) return null;
 
   return (
-    <div className={`relative h-full w-full overflow-hidden rounded-xl bg-slate-950 ${className}`}>
+    <div className={`relative h-full w-full overflow-hidden rounded-xl bg-ink ${className}`}>
       <div ref={hostRef} className="h-full w-full" />
 
       {/* Floating Control Panel */}
       <div className="absolute left-3 top-3 flex items-center gap-2">
-        <div className="rounded-full bg-slate-950/85 px-3 py-1 text-xs font-semibold text-white border border-slate-800 backdrop-blur shadow-sm">
+        <div className="rounded-full bg-ink/85 px-3 py-1 text-xs font-semibold text-white border border-border backdrop-blur shadow-sm">
           Model 3D Terenu
         </div>
         {status === 'ready' && (
@@ -508,8 +508,8 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
             onClick={handleToggleFlythrough}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
               flythroughActive
-                ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500 shadow-rose-900/30 shadow-md animate-pulse'
-                : 'bg-slate-900 hover:bg-slate-800 text-slate-100 border-slate-700 shadow-sm'
+                ? 'bg-accent hover:bg-accent text-white border-rose-500 shadow-rose-900/30 shadow-md animate-pulse'
+                : 'bg-ink hover:bg-ink text-slate-100 border-border shadow-sm'
             }`}
           >
             <span className="relative flex h-2 w-2">
@@ -522,7 +522,7 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
       </div>
 
       {status !== 'ready' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/75">
+        <div className="absolute inset-0 flex items-center justify-center bg-ink/75">
           <div className="flex max-w-xs flex-col items-center gap-3 px-4 text-center text-white">
             {status === 'loading' ? <Loader2 className="h-6 w-6 animate-spin" /> : <Box className="h-6 w-6" />}
             <p className="text-sm text-white/85">

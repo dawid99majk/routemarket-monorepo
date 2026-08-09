@@ -204,7 +204,7 @@ export default function Discover() {
               Miejsce trafi do wspólnego katalogu z adnotacją, że dodał je użytkownik.
             </p>
             <div className="flex gap-2">
-              <Button onClick={submitPlace} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-500">
+              <Button onClick={submitPlace} disabled={submitting} className="bg-primary hover:bg-primary/90">
                 {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sprawdzam adres…</> : 'Dodaj'}
               </Button>
               <Button variant="ghost" onClick={() => setAdding(false)}>Anuluj</Button>
@@ -218,7 +218,7 @@ export default function Discover() {
               key={v}
               onClick={() => setVibe(vibe === v ? null : v)}
               className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${
-                vibe === v ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-background hover:bg-muted'
+                vibe === v ? 'bg-primary border-primary text-white' : 'bg-background hover:bg-muted'
               }`}
             >
               {v}
@@ -245,7 +245,7 @@ export default function Discover() {
                 : 'Wpisz miasto, żeby zobaczyć, co w nim jest.'}
             </p>
             {city.trim() && (
-              <Button onClick={seedCity} disabled={seeding} className="bg-emerald-600 hover:bg-emerald-500">
+              <Button onClick={seedCity} disabled={seeding} className="bg-primary hover:bg-primary/90">
                 {seeding
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Przeglądam miasto…</>
                   : <>Zbierz miejsca dla: {city}</>}
@@ -270,7 +270,7 @@ export default function Discover() {
                       aria-label="Do ulubionych"
                       className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur flex items-center justify-center transition-colors"
                     >
-                      <Heart className={`w-4 h-4 ${favorites.has(p.id) ? 'fill-rose-500 text-rose-500' : 'text-white'}`} />
+                      <Heart className={`w-4 h-4 ${favorites.has(p.id) ? 'fill-accent text-accent' : 'text-white'}`} />
                     </button>
                   </div>
                   <div className="p-3">

@@ -247,7 +247,7 @@ export default function PlacePage() {
 
           <div className="flex items-center gap-2">
             <Button variant={favorite ? 'default' : 'outline'} size="sm" onClick={toggleFavorite}
-              className={favorite ? 'bg-rose-600 hover:bg-rose-500' : ''}>
+              className={favorite ? 'bg-accent hover:bg-accent/90' : ''}>
               <Heart className={`w-4 h-4 mr-1.5 ${favorite ? 'fill-current' : ''}`} />
               {favorite ? 'W ulubionych' : 'Do ulubionych'}
             </Button>
@@ -257,7 +257,7 @@ export default function PlacePage() {
         {(place as any).source === 'user' && (
           <p className="text-xs text-muted-foreground bg-muted/60 rounded-lg px-3 py-2">
             To miejsce dodał użytkownik serwisu — nie pochodzi z OpenStreetMap.{' '}
-            <button onClick={report} disabled={reported} className="text-emerald-700 hover:underline disabled:opacity-60">
+            <button onClick={report} disabled={reported} className="text-primary hover:underline disabled:opacity-60">
               {reported ? 'Zgłoszone' : 'Zgłoś nieprawidłowość'}
             </button>
           </p>
@@ -278,14 +278,14 @@ export default function PlacePage() {
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground border-t pt-4">
           {place.opening_hours && <span>Godziny: <strong className="text-foreground">{place.opening_hours}</strong></span>}
           {place.website && (
-            <a href={place.website} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline flex items-center gap-1">
+            <a href={place.website} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1">
               Strona miejsca <ExternalLink className="w-3.5 h-3.5" />
             </a>
           )}
           <a
             href={`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`}
             target="_blank" rel="noreferrer"
-            className="text-emerald-700 hover:underline flex items-center gap-1"
+            className="text-primary hover:underline flex items-center gap-1"
           >
             Pokaż na mapie <ExternalLink className="w-3.5 h-3.5" />
           </a>
@@ -301,7 +301,7 @@ export default function PlacePage() {
           {myBoards.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Nie masz jeszcze żadnej tablicy.{' '}
-              <button onClick={() => navigate('/plany')} className="text-emerald-700 hover:underline">Załóż pierwszą</button>.
+              <button onClick={() => navigate('/plany')} className="text-primary hover:underline">Załóż pierwszą</button>.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -319,7 +319,7 @@ export default function PlacePage() {
           {myCollections.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Kolekcje to zbiory bez daty i celu — „kawiarnie, do których chcę kiedyś trafić”.{' '}
-              <button onClick={() => navigate('/kolekcje')} className="text-emerald-700 hover:underline">
+              <button onClick={() => navigate('/kolekcje')} className="text-primary hover:underline">
                 Załóż pierwszą
               </button>.
             </p>

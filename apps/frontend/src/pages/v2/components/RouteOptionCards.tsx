@@ -22,25 +22,25 @@ export default function RouteOptionCards({ options, disabled, allowCustom, onCho
           onClick={() => onChoose(option)}
           className={`w-full text-left rounded-xl border p-3 transition-all ${
             disabled
-              ? 'border-slate-200 bg-slate-50/60 opacity-60 cursor-default'
-              : 'border-slate-200 bg-white hover:border-emerald-500 hover:shadow-md hover:-translate-y-px cursor-pointer'
+              ? 'border-border bg-muted/60 opacity-60 cursor-default'
+              : 'border-border bg-white hover:border-primary hover:shadow-md hover:-translate-y-px cursor-pointer'
           }`}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-slate-900 text-sm leading-snug">{option.title}</div>
+              <div className="font-semibold text-foreground text-sm leading-snug">{option.title}</div>
               {option.subtitle && (
-                <div className="text-emerald-700 text-xs font-medium mt-0.5">{option.subtitle}</div>
+                <div className="text-primary text-xs font-medium mt-0.5">{option.subtitle}</div>
               )}
               {option.description && (
-                <p className="text-slate-600 text-xs mt-1.5 leading-relaxed">{option.description}</p>
+                <p className="text-foreground/80 text-xs mt-1.5 leading-relaxed">{option.description}</p>
               )}
               {option.highlights && option.highlights.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {option.highlights.map((highlight) => (
                     <span
                       key={highlight}
-                      className="text-[11px] bg-slate-100 text-slate-600 rounded-full px-2 py-0.5"
+                      className="text-[11px] bg-muted text-foreground/80 rounded-full px-2 py-0.5"
                     >
                       {highlight}
                     </span>
@@ -48,13 +48,13 @@ export default function RouteOptionCards({ options, disabled, allowCustom, onCho
                 </div>
               )}
             </div>
-            {!disabled && <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />}
-            {disabled && <Check className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />}
+            {!disabled && <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
+            {disabled && <Check className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />}
           </div>
         </button>
       ))}
       {allowCustom && !disabled && (
-        <p className="text-[11px] text-slate-400 px-1">
+        <p className="text-[11px] text-muted-foreground px-1">
           Możesz też po prostu napisać, czego chcesz — albo „generuj”, żeby pominąć pytania.
         </p>
       )}

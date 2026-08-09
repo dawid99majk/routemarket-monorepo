@@ -127,7 +127,7 @@ export default function RoutePreferences() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <SlidersHorizontal className="w-5 h-5 text-emerald-600" />
+          <SlidersHorizontal className="w-5 h-5 text-primary" />
           Preferencje tras
         </CardTitle>
         <CardDescription>
@@ -149,8 +149,8 @@ export default function RoutePreferences() {
               step={10}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span className={values[axis.key] < 40 ? 'text-emerald-600 font-medium' : ''}>{axis.left}</span>
-              <span className={values[axis.key] > 60 ? 'text-emerald-600 font-medium' : ''}>{axis.right}</span>
+              <span className={values[axis.key] < 40 ? 'text-primary font-medium' : ''}>{axis.left}</span>
+              <span className={values[axis.key] > 60 ? 'text-primary font-medium' : ''}>{axis.right}</span>
             </div>
           </div>
         ))}
@@ -159,7 +159,7 @@ export default function RoutePreferences() {
           <Button variant="ghost" onClick={() => setValues(DEFAULT_PREFERENCES)} disabled={saving}>
             Wyzeruj
           </Button>
-          <Button onClick={save} disabled={saving} className="bg-emerald-600 hover:bg-emerald-500">
+          <Button onClick={save} disabled={saving} className="bg-primary hover:bg-primary/90">
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Zapisz preferencje
           </Button>

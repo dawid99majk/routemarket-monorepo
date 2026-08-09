@@ -89,13 +89,13 @@ export default function NavigationLauncher() {
       <button
         onClick={openPicker}
         aria-label="Nawigacja"
-        className="fixed bottom-5 right-5 z-[1400] w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg flex items-center justify-center transition-colors"
+        className="fixed bottom-5 right-5 z-[1400] w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-white shadow-lg flex items-center justify-center transition-colors"
       >
         <Navigation className="w-6 h-6" />
       </button>
 
       {picking && (
-        <div className="fixed inset-0 z-[1500] bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1500] bg-ink/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
           <div className="bg-background rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <span className="font-semibold">Którą trasą nawigujemy?</span>
@@ -121,7 +121,7 @@ export default function NavigationLauncher() {
                     setActive(route);
                     setPicking(false);
                   }}
-                  className="w-full text-left rounded-xl border p-3 hover:border-emerald-500 hover:bg-muted/50 transition-colors"
+                  className="w-full text-left rounded-xl border p-3 hover:border-primary hover:bg-muted/50 transition-colors"
                 >
                   <div className="font-medium text-sm">{route.title}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{route.track.length} punktów śladu</div>

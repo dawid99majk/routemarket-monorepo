@@ -150,7 +150,7 @@ export default function Collections() {
           {places.length === 0 ? (
             <div className="text-center py-16 space-y-3">
               <p className="text-muted-foreground">Ta kolekcja jest jeszcze pusta.</p>
-              <Button onClick={() => navigate('/odkrywaj')} className="bg-emerald-600 hover:bg-emerald-500">
+              <Button onClick={() => navigate('/odkrywaj')} className="bg-primary hover:bg-primary/90">
                 Znajdź miejsca
               </Button>
             </div>
@@ -200,7 +200,7 @@ export default function Collections() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <span className="font-semibold">Moje kolekcje</span>
-          <Button size="sm" className="ml-auto bg-emerald-600 hover:bg-emerald-500" onClick={() => setCreating(true)}>
+          <Button size="sm" className="ml-auto bg-primary hover:bg-primary/90" onClick={() => setCreating(true)}>
             <Plus className="w-4 h-4 mr-1.5" /> Nowa
           </Button>
         </div>
@@ -216,7 +216,7 @@ export default function Collections() {
               onKeyDown={(e) => e.key === 'Enter' && create()}
               placeholder="Nazwa, np. „Modernizm w Polsce”"
             />
-            <Button onClick={create} className="bg-emerald-600 hover:bg-emerald-500">Utwórz</Button>
+            <Button onClick={create} className="bg-primary hover:bg-primary/90">Utwórz</Button>
             <Button variant="ghost" onClick={() => { setCreating(false); setNewName(''); }}>Anuluj</Button>
           </div>
         )}
@@ -227,7 +227,7 @@ export default function Collections() {
               Kolekcja nie wymaga decyzji, dokąd i kiedy jedziesz. To zbiór miejsc odkładanych latami —
               „kawiarnie, do których chcę kiedyś trafić”, „modernizm w Polsce”.
             </p>
-            <Button onClick={() => setCreating(true)} className="bg-emerald-600 hover:bg-emerald-500">
+            <Button onClick={() => setCreating(true)} className="bg-primary hover:bg-primary/90">
               Załóż pierwszą kolekcję
             </Button>
           </div>
@@ -242,7 +242,7 @@ export default function Collections() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{col.name}</span>
                   {col.is_public
-                    ? <Globe className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    ? <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
                     : <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
                 </div>
                 <span className="text-xs text-muted-foreground">

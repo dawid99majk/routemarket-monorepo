@@ -81,7 +81,7 @@ export default function Logo({ showName = true, size = 'md', className = '' }: L
             className={`font-mono ${s.sub} text-muted-foreground/80 mt-1 uppercase`}
             style={{ letterSpacing: '0.32em' }}
           >
-            find · ride · explore
+            zbieraj · układaj · jedź
           </span>
         </span>
       )}

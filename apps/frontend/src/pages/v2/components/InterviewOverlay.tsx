@@ -106,12 +106,12 @@ export default function InterviewOverlay({
     options.length >= 3 ? 'md:grid-cols-3' : options.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
 
   return (
-    <div className="absolute inset-0 z-[1200] flex flex-col bg-slate-950/45 backdrop-blur-xl animate-in fade-in duration-300">
+    <div className="absolute inset-0 z-[1200] flex flex-col bg-ink/45 backdrop-blur-xl animate-in fade-in duration-300">
       {/* Pasek kroków */}
       <div className={`shrink-0 px-8 pt-6 ${started ? 'pb-4' : 'pb-2'}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-white/90">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
+            <Sparkles className="w-5 h-5 text-primary-light" />
             <span className="font-semibold tracking-tight">Kreator trasy</span>
           </div>
           <button
@@ -136,7 +136,7 @@ export default function InterviewOverlay({
                   title={done ? 'Wróć do tego kroku i wybierz inaczej' : undefined}
                   className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active
-                      ? 'bg-emerald-500 text-white font-medium'
+                      ? 'bg-primary text-white font-medium'
                       : done
                         ? 'bg-white/15 text-white/80 hover:bg-white/30 cursor-pointer'
                         : 'bg-white/5 text-white/40 cursor-default'
@@ -187,7 +187,7 @@ export default function InterviewOverlay({
                     onClick={() => onVehicleChange(id)}
                     className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition-all border ${
                       vehicleType === id
-                        ? 'bg-emerald-500 border-emerald-400 text-white font-medium'
+                        ? 'bg-primary border-primary-light text-white font-medium'
                         : 'bg-white/10 border-white/15 text-white/80 hover:bg-white/20'
                     }`}
                   >
@@ -256,7 +256,7 @@ export default function InterviewOverlay({
                 placeholder="np. Durrës z dziećmi"
                 className="mt-2 w-full bg-white/10 border border-white/15 rounded-xl px-4 py-3
                            text-white text-lg font-medium placeholder:text-white/30
-                           focus:outline-none focus:border-emerald-400/60 focus:bg-white/15 transition-colors"
+                           focus:outline-none focus:border-primary-light/60 focus:bg-white/15 transition-colors"
               />
             </div>
           )}
@@ -270,12 +270,12 @@ export default function InterviewOverlay({
                             [&_ul]:space-y-1.5 [&_ul]:mt-2 [&_ol]:space-y-1.5 [&_ol]:mt-2
                             [&_li]:relative [&_li]:pl-5
                             [&_ul>li]:before:content-['•'] [&_ul>li]:before:absolute
-                            [&_ul>li]:before:left-1 [&_ul>li]:before:text-emerald-400
+                            [&_ul>li]:before:left-1 [&_ul>li]:before:text-primary-light
                             [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:mt-4
                             [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-4
                             [&_h3]:font-semibold [&_h3]:mt-3
                             [&_p]:leading-relaxed
-                            [&_a]:text-emerald-300 [&_a]:underline">
+                            [&_a]:text-primary-light [&_a]:underline">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {lastAgent.text.replace(/\s*\[[^\]]+\]/g, '')}
               </ReactMarkdown>
@@ -284,17 +284,17 @@ export default function InterviewOverlay({
 
           {busyLabel && (
             <div className="flex items-center gap-2 text-white/70 text-sm">
-              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" />
-              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce delay-75" />
-              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce delay-150" />
+              <span className="w-1.5 h-1.5 bg-primary-light rounded-full animate-bounce" />
+              <span className="w-1.5 h-1.5 bg-primary-light rounded-full animate-bounce delay-75" />
+              <span className="w-1.5 h-1.5 bg-primary-light rounded-full animate-bounce delay-150" />
               {busyLabel}
             </div>
           )}
 
           {!busyLabel && errorMessage && (
-            <div className="mb-6 rounded-2xl border border-rose-400/40 bg-rose-500/10 backdrop-blur-md p-4 max-w-3xl">
+            <div className="mb-6 rounded-2xl border border-rose-400/40 bg-accent backdrop-blur-md p-4 max-w-3xl">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-white font-medium">Nie udało się dokończyć tego kroku</div>
                   <p className="text-white/70 text-sm mt-1 leading-relaxed">{errorMessage}</p>
@@ -313,7 +313,7 @@ export default function InterviewOverlay({
           )}
 
           {!busyLabel && inputCard && (
-            <form onSubmit={submitCardValue} className="mb-4 rounded-2xl border border-emerald-400/50 bg-white/10 backdrop-blur-md p-4">
+            <form onSubmit={submitCardValue} className="mb-4 rounded-2xl border border-primary-light/50 bg-white/10 backdrop-blur-md p-4">
               <div className="text-white font-medium mb-2">{inputCard.title}</div>
               <div className="flex gap-2">
                 <Input
@@ -323,7 +323,7 @@ export default function InterviewOverlay({
                   placeholder={inputCard.inputPlaceholder || 'Wpisz miejsce…'}
                   className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full px-5 py-5"
                 />
-                <Button type="submit" disabled={!cardValue.trim()} className="rounded-full bg-emerald-500 hover:bg-emerald-400 text-white px-5">
+                <Button type="submit" disabled={!cardValue.trim()} className="rounded-full bg-primary hover:bg-primary-light text-white px-5">
                   Zatwierdź
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => setInputCard(null)} className="rounded-full text-white/60 hover:text-white">
@@ -340,11 +340,11 @@ export default function InterviewOverlay({
                   key={option.id || option.title}
                   type="button"
                   onClick={() => pickCard(option)}
-                  className="text-left rounded-2xl border border-white/15 bg-white/10 hover:bg-white/20 hover:border-emerald-400/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
+                  className="text-left rounded-2xl border border-white/15 bg-white/10 hover:bg-white/20 hover:border-primary-light/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
                 >
                   <div className="font-semibold text-white leading-snug">{option.title}</div>
                   {option.subtitle && (
-                    <div className="text-emerald-300 text-xs font-medium mt-1">{option.subtitle}</div>
+                    <div className="text-primary-light text-xs font-medium mt-1">{option.subtitle}</div>
                   )}
                   {option.description && (
                     <p className="text-white/70 text-sm mt-2 leading-relaxed flex-1">{option.description}</p>
@@ -372,13 +372,13 @@ export default function InterviewOverlay({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={started ? 'Napisz coś od siebie albo „generuj”, żeby pominąć pytania…' : 'np. Tirana, kilka godzin, miejsca związane ze sztuką…'}
-            className="w-full bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full pl-5 pr-12 py-6 backdrop-blur-md focus-visible:ring-emerald-400/50"
+            className="w-full bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full pl-5 pr-12 py-6 backdrop-blur-md focus-visible:ring-ring/50"
           />
           <Button
             type="submit"
             size="icon"
             disabled={!!busyLabel}
-            className="absolute right-1.5 rounded-full bg-emerald-500 hover:bg-emerald-400 w-9 h-9 text-white"
+            className="absolute right-1.5 rounded-full bg-primary hover:bg-primary-light w-9 h-9 text-white"
           >
             <Send className="w-4 h-4 ml-0.5" />
           </Button>
