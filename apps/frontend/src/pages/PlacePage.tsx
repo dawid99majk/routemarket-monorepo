@@ -75,11 +75,25 @@ export default function PlacePage() {
       // Podobne w klimacie: część wspólna znaczników nastroju, a przy ich braku
       // to samo miasto. Sortowanie po liczbie przypięć, bo to jedyny sygnał
       // popularności, jaki mamy bez ocen i recenzji.
-      const query = (supabase as any).from('place_catalog').select('*').neq('id', data.id).limit(12);
+      const query = (supabase as any).from('place_catalog').select('*').neq('id', data.id).limit(40);
       const { data: sim } = data.vibe_tags?.length
         ? await query.overlaps('vibe_tags', data.vibe_tags)
         : await query.ilike('city', data.city ?? '');
-      if (!cancelled) setSimilar((sim ?? []).slice(0, 8));
+
+      // Kolejność ma znaczenie: "podobne" to nie "cokolwiek z jednym wspólnym
+      // znacznikiem". Sortujemy po liczbie wspólnych określeń, potem po tym samym
+      // mieście, a dopiero na końcu po popularności — inaczej pierwsze miejsce na
+      // liście byłoby przypadkowe.
+      const myTags = new Set<string>(data.vibe_tags ?? []);
+      const ranked = (sim ?? [])
+        .map((sp: CatalogPlace) => ({
+          sp,
+          shared: (sp.vibe_tags ?? []).filter((t) => myTags.has(t)).length,
+          sameCity: sp.city && data.city && sp.city.toLowerCase() === data.city.toLowerCase() ? 1 : 0
+        }))
+        .sort((a, b) => (b.shared - a.shared) || (b.sameCity - a.sameCity) || (b.sp.pin_count - a.sp.pin_count))
+        .map((r) => r.sp);
+      if (!cancelled) setSimilar(ranked.slice(0, 8));
     })();
     return () => { cancelled = true; };
   }, [slug]);

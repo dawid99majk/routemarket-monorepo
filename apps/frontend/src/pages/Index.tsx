@@ -32,6 +32,8 @@ export default function Index() {
             {loading ? null : loggedIn ? (
               <>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/plany')}>Plany</Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/odkrywaj')}>Odkrywaj</Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/ulubione')}>Ulubione</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/my-routes')}>Moje trasy</Button>
                 <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>Profil</Button>
               </>
@@ -58,8 +60,8 @@ Wyjazdy układane pod Ciebie, nie pod średnią
             <Button size="lg" onClick={start} className="bg-emerald-600 hover:bg-emerald-500">
               <CalendarDays className="w-4 h-4 mr-2" /> Zacznij zbierać miejsca
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/my-routes' : '/auth')}>
-              <Wand2 className="w-4 h-4 mr-2" /> Twoje trasy
+            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/odkrywaj' : '/auth')}>
+              <Sparkles className="w-4 h-4 mr-2" /> Przeglądaj miejsca
             </Button>
           </div>
         </section>

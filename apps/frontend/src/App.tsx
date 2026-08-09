@@ -21,6 +21,8 @@ const GaTracker = () => {
 const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const PlacePage = lazy(() => import("./pages/PlacePage"));
+const Discover = lazy(() => import("./pages/Discover"));
+const Favorites = lazy(() => import("./pages/Favorites"));
 const TripPlans = lazy(() => import("./pages/TripPlans"));
 const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
 
@@ -91,6 +93,8 @@ const App = () => (
                   <Route path="/brand" element={<Brand />} />
 
                   {/* Authenticated routes */}
+                  <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+                  <Route path="/ulubione" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
                   <Route path="/miejsce/:slug" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
