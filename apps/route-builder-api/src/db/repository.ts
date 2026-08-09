@@ -42,6 +42,46 @@ export class RouteBuilderRepository {
     };
   }
 
+
+  // --- Katalog miejsc -------------------------------------------------------
+  // Zapis idzie przez backend, bo RLS daje użytkownikom wyłącznie odczyt:
+  // katalog jest wspólnym dobrem i nie może być przepisywalny z przeglądarki.
+
+  async findCatalogPlace(osmId: string | null, slug: string): Promise<any | null> {
+    if (osmId) {
+      const { data } = await supabase.from('place_catalog').select('*').eq('osm_id', osmId).maybeSingle();
+      if (data) return data;
+    }
+    const { data } = await supabase.from('place_catalog').select('*').eq('slug', slug).maybeSingle();
+    return data ?? null;
+  }
+
+  async insertCatalogPlace(row: Record<string, unknown>): Promise<any> {
+    const { data, error } = await supabase.from('place_catalog').insert(row).select('*').single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async updateCatalogPlace(id: string, patch: Record<string, unknown>): Promise<any | null> {
+    if (Object.keys(patch).length <= 1) return null;
+    const { data, error } = await supabase.from('place_catalog').update(patch).eq('id', id).select('*').single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  async setVibeTags(id: string, tags: string[]): Promise<void> {
+    await supabase.from('place_catalog').update({ vibe_tags: tags }).eq('id', id);
+  }
+
+  async listCatalogByCity(city: string, limit = 40): Promise<any[]> {
+    const { data } = await supabase
+      .from('place_catalog').select('*')
+      .ilike('city', city)
+      .order('pin_count', { ascending: false })
+      .limit(limit);
+    return data ?? [];
+  }
+
   canAccessProject(project: RouteProject, user: AuthenticatedRouteBuilderUser): boolean {
     if (user.roles.includes('admin')) return true;
     return Boolean(project.user_id && project.user_id === user.id);

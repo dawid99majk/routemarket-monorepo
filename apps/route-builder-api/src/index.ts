@@ -35,6 +35,7 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/live-route': { windowMs: 5 * 60_000, max: 30 },
   '/point-details': { windowMs: 5 * 60_000, max: 60 },
   '/points-details': { windowMs: 5 * 60_000, max: 20 },
+  '/catalog/upsert': { windowMs: 5 * 60_000, max: 120 },
   '/discover-places': { windowMs: 5 * 60_000, max: 20 },
   '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
   '/geocode-points': { windowMs: 5 * 60_000, max: 60 }
@@ -1108,6 +1109,79 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
     return c.json({ details });
   } catch (err: any) {
     console.error('[points-details] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Slug miejsca. Ma być czytelny w adresie i stabilny, więc powstaje z nazwy i
+ * miasta, a krótki przyrostek z współrzędnych rozróżnia dwa "Rynki" w dwóch
+ * miastach o tej samej nazwie.
+ */
+function placeSlug(name: string, city: string | null, lat: number, lng: number): string {
+  const base = [name, city].filter(Boolean).join(' ')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  const suffix = Math.abs(Math.round(lat * 10000) ^ Math.round(lng * 10000)).toString(36).slice(0, 5);
+  return `${base || 'miejsce'}-${suffix}`;
+}
+
+/**
+ * Wpis w katalogu miejsc. Do tej pory miejsce istniało wyłącznie jako wiersz
+ * przypięty do tablicy: to samo muzeum na trzech tablicach było trzema bytami,
+ * bez wspólnej strony i bez możliwości policzenia, ile osób je przypięło.
+ * Rozpoznajemy po identyfikatorze z OSM, a gdy go brak — po nazwie i położeniu.
+ */
+app.post('/catalog/upsert', async (c) => {
+  try {
+    const body = await c.req.json() as {
+      name: string; lat: number; lng: number; city?: string; country?: string;
+      category?: string; kind?: string; description?: string; wiki_extract?: string;
+      photos?: string[]; opening_hours?: string; website?: string; visit_minutes?: number;
+      osm_id?: string;
+    };
+    if (!body?.name || body.lat == null || body.lng == null) {
+      return c.json({ error: 'name, lat i lng są wymagane' }, 400);
+    }
+
+    const slug = placeSlug(body.name, body.city ?? null, body.lat, body.lng);
+    const row = {
+      slug,
+      name: body.name.trim(),
+      city: body.city ?? null,
+      country: body.country ?? null,
+      lat: body.lat,
+      lng: body.lng,
+      category: body.category || 'attraction',
+      kind: body.kind ?? null,
+      description: body.description || '',
+      wiki_extract: body.wiki_extract ?? null,
+      photos: body.photos ?? [],
+      opening_hours: body.opening_hours ?? null,
+      website: body.website ?? null,
+      visit_minutes: body.visit_minutes ?? null,
+      osm_id: body.osm_id ?? null,
+      updated_at: new Date().toISOString()
+    };
+
+    const existing = await repo.findCatalogPlace(body.osm_id ?? null, slug);
+    if (existing) {
+      // Nie nadpisujemy tego, co już mamy, pustkami z gorszego źródła
+      const merged: Record<string, unknown> = { updated_at: row.updated_at };
+      for (const key of ['description', 'wiki_extract', 'opening_hours', 'website', 'visit_minutes', 'kind', 'city', 'country'] as const) {
+        if (!existing[key] && row[key]) merged[key] = row[key];
+      }
+      if ((!existing.photos || existing.photos.length === 0) && row.photos.length > 0) merged.photos = row.photos;
+      const updated = await repo.updateCatalogPlace(existing.id, merged);
+      return c.json({ id: existing.id, slug: existing.slug, created: false, place: updated ?? existing });
+    }
+
+    const created = await repo.insertCatalogPlace(row);
+    console.log(`[catalog] Nowe miejsce: "${row.name}" (${slug})`);
+    return c.json({ id: created.id, slug: created.slug, created: true, place: created });
+  } catch (err: any) {
+    console.error('[catalog/upsert] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });

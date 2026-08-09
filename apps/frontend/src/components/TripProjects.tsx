@@ -262,10 +262,36 @@ export default function TripProjects() {
 
   const pin = async (place: DiscoveredPlace, priority: Priority) => {
     if (!active) return;
+
+    // Wpis w katalogu przed przypięciem: to samo miejsce na trzech tablicach ma
+    // być jednym bytem z własną stroną, a nie trzema niezależnymi wierszami.
+    // Nieudany zapis katalogu nie może blokować przypięcia — tablica jest
+    // ważniejsza niż porządek w katalogu.
+    let catalogId: string | null = null;
+    try {
+      const cat = await apiPost<any>('/catalog/upsert', {
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        city: active.destination,
+        category: place.category,
+        description: place.description,
+        wiki_extract: place.wiki_extract,
+        photos: (place as any).photos ?? (place.image_url ? [place.image_url] : []),
+        opening_hours: place.opening_hours,
+        website: place.website,
+        visit_minutes: place.visit_minutes
+      });
+      catalogId = cat?.id ?? null;
+    } catch (err) {
+      console.warn('Nie udało się dopisać miejsca do katalogu:', err);
+    }
+
     const { data, error } = await (supabase as any)
       .from('trip_project_places')
       .insert({
         project_id: active.id,
+        catalog_id: catalogId,
         name: place.name,
         category: place.category,
         priority,
@@ -278,7 +304,7 @@ export default function TripProjects() {
         image_url: place.image_url,
         wiki_extract: place.wiki_extract
       })
-      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id')
       .single();
     if (error) return toast.error(error.message);
     setPlaces((prev) => [...prev, data]);
