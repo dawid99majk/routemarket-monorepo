@@ -36,6 +36,7 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/point-details': { windowMs: 5 * 60_000, max: 60 },
   '/points-details': { windowMs: 5 * 60_000, max: 20 },
   '/catalog/upsert': { windowMs: 5 * 60_000, max: 120 },
+  '/catalog/seed': { windowMs: 10 * 60_000, max: 6 },
   '/discover-places': { windowMs: 5 * 60_000, max: 20 },
   '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
   '/geocode-points': { windowMs: 5 * 60_000, max: 60 }
@@ -1182,6 +1183,150 @@ app.post('/catalog/upsert', async (c) => {
     return c.json({ id: created.id, slug: created.slug, created: true, place: created });
   } catch (err: any) {
     console.error('[catalog/upsert] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Zamknięty słownik znaczników nastroju. Gdyby model wymyślał je swobodnie,
+ * "podobne w klimacie" nigdy by nie zadziałało: każde miejsce dostałoby własny,
+ * niepowtarzalny zestaw określeń i część wspólna zawsze byłaby pusta.
+ */
+const VIBE_TAGS = [
+  'historyczne', 'sakralne', 'muzealne', 'sztuka', 'architektura',
+  'widokowe', 'zielone', 'nadwodne', 'spacerowe', 'kameralne',
+  'gwarne', 'nocne', 'kulinarne', 'targowe', 'dla-dzieci',
+  'industrialne', 'nietypowe', 'ikoniczne', 'lokalne', 'darmowe'
+];
+
+/**
+ * Zasilenie katalogu miejscami z danego miasta. Feed odkrywczy bez treści jest
+ * pustą półką, a treść musi skądś przyjść — bierzemy ją z OSM (fakty i
+ * współrzędne) plus jedno wywołanie modelu na opisy i znaczniki dla całej partii.
+ */
+app.post('/catalog/seed', async (c) => {
+  try {
+    const { city, limit } = await c.req.json() as { city: string; limit?: number };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+
+    const center = await geocodingService.geocodeSettlement(city);
+    const take = Math.min(40, Math.max(6, limit ?? 24));
+    const candidates = await poiService.fetchCandidates(
+      { lat: center.lat, lng: center.lng }, 'city_walk', { radiusKm: 4, limit: take }
+    );
+    if (candidates.length === 0) return c.json({ city, added: 0, places: [] });
+
+    const prompt = `Opisujesz miejsca w mieście ${city} dla serwisu planowania wyjazdów.
+
+Miejsca (nazwy skopiuj DOKŁADNIE):
+${candidates.map((p, i) => `${i + 1}. ${p.name} (${p.kind})`).join('\n')}
+
+Dla każdego zwróć:
+- "name": nazwa dokładnie jak wyżej
+- "description": 1-2 zdania, czym to miejsce jest i co w nim ciekawego. Konkret, nie ogólnik. Bez zwrotów typu "warto zobaczyć".
+- "vibe_tags": 2-4 znaczniki WYŁĄCZNIE z tej listy: ${VIBE_TAGS.join(', ')}
+- "visit_minutes": ile realnie zajmuje pobyt
+
+Jeśli jakiegoś miejsca nie kojarzysz, opisz je na podstawie jego rodzaju — nie wymyślaj faktów.
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
+
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              places: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    vibe_tags: { type: 'array', items: { type: 'string' } },
+                    visit_minutes: { type: 'integer' }
+                  },
+                  required: ['name']
+                }
+              }
+            },
+            required: ['places']
+          },
+          maxOutputTokens: 16384
+        }
+      },
+      { operation: 'catalog-seed', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+    );
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let described: any[] = [];
+    try {
+      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const first = cleaned.indexOf('{');
+      const last = cleaned.lastIndexOf('}');
+      if (first >= 0 && last > first) described = JSON.parse(cleaned.slice(first, last + 1)).places || [];
+    } catch (err) {
+      console.warn('[catalog/seed] Nie udało się sparsować opisów, zapisuję same fakty z OSM');
+    }
+    const byName = new Map(described.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
+
+    // Zdjęcia partiami: Commons nie lubi czterdziestu równoległych zapytań
+    const saved: any[] = [];
+    const BATCH = 5;
+    for (let i = 0; i < candidates.length; i += BATCH) {
+      const batch = candidates.slice(i, i + BATCH);
+      const photoSets = await Promise.all(batch.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 3)));
+      await Promise.all(batch.map(async (p, j) => {
+        const d = byName.get(p.name.trim().toLowerCase());
+        const tags = Array.isArray(d?.vibe_tags)
+          ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)
+          : [];
+        const slug = placeSlug(p.name, city, p.lat, p.lng);
+        const row = {
+          slug,
+          name: p.name,
+          city,
+          lat: p.lat,
+          lng: p.lng,
+          category: p.kind === 'restaurant' || p.kind === 'cafe' ? 'food' : 'attraction',
+          kind: p.kind,
+          description: d?.description || '',
+          photos: photoSets[j] || [],
+          opening_hours: p.openingHours ?? null,
+          website: p.website ?? null,
+          visit_minutes: d?.visit_minutes ?? null,
+          osm_id: p.id,
+          vibe_tags: tags,
+          updated_at: new Date().toISOString()
+        };
+        try {
+          const existing = await repo.findCatalogPlace(p.id, slug);
+          if (existing) {
+            const patch: Record<string, unknown> = { updated_at: row.updated_at };
+            if (!existing.description && row.description) patch.description = row.description;
+            if ((!existing.photos || existing.photos.length === 0) && row.photos.length) patch.photos = row.photos;
+            if ((!existing.vibe_tags || existing.vibe_tags.length === 0) && tags.length) patch.vibe_tags = tags;
+            await repo.updateCatalogPlace(existing.id, patch);
+            saved.push(existing);
+          } else {
+            saved.push(await repo.insertCatalogPlace(row));
+          }
+        } catch (err: any) {
+          console.warn(`[catalog/seed] Pominięte "${p.name}": ${err.message}`);
+        }
+      }));
+    }
+
+    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc`);
+    return c.json({ city, added: saved.length, center: { lat: center.lat, lng: center.lng } });
+  } catch (err: any) {
+    console.error('[catalog/seed] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });

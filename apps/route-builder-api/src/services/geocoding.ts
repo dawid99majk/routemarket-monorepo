@@ -165,23 +165,31 @@ export class GeocodingService {
    * "Złotych Hor i okolicy" potrafią inaczej dopasować się do przypadkowego obiektu
    * po drugiej stronie kraju i przenieść całą trasę w zły region.
    */
+  /**
+   * Środek miasta. Nominatim zwraca dla dużych miast KILKA pasujących granic
+   * administracyjnych — dla Wrocławia obwód gminy (addresstype=administrative,
+   * środek wypada na Gądowie, 4,5 km od Rynku) oraz samo miasto
+   * (addresstype=city, środek przy Rynku). Kolejność wyników bywa różna między
+   * zapytaniami, więc branie pierwszego z brzegu dawało raz jeden punkt, raz
+   * drugi — i cała trasa układała się wtedy poza centrum.
+   *
+   * Dlatego nie polegamy na kolejności, tylko wybieramy po typie obiektu.
+   */
   async geocodeSettlement(query: string): Promise<GeocodedPlace> {
+    const PREFERRED = ['city', 'town', 'village', 'hamlet', 'municipality', 'suburb'];
     try {
-      // Bez featuretype=settlement. Ten parametr oddaje centroid granic
-      // administracyjnych, a rozległe miasta mają go daleko od centrum: dla
-      // Wrocławia wypadał w magazynie na Gądowie 4,5 km od Rynku, dla Gdańska
-      // na peryferiach zamiast Głównego Miasta. Zwykłe wyszukiwanie zwraca
-      // punkt reprezentatywny — tam, gdzie ludzie umawiają się "w mieście".
-      // Dla miast zwartych (Tirana, Berlin) oba warianty dają to samo.
-      // Bez addressdetails: ten parametr, choć wygląda niewinnie, przestawia
-      // Nominatima na inny punkt tego samego obiektu — dla Wrocławia na centroid
-      // granic zamiast punktu reprezentatywnego. Zmierzone, nie domniemane.
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=jsonv2&limit=5&addressdetails=1`;
       const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
       if (res.ok) {
-        const data = await res.json() as any;
-        if (data && data.length > 0) {
-          const item = data[0];
+        const data = await res.json() as any[];
+        if (Array.isArray(data) && data.length > 0) {
+          const preferred = PREFERRED
+            .map((type) => data.find((d) => d.addresstype === type))
+            .find(Boolean);
+          const item = preferred || data[0];
+          if (preferred && item !== data[0]) {
+            console.log(`[Geocoding] "${query}": wybrano ${item.addresstype} zamiast ${data[0].addresstype}`);
+          }
           return {
             name: item.display_name || query,
             lat: parseFloat(item.lat),
