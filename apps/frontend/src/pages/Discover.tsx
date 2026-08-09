@@ -43,6 +43,9 @@ export default function Discover() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
   const [cities, setCities] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ name: '', address: '', description: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +106,39 @@ export default function Discover() {
     toast.success(`Dodano do tablicy: ${place.name}`);
   };
 
+  /**
+   * Miejsce zgłoszone przez użytkownika. OSM nie zna wszystkiego: knajpy bez
+   * szyldu ani świeżo otwartej galerii tam nie ma. Warunek jest jeden — adres
+   * musi dać się zamienić na współrzędne, bo miejsce bez położenia jest
+   * bezużyteczne w planowaniu.
+   */
+  const submitPlace = async () => {
+    if (!draft.name.trim()) return toast.error('Podaj nazwę miejsca');
+    if (!city.trim()) return toast.error('Podaj miasto na górze strony');
+    setSubmitting(true);
+    try {
+      const data = await apiPost<any>('/catalog/submit', {
+        name: draft.name.trim(),
+        city: city.trim(),
+        address: draft.address.trim() || undefined,
+        description: draft.description.trim() || undefined
+      }, { timeoutMs: 60_000 });
+      if (data.duplicate) {
+        toast.info('To miejsce już mamy');
+      } else {
+        toast.success('Dodano miejsce — dzięki!');
+      }
+      setDraft({ name: '', address: '', description: '' });
+      setAdding(false);
+      await load();
+      if (data.slug) navigate(`/miejsce/${data.slug}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Nie udało się dodać miejsca');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   /** Miasto bez wpisów to pusta półka — pozwalamy ją zapełnić na żądanie. */
   const seedCity = async () => {
     if (!city.trim()) return toast.error('Podaj miasto, które mamy przejrzeć');
@@ -154,7 +190,29 @@ export default function Discover() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        {adding && (
+          <div className="rounded-xl border p-4 space-y-2.5 bg-card">
+            <h3 className="text-sm font-semibold">Dodaj miejsce, którego u nas nie ma</h3>
+            <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              placeholder="Nazwa miejsca" />
+            <Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })}
+              placeholder="Ulica i numer (pomaga trafić w dobre miejsce)" />
+            <Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              placeholder="Jedno zdanie: czym to miejsce jest" />
+            <p className="text-[11px] text-muted-foreground">
+              Zdjęć nie przyjmujemy — pobieramy je z Wikimedia Commons, gdzie licencja jest znana.
+              Miejsce trafi do wspólnego katalogu z adnotacją, że dodał je użytkownik.
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={submitPlace} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-500">
+                {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sprawdzam adres…</> : 'Dodaj'}
+              </Button>
+              <Button variant="ghost" onClick={() => setAdding(false)}>Anuluj</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-1.5 items-center">
           {VIBES.map((v) => (
             <button
               key={v}
@@ -166,6 +224,12 @@ export default function Discover() {
               {v}
             </button>
           ))}
+          {!adding && (
+            <button onClick={() => setAdding(true)}
+              className="text-xs rounded-full px-3 py-1.5 border border-dashed hover:bg-muted transition-colors ml-auto">
+              + Brakuje miejsca?
+            </button>
+          )}
         </div>
 
         {loading ? (

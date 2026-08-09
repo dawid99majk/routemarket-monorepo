@@ -37,6 +37,7 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/points-details': { windowMs: 5 * 60_000, max: 20 },
   '/catalog/upsert': { windowMs: 5 * 60_000, max: 120 },
   '/catalog/seed': { windowMs: 10 * 60_000, max: 6 },
+  '/catalog/submit': { windowMs: 10 * 60_000, max: 15 },
   '/events/refresh': { windowMs: 10 * 60_000, max: 6 },
   '/discover-places': { windowMs: 5 * 60_000, max: 20 },
   '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
@@ -1421,6 +1422,82 @@ Zwróć od 3 do 12 wydarzeń. Odpowiedz WYŁĄCZNIE obiektem JSON: {"events": [.
     return c.json({ city, saved: saved.length, events: saved });
   } catch (err: any) {
     console.error('[events/refresh] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Miejsce zgłoszone przez użytkownika. OSM nie zna wszystkiego — knajpy bez
+ * szyldu, punktu widokowego znanego lokalsom czy świeżo otwartej galerii tam po
+ * prostu nie ma. Warunek jest jeden i twardy: adres musi dać się zamienić na
+ * współrzędne, bo miejsce bez położenia jest bezużyteczne w planowaniu i psuje
+ * wszystko dalej.
+ *
+ * Świadomie NIE przyjmujemy zdjęć od użytkowników. To prawa autorskie i
+ * moderacja treści od pierwszego dnia, a nie problem "na potem" — zdjęcia biorą
+ * się z Wikimedia Commons, gdzie licencja jest znana.
+ */
+app.post('/catalog/submit', async (c) => {
+  try {
+    const userId = c.get('userId');
+    if (!userId) return c.json({ error: 'Wymagane zalogowanie' }, 401);
+
+    const body = await c.req.json() as {
+      name: string; city: string; address?: string; category?: string;
+      description?: string; website?: string; visit_minutes?: number;
+      lat?: number; lng?: number;
+    };
+    const name = String(body?.name || '').trim();
+    const city = String(body?.city || '').trim();
+    if (!name || !city) return c.json({ error: 'Nazwa i miasto są wymagane' }, 400);
+
+    let lat = typeof body.lat === 'number' ? body.lat : null;
+    let lng = typeof body.lng === 'number' ? body.lng : null;
+
+    if (lat == null || lng == null) {
+      const center = await geocodingService.geocodeSettlement(city);
+      const query = [body.address, name].filter(Boolean).join(', ');
+      try {
+        const geo = await geocodingService.geocodeSinglePoint(query, { lat: center.lat, lng: center.lng }, 40);
+        const dLat = (geo.lat - center.lat) * 111;
+        const dLng = (geo.lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180);
+        if (Math.sqrt(dLat * dLat + dLng * dLng) <= 40) {
+          lat = geo.lat;
+          lng = geo.lng;
+        }
+      } catch { /* obsłużone niżej */ }
+    }
+
+    if (lat == null || lng == null) {
+      return c.json({
+        error: 'Nie udało się ustalić położenia. Podaj dokładniejszy adres albo wskaż punkt na mapie.'
+      }, 422);
+    }
+
+    const slug = placeSlug(name, city, lat, lng);
+    const existing = await repo.findCatalogPlace(null, slug);
+    if (existing) return c.json({ id: existing.id, slug: existing.slug, created: false, duplicate: true });
+
+    const created = await repo.insertCatalogPlace({
+      slug,
+      name,
+      city,
+      lat,
+      lng,
+      category: body.category || 'attraction',
+      description: String(body.description || '').slice(0, 1000),
+      website: body.website || null,
+      visit_minutes: body.visit_minutes ?? null,
+      photos: [],
+      source: 'user',
+      created_by: userId,
+      updated_at: new Date().toISOString()
+    });
+    console.log(`[catalog/submit] "${name}" (${city}) od użytkownika ${userId.slice(0, 8)}`);
+    return c.json({ id: created.id, slug: created.slug, created: true });
+  } catch (err: any) {
+    console.error('[catalog/submit] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });

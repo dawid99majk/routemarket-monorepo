@@ -45,6 +45,7 @@ export default function PlacePage() {
   const [myBoards, setMyBoards] = useState<{ id: string; name: string }[]>([]);
   const [similar, setSimilar] = useState<CatalogPlace[]>([]);
   const [myCollections, setMyCollections] = useState<{ id: string; name: string }[]>([]);
+  const [reported, setReported] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -120,6 +121,22 @@ export default function PlacePage() {
       setFavorite(true);
       toast.success('Dodano do ulubionych');
     }
+  };
+
+  /**
+   * Zgłoszenie. Moderacja bez moderatora jest teatrem, więc mechanizm działa sam:
+   * po trzech niezależnych zgłoszeniach wpis znika z widoku publicznego. Autor
+   * widzi swój wpis dalej, więc nie da się nikomu po cichu skasować pracy.
+   */
+  const report = async () => {
+    if (!place) return;
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return navigate('/auth');
+    const { error } = await (supabase as any).from('place_reports')
+      .insert({ user_id: userData.user.id, place_id: place.id, reason: 'zgłoszone przez użytkownika' });
+    if (error && error.code !== '23505') return toast.error(error.message);
+    setReported(true);
+    toast.success('Dzięki, sprawdzimy to miejsce');
   };
 
   const addToCollection = async (collectionId: string) => {
@@ -236,6 +253,15 @@ export default function PlacePage() {
             </Button>
           </div>
         </div>
+
+        {(place as any).source === 'user' && (
+          <p className="text-xs text-muted-foreground bg-muted/60 rounded-lg px-3 py-2">
+            To miejsce dodał użytkownik serwisu — nie pochodzi z OpenStreetMap.{' '}
+            <button onClick={report} disabled={reported} className="text-emerald-700 hover:underline disabled:opacity-60">
+              {reported ? 'Zgłoszone' : 'Zgłoś nieprawidłowość'}
+            </button>
+          </p>
+        )}
 
         {place.vibe_tags?.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
