@@ -1,0 +1,20 @@
+{
+  "projectId": "a2a8e391-1182-467d-881f-903f0f158524",
+  "shape": "package",
+  "pkg": "@routemarket/frontend",
+  "globalName": "RouteMarket",
+  "srcDir": "src/components/ui",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": "ds-styles.css",
+  "componentSrcMap": {
+    "Toaster": null
+  },
+  "docsDir": "ds-docs",
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "primaryStory": "NowaTablica"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
