@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
@@ -336,6 +337,55 @@ export default function TripProjects() {
     const { error } = await (supabase as any)
       .from('trip_projects').update({ fill_percent: value }).eq('id', active.id);
     if (error) toast.error(error.message);
+  };
+
+  /**
+   * Karta miejsca z planu. Propozycje agenta widniały jako sama nazwa w
+   * harmonogramie — nie dało się sprawdzić, co to właściwie jest, więc decyzja
+   * "zostawiam czy wyrzucam" była zgadywanką. Opis i zdjęcia bierzemy z tego
+   * samego mechanizmu, który obsługuje karty punktów na mapie.
+   */
+  const [placeCard, setPlaceCard] = useState<any | null>(null);
+  const [cardLoading, setCardLoading] = useState(false);
+  const [cardPhoto, setCardPhoto] = useState(0);
+
+  const openPlaceCard = async (item: any) => {
+    const pinned = places.find((p) => p.name === item.name);
+    setPlaceCard({
+      name: item.name,
+      note: item.note || '',
+      minutes: item.minutes || pinned?.visit_minutes || null,
+      opening_hours: pinned?.opening_hours || null,
+      website: pinned?.website || null,
+      description: pinned?.description || '',
+      photos: pinned?.image_url ? [pinned.image_url] : [],
+      source: item.source
+    });
+    setCardPhoto(0);
+
+    // Przypięte miejsce zwykle ma już opis z wyszukiwarki; propozycję agenta
+    // trzeba dociągnąć, bo w planie jest tylko jej nazwa.
+    if (pinned?.description && pinned?.image_url) return;
+    if (item.lat == null || item.lng == null) return;
+    setCardLoading(true);
+    try {
+      const data = await apiPost<any>('/points-details', {
+        points: [{ name: item.name, lat: item.lat, lng: item.lng }]
+      }, { timeoutMs: 60_000 });
+      const d = data.details?.[item.name];
+      if (d) {
+        setPlaceCard((prev: any) => prev && prev.name === item.name ? {
+          ...prev,
+          description: prev.description || d.description || '',
+          recommendation: d.recommendation || '',
+          photos: (d.photos?.length ? d.photos : prev.photos) || []
+        } : prev);
+      }
+    } catch {
+      // Brak opisu nie jest powodem, żeby nie pokazać tego, co już mamy
+    } finally {
+      setCardLoading(false);
+    }
   };
 
   const changeTripType = async (presetId: string) => {
@@ -758,32 +808,47 @@ export default function TripProjects() {
 
         {active && (
           <>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground border-t pt-4">
-              <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" />{active.destination}</span>
-              {active.days && active.hours_per_day && (
-                <span className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4" />{active.days} × {active.hours_per_day} h
+            {/* Nagłówek wyjazdu. Wcześniej w jednym rzędzie stało siedem rzeczy o
+                różnej wadze: dane wyjazdu, przełączniki, statystyki i czynności.
+                Teraz po lewej to, co opisuje wyjazd, po prawej to, co się z nim
+                robi — a liczby zeszły do paska zajętości, gdzie mają kontekst. */}
+            <div className="flex items-center justify-between gap-3 border-t pt-4 flex-wrap">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                <span className="flex items-center gap-1.5 font-medium text-foreground">
+                  <MapPin className="w-4 h-4 text-emerald-600" />{active.destination}
                 </span>
-              )}
-              <button onClick={() => setEditingType((v) => !v)}
-                className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted transition-colors">
-                {active.trip_type
-                  ? (TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label || active.trip_type)
-                  : 'Ustaw charakter'}
-              </button>
-              <button onClick={duplicateProject}
-                className="text-xs flex items-center gap-1 hover:text-foreground transition-colors">
-                <Copy className="w-3.5 h-3.5" /> Kopiuj tablicę
-              </button>
-              {shares.length > 0 && (
-                <span className="text-xs flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" /> {shares.length}
-                </span>
-              )}
-              <span>Przypięte: <strong className="text-foreground">{places.length}</strong> ({mustCount} koniecznie)</span>
-              {totalMinutes > 0 && (
-                <span>Zwiedzanie łącznie: <strong className="text-foreground">{Math.round(totalMinutes / 60)} h</strong></span>
-              )}
+                {active.days && active.hours_per_day && (
+                  <>
+                    <span className="text-muted-foreground/40">·</span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4" />{active.days} × {active.hours_per_day} h
+                    </span>
+                  </>
+                )}
+                <span className="text-muted-foreground/40">·</span>
+                <button onClick={() => setEditingType((v) => !v)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                    active.trip_type
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                      : 'hover:bg-muted'
+                  }`}>
+                  {active.trip_type
+                    ? (TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label || active.trip_type)
+                    : 'Ustaw charakter'}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1">
+                {shares.length > 0 && (
+                  <span className="text-xs flex items-center gap-1 text-muted-foreground px-2" title="Współtwórcy tablicy">
+                    <Users className="w-3.5 h-3.5" /> {shares.length}
+                  </span>
+                )}
+                <button onClick={duplicateProject} title="Kopiuj tablicę"
+                  className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-muted transition-colors">
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
@@ -816,6 +881,7 @@ export default function TripProjects() {
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
+                    <strong className="text-foreground">{places.length}</strong> miejsc ({mustCount} koniecznie) ·{' '}
                     Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
                     {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
                     {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
@@ -937,6 +1003,68 @@ export default function TripProjects() {
                 })}
               </div>
             )}
+
+            {/* Karta miejsca: propozycje agenta widniały jako sama nazwa, więc
+                decyzja "zostawiam czy wyrzucam" była zgadywanką. */}
+            <Dialog open={!!placeCard} onOpenChange={(open) => !open && setPlaceCard(null)}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="pr-6 text-left leading-snug">{placeCard?.name}</DialogTitle>
+                </DialogHeader>
+                {placeCard && (
+                  <div className="space-y-3">
+                    {placeCard.photos?.length > 0 && (
+                      <div className="relative rounded-lg overflow-hidden bg-muted">
+                        <img
+                          src={placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}
+                          alt={placeCard.name}
+                          className="w-full h-48 object-cover"
+                          onError={() => setPlaceCard((prev: any) => ({ ...prev, photos: [] }))}
+                        />
+                        {placeCard.photos.length > 1 && (
+                          <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+                            {placeCard.photos.map((_: string, i: number) => (
+                              <button key={i} onClick={() => setCardPhoto(i)}
+                                className={`w-1.5 h-1.5 rounded-full ${i === Math.min(cardPhoto, placeCard.photos.length - 1) ? 'bg-white' : 'bg-white/50'}`} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {placeCard.source === 'suggested' && (
+                      <span className="inline-block text-[10px] text-emerald-700 bg-emerald-50 rounded-full px-2 py-0.5">
+                        propozycja agenta — nie ma jej jeszcze na Twojej tablicy
+                      </span>
+                    )}
+
+                    {cardLoading && !placeCard.description && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Sprawdzam, co to za miejsce…
+                      </p>
+                    )}
+                    {placeCard.description && <p className="text-sm leading-relaxed">{placeCard.description}</p>}
+                    {placeCard.recommendation && (
+                      <p className="text-xs bg-emerald-50/70 border border-emerald-100 rounded-lg p-2.5 leading-relaxed">
+                        <strong className="block text-[10px] uppercase tracking-wider text-emerald-800 mb-0.5">Wskazówka</strong>
+                        {placeCard.recommendation}
+                      </p>
+                    )}
+                    {placeCard.note && <p className="text-xs text-muted-foreground italic">{placeCard.note}</p>}
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground border-t pt-2.5">
+                      {placeCard.minutes && <span>Czas: <strong className="text-foreground">{placeCard.minutes} min</strong></span>}
+                      {placeCard.opening_hours && <span>Godziny: <strong className="text-foreground">{placeCard.opening_hours}</strong></span>}
+                      {placeCard.website && (
+                        <a href={placeCard.website} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                          strona miejsca
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
 
             {(outliers.length > 0 || duplicates.length > 0) && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 space-y-1.5">
@@ -1189,15 +1317,52 @@ export default function TripProjects() {
                       </button>
                     </div>
                     <div className="divide-y">
+                      {(() => {
+                        // Podsumowanie dnia: ile czasu zajmą same wizyty i ile
+                        // dzielą kilometry. Dystans liczymy z odcinków między
+                        // kolejnymi punktami i mnożymy przez 1,3, bo ulice nie
+                        // biegną w linii prostej — to szacunek, nie pomiar, więc
+                        // podpisujemy go jako "ok.".
+                        const items = day.items || [];
+                        const minutes = items.reduce((sum: number, it: any) => sum + (it.minutes || 0), 0);
+                        let km = 0;
+                        let prev: any = null;
+                        for (const it of items) {
+                          if (it.lat != null && it.lng != null) {
+                            if (prev) {
+                              const dLat = (it.lat - prev.lat) * 111;
+                              const dLng = (it.lng - prev.lng) * 111 * Math.cos((it.lat * Math.PI) / 180);
+                              km += Math.sqrt(dLat * dLat + dLng * dLng);
+                            }
+                            prev = it;
+                          }
+                        }
+                        km *= 1.3;
+                        if (minutes === 0 && km === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-xs text-muted-foreground border-b">
+                            <span>Zwiedzanie: <strong className="text-foreground">{(minutes / 60).toFixed(1)} h</strong></span>
+                            {km > 0 && <span>Do przejścia: <strong className="text-foreground">ok. {km.toFixed(1)} km</strong></span>}
+                            {km > 0 && <span>Marsz: <strong className="text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
+                            <span>Punktów: <strong className="text-foreground">{items.length}</strong></span>
+                          </div>
+                        );
+                      })()}
+
                       {(day.items || []).map((it: any, i: number) => {
                         const suggested = it.source === 'suggested';
                         const alreadyPinned = places.some((p) => p.name === it.name);
-                        return (
-                          <div key={i} className="flex gap-3 px-4 py-2 text-sm items-start">
+  return (
+                          <div key={i} className="flex gap-3 px-4 py-2 text-sm items-start hover:bg-muted/40 transition-colors">
                             <span className="font-mono text-xs text-muted-foreground pt-0.5 w-12 shrink-0">{it.time}</span>
                             <div className="min-w-0 flex-1">
                               <div className="font-medium flex items-center gap-2 flex-wrap">
-                                {it.name}
+                                <button
+                                  onClick={() => openPlaceCard(it)}
+                                  className="text-left hover:text-emerald-700 hover:underline decoration-dotted underline-offset-2"
+                                >
+                                  {it.name}
+                                </button>
                                 {suggested && (
                                   <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 rounded-full px-1.5 py-0.5">
                                     propozycja agenta
