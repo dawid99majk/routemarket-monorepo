@@ -161,7 +161,7 @@ export function AtlasInterviewWizard({
     return (
       <Card className="p-6 border-primary/20 bg-primary/5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-primary/10 rounded-lg">
+          <div className="p-2 bg-primary/10 rounded-md">
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <h2 className="text-xl font-bold">Zacznij z Atlasem (Szybki Wywiad)</h2>
@@ -204,7 +204,7 @@ export function AtlasInterviewWizard({
   }
 
   return (
-    <Card className="p-6 border-primary/30 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+    <Card className="p-6 border-primary/30 shadow-token-xl animate-in fade-in zoom-in-95 duration-300">
       <div className="space-y-6">
         {/* Header & Progress */}
         <div className="space-y-2">
@@ -282,7 +282,7 @@ export function AtlasInterviewWizard({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {currentStep.proposals?.map((p) => (
-                <Card key={p.id} className="p-6 flex flex-col h-full border-2 hover:border-primary transition-all bg-card shadow-sm hover:shadow-xl group">
+                <Card key={p.id} className="p-6 flex flex-col h-full border-2 hover:border-primary transition-all bg-card shadow-token-sm hover:shadow-token-xl group">
                   <h4 className="text-xl font-extrabold mb-3 group-hover:text-primary transition-colors">{p.title}</h4>
                   <p className="text-sm text-muted-foreground mb-5 flex-grow leading-relaxed">{p.description}</p>
                   <div className="space-y-2 mb-8">
@@ -293,7 +293,7 @@ export function AtlasInterviewWizard({
                       </div>
                     ))}
                   </div>
-                  <Button className="w-full h-11 font-bold shadow-lg" onClick={() => selectProposal(p)}>
+                  <Button className="w-full h-11 font-bold shadow-token-lg" onClick={() => selectProposal(p)}>
                     Wybieram
                   </Button>
                 </Card>

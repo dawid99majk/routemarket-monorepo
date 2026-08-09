@@ -157,7 +157,7 @@ export default function Collections() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {places.map((p) => (
-                <div key={p.id} className="rounded-2xl overflow-hidden border bg-card hover:shadow-lg transition-shadow">
+                <div key={p.id} className="rounded-md overflow-hidden border bg-card hover:shadow-token-lg transition-shadow">
                   <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="text-left w-full">
                     <div className="h-36 bg-muted relative">
                       {p.photos?.[0] ? (
@@ -208,7 +208,7 @@ export default function Collections() {
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-4">
         {creating && (
-          <div className="flex gap-2 rounded-xl border p-3">
+          <div className="flex gap-2 rounded-md border p-3">
             <Input
               autoFocus
               value={newName}
@@ -237,7 +237,7 @@ export default function Collections() {
               <button
                 key={col.id}
                 onClick={() => navigate(`/kolekcja/${col.slug}`)}
-                className="text-left rounded-xl border p-4 hover:shadow-md transition-shadow bg-card"
+                className="text-left rounded-md border p-4 hover:shadow-token-md transition-shadow bg-card"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{col.name}</span>

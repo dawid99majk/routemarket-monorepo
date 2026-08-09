@@ -15,7 +15,7 @@ export default function FilterPresets({ activePreset, onApply }: FilterPresetsPr
           onClick={() => onApply(preset)}
           className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border min-h-[36px] ${
             activePreset === preset.id
-              ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+              ? 'bg-primary text-primary-foreground border-primary shadow-token-sm'
               : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'
           }`}
         >

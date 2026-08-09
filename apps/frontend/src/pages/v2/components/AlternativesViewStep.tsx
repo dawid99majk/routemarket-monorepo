@@ -43,7 +43,7 @@ export default function AlternativesViewStep({
       
       {/* Alternatives Sidebar */}
       <div className="lg:col-span-4 space-y-6 flex flex-col">
-        <Card className="bg-zinc-950 border-zinc-800 shadow-xl flex-grow">
+        <Card className="bg-zinc-950 border-zinc-800 shadow-token-xl flex-grow">
           <CardHeader className="border-b border-zinc-800 pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -67,9 +67,9 @@ export default function AlternativesViewStep({
                   <div 
                     key={alt.id}
                     onClick={() => onSelectAlternative(alt.id)}
-                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    className={`p-4 rounded-md border cursor-pointer transition-all ${
                       isSelected 
-                        ? 'border-cyan-500 bg-cyan-500/10 shadow-lg shadow-cyan-950/10' 
+                        ? 'border-cyan-500 bg-cyan-500/10 shadow-token-lg shadow-cyan-950/10' 
                         : 'border-zinc-800/80 bg-zinc-900/10 hover:bg-zinc-900/40 text-zinc-400'
                     }`}
                   >
@@ -128,7 +128,7 @@ export default function AlternativesViewStep({
 
       {/* Leaflet Map Preview */}
       <div className="lg:col-span-8 flex flex-col h-[500px]">
-        <Card className="h-full overflow-hidden border border-zinc-800 shadow-2xl relative rounded-2xl">
+        <Card className="h-full overflow-hidden border border-zinc-800 shadow-token-xl relative rounded-md">
           {showMap && trackPoints ? (
             <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-zinc-950"><Loader2 className="animate-spin text-cyan-400" /></div>}>
               <RouteDetailMap 

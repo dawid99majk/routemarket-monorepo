@@ -305,14 +305,14 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
 
         {/* Dynamic settings panel */}
         {showSettings && (
-          <div className="absolute top-3 left-3 right-3 z-[1500] bg-card/95 backdrop-blur-md border border-border rounded-xl shadow-lg p-4 animate-in slide-in-from-top-4 duration-200">
+          <div className="absolute top-3 left-3 right-3 z-[1500] bg-card/95 backdrop-blur-md border border-border rounded-md shadow-token-lg p-4 animate-in slide-in-from-top-4 duration-200">
             <h3 className="font-semibold text-sm mb-3">Ustawienia nawigacji</h3>
             
             <div className="space-y-4">
               {/* Map style selection */}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground block mb-2">Styl mapy (Dane mobilne)</label>
-                <div className="grid grid-cols-3 gap-1 bg-muted p-0.5 rounded-lg">
+                <div className="grid grid-cols-3 gap-1 bg-muted p-0.5 rounded-md">
                   <button
                     onClick={() => setMapStyle('city')}
                     className={`text-xs py-1.5 rounded-md font-medium transition-all ${
@@ -321,7 +321,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    🏙️ Miejski
+                    Miejski
                   </button>
                   <button
                     onClick={() => setMapStyle('topo')}
@@ -331,7 +331,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    ⛰️ Terenowy
+                    Terenowy
                   </button>
                   <button
                     onClick={() => setMapStyle('eko')}
@@ -341,7 +341,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    🔋 Tylko ślad (Eko)
+                    Tylko ślad (Eko)
                   </button>
                 </div>
               </div>
@@ -394,7 +394,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
 
         {/* Far from start banner */}
         {farFromStart && (
-          <div className="absolute top-3 left-3 right-3 bg-secondary/95 backdrop-blur-md text-secondary-foreground border border-border rounded-lg shadow-md px-3 py-2 flex items-center justify-between gap-2 animate-in slide-in-from-top">
+          <div className="absolute top-3 left-3 right-3 bg-secondary/95 backdrop-blur-md text-secondary-foreground border border-border rounded-md shadow-token-md px-3 py-2 flex items-center justify-between gap-2 animate-in slide-in-from-top">
             <div className="min-w-0">
               <p className="text-xs font-semibold">Jesteś daleko od startu trasy</p>
               <p className="text-[10px] text-muted-foreground">Odległość: {formatDistance(distanceToStart)}</p>
@@ -407,7 +407,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
 
         {/* Off-route banner */}
         {offRoute && (
-          <div className="absolute top-3 left-3 right-3 bg-warning text-warning-foreground rounded-lg shadow-md px-3 py-2 flex items-center gap-2 animate-in slide-in-from-top">
+          <div className="absolute top-3 left-3 right-3 bg-warning text-warning-foreground rounded-md shadow-token-md px-3 py-2 flex items-center gap-2 animate-in slide-in-from-top">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <p className="text-sm font-medium">
               Zbaczasz z trasy ({formatDistance(distanceToTrack)} od śladu)
@@ -417,7 +417,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
 
         {/* Permission/error state */}
         {!position && (
-          <div className="absolute top-3 left-3 right-3 bg-card border border-border rounded-lg shadow-md px-3 py-2 flex items-center gap-2">
+          <div className="absolute top-3 left-3 right-3 bg-card border border-border rounded-md shadow-token-md px-3 py-2 flex items-center gap-2">
             {error ? (
               <>
                 <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
@@ -439,7 +439,7 @@ export default function NavigationMode({ track, routeTitle, onClose }: Navigatio
       </div>
 
       {/* Bottom panel */}
-      <div className="bg-card border-t border-border p-4 space-y-3 shadow-md">
+      <div className="bg-card border-t border-border p-4 space-y-3 shadow-token-md">
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Przebyte</p>

@@ -254,7 +254,7 @@ export default function InterviewOverlay({
                 value={title === 'Nowa Trasa AI' ? '' : title}
                 onChange={(e) => onTitleChange(e.target.value)}
                 placeholder="np. Durrës z dziećmi"
-                className="mt-2 w-full bg-white/10 border border-white/15 rounded-xl px-4 py-3
+                className="mt-2 w-full bg-white/10 border border-white/15 rounded-md px-4 py-3
                            text-white text-lg font-medium placeholder:text-white/30
                            focus:outline-none focus:border-primary-light/60 focus:bg-white/15 transition-colors"
               />
@@ -292,7 +292,7 @@ export default function InterviewOverlay({
           )}
 
           {!busyLabel && errorMessage && (
-            <div className="mb-6 rounded-2xl border border-rose-400/40 bg-accent backdrop-blur-md p-4 max-w-3xl">
+            <div className="mb-6 rounded-md border border-rose-400/40 bg-accent backdrop-blur-md p-4 max-w-3xl">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -313,7 +313,7 @@ export default function InterviewOverlay({
           )}
 
           {!busyLabel && inputCard && (
-            <form onSubmit={submitCardValue} className="mb-4 rounded-2xl border border-primary-light/50 bg-white/10 backdrop-blur-md p-4">
+            <form onSubmit={submitCardValue} className="mb-4 rounded-md border border-primary-light/50 bg-white/10 backdrop-blur-md p-4">
               <div className="text-white font-medium mb-2">{inputCard.title}</div>
               <div className="flex gap-2">
                 <Input
@@ -340,7 +340,7 @@ export default function InterviewOverlay({
                   key={option.id || option.title}
                   type="button"
                   onClick={() => pickCard(option)}
-                  className="text-left rounded-2xl border border-white/15 bg-white/10 hover:bg-white/20 hover:border-primary-light/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
+                  className="text-left rounded-md border border-white/15 bg-white/10 hover:bg-white/20 hover:border-primary-light/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
                 >
                   <div className="font-semibold text-white leading-snug">{option.title}</div>
                   {option.subtitle && (

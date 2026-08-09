@@ -84,7 +84,7 @@ export default function LocationSearch({ value, onChange, onSelect, placeholder,
         maxLength={200}
       />
       {isOpen && suggestions.length > 0 && (
-        <ul className="absolute top-full left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+        <ul className="absolute top-full left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover shadow-token-lg">
           {suggestions.map((item) => (
             <li
               key={item.place_id}

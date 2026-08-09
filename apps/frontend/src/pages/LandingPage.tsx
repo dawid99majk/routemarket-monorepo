@@ -57,7 +57,7 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section className="relative overflow-hidden">
         {/* Gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+        <div className="absolute inset-0 bg-background" />
         <div className="absolute top-20 right-10 w-72 h-72 bg-accent/10 rounded-full blur-3xl" />
         <div className="absolute bottom-10 left-10 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
 
@@ -83,7 +83,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               onClick={() => navigate('/auth?mode=signup')}
-              className="min-h-[52px] px-8 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg shadow-accent/25 gap-2"
+              className="min-h-[52px] px-8 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground shadow-token-lg shadow-accent/25 gap-2"
             >
               <Zap className="w-5 h-5" />
               Join as Creator (Early Access)
@@ -115,9 +115,9 @@ export default function LandingPage() {
             {AUDIENCES.map(({ icon: Icon, label, desc }) => (
               <div
                 key={label}
-                className="group relative p-6 rounded-xl bg-background border border-border hover:border-primary/30 hover:shadow-md transition-all duration-300 text-center"
+                className="group relative p-6 rounded-md bg-background border border-border hover:border-primary/30 hover:shadow-token-md transition-all duration-300 text-center"
               >
-                <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                   <Icon className="w-7 h-7 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-1">{label}</h3>
@@ -143,7 +143,7 @@ export default function LandingPage() {
               <div key={step} className="relative">
                 <span className="text-6xl font-black text-primary/10 absolute -top-4 -left-2 select-none">{step}</span>
                 <div className="relative pt-8 pl-2">
-                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4">
+                  <div className="w-12 h-12 rounded-md bg-accent/10 flex items-center justify-center mb-4">
                     <Icon className="w-6 h-6 text-accent" />
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
@@ -156,7 +156,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── WHY JOIN NOW ── */}
-      <section className="py-16 sm:py-24 bg-gradient-to-b from-primary/5 to-background">
+      <section className="py-16 sm:py-24 bg-muted/40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center mb-4">
             Why join now?
@@ -169,9 +169,9 @@ export default function LandingPage() {
             {REASONS.map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className="p-6 rounded-xl bg-card border border-border hover:shadow-lg transition-shadow duration-300"
+                className="p-6 rounded-md bg-card border border-border hover:shadow-token-lg transition-shadow duration-300"
               >
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center mb-4">
                   <Icon className="w-5 h-5 text-primary" />
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">{title}</h3>
@@ -223,7 +223,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               onClick={() => navigate('/auth?mode=signup')}
-              className="min-h-[52px] px-8 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground shadow-lg gap-2"
+              className="min-h-[52px] px-8 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground shadow-token-lg gap-2"
             >
               <Zap className="w-5 h-5" />
               Join as Creator

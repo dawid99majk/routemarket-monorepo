@@ -20,10 +20,10 @@ export default function RouteOptionCards({ options, disabled, allowCustom, onCho
           type="button"
           disabled={disabled}
           onClick={() => onChoose(option)}
-          className={`w-full text-left rounded-xl border p-3 transition-all ${
+          className={`w-full text-left rounded-md border p-3 transition-all ${
             disabled
               ? 'border-border bg-muted/60 opacity-60 cursor-default'
-              : 'border-border bg-white hover:border-primary hover:shadow-md hover:-translate-y-px cursor-pointer'
+              : 'border-border bg-white hover:border-primary hover:shadow-token-md hover:-translate-y-px cursor-pointer'
           }`}
         >
           <div className="flex items-start justify-between gap-2">

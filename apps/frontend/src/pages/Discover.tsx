@@ -191,7 +191,7 @@ export default function Discover() {
         </div>
 
         {adding && (
-          <div className="rounded-xl border p-4 space-y-2.5 bg-card">
+          <div className="rounded-md border p-4 space-y-2.5 bg-card">
             <h3 className="text-sm font-semibold">Dodaj miejsce, którego u nas nie ma</h3>
             <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               placeholder="Nazwa miejsca" />
@@ -255,7 +255,7 @@ export default function Discover() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {places.map((p) => (
-              <div key={p.id} className="group rounded-2xl overflow-hidden border bg-card hover:shadow-lg transition-shadow flex flex-col">
+              <div key={p.id} className="group rounded-md overflow-hidden border bg-card hover:shadow-token-lg transition-shadow flex flex-col">
                 <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block text-left">
                   <div className="h-40 bg-muted relative">
                     {p.photos?.[0] ? (
@@ -288,7 +288,7 @@ export default function Discover() {
                     <select
                       onChange={(e) => { if (e.target.value) { addToBoard(p, e.target.value); e.target.value = ''; } }}
                       defaultValue=""
-                      className="ml-auto text-[11px] border rounded-lg px-1.5 py-1 bg-background hover:bg-muted cursor-pointer"
+                      className="ml-auto text-[11px] border rounded-md px-1.5 py-1 bg-background hover:bg-muted cursor-pointer"
                       aria-label="Dodaj do tablicy"
                     >
                       <option value="">+ tablica</option>

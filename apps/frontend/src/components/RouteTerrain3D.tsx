@@ -494,12 +494,12 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
   if (track.length < 2) return null;
 
   return (
-    <div className={`relative h-full w-full overflow-hidden rounded-xl bg-ink ${className}`}>
+    <div className={`relative h-full w-full overflow-hidden rounded-md bg-ink ${className}`}>
       <div ref={hostRef} className="h-full w-full" />
 
       {/* Floating Control Panel */}
       <div className="absolute left-3 top-3 flex items-center gap-2">
-        <div className="rounded-full bg-ink/85 px-3 py-1 text-xs font-semibold text-white border border-border backdrop-blur shadow-sm">
+        <div className="rounded-full bg-ink/85 px-3 py-1 text-xs font-semibold text-white border border-border backdrop-blur shadow-token-sm">
           Model 3D Terenu
         </div>
         {status === 'ready' && (
@@ -508,15 +508,15 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
             onClick={handleToggleFlythrough}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
               flythroughActive
-                ? 'bg-accent hover:bg-accent text-white border-rose-500 shadow-rose-900/30 shadow-md animate-pulse'
-                : 'bg-ink hover:bg-ink text-slate-100 border-border shadow-sm'
+                ? 'bg-accent hover:bg-accent text-white border-rose-500 shadow-rose-900/30 shadow-token-md animate-pulse'
+                : 'bg-ink hover:bg-ink text-slate-100 border-border shadow-token-sm'
             }`}
           >
             <span className="relative flex h-2 w-2">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${flythroughActive ? 'bg-white' : 'bg-red-400'}`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${flythroughActive ? 'bg-white' : 'bg-red-500'}`}></span>
             </span>
-            {flythroughActive ? 'Zatrzymaj Przelot' : '📹 Wirtualny Przelot'}
+            {flythroughActive ? 'Zatrzymaj Przelot' : 'Wirtualny Przelot'}
           </button>
         )}
       </div>

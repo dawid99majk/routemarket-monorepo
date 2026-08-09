@@ -69,11 +69,11 @@ function StripeConnectStatus({ userId }: { userId: string }) {
   const isComplete = !!creatorProfile?.stripe_onboarding_complete || !!stripeStatus?.onboarding_complete;
 
   return (
-    <div className="bg-card rounded-xl p-6 shadow-sm">
+    <div className="bg-card rounded-md p-6 shadow-token-sm">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
         <Link2 className="w-5 h-5 text-primary" /> {t('stripe.title')}
       </h2>
-      <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+      <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
         {isComplete ? (
           <>
             <CheckCircle2 className="w-6 h-6 text-accent shrink-0" />
@@ -222,11 +222,11 @@ export default function UserProfile() {
       </header>
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <h1 className="text-2xl font-bold">{t('profile.title')}</h1>
-        <div className="bg-card rounded-xl p-6 shadow-sm">
+        <div className="bg-card rounded-md p-6 shadow-token-sm">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> {t('profile.account_info')}</h2>
           <div className="space-y-4">
             {/* Display name */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
               <User className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t('profile.username')}</p>
@@ -248,7 +248,7 @@ export default function UserProfile() {
             </div>
 
             {/* Email */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
               <Mail className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t('profile.email')}</p>
@@ -270,7 +270,7 @@ export default function UserProfile() {
             </div>
 
             {/* Primary language */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
               <Globe className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t('profile.primary_language')}</p>
@@ -292,7 +292,7 @@ export default function UserProfile() {
             </div>
 
             {/* Role */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
               <Shield className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('profile.role')}</p>
@@ -308,9 +308,9 @@ export default function UserProfile() {
         )}
 
         {!user.roles?.includes('creator') && !user.roles?.includes('admin') && (
-          <div className="bg-gradient-to-r from-accent/10 via-accent/5 to-primary/10 rounded-xl p-6 shadow-sm border border-accent/20">
+          <div className="bg-muted/50 rounded-md p-6 shadow-token-sm border border-accent/20">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center shrink-0"><Sparkles className="w-6 h-6 text-accent" /></div>
+              <div className="w-12 h-12 bg-accent/10 rounded-md flex items-center justify-center shrink-0"><Sparkles className="w-6 h-6 text-accent" /></div>
               <div className="flex-1">
                 <h2 className="text-lg font-semibold">{t('creator.become_cta')}</h2>
                 <p className="text-sm text-muted-foreground mt-1">{t('creator.earn_share')}</p>
@@ -328,9 +328,9 @@ export default function UserProfile() {
             { icon: CreditCard, label: t('profile.purchased_routes'), value: '0', color: 'bg-blue-50 text-blue-500' },
             { icon: DollarSign, label: t('profile.total_earnings'), value: '0 zł', color: 'bg-accent/10 text-accent' },
           ].map(({ icon: I, label, value, color }) => (
-            <div key={label} className="bg-card rounded-xl p-5 shadow-sm">
+            <div key={label} className="bg-card rounded-md p-5 shadow-token-sm">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}><I className="w-5 h-5" /></div>
+                <div className={`w-10 h-10 rounded-md flex items-center justify-center ${color}`}><I className="w-5 h-5" /></div>
                 <div><p className="text-2xl font-bold">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div>
               </div>
             </div>

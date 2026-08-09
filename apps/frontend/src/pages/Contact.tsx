@@ -111,7 +111,7 @@ export default function Contact() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 sm:py-12">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-md bg-primary/10 flex items-center justify-center">
             <Mail className="w-7 h-7 text-primary" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">Kontakt</h1>
@@ -123,7 +123,7 @@ export default function Contact() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 bg-card rounded-xl p-6 sm:p-8 shadow-token-sm border border-border">
+        <form onSubmit={handleSubmit} className="space-y-5 bg-card rounded-md p-6 sm:p-8 shadow-token-sm border border-border">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Imię</Label>

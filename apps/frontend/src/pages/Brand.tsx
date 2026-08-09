@@ -50,7 +50,7 @@ export default function Brand() {
         {/* Logo previews + downloads */}
         <section className="grid md:grid-cols-2 gap-6 mb-20">
           {FILES.map((f) => (
-            <div key={f.label} className="rounded-2xl border border-border/60 overflow-hidden bg-card shadow-token-md">
+            <div key={f.label} className="rounded-md border border-border/60 overflow-hidden bg-card shadow-token-md">
               <div className={`${f.bg} p-10 flex items-center justify-center min-h-[200px] border-b border-border/60`}>
                 <img src={f.href} alt={f.label} className="max-h-24 w-auto" />
               </div>
@@ -73,7 +73,7 @@ export default function Brand() {
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {PALETTE.map((c) => (
-              <div key={c.name} className="rounded-xl border border-border/60 overflow-hidden bg-card shadow-token-sm">
+              <div key={c.name} className="rounded-md border border-border/60 overflow-hidden bg-card shadow-token-sm">
                 <div className="h-24" style={{ background: c.hex }} />
                 <div className="p-3">
                   <p className="text-sm font-medium text-foreground">{c.name}</p>
@@ -90,7 +90,7 @@ export default function Brand() {
           <h2 className="font-narrow text-xl uppercase tracking-[0.08em] text-foreground mb-6" style={{ fontWeight: 700 }}>
             Typography
           </h2>
-          <div className="space-y-6 rounded-2xl border border-border/60 bg-card p-8 shadow-token-md">
+          <div className="space-y-6 rounded-md border border-border/60 bg-card p-8 shadow-token-md">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground mb-2">Display · Archivo Narrow Bold</p>
               <p className="font-narrow text-3xl uppercase text-foreground" style={{ fontWeight: 700, letterSpacing: '0.02em' }}>

@@ -303,7 +303,7 @@ export default function AdminAtlas() {
               Import as RouteMarket draft
             </Button>
             {selectedProject && (
-              <div className="rounded-lg border p-3 text-sm bg-muted/40">
+              <div className="rounded-md border p-3 text-sm bg-muted/40">
                 <div className="font-medium">{selectedProject.title}</div>
                 <div className="text-muted-foreground mt-1">
                   {selectedProject.category} · {selectedProject.region} · {selectedProject.language}
@@ -314,7 +314,7 @@ export default function AdminAtlas() {
               </div>
             )}
             {lastImportedRoute && (
-              <div className="rounded-lg border p-3 text-sm bg-muted/40">
+              <div className="rounded-md border p-3 text-sm bg-muted/40">
                 <div className="font-medium">Last imported draft: #{lastImportedRoute.id}</div>
                 <div className="text-muted-foreground mt-1">
                   {lastImportedRoute.title} · {lastImportedRoute.status}
@@ -402,7 +402,7 @@ export default function AdminAtlas() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-lg border">
+            <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -517,7 +517,7 @@ export default function AdminAtlas() {
                 </div>
 
                 {reviewQuery.data.latestDecision && (
-                  <div className="rounded-lg border p-3 text-sm bg-muted/40">
+                  <div className="rounded-md border p-3 text-sm bg-muted/40">
                     <div className="font-medium">Latest decision: {reviewQuery.data.latestDecision.decision}</div>
                     <div className="text-muted-foreground mt-1">
                       {reviewQuery.data.latestDecision.reviewer || 'Unknown reviewer'} · {new Date(reviewQuery.data.latestDecision.decidedAt).toLocaleString()}

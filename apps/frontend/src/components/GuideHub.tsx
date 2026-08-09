@@ -15,9 +15,9 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 function ArticleCardSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-md border border-border bg-card p-4">
       <div className="flex items-start gap-3">
-        <Skeleton className="w-10 h-10 rounded-lg shrink-0" />
+        <Skeleton className="w-10 h-10 rounded-md shrink-0" />
         <div className="flex-1 space-y-2">
           <Skeleton className="h-3 w-16" />
           <Skeleton className="h-4 w-3/4" />
@@ -33,11 +33,11 @@ function ArticleCard({ article, onClick }: { article: GuideArticle; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left group rounded-xl border border-border bg-card p-4 transition-all hover:shadow-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+      className="w-full text-left group rounded-md border border-border bg-card p-4 transition-all hover:shadow-token-md hover:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
       aria-label={`Read article: ${article.title}`}
     >
       <div className="flex items-start gap-3">
-        <div className="shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+        <div className="shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
           <Icon className="w-5 h-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
@@ -144,7 +144,7 @@ export default function GuideHub() {
       {/* Expandable FAB — icon-only, expands on hover/focus */}
       <button
         onClick={() => setOpen(true)}
-        className="group fixed right-4 bottom-4 z-[1300] flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="group fixed right-4 bottom-4 z-[1300] flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label="Open Guide Hub"
       >
         <HelpCircle className="w-5 h-5 shrink-0" />
@@ -174,7 +174,7 @@ export default function GuideHub() {
               <>
                 <SheetHeader className="px-6 pt-6 pb-4 border-b border-border shrink-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center">
                       <Sparkles className="w-5 h-5 text-primary" />
                     </div>
                     <div>

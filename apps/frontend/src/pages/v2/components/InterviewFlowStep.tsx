@@ -34,7 +34,7 @@ export default function InterviewFlowStep({
 }: InterviewFlowStepProps) {
 
   return (
-    <Card className="bg-zinc-950 border-zinc-800 max-w-2xl mx-auto shadow-xl animate-in fade-in duration-300">
+    <Card className="bg-zinc-950 border-zinc-800 max-w-2xl mx-auto shadow-token-xl animate-in fade-in duration-300">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-zinc-800/80">
         <div>
           <CardTitle className="text-xl flex items-center gap-2">
@@ -64,7 +64,7 @@ export default function InterviewFlowStep({
             <Label className="text-lg font-bold text-zinc-200">1. Gdzie chcesz jechać / W jakim regionie?</Label>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { id: 'tatry', label: '⛰️ Tatry i Podhale' },
+                { id: 'tatry', label: 'Tatry i Podhale' },
                 { id: 'mazury', label: '⛵ Mazury i Jeziora' },
                 { id: 'bieszczady', label: '🌲 Bieszczady' },
                 { id: 'jura', label: '🏰 Jura Krakowsko-Częst.' }
@@ -72,7 +72,7 @@ export default function InterviewFlowStep({
                 <div 
                   key={item.id}
                   onClick={() => setPath3Answers({...path3Answers, region: item.label})}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                  className={`p-4 rounded-md border cursor-pointer transition-all ${
                     path3Answers.region === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
@@ -106,7 +106,7 @@ export default function InterviewFlowStep({
                 <div 
                   key={item.label}
                   onClick={() => setPath3Answers({...path3Answers, activity: item.label})}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                  className={`p-4 rounded-md border cursor-pointer transition-all ${
                     path3Answers.activity === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
@@ -132,14 +132,14 @@ export default function InterviewFlowStep({
             <Label className="text-lg font-bold text-zinc-200">3. Gdzie planujesz zaparkować lub zacząć?</Label>
             <div className="grid grid-cols-1 gap-3">
               {[
-                { label: '🚗 Darmowy, bezpieczny parking leśny' },
+                { label: 'Darmowy, bezpieczny parking leśny' },
                 { label: '🚉 Centrum miasta (blisko stacji PKP)' },
                 { label: '🌲 Dowolne ustronne miejsce na dziko' }
               ].map((item) => (
                 <div 
                   key={item.label}
                   onClick={() => setPath3Answers({...path3Answers, parking: item.label})}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                  className={`p-4 rounded-md border cursor-pointer transition-all ${
                     path3Answers.parking === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
@@ -172,7 +172,7 @@ export default function InterviewFlowStep({
                 <div 
                   key={item.val}
                   onClick={() => setPath3Answers({...path3Answers, distance: item.val})}
-                  className={`p-4 rounded-xl border cursor-pointer text-center flex flex-col items-center justify-center transition-all ${
+                  className={`p-4 rounded-md border cursor-pointer text-center flex flex-col items-center justify-center transition-all ${
                     path3Answers.distance === item.val ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >
@@ -207,7 +207,7 @@ export default function InterviewFlowStep({
                 <div 
                   key={item.val}
                   onClick={() => setPath3Answers({...path3Answers, difficulty: item.val})}
-                  className={`p-4 rounded-xl border text-center cursor-pointer transition-all ${
+                  className={`p-4 rounded-md border text-center cursor-pointer transition-all ${
                     path3Answers.difficulty === item.val ? 'border-warning/40 bg-warning/10 text-warning' : 'border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 text-zinc-400'
                   }`}
                 >

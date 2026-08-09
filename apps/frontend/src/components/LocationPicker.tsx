@@ -84,5 +84,5 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
     }
   }, [trackPoints]);
 
-  return <div ref={mapRef} className="w-full h-full rounded-lg" />;
+  return <div ref={mapRef} className="w-full h-full rounded-md" />;
 }

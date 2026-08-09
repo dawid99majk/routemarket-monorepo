@@ -85,7 +85,7 @@ Wyjazdy układane pod Ciebie, nie pod średnią
               text: 'Trasa jest sprawdzana pod kątem dystansu i czasu. Jeśli coś się nie mieści, dowiesz się wprost.'
             }
           ].map(({ Icon, title, text }) => (
-            <div key={title} className="rounded-2xl border p-6">
+            <div key={title} className="rounded-md border p-6">
               <Icon className="w-6 h-6 text-primary" />
               <h2 className="font-semibold mt-4">{title}</h2>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{text}</p>

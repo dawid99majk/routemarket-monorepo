@@ -111,7 +111,7 @@ export default function MyRoutes() {
           const reqs = project.requirements || {};
           const points = Array.isArray(reqs.waypoints) ? reqs.waypoints.length : 0;
           return (
-            <div key={project.id} className="rounded-xl border p-4 flex items-center gap-4">
+            <div key={project.id} className="rounded-md border p-4 flex items-center gap-4">
               <MapPin className="w-5 h-5 text-primary shrink-0" />
               <div className="flex-1 min-w-0">
                 <button

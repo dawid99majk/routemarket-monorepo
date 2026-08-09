@@ -79,7 +79,7 @@ export default function ReviewStep({ claims, onFinishReview, onBack }: ReviewSte
               </Card>
             ))
           ) : (
-            <div className="rounded-2xl border border-dashed border-zinc-800 p-12 text-center space-y-4">
+            <div className="rounded-md border border-dashed border-zinc-800 p-12 text-center space-y-4">
               <AlertCircle className="h-10 w-10 text-zinc-700 mx-auto" />
               <p className="text-zinc-500 text-sm italic">Brak konkretnych faktów do weryfikacji dla tej trasy.</p>
             </div>

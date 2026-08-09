@@ -92,7 +92,7 @@ export default function Favorites() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {places.map((p) => (
-              <div key={p.id} className="rounded-2xl overflow-hidden border bg-card hover:shadow-lg transition-shadow flex flex-col">
+              <div key={p.id} className="rounded-md overflow-hidden border bg-card hover:shadow-token-lg transition-shadow flex flex-col">
                 <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="text-left">
                   <div className="h-40 bg-muted relative">
                     {p.photos?.[0] ? (
@@ -120,7 +120,7 @@ export default function Favorites() {
                     <select
                       onChange={(e) => { if (e.target.value) { addToBoard(p, e.target.value); e.target.value = ''; } }}
                       defaultValue=""
-                      className="w-full text-[11px] border rounded-lg px-2 py-1.5 bg-background hover:bg-muted cursor-pointer"
+                      className="w-full text-[11px] border rounded-md px-2 py-1.5 bg-background hover:bg-muted cursor-pointer"
                       aria-label="Dodaj do tablicy"
                     >
                       <option value="">+ dodaj do tablicy</option>

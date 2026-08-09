@@ -852,7 +852,7 @@ export default function TripProjects() {
 
       <CardContent className="space-y-5">
         {creating && (
-          <div className="grid gap-2 sm:grid-cols-4 p-4 bg-muted/50 rounded-xl">
+          <div className="grid gap-2 sm:grid-cols-4 p-4 bg-muted/50 rounded-md">
             <Input placeholder="Nazwa, np. Bukareszt — delegacja" value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })} className="sm:col-span-2" />
             <Input placeholder="Miasto" value={form.destination}
@@ -966,14 +966,14 @@ export default function TripProjects() {
                   </span>
                 )}
                 <button onClick={duplicateProject} title="Kopiuj tablicę"
-                  className="text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-muted transition-colors">
+                  className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-muted transition-colors">
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
-            <div className="rounded-xl border bg-muted/30 px-4 py-3">
+            <div className="rounded-md border bg-muted/30 px-4 py-3">
               <div className="flex items-baseline justify-between gap-3 mb-2">
                 <span className="text-sm font-medium">Ile czasu zaplanować</span>
                 <span className="text-sm font-semibold text-primary tabular-nums">
@@ -1021,7 +1021,7 @@ export default function TripProjects() {
             </div>
 
             {editingType && (
-              <div className="rounded-xl bg-muted/50 p-3 space-y-2">
+              <div className="rounded-md bg-muted/50 p-3 space-y-2">
                 <span className="text-xs text-muted-foreground">
                   Charakter można zmieniać do woli — liczy się dopiero przy wyszukiwaniu i planowaniu.
                 </span>
@@ -1080,7 +1080,7 @@ export default function TripProjects() {
                 {results.map((r) => {
                   const Icon = CATEGORY_ICON[r.category] || MapPin;
                   return (
-                    <div key={r.name} className="rounded-xl border overflow-hidden bg-background flex flex-col">
+                    <div key={r.name} className="rounded-md border overflow-hidden bg-background flex flex-col">
                       {r.image_url && (
                         <img src={r.image_url} alt="" loading="lazy"
                           className="w-full h-32 object-cover bg-muted" />
@@ -1135,7 +1135,7 @@ export default function TripProjects() {
                 {placeCard && (
                   <div className="space-y-3">
                     {placeCard.photos?.length > 0 && (
-                      <div className="relative rounded-lg overflow-hidden bg-muted">
+                      <div className="relative rounded-md overflow-hidden bg-muted">
                         <img
                           src={placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}
                           alt={placeCard.name}
@@ -1166,7 +1166,7 @@ export default function TripProjects() {
                     )}
                     {placeCard.description && <p className="text-sm leading-relaxed">{placeCard.description}</p>}
                     {placeCard.recommendation && (
-                      <p className="text-xs bg-primary/10/70 border border-primary/30 rounded-lg p-2.5 leading-relaxed">
+                      <p className="text-xs bg-primary/10/70 border border-primary/30 rounded-md p-2.5 leading-relaxed">
                         <strong className="block text-[10px] uppercase tracking-wider text-primary mb-0.5">Wskazówka</strong>
                         {placeCard.recommendation}
                       </p>
@@ -1189,7 +1189,7 @@ export default function TripProjects() {
 
             {/* Wydarzenia: pokazujemy je przy tablicy, bo tam zapada decyzja
                 "dokładam dzień czy nie" — nie w osobnej zakładce. */}
-            <div className="rounded-xl border bg-card">
+            <div className="rounded-md border bg-card">
               <div className="flex items-center justify-between px-4 py-2.5 border-b">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <CalendarDays className="w-4 h-4 text-primary" />
@@ -1233,7 +1233,7 @@ export default function TripProjects() {
             </div>
 
             {(outliers.length > 0 || duplicates.length > 0) && (
-              <div className="rounded-xl border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">
+              <div className="rounded-md border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">
                 {outliers.length > 0 && (
                   <p className="text-xs text-warning-foreground">
                     <strong>Daleko od reszty:</strong> {outliers.map((p) => p.name).join(', ')}.
@@ -1269,7 +1269,7 @@ export default function TripProjects() {
                           const id = e.dataTransfer.getData('text/plain');
                           if (id) movePlace(id, zone.id);
                         }}
-                        className={`rounded-xl p-2.5 min-h-[120px] transition-colors ${
+                        className={`rounded-md p-2.5 min-h-[120px] transition-colors ${
                           zone.id === 'rejected' ? 'bg-muted/40' : 'bg-muted/60'
                         }`}
                       >
@@ -1302,7 +1302,7 @@ export default function TripProjects() {
                                   const id = e.dataTransfer.getData('text/plain');
                                   if (id && id !== p.id) movePlace(id, zone.id, p.id);
                                 }}
-                                className={`rounded-lg border bg-background overflow-hidden cursor-grab active:cursor-grabbing ${
+                                className={`rounded-md border bg-background overflow-hidden cursor-grab active:cursor-grabbing ${
                                   zone.id === 'rejected' ? 'opacity-60' : ''
                                 }`}
                               >
@@ -1375,7 +1375,7 @@ export default function TripProjects() {
               {shares.length > 0 && (
                 <div className="space-y-1">
                   {shares.map((sh) => (
-                    <div key={sh.id} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-muted/50">
+                    <div key={sh.id} className="flex items-center gap-2 text-xs p-2 rounded-md bg-muted/50">
                       <Users className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="flex-1 truncate">{sh.shared_with_email}</span>
                       <span className="text-muted-foreground">{sh.role === 'editor' ? 'może edytować' : 'podgląd'}</span>
@@ -1392,7 +1392,7 @@ export default function TripProjects() {
               <div className="border-t pt-4 space-y-2">
                 <h3 className="text-sm font-semibold">Zapisane plany ({savedPlans.length})</h3>
                 {savedPlans.map((sp) => (
-                  <div key={sp.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-sm">
+                  <div key={sp.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
                     <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
                     <button onClick={() => setPlan(sp.plan)} className="flex-1 text-left hover:underline truncate">
                       {sp.name}
@@ -1469,7 +1469,7 @@ export default function TripProjects() {
             {plan && (
               <div className="space-y-4">
                 {(plan.days || []).map((day: any) => (
-                  <div key={day.day} className="rounded-xl border overflow-hidden">
+                  <div key={day.day} className="rounded-md border overflow-hidden">
                     <div className="bg-muted/60 px-4 py-2 text-sm font-semibold flex items-center justify-between gap-2">
                       <span>
                         Dzień {day.day}
@@ -1580,7 +1580,7 @@ export default function TripProjects() {
                 ))}
 
                 {plan.not_scheduled?.length > 0 && (
-                  <div className="rounded-xl border border-warning/40 bg-warning/60 p-3">
+                  <div className="rounded-md border border-warning/40 bg-warning/60 p-3">
                     <div className="text-sm font-semibold text-warning-foreground mb-1">Nie zmieściło się</div>
                     {plan.not_scheduled.map((n: any) => (
                       <div key={n.name} className="text-xs text-warning-foreground">
@@ -1610,7 +1610,7 @@ export default function TripProjects() {
                 </Button>
 
                 {plan.question && (
-                  <div className="rounded-xl border border-primary/30 bg-primary/10/60 p-3 text-sm text-primary">
+                  <div className="rounded-md border border-primary/30 bg-primary/10/60 p-3 text-sm text-primary">
                     {plan.question}
                   </div>
                 )}

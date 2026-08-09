@@ -51,7 +51,7 @@ const customIcon = L.divIcon({
     font-weight: bold;
     border: 3px solid white;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  ">⛰</div>`,
+  "></div>`,
   iconSize: [32, 32],
   iconAnchor: [16, 16],
   popupAnchor: [0, -16],

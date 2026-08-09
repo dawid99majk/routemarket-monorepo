@@ -52,21 +52,21 @@ export default function GlobeLab() {
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
+          <div className="rounded-md border border-border bg-card px-4 py-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Route className="h-4 w-4" />
               <span className="text-xs uppercase">Track Points</span>
             </div>
             <div className="mt-2 text-2xl font-semibold">{DEMO_TRACK.length}</div>
           </div>
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
+          <div className="rounded-md border border-border bg-card px-4 py-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Ruler className="h-4 w-4" />
               <span className="text-xs uppercase">Distance</span>
             </div>
             <div className="mt-2 text-2xl font-semibold">47 km</div>
           </div>
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
+          <div className="rounded-md border border-border bg-card px-4 py-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Mountain className="h-4 w-4" />
               <span className="text-xs uppercase">Region</span>
@@ -75,7 +75,7 @@ export default function GlobeLab() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-token-sm" style={{ height: '72vh' }}>
+        <div className="overflow-hidden rounded-md border border-border bg-card shadow-token-sm" style={{ height: '72vh' }}>
           <Tabs value={mapMode} className="h-full">
             <TabsContent value="2d" className="m-0 h-full">
               <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>

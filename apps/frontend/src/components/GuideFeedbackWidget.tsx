@@ -27,14 +27,14 @@ export default function GuideFeedbackWidget({ articleSlug }: Props) {
 
   if (submitted) {
     return (
-      <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
-        <p className="text-sm font-medium text-foreground">Thank you for your feedback! 🎉</p>
+      <div className="rounded-md border border-border bg-muted/30 p-4 text-center">
+        <p className="text-sm font-medium text-foreground">Thank you for your feedback! </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+    <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3">
       <p className="text-sm font-medium text-foreground text-center">Was this guide helpful?</p>
       <div className="flex items-center justify-center gap-3">
         <button

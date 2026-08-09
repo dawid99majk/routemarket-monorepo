@@ -745,7 +745,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       )}
       
       {/* Left Panel - Control & Chat */}
-      <div className={`${panelOpen ? 'flex' : 'hidden'} md:flex absolute md:static inset-x-0 bottom-0 z-[1100] md:z-10 max-h-[78dvh] md:max-h-none w-full md:w-[400px] flex-col bg-white border-t md:border-t-0 md:border-r border-border shadow-xl md:shrink-0 rounded-t-2xl md:rounded-none`}>
+      <div className={`${panelOpen ? 'flex' : 'hidden'} md:flex absolute md:static inset-x-0 bottom-0 z-[1100] md:z-10 max-h-[78dvh] md:max-h-none w-full md:w-[400px] flex-col bg-white border-t md:border-t-0 md:border-r border-border shadow-token-xl md:shrink-0 rounded-t-md md:rounded-none`}>
         
         {/* Header */}
         <div className="p-5 border-b border-border bg-white">
@@ -783,9 +783,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         <div className="flex border-b border-border p-2 bg-muted/30 gap-1 shrink-0">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 ${
               activeTab === 'chat'
-                ? 'bg-white text-primary shadow-sm border border-border/50'
+                ? 'bg-white text-primary shadow-token-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -793,9 +793,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           </button>
           <button
             onClick={() => setActiveTab('details')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 ${
               activeTab === 'details'
-                ? 'bg-white text-primary shadow-sm border border-border/50'
+                ? 'bg-white text-primary shadow-token-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -808,9 +808,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           </button>
           <button
             onClick={() => setActiveTab('saved')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 ${
               activeTab === 'saved'
-                ? 'bg-white text-primary shadow-sm border border-border/50'
+                ? 'bg-white text-primary shadow-token-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -853,7 +853,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                     {chatMessages.length > 0 ? 'Przelicz z tymi założeniami' : 'Zacznij od tych założeń'}
                   </Button>
                   {waypoints.length > 0 && (
-                    <div className="flex justify-between items-center bg-primary/10 text-primary px-3 py-2 rounded-lg text-xs font-medium">
+                    <div className="flex justify-between items-center bg-primary/10 text-primary px-3 py-2 rounded-md text-xs font-medium">
                       <span>Punkty na mapie: {waypoints.length}</span>
                       <button onClick={clearRoute} className="text-red-500 hover:text-red-700 flex items-center gap-1 font-semibold">
                         <Trash2 className="w-3.5 h-3.5" /> Wyczyść
@@ -867,9 +867,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => setField('routingPreference', 'popular')}
-                        className={`py-3 px-2 text-xs font-medium rounded-xl border transition-all duration-200 flex flex-col items-center justify-center gap-2 ${
+                        className={`py-3 px-2 text-xs font-medium rounded-md border transition-all duration-200 flex flex-col items-center justify-center gap-2 ${
                           routingPreference === 'popular'
-                            ? 'bg-primary/5 border-primary text-primary shadow-sm ring-1 ring-primary/20'
+                            ? 'bg-primary/5 border-primary text-primary shadow-token-sm ring-1 ring-primary/20'
                             : 'bg-white border-border text-foreground/80 hover:bg-muted hover:border-border'
                         }`}
                       >
@@ -878,9 +878,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                       </button>
                       <button
                         onClick={() => setField('routingPreference', 'wild')}
-                        className={`py-3 px-2 text-xs font-medium rounded-xl border transition-all duration-200 flex flex-col items-center justify-center gap-2 ${
+                        className={`py-3 px-2 text-xs font-medium rounded-md border transition-all duration-200 flex flex-col items-center justify-center gap-2 ${
                           routingPreference === 'wild'
-                            ? 'bg-primary/5 border-primary text-primary shadow-sm ring-1 ring-primary/20'
+                            ? 'bg-primary/5 border-primary text-primary shadow-token-sm ring-1 ring-primary/20'
                             : 'bg-white border-border text-foreground/80 hover:bg-muted hover:border-border'
                         }`}
                       >
@@ -904,7 +904,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'w-full'}`}>
-                    <div className={`rounded-2xl p-3 text-sm leading-relaxed shadow-sm ${
+                    <div className={`rounded-md p-3 text-sm leading-relaxed shadow-token-sm ${
                       msg.role === 'user'
                         ? 'bg-primary text-white rounded-br-sm'
                         : 'bg-white text-foreground rounded-bl-sm border border-border/50'
@@ -923,7 +923,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 </div>
               ))}
               {hasError && (
-                <div className="rounded-xl border border-rose-200 bg-accent p-3.5 space-y-2.5">
+                <div className="rounded-md border border-rose-200 bg-accent p-3.5 space-y-2.5">
                   <div className="text-sm font-semibold text-accent-foreground">Nie udało się dokończyć operacji</div>
                   <p className="text-xs text-accent-foreground leading-relaxed">
                     {context.errorMessage || 'Nieznany błąd.'}
@@ -939,7 +939,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               )}
               {busyLabel && (
                 <div className="flex justify-start">
-                  <div className="bg-white text-foreground rounded-2xl rounded-bl-sm border border-border/50 p-4 shadow-sm flex items-center gap-2">
+                  <div className="bg-white text-foreground rounded-md rounded-bl-sm border border-border/50 p-4 shadow-token-sm flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{busyLabel}</span>
                     <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"></span>
                     <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce delay-75"></span>
@@ -981,14 +981,14 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               <>
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-muted border border-border/60 rounded-xl p-3.5 flex flex-col">
+                  <div className="bg-muted border border-border/60 rounded-md p-3.5 flex flex-col">
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Dystans</span>
                     <span className="text-2xl font-black text-foreground mt-1">
                       {routeStats.distance.toFixed(1)} <span className="text-xs font-bold text-muted-foreground">km</span>
                     </span>
                   </div>
                   
-                  <div className="bg-muted border border-border/60 rounded-xl p-3.5 flex flex-col">
+                  <div className="bg-muted border border-border/60 rounded-md p-3.5 flex flex-col">
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Suma podejść</span>
                     <span className="text-2xl font-black text-primary mt-1">
                       +{Math.round(routeStats.ascent)} <span className="text-xs font-bold text-primary">m</span>
@@ -1001,7 +1001,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
                 {/* Actions Card */}
                 {gpxData && (
-                  <Card className="p-4 border-border/60 bg-white shadow-sm flex flex-col gap-2.5">
+                  <Card className="p-4 border-border/60 bg-white shadow-token-sm flex flex-col gap-2.5">
                     <h4 className="font-bold text-muted-foreground text-[10px] uppercase tracking-wider">Pobierz trasę</h4>
                     <div className="flex gap-2">
                       <Button 
@@ -1053,7 +1053,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 {guideText && (
                   <div className="space-y-3 mt-4">
                     <h3 className="font-bold text-muted-foreground text-[10px] uppercase tracking-wider">Przewodnik po trasie</h3>
-                    <div id="guidebook-content" className="bg-white border border-border/60 shadow-sm rounded-xl p-6 sm:p-8 text-foreground prose prose-slate prose-sm sm:prose-base max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-primary hover:prose-a:text-primary prose-img:rounded-xl prose-p:leading-relaxed prose-strong:text-foreground prose-li:marker:text-primary">
+                    <div id="guidebook-content" className="bg-white border border-border/60 shadow-token-sm rounded-md p-6 sm:p-8 text-foreground prose prose-slate prose-sm sm:prose-base max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-primary hover:prose-a:text-primary prose-img:rounded-md prose-p:leading-relaxed prose-strong:text-foreground prose-li:marker:text-primary">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {guideText}
                       </ReactMarkdown>
@@ -1090,7 +1090,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                     <div 
                       key={project.id}
                       onClick={() => handleLoadProject(project)}
-                      className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all duration-200 hover:shadow-md flex items-start justify-between gap-3 ${
+                      className={`p-3.5 rounded-md border text-left cursor-pointer transition-all duration-200 hover:shadow-token-md flex items-start justify-between gap-3 ${
                         isCurrent 
                           ? 'border-primary bg-primary/10/20' 
                           : 'border-border/60 bg-white hover:border-border'
@@ -1140,7 +1140,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2">
           
           {/* Main Selector */}
-          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-lg p-1.5 flex gap-1 border border-border/50 max-w-[95vw] overflow-x-auto scrollbar-none">
+          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-token-lg p-1.5 flex gap-1 border border-border/50 max-w-[95vw] overflow-x-auto scrollbar-none">
             <Button 
               variant={vehicleType === 'motorcycle' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-primary text-white' : 'text-foreground/80 hover:text-foreground'}`}
@@ -1180,7 +1180,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
           {/* Sub Selector for Bicycle */}
           {vehicleType === 'bicycle' && (
-            <div className="bg-white/90 backdrop-blur-md rounded-full shadow-md p-1 flex gap-1 border border-border/50 animate-in slide-in-from-top-2">
+            <div className="bg-white/90 backdrop-blur-md rounded-full shadow-token-md p-1 flex gap-1 border border-border/50 animate-in slide-in-from-top-2">
               <Button 
                 variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} 
                 size="sm"
@@ -1211,7 +1211,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
         {/* Loading Indicator */}
         {isRouting && (
-          <div className="absolute top-6 right-6 z-[1000] bg-white/90 backdrop-blur-md rounded-full shadow-lg py-2 px-4 flex items-center gap-2 border border-primary/30">
+          <div className="absolute top-6 right-6 z-[1000] bg-white/90 backdrop-blur-md rounded-full shadow-token-lg py-2 px-4 flex items-center gap-2 border border-primary/30">
             <Loader2 className="w-4 h-4 text-primary animate-spin" />
             <span className="text-sm font-semibold text-primary">Przeliczam trasę...</span>
           </div>
@@ -1291,7 +1291,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
                   {/* Galeria: zdjęcia z Wikimedia Commons, przeklikiwane w bok */}
                   {photos.length > 0 && (
-                    <div className="relative mb-2.5 rounded-lg overflow-hidden bg-muted group">
+                    <div className="relative mb-2.5 rounded-md overflow-hidden bg-muted group">
                       <img
                         src={photos[idx]}
                         alt={key}
@@ -1355,7 +1355,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                           </button>
                         )}
                         {expanded && details.recommendation && (
-                          <div className="bg-primary/10/50 border border-primary/30/70 rounded-lg p-2 flex items-start gap-1.5">
+                          <div className="bg-primary/10/50 border border-primary/30/70 rounded-md p-2 flex items-start gap-1.5">
                             <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
                             <div className="text-[11px] text-primary font-medium leading-normal m-0">
                               <strong className="text-primary block text-[10px] uppercase tracking-wider mb-0.5 font-bold">Wskazówka AI</strong>
@@ -1427,7 +1427,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         {!panelOpen && (
           <Button
             onClick={() => setPanelOpen(true)}
-            className="md:hidden absolute bottom-6 right-6 z-[1050] rounded-full bg-white text-foreground hover:bg-muted shadow-lg h-12 px-5 font-bold border border-border"
+            className="md:hidden absolute bottom-6 right-6 z-[1050] rounded-full bg-white text-foreground hover:bg-muted shadow-token-lg h-12 px-5 font-bold border border-border"
           >
             <Bot className="w-4 h-4 mr-2 text-primary" /> Kreator
           </Button>
@@ -1437,12 +1437,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           {waypoints.length >= 2 && (
             <Button 
               onClick={() => send({ type: 'CALCULATE_ROUTE' })} 
-              className="bg-primary hover:bg-primary/90 text-white shadow-lg rounded-full px-5 h-10 font-bold"
+              className="bg-primary hover:bg-primary/90 text-white shadow-token-lg rounded-full px-5 h-10 font-bold"
             >
               <RefreshCw className="w-4 h-4 mr-2" /> Przelicz trasę
             </Button>
           )}
-          <Badge variant="outline" className="bg-white/90 border-primary/30 text-primary backdrop-blur-md py-1.5 px-4 rounded-full shadow-lg h-10 hidden sm:flex items-center">
+          <Badge variant="outline" className="bg-white/90 border-primary/30 text-primary backdrop-blur-md py-1.5 px-4 rounded-full shadow-token-lg h-10 hidden sm:flex items-center">
             <MapPin className="w-3 h-3 mr-2" /> OpenStreetMap
           </Badge>
         </div>

@@ -42,7 +42,7 @@ export function ElevationProfile({ coordinates }: { coordinates: number[][] }) {
   const polygonData = `${pathData} L 100 40 L 0 40 Z`;
 
   return (
-    <div className="bg-muted border border-border/60 rounded-xl p-4 flex flex-col gap-2 shadow-sm">
+    <div className="bg-muted border border-border/60 rounded-md p-4 flex flex-col gap-2 shadow-token-sm">
       <h3 className="font-bold text-muted-foreground text-[10px] uppercase tracking-wider flex items-center gap-1.5">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
         Profil wysokościowy

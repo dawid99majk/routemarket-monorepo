@@ -34,7 +34,7 @@ export default function AdminUsers() {
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4">Użytkownicy ({users.length})</h1>
-      <div className="rounded-lg border">
+      <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>

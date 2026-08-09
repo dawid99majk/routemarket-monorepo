@@ -390,7 +390,7 @@ export default function RouteGlobe3D({ track, className = '' }: RouteGlobe3DProp
   if (track.length < 2) return null;
 
   return (
-    <div className={`relative h-full w-full overflow-hidden rounded-xl bg-ink ${className}`}>
+    <div className={`relative h-full w-full overflow-hidden rounded-md bg-ink ${className}`}>
       <div ref={hostRef} className="h-full w-full" />
 
       <div className="absolute left-3 top-3 rounded-full bg-ink/70 px-3 py-1 text-xs font-medium text-white backdrop-blur">

@@ -80,13 +80,13 @@ export default function TranslationManager({ routeId, originalTitle, originalDes
   };
 
   return (
-    <div className="bg-card rounded-xl p-6 shadow-sm">
+    <div className="bg-card rounded-md p-6 shadow-token-sm">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
         <Languages className="w-5 h-5" /> Translations
       </h2>
 
       {/* Original */}
-      <div className="mb-4 p-3 bg-muted rounded-lg">
+      <div className="mb-4 p-3 bg-muted rounded-md">
         <div className="flex items-center gap-2 mb-1">
           <Badge variant="outline" className="text-xs">Original</Badge>
         </div>
@@ -99,7 +99,7 @@ export default function TranslationManager({ routeId, originalTitle, originalDes
       ) : (
         <div className="space-y-3">
           {translations.map((t) => (
-            <div key={t.id} className="border border-border rounded-lg p-3">
+            <div key={t.id} className="border border-border rounded-md p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium uppercase">{t.language_code}</span>

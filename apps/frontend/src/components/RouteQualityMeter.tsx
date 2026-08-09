@@ -19,7 +19,7 @@ export default function RouteQualityMeter({ quality }: RouteQualityMeterProps) {
   const cfg = statusConfig[status];
 
   return (
-    <div className="bg-card rounded-xl p-6 shadow-sm space-y-4">
+    <div className="bg-card rounded-md p-6 shadow-token-sm space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Star className="w-5 h-5 text-primary" /> Route Quality

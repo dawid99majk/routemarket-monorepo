@@ -26,7 +26,7 @@ export default function PromoPopup() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border-0 rounded-md shadow-token-xl max-h-[90vh] overflow-y-auto">
         <button
           onClick={handleClose}
           className="absolute right-3 top-3 z-10 p-1.5 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background transition-colors"
@@ -45,7 +45,7 @@ export default function PromoPopup() {
           {/* Creators column */}
           <div className="bg-background p-5 flex flex-col">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">✍️</span>
+              <span className="text-lg"></span>
               <div>
                 <p className="text-sm font-bold text-foreground uppercase tracking-wide">For Creators</p>
                 <p className="text-xs text-muted-foreground">Earn from your passion</p>
@@ -81,7 +81,7 @@ export default function PromoPopup() {
           {/* Explorers column */}
           <div className="bg-background p-5 flex flex-col border-t sm:border-t-0">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-lg">📍</span>
+              <span className="text-lg"></span>
               <div>
                 <p className="text-sm font-bold text-foreground uppercase tracking-wide">For Explorers</p>
                 <p className="text-xs text-muted-foreground">Discover something new</p>

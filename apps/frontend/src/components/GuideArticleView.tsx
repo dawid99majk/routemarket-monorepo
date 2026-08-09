@@ -93,7 +93,7 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
         <div className="px-4 sm:px-6 py-3 flex items-center gap-2">
           <button
             onClick={onBack}
-            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Back to Guide Hub"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -112,14 +112,14 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleCopyLink}
-              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
               aria-label="Copy link"
             >
               <Link2 className="w-4 h-4" />
             </button>
             <button
               onClick={handleShare}
-              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
               aria-label="Share guide"
             >
               <Share2 className="w-4 h-4" />
@@ -132,7 +132,7 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
         {/* Header */}
         <div className="flex items-start gap-3 mt-4 mb-4">
-          <div className="shrink-0 w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center">
+          <div className="shrink-0 w-11 h-11 rounded-md bg-primary/10 flex items-center justify-center">
             <Icon className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
@@ -161,7 +161,7 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
 
         {/* TL;DR */}
         <section className="mb-6" aria-labelledby="tldr-heading">
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
             <h3 id="tldr-heading" className="text-xs font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> TL;DR
             </h3>
@@ -237,7 +237,7 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
         </section>
 
         {/* CTA */}
-        <section className="rounded-xl border border-primary/20 bg-primary/5 p-5 text-center mb-6" aria-labelledby="cta-heading">
+        <section className="rounded-md border border-primary/20 bg-primary/5 p-5 text-center mb-6" aria-labelledby="cta-heading">
           <h3 id="cta-heading" className="text-base font-bold text-foreground mb-1">{article.ctaTitle}</h3>
           <p className="text-xs text-muted-foreground mb-3">{article.ctaDescription}</p>
           <Button size="sm" asChild className="min-h-[44px]">
@@ -256,9 +256,9 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
                   <button
                     key={r.slug}
                     onClick={() => handleNav(r.slug)}
-                    className="w-full text-left flex items-center gap-3 rounded-lg border border-border p-3 hover:border-primary/30 hover:shadow-sm transition-all min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="w-full text-left flex items-center gap-3 rounded-md border border-border p-3 hover:border-primary/30 hover:shadow-token-sm transition-all min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <div className="shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
                       <RIcon className="w-4 h-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">

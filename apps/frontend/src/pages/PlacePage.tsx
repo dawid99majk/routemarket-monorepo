@@ -203,7 +203,7 @@ export default function PlacePage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {photos.length > 0 && (
-          <div className="relative rounded-2xl overflow-hidden bg-muted">
+          <div className="relative rounded-md overflow-hidden bg-muted">
             <img
               src={photos[Math.min(photoIdx, photos.length - 1)]}
               alt={place.name}
@@ -255,7 +255,7 @@ export default function PlacePage() {
         </div>
 
         {(place as any).source === 'user' && (
-          <p className="text-xs text-muted-foreground bg-muted/60 rounded-lg px-3 py-2">
+          <p className="text-xs text-muted-foreground bg-muted/60 rounded-md px-3 py-2">
             To miejsce dodał użytkownik serwisu — nie pochodzi z OpenStreetMap.{' '}
             <button onClick={report} disabled={reported} className="text-primary hover:underline disabled:opacity-60">
               {reported ? 'Zgłoszone' : 'Zgłoś nieprawidłowość'}
@@ -342,7 +342,7 @@ export default function PlacePage() {
                 <button
                   key={sp.id}
                   onClick={() => navigate(`/miejsce/${sp.slug}`)}
-                  className="text-left rounded-xl overflow-hidden border hover:shadow-md transition-shadow bg-card"
+                  className="text-left rounded-md overflow-hidden border hover:shadow-token-md transition-shadow bg-card"
                 >
                   <div className="h-28 bg-muted">
                     {sp.photos?.[0] && (

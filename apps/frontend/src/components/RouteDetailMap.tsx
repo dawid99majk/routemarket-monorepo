@@ -32,11 +32,11 @@ function createCircleIcon(color: string, label: string) {
 }
 
 function createPoiIcon(name: string, color: string = '#6366f1') {
-  let emoji = '📍';
+  let emoji = '';
   const lowercase = name.toLowerCase();
-  if (lowercase.includes('start')) emoji = '🏁';
-  else if (lowercase.includes('meta') || lowercase.includes('koniec') || lowercase.includes('end')) emoji = '🏆';
-  else if (lowercase.includes('schronisko')) emoji = '🏡';
+  if (lowercase.includes('start')) emoji = '';
+  else if (lowercase.includes('meta') || lowercase.includes('koniec') || lowercase.includes('end')) emoji = '';
+  else if (lowercase.includes('schronisko')) emoji = '';
   else if (lowercase.includes('szczyt') || lowercase.includes('góra') || lowercase.includes('giewont') || lowercase.includes('kasprowy')) emoji = '🏔️';
   else if (lowercase.includes('parking')) emoji = '🅿️';
   else if (lowercase.includes('widok') || lowercase.includes('punkt widokowy')) emoji = '📷';
@@ -247,7 +247,7 @@ function RouteDetailMapInner({
       <div ref={containerRef} className="w-full h-full" />
       <button 
         onClick={handleLocateMe}
-        className="absolute top-4 right-4 z-[400] bg-white border border-border shadow-md text-foreground/80 hover:text-primary rounded-full w-10 h-10 flex items-center justify-center transition-colors"
+        className="absolute top-4 right-4 z-[400] bg-white border border-border shadow-token-md text-foreground/80 hover:text-primary rounded-full w-10 h-10 flex items-center justify-center transition-colors"
         title="Centruj na mnie (Nawiguj)"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
