@@ -574,6 +574,9 @@ function clusterPlacesByProximity<T extends { name: string; lat?: number | null;
 
 app.post('/plan-trip', async (c) => {
   try {
+    const tokenUserId = c.get('userId') || null;
+    const shortfall = await ensureTokens(tokenUserId, 'plan-trip');
+    if (shortfall) return c.json({ error: shortfall, needs_tokens: true }, 402);
     const body = await c.req.json() as {
       destination: string;
       days: number;
@@ -831,6 +834,8 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
       return { ...d, date: info?.date, weekday: info?.weekday };
     });
 
+    // Opłata dopiero teraz: plan jest gotowy i za chwilę trafi do użytkownika
+    await repo.chargeTokens(tokenUserId!, TOKEN_PRICES['plan-trip'], 'plan dni', body.destination);
     return c.json(plan);
   } catch (err: any) {
     console.error('[plan-trip] Error:', err);
@@ -1501,6 +1506,54 @@ app.post('/catalog/submit', async (c) => {
     return c.json({ error: err.message }, 500);
   }
 });
+
+
+/**
+ * Cennik. Zbieranie miejsc, tablice, ulubione i kolekcje są darmowe — to one
+ * budują nawyk i nie kosztują praktycznie nic. Tokeny pobieramy za momenty, w
+ * których użytkownik świadomie prosi o wynik i ten wynik widzi.
+ *
+ * Uczciwie: przy koszcie rzędu 0,0004 USD za wywołanie modelu to cennik wartości,
+ * nie zwrot kosztów. Nie ma sensu wyliczać go z rachunku za Gemini.
+ */
+const TOKEN_PRICES: Record<string, number> = {
+  'plan-trip': 5,
+  'live-route': 10,
+  'chat-interview': 3
+};
+
+/** Saldo i historia — użytkownik ma widzieć, za co zapłacił. */
+app.get('/tokens/balance', async (c) => {
+  const userId = c.get('userId');
+  if (!userId) return c.json({ error: 'Wymagane zalogowanie' }, 401);
+  try {
+    const [balance, ledger] = await Promise.all([
+      repo.getTokenBalance(userId),
+      repo.listLedger(userId, 30)
+    ]);
+    return c.json({ balance, prices: TOKEN_PRICES, ledger });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/**
+ * Sprawdzenie salda przed rozpoczęciem pracy. Wolimy odmówić od razu, niż
+ * policzyć całą trasę i dopiero potem powiedzieć, że nie ma za co.
+ */
+async function ensureTokens(userId: string | null, operation: string): Promise<string | null> {
+  const price = TOKEN_PRICES[operation];
+  if (!price || !userId) return null;
+  try {
+    const balance = await repo.getTokenBalance(userId);
+    if (balance < price) {
+      return `Na tę operację potrzeba ${price} tokenów, a masz ${balance}. Doładuj konto, żeby kontynuować.`;
+    }
+  } catch (err: any) {
+    console.warn('[tokens] Nie udało się sprawdzić salda, przepuszczam:', err.message);
+  }
+  return null;
+}
 
 // Healthcheck
 app.get('/health', (c) => {
@@ -3074,6 +3127,9 @@ app.get('/route-projects/:id/jobs/:jobId', async (c) => {
 // Fast endpoint for live routing on the interactive map
 app.post('/live-route', async (c) => {
   try {
+    const tokenUserId = c.get('userId') || null;
+    const shortfall = await ensureTokens(tokenUserId, 'live-route');
+    if (shortfall) return c.json({ error: shortfall, needs_tokens: true }, 402);
     const { points, route_type, surface_preferences, intent, distance_target_km } = await c.req.json();
     if (!points || points.length < 2) {
       return c.json({ error: 'At least 2 points required' }, 400);
@@ -3106,6 +3162,7 @@ app.post('/live-route', async (c) => {
       console.warn('[LiveRoute] Validation warnings:', validation.warnings);
     }
 
+    await repo.chargeTokens(tokenUserId!, TOKEN_PRICES['live-route'], 'wyznaczenie trasy');
     return c.json({ ...route, validation });
   } catch (err: any) {
     console.error('[LiveRoute] Error:', err);

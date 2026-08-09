@@ -28,6 +28,8 @@ export class ApiError extends Error {
 
 function messageForStatus(status: number, payload: any): string {
   if (status === 401) return 'Sesja wygasła. Zaloguj się ponownie, żeby kontynuować.';
+  // 402 to nie awaria: uzytkownik ma zadzialac, nie zglaszac usterki
+  if (status === 402) return payload?.error || 'Za malo tokenow na te operacje. Doladuj konto, zeby kontynuowac.';
   if (status === 429) {
     const wait = payload?.retry_after_s;
     return wait

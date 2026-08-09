@@ -99,6 +99,59 @@ export class RouteBuilderRepository {
     return data;
   }
 
+
+  // --- Tokeny ---------------------------------------------------------------
+  // Saldo jest sumą operacji w księdze, nie polem do nadpisania. Pole potrafi się
+  // rozjechać po każdym nieudanym zapisie i nie da się potem odtworzyć, co się
+  // stało; suma zawsze zgadza się z historią, którą użytkownik widzi.
+
+  private static readonly WELCOME_GRANT = 100;
+
+  async getTokenBalance(userId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('token_ledger').select('amount').eq('user_id', userId);
+    if (error) throw new Error(error.message);
+
+    // Pierwsze wejście: przyznajemy pulę powitalną leniwie, przy pierwszym
+    // odczycie salda. Wyzwalacz na auth.users już raz położył rejestrację,
+    // więc nie ruszamy tej ścieżki.
+    if (!data || data.length === 0) {
+      await supabase.from('token_ledger').insert({
+        user_id: userId,
+        amount: RouteBuilderRepository.WELCOME_GRANT,
+        reason: 'powitalne'
+      });
+      return RouteBuilderRepository.WELCOME_GRANT;
+    }
+    return data.reduce((sum: number, row: any) => sum + row.amount, 0);
+  }
+
+  /**
+   * Pobranie opłaty. Naliczamy PO udanej operacji, nie przed: gdy generowanie
+   * padnie, użytkownik nie może zostać z pustym portfelem i niczym w ręku.
+   */
+  async chargeTokens(userId: string, amount: number, reason: string, ref?: string): Promise<void> {
+    if (amount <= 0) return;
+    const { error } = await supabase.from('token_ledger').insert({
+      user_id: userId, amount: -Math.abs(amount), reason, ref: ref ?? null
+    });
+    if (error) console.error('[tokens] Nie udało się zapisać opłaty:', error.message);
+  }
+
+  async grantTokens(userId: string, amount: number, reason: string, ref?: string): Promise<void> {
+    const { error } = await supabase.from('token_ledger').insert({
+      user_id: userId, amount: Math.abs(amount), reason, ref: ref ?? null
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  async listLedger(userId: string, limit = 50): Promise<any[]> {
+    const { data } = await supabase
+      .from('token_ledger').select('*')
+      .eq('user_id', userId).order('created_at', { ascending: false }).limit(limit);
+    return data ?? [];
+  }
+
   canAccessProject(project: RouteProject, user: AuthenticatedRouteBuilderUser): boolean {
     if (user.roles.includes('admin')) return true;
     return Boolean(project.user_id && project.user_id === user.id);

@@ -412,6 +412,24 @@ export default function TripProjects() {
   const [events, setEvents] = useState<any[]>([]);
   const [eventsBusy, setEventsBusy] = useState(false);
 
+  /**
+   * Saldo tokenów. Zbieranie miejsc jest darmowe, płatne są dopiero momenty, w
+   * których prosisz o gotowy wynik — dlatego licznik stoi przy tablicy, a nie
+   * na wejściu do serwisu.
+   */
+  const [tokens, setTokens] = useState<{ balance: number; prices: Record<string, number> } | null>(null);
+  const refreshTokens = async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const base = import.meta.env.VITE_API_URL || '/route-builder-api';
+      const res = await fetch(`${base}/tokens/balance`, {
+        headers: data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+      });
+      if (res.ok) setTokens(await res.json());
+    } catch { /* licznik jest informacją, nie warunkiem pracy */ }
+  };
+  useEffect(() => { refreshTokens(); }, []);
+
   const loadEvents = async (city: string) => {
     const today = new Date().toISOString().slice(0, 10);
     const { data } = await (supabase as any)
@@ -740,6 +758,7 @@ export default function TripProjects() {
         .select('id, name, window_start, window_end, start_date, plan, created_at')
         .single();
       if (saved) setSavedPlans((prev) => [saved, ...prev]);
+      refreshTokens();
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -931,6 +950,16 @@ export default function TripProjects() {
               </div>
 
               <div className="flex items-center gap-1">
+                {tokens && (
+                  <span
+                    className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full ${
+                      tokens.balance < 10 ? 'bg-amber-50 text-amber-800' : 'text-muted-foreground'
+                    }`}
+                    title={`Plan dni: ${tokens.prices?.['plan-trip'] ?? '?'} tokenów, wyznaczenie trasy: ${tokens.prices?.['live-route'] ?? '?'}`}
+                  >
+                    <Coins className="w-3.5 h-3.5" /> {tokens.balance}
+                  </span>
+                )}
                 {shares.length > 0 && (
                   <span className="text-xs flex items-center gap-1 text-muted-foreground px-2" title="Współtwórcy tablicy">
                     <Users className="w-3.5 h-3.5" /> {shares.length}
