@@ -82,6 +82,23 @@ export class RouteBuilderRepository {
     return data ?? [];
   }
 
+
+  /** Wydarzenie rozpoznajemy po mieście, nazwie i dacie startu — ta trójka jest
+   *  wystarczająco unikalna, a pozwala odświeżać listę bez mnożenia duplikatów. */
+  async upsertEvent(row: Record<string, any>): Promise<any | null> {
+    const { data: existing } = await supabase
+      .from('place_events').select('id')
+      .eq('city', row.city).eq('name', row.name).eq('starts_on', row.starts_on)
+      .maybeSingle();
+    if (existing) {
+      const { data } = await supabase.from('place_events').update(row).eq('id', existing.id).select('*').single();
+      return data;
+    }
+    const { data, error } = await supabase.from('place_events').insert(row).select('*').single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
   canAccessProject(project: RouteProject, user: AuthenticatedRouteBuilderUser): boolean {
     if (user.roles.includes('admin')) return true;
     return Boolean(project.user_id && project.user_id === user.id);

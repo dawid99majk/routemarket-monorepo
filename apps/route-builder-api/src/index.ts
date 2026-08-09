@@ -37,6 +37,7 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/points-details': { windowMs: 5 * 60_000, max: 20 },
   '/catalog/upsert': { windowMs: 5 * 60_000, max: 120 },
   '/catalog/seed': { windowMs: 10 * 60_000, max: 6 },
+  '/events/refresh': { windowMs: 10 * 60_000, max: 6 },
   '/discover-places': { windowMs: 5 * 60_000, max: 20 },
   '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
   '/geocode-points': { windowMs: 5 * 60_000, max: 60 }
@@ -1327,6 +1328,99 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
     return c.json({ city, added: saved.length, center: { lat: center.lat, lng: center.lng } });
   } catch (err: any) {
     console.error('[catalog/seed] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Wydarzenia w mieście. To jedyna warstwa, której nie ma w żadnym przewodniku,
+ * bo wystawa trwa trzy tygodnie i za miesiąc opis jest nieaktualny — a
+ * jednocześnie to najmocniejszy powód, żeby wrócić na stronę przed wyjazdem.
+ * Szukamy z wyszukiwarką, bo bez niej model podałby wydarzenia sprzed dwóch lat.
+ */
+app.post('/events/refresh', async (c) => {
+  try {
+    const { city, from, to } = await c.req.json() as { city: string; from?: string; to?: string };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const fromDate = from || today;
+    const toDate = to || new Date(Date.now() + 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+    const prompt = `Znajdź WYDARZENIA odbywające się w mieście ${city} w okresie od ${fromDate} do ${toDate}.
+
+Interesują nas: wystawy czasowe, festiwale, koncerty cykliczne, jarmarki, wydarzenia sportowe i kulturalne — rzeczy z konkretnym zakresem dat, których nie ma w stałym programie miasta.
+
+Użyj wyszukiwarki, żeby sprawdzić AKTUALNE terminy. Dzisiaj jest ${today}.
+Nie podawaj wydarzeń, które już się zakończyły, ani takich, których dat nie potrafisz ustalić.
+
+Dla każdego zwróć:
+- "name": nazwa wydarzenia
+- "venue": nazwa miejsca, w którym się odbywa (dokładnie, jeśli znasz)
+- "description": jedno zdanie, czego dotyczy
+- "starts_on": data w formacie RRRR-MM-DD
+- "ends_on": data zakończenia w formacie RRRR-MM-DD (jeśli jednodniowe, ta sama co starts_on)
+- "url": adres strony wydarzenia, jeśli znasz
+
+Zwróć od 3 do 12 wydarzeń. Odpowiedz WYŁĄCZNIE obiektem JSON: {"events": [...]}`;
+
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      { contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] },
+      { operation: 'events-refresh', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+    );
+
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let events: any[] = [];
+    try {
+      const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const first = cleaned.indexOf('{');
+      const last = cleaned.lastIndexOf('}');
+      if (first >= 0 && last > first) events = JSON.parse(cleaned.slice(first, last + 1)).events || [];
+    } catch {
+      console.warn('[events] Nie udało się sparsować odpowiedzi');
+    }
+
+    const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const catalog = await repo.listCatalogByCity(city, 200);
+    const saved: any[] = [];
+
+    for (const ev of events) {
+      // Data bez formatu to data zmyślona — takie wpisy odrzucamy, bo wydarzenie
+      // bez terminu nie ma żadnej wartości w planowaniu wyjazdu.
+      if (!ev?.name || !isDate(ev.starts_on)) continue;
+      if (ev.ends_on && !isDate(ev.ends_on)) ev.ends_on = null;
+      if ((ev.ends_on || ev.starts_on) < today) continue;
+
+      const venue = typeof ev.venue === 'string' ? ev.venue.trim().toLowerCase() : '';
+      const match = venue
+        ? catalog.find((p: any) => p.name.toLowerCase() === venue)
+          || catalog.find((p: any) => p.name.toLowerCase().includes(venue) || venue.includes(p.name.toLowerCase()))
+        : null;
+
+      try {
+        const row = await repo.upsertEvent({
+          place_id: match?.id ?? null,
+          city,
+          name: String(ev.name).slice(0, 200),
+          description: String(ev.description || '').slice(0, 500),
+          starts_on: ev.starts_on,
+          ends_on: ev.ends_on || ev.starts_on,
+          url: typeof ev.url === 'string' ? ev.url.slice(0, 500) : null
+        });
+        if (row) saved.push(row);
+      } catch (err: any) {
+        console.warn(`[events] Pominięte "${ev.name}": ${err.message}`);
+      }
+    }
+
+    console.log(`[events] ${city}: zapisano ${saved.length} z ${events.length} znalezionych`);
+    return c.json({ city, saved: saved.length, events: saved });
+  } catch (err: any) {
+    console.error('[events/refresh] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });

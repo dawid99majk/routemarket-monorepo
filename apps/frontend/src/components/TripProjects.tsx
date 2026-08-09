@@ -188,6 +188,8 @@ export default function TripProjects() {
     setResults([]);
     setQuery('');
     setPlan(null);
+    setEvents([]);
+    if (active?.destination) loadEvents(active.destination);
     setEditingType(false);
     setShareEmail('');
     (async () => {
@@ -399,6 +401,39 @@ export default function TripProjects() {
     } catch (err: any) {
       setDayRoutes((prev) => { const next = { ...prev }; delete next[day.day]; return next; });
       toast.error(err.message || 'Nie udało się przeliczyć dnia');
+    }
+  };
+
+  /**
+   * Wydarzenia w mieście wyjazdu. To jedyna warstwa, której nie ma w przewodnikach,
+   * bo wystawa trwa trzy tygodnie — a jednocześnie najczęstszy powód, dla którego
+   * ktoś w ogóle przestawia termin albo dokłada dzień.
+   */
+  const [events, setEvents] = useState<any[]>([]);
+  const [eventsBusy, setEventsBusy] = useState(false);
+
+  const loadEvents = async (city: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await (supabase as any)
+      .from('place_events').select('*')
+      .ilike('city', city)
+      .gte('ends_on', today)
+      .order('starts_on', { ascending: true })
+      .limit(12);
+    setEvents(data ?? []);
+  };
+
+  const refreshEvents = async () => {
+    if (!active) return;
+    setEventsBusy(true);
+    try {
+      const data = await apiPost<any>('/events/refresh', { city: active.destination }, { timeoutMs: 120_000 });
+      await loadEvents(active.destination);
+      toast.success(data.saved > 0 ? `Znaleziono ${data.saved} wydarzeń` : 'Nie znaleziono nowych wydarzeń');
+    } catch (err: any) {
+      toast.error(err.message || 'Nie udało się pobrać wydarzeń');
+    } finally {
+      setEventsBusy(false);
     }
   };
 
@@ -1122,6 +1157,51 @@ export default function TripProjects() {
                 )}
               </DialogContent>
             </Dialog>
+
+            {/* Wydarzenia: pokazujemy je przy tablicy, bo tam zapada decyzja
+                "dokładam dzień czy nie" — nie w osobnej zakładce. */}
+            <div className="rounded-xl border bg-card">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-emerald-600" />
+                  Co się dzieje w: {active.destination}
+                </h3>
+                <button onClick={refreshEvents} disabled={eventsBusy}
+                  className="text-xs text-emerald-700 hover:underline disabled:opacity-60 flex items-center gap-1">
+                  {eventsBusy
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Szukam…</>
+                    : <>{events.length > 0 ? 'Odśwież' : 'Sprawdź wydarzenia'}</>}
+                </button>
+              </div>
+              {events.length === 0 ? (
+                <p className="px-4 py-3 text-xs text-muted-foreground">
+                  Wystawy, festiwale i jarmarki z konkretnymi terminami — sprawdzamy je na żądanie,
+                  bo szybko się dezaktualizują.
+                </p>
+              ) : (
+                <div className="divide-y max-h-64 overflow-y-auto">
+                  {events.map((ev) => (
+                    <div key={ev.id} className="px-4 py-2.5 flex items-start gap-3 text-sm">
+                      <span className="font-mono text-[11px] text-muted-foreground shrink-0 pt-0.5 w-[92px]">
+                        {ev.starts_on?.slice(5)}{ev.ends_on && ev.ends_on !== ev.starts_on ? `–${ev.ends_on.slice(5)}` : ''}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium leading-snug">{ev.name}</div>
+                        {ev.description && (
+                          <div className="text-xs text-muted-foreground leading-snug">{ev.description}</div>
+                        )}
+                      </div>
+                      {ev.url && (
+                        <a href={ev.url} target="_blank" rel="noreferrer"
+                          className="text-muted-foreground hover:text-emerald-600 shrink-0 mt-0.5" title="Strona wydarzenia">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {(outliers.length > 0 || duplicates.length > 0) && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 space-y-1.5">
