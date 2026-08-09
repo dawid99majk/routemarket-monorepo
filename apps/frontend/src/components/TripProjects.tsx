@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, Search, Share2, Star, Trash2, Users, Utensils, Wand2
+  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -345,6 +345,37 @@ export default function TripProjects() {
    * "zostawiam czy wyrzucam" była zgadywanką. Opis i zdjęcia bierzemy z tego
    * samego mechanizmu, który obsługuje karty punktów na mapie.
    */
+  /**
+   * Dokładny kilometraż dnia. Domyślnie pokazujemy szacunek z odcinków między
+   * punktami razy 1,3, bo policzenie prawdziwego przebiegu to osobne zapytanie
+   * routingu na każdy dzień. Kto chce twardej liczby, prosi o nią jednym
+   * kliknięciem — i wtedy dostaje przebieg po chodnikach, a nie po linii prostej.
+   */
+  const [dayRoutes, setDayRoutes] = useState<Record<number, { km: number; h: number } | 'loading'>>({});
+
+  const recalcDay = async (day: any) => {
+    const points = (day.items || [])
+      .filter((it: any) => it.lat != null && it.lng != null)
+      .map((it: any) => ({ lat: it.lat, lng: it.lng, name: it.name }));
+    if (points.length < 2) return toast.error('Ten dzień ma za mało punktów ze współrzędnymi');
+
+    setDayRoutes((prev) => ({ ...prev, [day.day]: 'loading' }));
+    try {
+      const data = await apiPost<any>('/live-route', {
+        points,
+        route_type: 'city_walk',
+        intent: 'popular'
+      }, { timeoutMs: 90_000 });
+      setDayRoutes((prev) => ({
+        ...prev,
+        [day.day]: { km: data.distance_km, h: data.duration_h }
+      }));
+    } catch (err: any) {
+      setDayRoutes((prev) => { const next = { ...prev }; delete next[day.day]; return next; });
+      toast.error(err.message || 'Nie udało się przeliczyć dnia');
+    }
+  };
+
   const [placeCard, setPlaceCard] = useState<any | null>(null);
   const [cardLoading, setCardLoading] = useState(false);
   const [cardPhoto, setCardPhoto] = useState(0);
@@ -1339,12 +1370,35 @@ export default function TripProjects() {
                         }
                         km *= 1.3;
                         if (minutes === 0 && km === 0) return null;
+                        const exact = dayRoutes[day.day];
+                        const measured = exact && exact !== 'loading' ? exact : null;
                         return (
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-xs text-muted-foreground border-b">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-xs text-muted-foreground border-b">
                             <span>Zwiedzanie: <strong className="text-foreground">{(minutes / 60).toFixed(1)} h</strong></span>
-                            {km > 0 && <span>Do przejścia: <strong className="text-foreground">ok. {km.toFixed(1)} km</strong></span>}
-                            {km > 0 && <span>Marsz: <strong className="text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
+                            {measured ? (
+                              <>
+                                <span>Do przejścia: <strong className="text-foreground">{measured.km.toFixed(1)} km</strong></span>
+                                <span>Marsz: <strong className="text-foreground">{Math.round(measured.h * 60)} min</strong></span>
+                                <span className="text-emerald-700">przeliczone po chodnikach</span>
+                              </>
+                            ) : (
+                              <>
+                                {km > 0 && <span>Do przejścia: <strong className="text-foreground">ok. {km.toFixed(1)} km</strong></span>}
+                                {km > 0 && <span>Marsz: <strong className="text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
+                              </>
+                            )}
                             <span>Punktów: <strong className="text-foreground">{items.length}</strong></span>
+                            {items.filter((it: any) => it.lat != null).length >= 2 && !measured && (
+                              <button
+                                onClick={() => recalcDay(day)}
+                                disabled={exact === 'loading'}
+                                className="ml-auto flex items-center gap-1 text-emerald-700 hover:text-emerald-800 hover:underline disabled:opacity-60"
+                              >
+                                {exact === 'loading'
+                                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Liczę przebieg…</>
+                                  : <><RefreshCw className="w-3 h-3" /> Przelicz dokładnie</>}
+                              </button>
+                            )}
                           </div>
                         );
                       })()}
