@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import PlanDayMap from '@/components/PlanDayMap';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -61,10 +62,18 @@ interface DiscoveredPlace {
 }
 
 /** Strefy tablicy — kartkę przeciąga się między nimi. */
-const ZONES: { id: Priority; label: string; hint: string }[] = [
-  { id: 'must', label: 'Na pewno', hint: 'Te miejsca planer wstawi w pierwszej kolejności' },
-  { id: 'nice', label: 'Być może', hint: 'Wypełnią luki, jeśli zostanie czas' },
-  { id: 'rejected', label: 'Nie tym razem', hint: 'Pomijane przy planowaniu' }
+/** "1 g 30 min" zamiast "90 min" — tak ludzie mówią o czasie zwiedzania. */
+function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h && m) return `${h} g ${m} min`;
+  if (h) return `${h} g`;
+  return `${m} min`;
+}
+
+const ZONES: { id: Priority; label: string; short: string; hint: string }[] = [
+  { id: 'must', label: 'Na pewno', short: 'Na pewno', hint: 'Tu trafia to, bez czego wyjazd nie ma sensu.' },
+  { id: 'nice', label: 'Być może', short: 'Może', hint: 'Wypełnią luki, jeśli zostanie czas.' },
+  { id: 'rejected', label: 'Nie', short: 'Nie', hint: 'Odrzucone zostają tu — bez usuwania.' }
 ];
 
 const CATEGORY_ICON: Record<string, any> = {
@@ -119,7 +128,12 @@ const SUGGESTION_SETS: Record<string, string[]> = {
   ]
 };
 
-export default function TripProjects() {
+interface TripProjectsProps {
+  /** Podaje wyżej kontekst aktywnego wyjazdu, żeby wspólny pasek mógł go pokazać. */
+  onContextChange?: (ctx: string | null) => void;
+}
+
+export default function TripProjects({ onContextChange }: TripProjectsProps = {}) {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<TripProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -137,6 +151,9 @@ export default function TripProjects() {
   const [editingType, setEditingType] = useState(false);
   const [grouped, setGrouped] = useState(true);
   const [planning, setPlanning] = useState(false);
+  /** Który dzień planu jest pokazany. Projekt pokazuje jeden dzień naraz, bo
+   *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
+  const [planDay, setPlanDay] = useState(0);
   const [plan, setPlan] = useState<any | null>(null);
   const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
   // Data w formularzu zostaje stringiem 'yyyy-MM-dd' — kalendarz potrzebuje obiektu Date
@@ -151,6 +168,14 @@ export default function TripProjects() {
   const [results, setResults] = useState<DiscoveredPlace[]>([]);
 
   const active = projects.find((p) => p.id === activeId) || null;
+
+  useEffect(() => {
+    if (!onContextChange) return;
+    onContextChange(active
+      ? [active.destination, active.days ? `${active.days} dni` : null, active.trip_type]
+          .filter(Boolean).join(' · ')
+      : null);
+  }, [active?.id, active?.destination, active?.days, active?.trip_type, onContextChange]);
 
   useEffect(() => {
     (async () => {
@@ -832,25 +857,39 @@ export default function TripProjects() {
   })();
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Pin className="w-5 h-5 text-primary" />
-              Plany wyjazdów
-            </CardTitle>
-            <CardDescription>
+    <div>
+      {/* Nagłówek wyjazdu w układzie z projektu: nadtytuł, nazwa krojem
+          nagłówkowym i wezwanie do ułożenia planu po prawej. */}
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+        <div>
+          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
+            {active ? 'Tablica wyjazdu' : 'Plany wyjazdów'}
+          </p>
+          <h1 className="font-display font-light text-[40px] leading-[1.05] tracking-[-0.02em] mt-2">
+            {active ? active.name : 'Twoje wyjazdy'}
+          </h1>
+          {!active && (
+            <p className="text-sm text-muted-foreground mt-2">
               Zbieraj miejsca, kiedy tylko chcesz. Trasy ułożymy z nich później.
-            </CardDescription>
-          </div>
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
           <Button size="sm" variant="outline" onClick={() => setCreating((v) => !v)}>
             <Plus className="w-4 h-4 mr-1" /> Nowy plan
           </Button>
+          {active && mustCount > 0 && (
+            <Button onClick={() => buildPlan()} disabled={planning}
+              className="bg-primary hover:bg-primary/90">
+              {planning
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
+                : <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>}
+            </Button>
+          )}
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-5">
+      <div className="space-y-5">
         {creating && (
           <div className="grid gap-2 sm:grid-cols-4 p-4 bg-muted/50 rounded-md">
             <Input placeholder="Nazwa, np. Bukareszt — delegacja" value={form.name}
@@ -1271,20 +1310,25 @@ export default function TripProjects() {
                           const id = e.dataTransfer.getData('text/plain');
                           if (id) movePlace(id, zone.id);
                         }}
-                        className={`rounded-md p-2.5 min-h-[120px] border border-border bg-card border-t-2 transition-colors ${
-                          zone.id === 'must' ? 'border-t-primary'
-                            : zone.id === 'nice' ? 'border-t-dusty-blue'
-                            : 'border-t-clay bg-muted/30'
+                        className={`rounded-md min-h-[160px] border border-border transition-colors ${
+                          zone.id === 'rejected' ? 'bg-muted/30' : 'bg-card'
                         }`}
                       >
-                        <div className="flex items-baseline justify-between mb-2 px-1">
-                          <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                            {zone.label}
+                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border">
+                          <span className="flex items-center gap-2.5">
+                            <span className={`w-2 h-2 rounded-full ${
+                              zone.id === 'must' ? 'bg-primary'
+                                : zone.id === 'nice' ? 'bg-dusty-blue' : 'bg-clay'
+                            }`} />
+                            <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+                              {zone.label}
+                            </span>
                           </span>
-                          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                            {String(zonePlaces.length).padStart(2, '0')}
+                          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
+                            {zonePlaces.length}
                           </span>
                         </div>
+                        <div className="p-3">
                         <div className="space-y-2">
                           {(grouped ? groupByCategory(zonePlaces) : [{ cat: 'all', label: '', items: zonePlaces }]).map((group) => (
                           <div key={group.cat} className="space-y-2">
@@ -1310,38 +1354,51 @@ export default function TripProjects() {
                                   const id = e.dataTransfer.getData('text/plain');
                                   if (id && id !== p.id) movePlace(id, zone.id, p.id);
                                 }}
-                                className={`rounded-md border border-border bg-background overflow-hidden cursor-grab active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow ${
-                                  zone.id === 'rejected' ? 'opacity-60' : ''
+                                className={`group rounded-md border border-border bg-background p-3 cursor-grab
+                                            active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow ${
+                                  zone.id === 'rejected' ? 'opacity-70' : ''
                                 }`}
                               >
-                                {p.image_url && zone.id !== 'rejected' && (
-                                  <img src={p.image_url} alt="" loading="lazy"
-                                    className="w-full h-20 object-cover bg-muted" />
-                                )}
-                                <div className="p-2 space-y-1">
-                                  <div className="flex items-start gap-1.5">
-                                    <Icon className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
-                                    <span className="font-display text-[13px] leading-snug flex-1">{p.name}</span>
-                                    <button onClick={() => unpin(p.id)}
-                                      className="text-muted-foreground hover:text-red-500 shrink-0">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
+                                <div className="flex gap-3">
+                                  <div className="w-[70px] h-[70px] rounded-sm bg-muted shrink-0 overflow-hidden
+                                                  flex items-center justify-center">
+                                    {p.image_url
+                                      ? <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                      : <Icon className="w-5 h-5 text-muted-foreground/60" />}
                                   </div>
-                                  {p.opening_hours && (
-                                    <div className="text-[10px] text-muted-foreground truncate">{p.opening_hours}</div>
-                                  )}
-                                  <div className="flex items-center gap-2">
-                                    {p.visit_minutes && (
-                                      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                                        {p.visit_minutes} min
-                                      </span>
-                                    )}
-                                    {p.website && (
-                                      <a href={p.website} target="_blank" rel="noopener noreferrer"
-                                        className="text-[10px] text-primary hover:underline inline-flex items-center gap-0.5">
-                                        <ExternalLink className="w-2.5 h-2.5" /> strona
-                                      </a>
-                                    )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-start gap-1.5">
+                                      <button onClick={() => openPlaceCard(p)}
+                                        className="font-display text-[15px] leading-snug text-left flex-1
+                                                   hover:text-primary transition-colors">
+                                        {p.name}
+                                      </button>
+                                      <button onClick={() => unpin(p.id)} aria-label="Usuń z tablicy"
+                                        className="text-muted-foreground/50 hover:text-destructive shrink-0
+                                                   opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                    <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
+                                      {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
+                                        .filter(Boolean).join(' · ') || '—'}
+                                    </div>
+                                    {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
+                                        wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
+                                    <div className="flex gap-1.5 mt-2">
+                                      {ZONES.map((z) => (
+                                        <button key={z.id} onClick={() => movePlace(p.id, z.id)}
+                                          className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                                            p.priority === z.id
+                                              ? z.id === 'must' ? 'bg-primary text-primary-foreground'
+                                                : z.id === 'nice' ? 'bg-dusty-blue text-dusty-blue-foreground'
+                                                : 'bg-clay text-clay-foreground'
+                                              : 'text-muted-foreground hover:bg-muted'
+                                          }`}>
+                                          {z.short}
+                                        </button>
+                                      ))}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -1350,10 +1407,11 @@ export default function TripProjects() {
                           </div>
                           ))}
                           {zonePlaces.length === 0 && (
-                            <p className="text-[11px] text-muted-foreground px-1 py-3 text-center">
+                            <p className="text-[13px] text-muted-foreground px-3 py-10 text-center text-balance">
                               {zone.hint}
                             </p>
                           )}
+                        </div>
                         </div>
                       </div>
                     );
@@ -1477,8 +1535,49 @@ export default function TripProjects() {
             )}
 
             {plan && (
-              <div className="space-y-4">
-                {(plan.days || []).map((day: any) => (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-display font-light text-[32px] leading-[1.05] tracking-[-0.02em]">
+                      {plan.title || active?.name || 'Plan wyjazdu'}
+                    </h2>
+                    {plan.summary && (
+                      <p className="text-sm text-muted-foreground mt-2 max-w-[62ch] text-pretty">{plan.summary}</p>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={buildPlan} disabled={planning}>
+                    {planning
+                      ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Liczę…</>
+                      : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Przelicz plan</>}
+                  </Button>
+                </div>
+
+                {/* Dni jako zakładki: data nad nazwą dnia. Wybrany dzień ma ciemną
+                    ramkę, bo wypełnienie kolorem konkurowałoby z kubełkami. */}
+                {(plan.days || []).length > 1 && (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {(plan.days || []).map((d: any, i: number) => (
+                      <button key={d.day} onClick={() => setPlanDay(i)}
+                        className={`text-left rounded-md border px-4 py-3 transition-colors ${
+                          i === Math.min(planDay, (plan.days || []).length - 1)
+                            ? 'border-foreground bg-card' : 'border-border hover:bg-muted/50'
+                        }`}>
+                        <span className="font-mono uppercase tracking-[0.14em] text-[10px] text-muted-foreground tabular-nums">
+                          {[d.weekday, d.date].filter(Boolean).join(' · ') || `Dzień ${d.day}`}
+                        </span>
+                        <span className="font-display text-[17px] block mt-1">
+                          {d.title || `Dzień ${d.day}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
+                  <div className="space-y-4">
+                {(plan.days || [])
+                  .filter((_: any, i: number) => i === Math.min(planDay, (plan.days || []).length - 1))
+                  .map((day: any) => (
                   <div key={day.day} className="rounded-md border overflow-hidden">
                     <div className="bg-muted/60 border-l-2 border-l-primary px-4 py-2.5 flex items-center justify-between gap-2">
                       <span className="flex items-baseline gap-2.5">
@@ -1529,9 +1628,12 @@ export default function TripProjects() {
                         return (
                           <>
                           {loadH > 9 && (
-                            <div className="flex items-start gap-2 px-4 py-2.5 bg-warning/60 border-b border-warning/40">
-                              <AlertTriangle className="w-3.5 h-3.5 text-warning-foreground shrink-0 mt-0.5" />
-                              <p className="text-xs text-warning-foreground leading-relaxed">
+                            <div className="flex items-start gap-3 px-4 py-3.5 bg-warning/60 border-b border-warning/40">
+                              <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground
+                                               border border-warning-foreground/25 rounded-full px-2.5 py-1 shrink-0">
+                                Realizm
+                              </span>
+                              <p className="text-[13px] text-warning-foreground leading-relaxed text-pretty">
                                 Ten dzień to <strong className="font-mono tabular-nums">{loadH.toFixed(1)} h</strong> na
                                 nogach razem z dojściami. Realnie zwiedza się jakieś siedem, osiem — rozważ przeniesienie
                                 jednego punktu na inny dzień.
@@ -1574,13 +1676,22 @@ export default function TripProjects() {
                         const alreadyPinned = places.some((p) => p.name === it.name);
   return (
                           <div key={i} className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
-                            <span className="font-mono text-xs tabular-nums text-muted-foreground pt-0.5 w-12 shrink-0">
-                              {it.time}
+                            <span className="w-14 shrink-0 pt-0.5">
+                              <span className="font-mono text-[13px] tabular-nums block">{it.time}</span>
+                              {it.minutes && (
+                                <span className="font-mono text-[11px] tabular-nums text-muted-foreground block mt-0.5">
+                                  {formatMinutes(it.minutes)}
+                                </span>
+                              )}
                             </span>
-                            <span className="relative w-px bg-border self-stretch shrink-0" aria-hidden>
-                              <span className={`absolute -left-[3px] top-1.5 w-[7px] h-[7px] rounded-full ${
-                                suggested ? 'bg-dusty-blue' : 'bg-primary'
-                              }`} />
+                            {/* Numer na osi odpowiada numerowi pinezki na mapie obok. */}
+                            <span className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
+                                              text-[12px] font-medium ${
+                              suggested
+                                ? 'bg-dusty-blue text-dusty-blue-foreground'
+                                : 'bg-primary text-primary-foreground'
+                            }`}>
+                              {i + 1}
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="font-display text-[15px] flex items-center gap-2 flex-wrap">
@@ -1607,9 +1718,7 @@ export default function TripProjects() {
                                 <Pin className="w-3.5 h-3.5" />
                               </button>
                             )}
-                            {it.minutes && (
-                              <span className="text-xs text-muted-foreground shrink-0 mt-0.5">{it.minutes} min</span>
-                            )}
+
                           </div>
                         );
                       })}
@@ -1639,8 +1748,32 @@ export default function TripProjects() {
                   </div>
                 )}
 
-                {/* Karta eksportu na ciemnym tle — jedyne miejsce w produkcie, gdzie
-                    kolorem akcji jest primary-light, bo sage nie ma na ciemnym kontrastu. */}
+                  </div>
+
+                  {/* Prawa kolumna: mapa wybranego dnia i eksport. Numery pinezek
+                      odpowiadają numerom na osi godzinowej po lewej. */}
+                  <aside className="space-y-4 lg:sticky lg:top-[88px]">
+                    {(() => {
+                      const d = (plan.days || [])[Math.min(planDay, (plan.days || []).length - 1)];
+                      const pts = (d?.items || [])
+                        .filter((it: any) => it.lat != null && it.lng != null)
+                        .map((it: any) => ({ name: it.name, lat: it.lat, lng: it.lng }));
+                      if (pts.length === 0) return null;
+                      return (
+                        <div className="rounded-md border border-border overflow-hidden bg-card">
+                          <PlanDayMap points={pts} className="h-[380px] w-full" />
+                          <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
+                            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                              Trasa dnia
+                            </span>
+                            <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                              {pts.length} {pts.length === 1 ? 'punkt' : 'punktów'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                 {(() => {
                   const days = plan.days || [];
                   const allItems = days.flatMap((d: any) => d.items || []);
@@ -1671,6 +1804,9 @@ export default function TripProjects() {
                   );
                 })()}
 
+                  </aside>
+                </div>
+
                 {plan.question && (
                   <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
                     {plan.question}
@@ -1680,7 +1816,7 @@ export default function TripProjects() {
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
