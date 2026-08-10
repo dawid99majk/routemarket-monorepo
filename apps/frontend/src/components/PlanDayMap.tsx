@@ -6,6 +6,8 @@ export interface PlanPoint { name: string; lat: number; lng: number }
 
 interface PlanDayMapProps {
   points: PlanPoint[];
+  /** Przebieg po chodnikach z przeliczenia dnia. Bez niego rysujemy odcinki proste. */
+  track?: [number, number][] | null;
   className?: string;
 }
 
@@ -14,7 +16,7 @@ interface PlanDayMapProps {
  * Numer jest tu treścią, nie ozdobą: po lewej stronie widać oś godzinową, a na
  * mapie ten sam numer, więc od razu wiadomo, w którą stronę idzie dzień.
  */
-function PlanDayMapInner({ points, className = '' }: PlanDayMapProps) {
+function PlanDayMapInner({ points, track, className = '' }: PlanDayMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
@@ -37,9 +39,17 @@ function PlanDayMapInner({ points, className = '' }: PlanDayMapProps) {
     if (valid.length === 0) return;
 
     const latLngs = valid.map((p) => L.latLng(p.lat, p.lng));
-    if (latLngs.length > 1) {
+
+    // Przerywana linia prosta to uczciwe "tędy mniej więcej". Kiedy dzień zostanie
+    // przeliczony, zastępuje ją ciągły przebieg po chodnikach — i wtedy ciągłość
+    // linii sama mówi, że to już pomiar, a nie szacunek.
+    if (track && track.length > 1) {
+      L.polyline(track.map(([lat, lng]) => L.latLng(lat, lng)), {
+        color: 'hsl(158 28% 32%)', weight: 3.5, opacity: 0.85
+      }).addTo(layer);
+    } else if (latLngs.length > 1) {
       L.polyline(latLngs, {
-        color: 'hsl(158 28% 32%)', weight: 2, opacity: 0.55, dashArray: '5 5'
+        color: 'hsl(158 28% 32%)', weight: 2, opacity: 0.5, dashArray: '5 5'
       }).addTo(layer);
     }
 
@@ -55,9 +65,12 @@ function PlanDayMapInner({ points, className = '' }: PlanDayMapProps) {
       }).addTo(layer).bindTooltip(p.name, { direction: 'top', offset: [0, -14] });
     });
 
-    map.fitBounds(L.latLngBounds(latLngs).pad(0.25), { animate: false });
-    if (valid.length === 1) map.setZoom(15);
-  }, [points]);
+    const bounds = track && track.length > 1
+      ? L.latLngBounds(track.map(([lat, lng]) => L.latLng(lat, lng)))
+      : L.latLngBounds(latLngs);
+    map.fitBounds(bounds.pad(0.2), { animate: false });
+    if (valid.length === 1 && !track) map.setZoom(15);
+  }, [points, track]);
 
   return <div ref={containerRef} className={className} />;
 }

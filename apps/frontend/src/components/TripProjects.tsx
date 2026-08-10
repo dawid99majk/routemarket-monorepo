@@ -408,7 +408,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
    * routingu na każdy dzień. Kto chce twardej liczby, prosi o nią jednym
    * kliknięciem — i wtedy dostaje przebieg po chodnikach, a nie po linii prostej.
    */
-  const [dayRoutes, setDayRoutes] = useState<Record<number, { km: number; h: number } | 'loading'>>({});
+  const [dayRoutes, setDayRoutes] = useState<Record<number, { km: number; h: number; track: [number, number][] | null } | 'loading'>>({});
 
   const recalcDay = async (day: any) => {
     const points = (day.items || [])
@@ -425,7 +425,15 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       }, { timeoutMs: 90_000 });
       setDayRoutes((prev) => ({
         ...prev,
-        [day.day]: { km: data.distance_km, h: data.duration_h }
+        [day.day]: {
+          km: data.distance_km,
+          h: data.duration_h,
+          // Ślad z routera trzymamy przy dniu, żeby mapa obok pokazała ten sam
+          // przebieg, o którym mówią liczby w pasku.
+          track: Array.isArray(data.trackPoints)
+            ? data.trackPoints.map((t: any[]) => [t[0], t[1]] as [number, number])
+            : null
+        }
       }));
     } catch (err: any) {
       setDayRoutes((prev) => { const next = { ...prev }; delete next[day.day]; return next; });
@@ -1801,15 +1809,20 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                         .filter((it: any) => it.lat != null && it.lng != null)
                         .map((it: any) => ({ name: it.name, lat: it.lat, lng: it.lng }));
                       if (pts.length === 0) return null;
+                      const dr = d ? dayRoutes[d.day] : null;
+                      const dayTrack = dr && dr !== 'loading' ? dr.track ?? null : null;
+                      const withoutCoords = (d?.items || []).length - pts.length;
                       return (
                         <div className="rounded-md border border-border overflow-hidden bg-card">
-                          <PlanDayMap points={pts} className="h-[380px] w-full" />
+                          <PlanDayMap points={pts} track={dayTrack} className="h-[380px] w-full" />
                           <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
                             <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                               Trasa dnia
                             </span>
                             <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
                               {pts.length} {pts.length === 1 ? 'punkt' : 'punktów'}
+                              {withoutCoords > 0 && ` · ${withoutCoords} bez położenia`}
+                              {dayTrack && dr && dr !== 'loading' && ` · ${dr.km.toFixed(1)} km`}
                             </span>
                           </div>
                         </div>

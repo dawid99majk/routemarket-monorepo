@@ -651,8 +651,11 @@ app.post('/plan-trip', async (c) => {
     // miejsce i oczekiwać, że resztę dnia agent zaproponuje sam. Bez puli
     // kandydatów planer nie miałby czym wypełnić czasu poza "spacerem".
     let fillerPois: PoiCandidate[] = [];
+    // Środek miasta przydaje się jeszcze raz niżej, przy sprawdzaniu współrzędnych
+    // od modelu, więc żyje poza tym blokiem.
+    let center: { lat: number; lng: number } | null = null;
     try {
-      const center = await geocodingService.geocodeSettlement(body.destination);
+      center = await geocodingService.geocodeSettlement(body.destination);
       const [sights, food] = await Promise.all([
         poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'city_walk', { limit: 40 }),
         poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 15 }).catch(() => [])
@@ -797,26 +800,89 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
       ...fillerPois.map((f) => ({ name: f.name, lat: f.lat, lng: f.lng }))
     ].filter((x) => x.lat != null && x.lng != null);
 
-    const byNormalizedName = new Map<string, { lat: number; lng: number }>();
-    for (const x of coordPool) {
-      byNormalizedName.set(x.name.trim().toLowerCase(), { lat: x.lat as number, lng: x.lng as number });
-    }
+    // Dopasowanie po samej równości nazw prawie nie działało. Model przeformułowuje
+    // nazwy — "Amfiteatr w Durrës" wraca jako "Amfiteatr rzymski", "Kościół
+    // Garnizonowy pw. św. Elżbiety" jako "Bazylika św. Elżbiety" — więc równość
+    // łapała jedną pozycję na dzień i mapa pokazywała jedną pinezkę. Porównujemy
+    // teraz zbiory słów znaczących, bez znaków diakrytycznych i bez wyrazów
+    // pospolitych, które w nazwach zabytków powtarzają się wszędzie.
+    const NAME_STOP = new Set(['w', 'we', 'na', 'pod', 'przy', 'the', 'of', 'i', 'oraz',
+      'pw', 'sw', 'swietej', 'swietego', 'sw.', 'stary', 'stare', 'nowy', 'nowe']);
+
+    const nameTokens = (raw: string): string[] => [...new Set(
+      String(raw || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length >= 3 && !NAME_STOP.has(t))
+    )];
+
+    const pool = coordPool.map((x) => ({ ...x, tokens: nameTokens(x.name) }));
+
+    // Same liczone słowa nie wystarczą. "Muzeum Archeologiczne" i "Muzeum Narodowe"
+    // dzielą połowę nazwy, a to dwa różne budynki; "Amfiteatr rzymski" i "Amfiteatr
+    // w Durrës" dzielą też połowę i to jest jedno miejsce. Różnica siedzi w tym, że
+    // "muzeum" powtarza się w całej puli, a "amfiteatr" występuje raz. Dlatego słowo
+    // waży tym więcej, im rzadziej pojawia się wśród nazw, które mamy.
+    const docFreq = new Map<string, number>();
+    for (const x of pool) for (const t of x.tokens) docFreq.set(t, (docFreq.get(t) || 0) + 1);
+    const weight = (t: string) => Math.log((pool.length + 1) / ((docFreq.get(t) || 0) + 1)) + 1;
+    const mass = (tokens: string[]) => tokens.reduce((sum, t) => sum + weight(t), 0);
+
+    const similarity = (a: string[], b: string[]): number => {
+      if (a.length === 0 || b.length === 0) return 0;
+      const inB = new Set(b);
+      const shared = a.filter((t) => inB.has(t)).reduce((sum, t) => sum + weight(t), 0);
+      const base = Math.min(mass(a), mass(b));
+      return base > 0 ? shared / base : 0;
+    };
+
+    const kmFromCenter = (lat: number, lng: number): number => {
+      if (!center) return 0;
+      const dLat = (lat - center.lat) * 111;
+      const dLng = (lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
 
     let located = 0;
     let unlocated = 0;
+    const missing: string[] = [];
     for (const day of plan.days || []) {
       for (const item of day.items || []) {
-        const hit = byNormalizedName.get(String(item.name || '').trim().toLowerCase());
+        const raw = String(item.name || '');
+        const exact = pool.find((x) => x.name.trim().toLowerCase() === raw.trim().toLowerCase());
+        let hit: { lat: any; lng: any } | undefined = exact;
+
+        if (!hit) {
+          const tokens = nameTokens(raw);
+          const scored = pool
+            .map((x) => ({ x, score: similarity(tokens, x.tokens) }))
+            .filter((r) => r.score >= 0.5)
+            .sort((a, b) => b.score - a.score);
+          hit = scored[0]?.x;
+        }
+
         if (hit) {
           item.lat = hit.lat;
           item.lng = hit.lng;
           located++;
+          continue;
+        }
+
+        // Bez dopasowania zostają tylko współrzędne od modelu, a te bywają zmyślone.
+        // Przyjmujemy je wyłącznie wtedy, gdy leżą w zasięgu miasta; inaczej lepszy
+        // jest brak pinezki niż pinezka w innym kraju.
+        if (typeof item.lat === 'number' && typeof item.lng === 'number' && kmFromCenter(item.lat, item.lng) < 40) {
+          located++;
         } else {
+          delete item.lat;
+          delete item.lng;
           unlocated++;
+          missing.push(raw);
         }
       }
     }
-    console.log(`[plan-trip] Współrzędne: ${located} pozycji ma, ${unlocated} bez`);
+    console.log(`[plan-trip] Współrzędne: ${located} pozycji ma, ${unlocated} bez${
+      missing.length ? ` (${missing.slice(0, 5).join(', ')})` : ''}`);
 
     // "Nie zmieściło się" ma mówić o tym, co użytkownik przypiął. Model dostaje
     // pulę kilkudziesięciu propozycji do wypełniania dnia i raportował każdą
