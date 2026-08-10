@@ -149,7 +149,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   const [shareEmail, setShareEmail] = useState('');
   const [sharing, setSharing] = useState(false);
   const [editingType, setEditingType] = useState(false);
-  const [grouped, setGrouped] = useState(true);
+  /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
+   *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
+  const [grouped, setGrouped] = useState(false);
   const [planning, setPlanning] = useState(false);
   /** Który dzień planu jest pokazany. Projekt pokazuje jeden dzień naraz, bo
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
@@ -914,6 +916,13 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
           <Button size="sm" variant="outline" onClick={() => setCreating((v) => !v)}>
             <Plus className="w-4 h-4 mr-1" /> Nowy plan
           </Button>
+          {active && view === 'plan' && plan && (
+            <Button size="sm" variant="outline" onClick={buildPlan} disabled={planning}>
+              {planning
+                ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Liczę…</>
+                : <><RefreshCw className="w-4 h-4 mr-1.5" /> Przelicz plan</>}
+            </Button>
+          )}
           {active && mustCount > 0 && view === 'tablica' && (
             <Button onClick={() => buildPlan()} disabled={planning}
               className="bg-primary hover:bg-primary/90">
@@ -987,7 +996,6 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 }`}
               >
                 {p.name}
-                {p.destination && <span className="opacity-60"> · {p.destination}</span>}
               </button>
             ))}
           </div>
@@ -1002,10 +1010,11 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 zeszła pod spód: to narzędzia do tablicy, nie sama tablica. */}
             {places.length > 0 && (
               <div>
-                <div className="flex items-center justify-end mb-3">
+                <div className="flex items-center justify-end mb-2">
                   <button onClick={() => setGrouped((v) => !v)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    {grouped ? 'Pokaż jako jedną listę' : 'Grupuj wg kategorii'}
+                    className="text-[12px] text-muted-foreground hover:text-foreground transition-colors
+                               underline decoration-dotted underline-offset-4">
+                    {grouped ? 'bez podziału na kategorie' : 'pogrupuj wg kategorii'}
                   </button>
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
@@ -1064,13 +1073,11 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                                   const id = e.dataTransfer.getData('text/plain');
                                   if (id && id !== p.id) movePlace(id, zone.id, p.id);
                                 }}
-                                className={`group rounded-md border border-border bg-background p-3 cursor-grab
-                                            active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow ${
-                                  zone.id === 'rejected' ? 'opacity-70' : ''
-                                }`}
+                                className={`group rounded-md border border-border bg-background p-3.5 cursor-grab
+                                            active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow`}
                               >
-                                <div className="flex gap-3">
-                                  <div className="w-[70px] h-[70px] rounded-sm bg-muted shrink-0 overflow-hidden
+                                <div className="flex gap-3.5">
+                                  <div className="w-[84px] h-[84px] rounded-sm bg-muted shrink-0 overflow-hidden
                                                   flex items-center justify-center">
                                     {p.image_url
                                       ? <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
@@ -1095,7 +1102,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                                     </div>
                                     {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
                                         wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
-                                    <div className="flex gap-1.5 mt-2">
+                                    <div className="flex gap-1.5 mt-2.5">
                                       {ZONES.map((z) => (
                                         <button key={z.id} onClick={() => movePlace(p.id, z.id)}
                                           className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
@@ -1505,126 +1512,21 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             </>)}
 
             {view === 'plan' && (<>
-            {/* Pusto w zakładce planu nie znaczy "nic tu nie ma", tylko "nie ma
-                jeszcze czego pokazać" — więc mówimy, czego brakuje i dajemy
-                przycisk, zamiast zostawiać białą stronę. */}
-            {!plan && savedPlans.length === 0 && (
-              <div className="rounded-md border border-border bg-card px-6 py-16 text-center">
-                <h2 className="font-display font-light text-[24px]">Planu jeszcze nie ma</h2>
-                <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
-                  {mustCount > 0
-                    ? `Na tablicy czeka ${mustCount} ${mustCount === 1 ? 'miejsce' : 'miejsc'} oznaczonych „na pewno”. Ułóż z nich dni.`
-                    : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
-                </p>
-                <Button
-                  className="mt-6 bg-primary hover:bg-primary/90"
-                  disabled={mustCount === 0 || planning}
-                  onClick={() => (mustCount > 0 ? buildPlan() : navigate('/plany'))}
-                >
-                  {planning
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
-                    : mustCount > 0
-                      ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
-                      : 'Wróć na tablicę'}
-                </Button>
-              </div>
-            )}
-
-            {savedPlans.length > 0 && (
-              <div className="border-t pt-4 space-y-2">
-                <h3 className="text-sm font-semibold">Zapisane plany ({savedPlans.length})</h3>
-                {savedPlans.map((sp) => (
-                  <div key={sp.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
-                    <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <button onClick={() => setPlan(sp.plan)} className="flex-1 text-left hover:underline truncate">
-                      {sp.name}
-                      <span className="text-xs text-muted-foreground ml-2">
-                        {new Date(sp.created_at).toLocaleDateString('pl-PL')}
-                      </span>
-                    </button>
-                    <button onClick={() => deletePlan(sp.id)} className="text-muted-foreground hover:text-red-500">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {places.length > 0 && (
-              <div className="border-t pt-4 space-y-3">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-primary" /> Ułóż plan dni
-                </h3>
-                <div className="grid gap-2 sm:grid-cols-5">
-                  <label className="text-xs text-muted-foreground">Od
-                    <Input type="time" value={planForm.start}
-                      onChange={(e) => setPlanForm({ ...planForm, start: e.target.value })} className="mt-1" />
-                  </label>
-                  <label className="text-xs text-muted-foreground">Do
-                    <Input type="time" value={planForm.end}
-                      onChange={(e) => setPlanForm({ ...planForm, end: e.target.value })} className="mt-1" />
-                  </label>
-                  {/* Natywny picker otwierał się w dół i chował się pod krawędzią okna —
-                      formularz siedzi na samym dole strony. Radix sam odwraca panel do góry,
-                      gdy pod spodem nie ma miejsca. */}
-                  <label className="text-xs text-muted-foreground">Pierwszy dzień
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="mt-1 w-full justify-start font-normal text-sm h-10"
-                        >
-                          <CalendarDays className="w-4 h-4 mr-2 text-primary shrink-0" />
-                          {planDate ? format(planDate, 'd MMMM yyyy', { locale: pl }) : 'Wybierz datę'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start" side="top" sideOffset={8} collisionPadding={16}>
-                        <Calendar
-                          mode="single"
-                          locale={pl}
-                          weekStartsOn={1}
-                          selected={planDate}
-                          defaultMonth={planDate}
-                          onSelect={(d) => d && setPlanForm({ ...planForm, date: format(d, 'yyyy-MM-dd') })}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </label>
-                  <label className="text-xs text-muted-foreground">Kolacja o
-                    <Input type="time" value={planForm.dinner}
-                      onChange={(e) => setPlanForm({ ...planForm, dinner: e.target.value })} className="mt-1" />
-                  </label>
-                  <Button onClick={buildPlan} disabled={planning}
-                    className="self-end bg-primary hover:bg-primary/90">
-                    {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Zaplanuj'}
-                  </Button>
-                </div>
-                {planning && (
-                  <p className="text-xs text-muted-foreground">
-                    Sprawdzam godziny otwarcia i układam dni…
-                  </p>
-                )}
-              </div>
-            )}
-
+            {/* Plan na górze, narzędzia pod nim. Lista zapisanych planów i pola
+                z godzinami stały wyżej niż sam plan, więc po wejściu w zakładkę
+                widać było formularz, a nie to, po co się tu przychodzi. */}
             {plan && (
               <div className="space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h2 className="font-display font-light text-[32px] leading-[1.05] tracking-[-0.02em]">
-                      {plan.title || active?.name || 'Plan wyjazdu'}
-                    </h2>
+                {(plan.title && plan.title !== active?.name) || plan.summary ? (
+                  <div className="-mt-1">
+                    {plan.title && plan.title !== active?.name && (
+                      <h2 className="font-display text-[20px]">{plan.title}</h2>
+                    )}
                     {plan.summary && (
-                      <p className="text-sm text-muted-foreground mt-2 max-w-[62ch] text-pretty">{plan.summary}</p>
+                      <p className="text-sm text-muted-foreground mt-1.5 max-w-[62ch] text-pretty">{plan.summary}</p>
                     )}
                   </div>
-                  <Button variant="outline" size="sm" onClick={buildPlan} disabled={planning}>
-                    {planning
-                      ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Liczę…</>
-                      : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Przelicz plan</>}
-                  </Button>
-                </div>
+                ) : null}
 
                 {/* Dni jako zakładki: data nad nazwą dnia. Wybrany dzień ma ciemną
                     ramkę, bo wypełnienie kolorem konkurowałoby z kubełkami. */}
@@ -1893,6 +1795,110 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 )}
               </div>
             )}
+
+            {/* Pusto w zakładce planu nie znaczy "nic tu nie ma", tylko "nie ma
+                jeszcze czego pokazać" — więc mówimy, czego brakuje i dajemy
+                przycisk, zamiast zostawiać białą stronę. */}
+            {!plan && savedPlans.length === 0 && (
+              <div className="rounded-md border border-border bg-card px-6 py-16 text-center">
+                <h2 className="font-display font-light text-[24px]">Planu jeszcze nie ma</h2>
+                <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
+                  {mustCount > 0
+                    ? `Na tablicy czeka ${mustCount} ${mustCount === 1 ? 'miejsce' : 'miejsc'} oznaczonych „na pewno”. Ułóż z nich dni.`
+                    : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
+                </p>
+                <Button
+                  className="mt-6 bg-primary hover:bg-primary/90"
+                  disabled={mustCount === 0 || planning}
+                  onClick={() => (mustCount > 0 ? buildPlan() : navigate('/plany'))}
+                >
+                  {planning
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
+                    : mustCount > 0
+                      ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
+                      : 'Wróć na tablicę'}
+                </Button>
+              </div>
+            )}
+
+            {savedPlans.length > 0 && (
+              <div className="border-t pt-4 space-y-2">
+                <h3 className="text-sm font-semibold">Zapisane plany ({savedPlans.length})</h3>
+                {savedPlans.map((sp) => (
+                  <div key={sp.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
+                    <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <button onClick={() => setPlan(sp.plan)} className="flex-1 text-left hover:underline truncate">
+                      {sp.name}
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {new Date(sp.created_at).toLocaleDateString('pl-PL')}
+                      </span>
+                    </button>
+                    <button onClick={() => deletePlan(sp.id)} className="text-muted-foreground hover:text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {places.length > 0 && (
+              <div className="border-t pt-4 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-primary" /> Ułóż plan dni
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-5">
+                  <label className="text-xs text-muted-foreground">Od
+                    <Input type="time" value={planForm.start}
+                      onChange={(e) => setPlanForm({ ...planForm, start: e.target.value })} className="mt-1" />
+                  </label>
+                  <label className="text-xs text-muted-foreground">Do
+                    <Input type="time" value={planForm.end}
+                      onChange={(e) => setPlanForm({ ...planForm, end: e.target.value })} className="mt-1" />
+                  </label>
+                  {/* Natywny picker otwierał się w dół i chował się pod krawędzią okna —
+                      formularz siedzi na samym dole strony. Radix sam odwraca panel do góry,
+                      gdy pod spodem nie ma miejsca. */}
+                  <label className="text-xs text-muted-foreground">Pierwszy dzień
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="mt-1 w-full justify-start font-normal text-sm h-10"
+                        >
+                          <CalendarDays className="w-4 h-4 mr-2 text-primary shrink-0" />
+                          {planDate ? format(planDate, 'd MMMM yyyy', { locale: pl }) : 'Wybierz datę'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start" side="top" sideOffset={8} collisionPadding={16}>
+                        <Calendar
+                          mode="single"
+                          locale={pl}
+                          weekStartsOn={1}
+                          selected={planDate}
+                          defaultMonth={planDate}
+                          onSelect={(d) => d && setPlanForm({ ...planForm, date: format(d, 'yyyy-MM-dd') })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </label>
+                  <label className="text-xs text-muted-foreground">Kolacja o
+                    <Input type="time" value={planForm.dinner}
+                      onChange={(e) => setPlanForm({ ...planForm, dinner: e.target.value })} className="mt-1" />
+                  </label>
+                  <Button onClick={buildPlan} disabled={planning}
+                    className="self-end bg-primary hover:bg-primary/90">
+                    {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Zaplanuj'}
+                  </Button>
+                </div>
+                {planning && (
+                  <p className="text-xs text-muted-foreground">
+                    Sprawdzam godziny otwarcia i układam dni…
+                  </p>
+                )}
+              </div>
+            )}
+
             </>)}
           </>
         )}
