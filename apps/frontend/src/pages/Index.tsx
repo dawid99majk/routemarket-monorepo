@@ -49,21 +49,61 @@ export default function Index() {
       </header>
 
       <main>
-        <section className="max-w-5xl mx-auto px-4 pt-20 pb-16 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight max-w-3xl mx-auto leading-tight">
-Wyjazdy układane pod Ciebie, nie pod średnią
-          </h1>
-          <p className="text-lg text-muted-foreground mt-5 max-w-2xl mx-auto leading-relaxed">
-            Zbieraj miejsca, które chcesz zobaczyć, tygodniami albo w jeden wieczór.
-            Kiedy będziesz gotowy, ułożymy z nich dni i wyznaczymy przebieg — z plikiem GPX i przewodnikiem.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3 justify-center">
-            <Button size="lg" onClick={start} className="bg-primary hover:bg-primary/90">
-              <CalendarDays className="w-4 h-4 mr-2" /> Zacznij zbierać miejsca
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/odkrywaj' : '/auth')}>
-              <Sparkles className="w-4 h-4 mr-2" /> Przeglądaj miejsca
-            </Button>
+        {/* Hero w układzie z projektu marki: tekstura konturowa, nadtytuł z separatorem,
+            wyrównanie do lewej i pasek danych w mono pod włosową linią. Redakcyjny spokój
+            zamiast wyśrodkowanej reklamy. */}
+        <section className="relative overflow-hidden">
+          <img
+            src="/contour.svg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-16 -right-24 w-[700px] max-w-none opacity-50 select-none"
+          />
+          <div className="relative max-w-6xl mx-auto px-6 pt-24 pb-20">
+            <p className="font-narrow uppercase text-muted-foreground text-xs tracking-[0.32em]">
+              Planer wyjazdów · od zbierania do trasy
+            </p>
+
+            <h1 className="font-display font-light mt-6 max-w-4xl text-[clamp(2.75rem,7vw,5.5rem)] leading-[0.98] tracking-[-0.035em] text-balance">
+              Wyjazdy układane pod Ciebie,<br />nie pod średnią<span className="text-primary">.</span>
+            </h1>
+
+            <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-foreground/80 text-pretty">
+              Zbieraj miejsca, które chcesz zobaczyć — tygodniami albo w jeden wieczór.
+              Kiedy będziesz gotowy, ułożymy z nich dni i wyznaczymy przebieg.
+            </p>
+
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Button size="lg" onClick={start} className="bg-primary hover:bg-primary/90">
+                <CalendarDays className="w-4 h-4 mr-2" /> Zacznij zbierać miejsca
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/odkrywaj' : '/auth')}>
+                <Sparkles className="w-4 h-4 mr-2" /> Przeglądaj miejsca
+              </Button>
+            </div>
+
+            {/* Pasek danych: żadnych wymyślonych liczb — same fakty o produkcie,
+                złożone monospacem z cyframi tabelarycznymi, jak chce dokument marki. */}
+            <div className="mt-20 pt-8 border-t border-border flex flex-wrap gap-x-14 gap-y-6 font-mono text-[13px]">
+              <div>
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Miejsca</div>
+                <div className="mt-1.5 text-foreground">OpenStreetMap</div>
+              </div>
+              <div>
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Na wyjściu</div>
+                <div className="mt-1.5 text-foreground">GPX · przewodnik</div>
+              </div>
+              <div>
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Zbieranie</div>
+                <div className="mt-1.5 text-foreground">bez limitu</div>
+              </div>
+              <div className="sm:ml-auto max-w-xs">
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Zasada</div>
+                <div className="mt-1.5 leading-relaxed text-foreground/80">
+                  „Tablica czeka, plan powstaje wtedy, kiedy jesteś gotowy."
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
