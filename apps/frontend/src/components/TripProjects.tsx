@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
@@ -154,6 +154,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   /** Który dzień planu jest pokazany. Projekt pokazuje jeden dzień naraz, bo
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
   const [planDay, setPlanDay] = useState(0);
+  /** Zakładka z adresu. Tablica i plan to dwa widoki tych samych danych, a nie
+   *  dwie sekcje jednej długiej strony — inaczej "Plan" w pasku niczego nie robi. */
+  const [searchParams] = useSearchParams();
+  const view = searchParams.get('widok') === 'plan' ? 'plan' : 'tablica';
   const [plan, setPlan] = useState<any | null>(null);
   const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
   // Data w formularzu zostaje stringiem 'yyyy-MM-dd' — kalendarz potrzebuje obiektu Date
@@ -769,6 +773,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         creator_preferences: mergePreferences(userPrefs, active)
       });
       setPlan(data);
+      setPlanDay(0);
+      // Plan powstaje z tablicy, ale mieszka w swojej zakładce. Bez tego skoku
+      // przycisk "ułóż plan" wyglądałby, jakby nic nie zrobił.
+      navigate('/plany?widok=plan');
       // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
       const { data: saved } = await (supabase as any)
         .from('trip_plans')
@@ -863,7 +871,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <div>
           <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
-            {active ? 'Tablica wyjazdu' : 'Plany wyjazdów'}
+            {!active ? 'Plany wyjazdów' : view === 'plan' ? 'Plan wyjazdu' : 'Tablica wyjazdu'}
           </p>
           <h1 className="font-display font-light text-[40px] leading-[1.05] tracking-[-0.02em] mt-2">
             {active ? active.name : 'Twoje wyjazdy'}
@@ -878,7 +886,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
           <Button size="sm" variant="outline" onClick={() => setCreating((v) => !v)}>
             <Plus className="w-4 h-4 mr-1" /> Nowy plan
           </Button>
-          {active && mustCount > 0 && (
+          {active && mustCount > 0 && view === 'tablica' && (
             <Button onClick={() => buildPlan()} disabled={planning}
               className="bg-primary hover:bg-primary/90">
               {planning
@@ -958,6 +966,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
 
         {active && (
           <>
+            {view === 'tablica' && (<>
             {/* Nagłówek wyjazdu. Wcześniej w jednym rzędzie stało siedem rzeczy o
                 różnej wadze: dane wyjazdu, przełączniki, statystyki i czynności.
                 Teraz po lewej to, co opisuje wyjazd, po prawej to, co się z nim
@@ -1166,6 +1175,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
 
             {/* Karta miejsca: propozycje agenta widniały jako sama nazwa, więc
                 decyzja "zostawiam czy wyrzucam" była zgadywanką. */}
+            </>)}
+
+            {/* Okno karty miejsca zostaje poza podziałem: otwiera je zarówno kafelek
+                na tablicy, jak i punkt na osi dnia w planie. */}
             <Dialog open={!!placeCard} onOpenChange={(open) => !open && setPlaceCard(null)}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -1226,6 +1239,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
               </DialogContent>
             </Dialog>
 
+            {view === 'tablica' && (<>
             {/* Wydarzenia: pokazujemy je przy tablicy, bo tam zapada decyzja
                 "dokładam dzień czy nie" — nie w osobnej zakładce. */}
             <div className="rounded-md border bg-card">
@@ -1455,6 +1469,34 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 </div>
               )}
             </div>
+
+            </>)}
+
+            {view === 'plan' && (<>
+            {/* Pusto w zakładce planu nie znaczy "nic tu nie ma", tylko "nie ma
+                jeszcze czego pokazać" — więc mówimy, czego brakuje i dajemy
+                przycisk, zamiast zostawiać białą stronę. */}
+            {!plan && savedPlans.length === 0 && (
+              <div className="rounded-md border border-border bg-card px-6 py-16 text-center">
+                <h2 className="font-display font-light text-[24px]">Planu jeszcze nie ma</h2>
+                <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
+                  {mustCount > 0
+                    ? `Na tablicy czeka ${mustCount} ${mustCount === 1 ? 'miejsce' : 'miejsc'} oznaczonych „na pewno”. Ułóż z nich dni.`
+                    : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
+                </p>
+                <Button
+                  className="mt-6 bg-primary hover:bg-primary/90"
+                  disabled={mustCount === 0 || planning}
+                  onClick={() => (mustCount > 0 ? buildPlan() : navigate('/plany'))}
+                >
+                  {planning
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
+                    : mustCount > 0
+                      ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
+                      : 'Wróć na tablicę'}
+                </Button>
+              </div>
+            )}
 
             {savedPlans.length > 0 && (
               <div className="border-t pt-4 space-y-2">
@@ -1814,6 +1856,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 )}
               </div>
             )}
+            </>)}
           </>
         )}
       </div>
