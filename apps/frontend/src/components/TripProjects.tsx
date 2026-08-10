@@ -890,7 +890,27 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          {/* Współdzielenie w nagłówku, bo to informacja o wyjeździe, a nie czynność.
+              Zarządzanie osobami zostaje niżej, przy polu z adresem. */}
+          {active && shares.length > 0 && (
+            <div className="hidden sm:flex items-center gap-2.5">
+              <div className="flex -space-x-2">
+                {shares.slice(0, 3).map((sh) => (
+                  <span key={sh.id} title={sh.shared_with_email}
+                    className="w-8 h-8 rounded-full bg-primary-light border-2 border-background
+                               flex items-center justify-center text-[11px] font-medium text-foreground">
+                    {sh.shared_with_email.slice(0, 2).toUpperCase()}
+                  </span>
+                ))}
+              </div>
+              <span className="text-[13px] text-muted-foreground">
+                {shares.length === 1
+                  ? `Współdzielona z ${shares[0].shared_with_email.split('@')[0]}`
+                  : `Współdzielona z ${shares.length} osobami`}
+              </span>
+            </div>
+          )}
           <Button size="sm" variant="outline" onClick={() => setCreating((v) => !v)}>
             <Plus className="w-4 h-4 mr-1" /> Nowy plan
           </Button>
@@ -950,23 +970,24 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
           </p>
         )}
 
-        {projects.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+        {/* Przełącznik wyjazdów tylko wtedy, gdy jest co przełączać. Przy jednym
+            wyjeździe pigułka powtarzała nazwę stojącą wyżej jako tytuł, a przy
+            kilku wypełniona kolorem konkurowała z kubełkami — stąd sama kreska
+            pod aktywnym. */}
+        {projects.length > 1 && (
+          <div className="flex flex-wrap gap-x-5 gap-y-2 -mt-3">
             {projects.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setActiveId(p.id)}
-                className={`rounded-full px-3.5 py-1.5 text-sm border transition-colors ${
+                className={`text-[13px] pb-1 border-b-2 transition-colors ${
                   p.id === activeId
-                    ? 'bg-primary border-primary text-white'
-                    : 'bg-background hover:bg-muted'
+                    ? 'border-b-foreground text-foreground'
+                    : 'border-b-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {p.name}
-                <span className="opacity-70">
-                  {p.destination ? ` · ${p.destination}` : ''}
-                  {p.days ? ` · ${p.days} dni` : ''}
-                </span>
+                {p.destination && <span className="opacity-60"> · {p.destination}</span>}
               </button>
             ))}
           </div>
@@ -975,6 +996,144 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         {active && (
           <>
             {view === 'tablica' && (<>
+            {/* Kubełki od razu pod nagłówkiem. Wcześniej stało nad nimi pięć
+                bloków — dane wyjazdu, suwak proporcji, wyszukiwarka, wydarzenia
+                i ostrzeżenia — więc tablica zaczynała się poniżej ekranu. Reszta
+                zeszła pod spód: to narzędzia do tablicy, nie sama tablica. */}
+            {places.length > 0 && (
+              <div>
+                <div className="flex items-center justify-end mb-3">
+                  <button onClick={() => setGrouped((v) => !v)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    {grouped ? 'Pokaż jako jedną listę' : 'Grupuj wg kategorii'}
+                  </button>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {ZONES.map((zone) => {
+                    const zonePlaces = places.filter((p) => p.priority === zone.id);
+                    return (
+                      <div
+                        key={zone.id}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const id = e.dataTransfer.getData('text/plain');
+                          if (id) movePlace(id, zone.id);
+                        }}
+                        className={`rounded-md min-h-[160px] border border-border transition-colors ${
+                          zone.id === 'rejected' ? 'bg-muted/30' : 'bg-card'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border">
+                          <span className="flex items-center gap-2.5">
+                            <span className={`w-2 h-2 rounded-full ${
+                              zone.id === 'must' ? 'bg-primary'
+                                : zone.id === 'nice' ? 'bg-dusty-blue' : 'bg-clay'
+                            }`} />
+                            <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+                              {zone.label}
+                            </span>
+                          </span>
+                          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
+                            {zonePlaces.length}
+                          </span>
+                        </div>
+                        <div className="p-3">
+                        <div className="space-y-2">
+                          {(grouped ? groupByCategory(zonePlaces) : [{ cat: 'all', label: '', items: zonePlaces }]).map((group) => (
+                          <div key={group.cat} className="space-y-2">
+                            {grouped && group.label && (
+                              <div className="flex items-center justify-between px-1 pt-1">
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  {group.label}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">{group.items.length}</span>
+                              </div>
+                            )}
+                          {group.items.map((p) => {
+                            const Icon = CATEGORY_ICON[p.category] || MapPin;
+                            return (
+                              <div
+                                key={p.id}
+                                draggable
+                                onDragStart={(e) => e.dataTransfer.setData('text/plain', p.id)}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const id = e.dataTransfer.getData('text/plain');
+                                  if (id && id !== p.id) movePlace(id, zone.id, p.id);
+                                }}
+                                className={`group rounded-md border border-border bg-background p-3 cursor-grab
+                                            active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow ${
+                                  zone.id === 'rejected' ? 'opacity-70' : ''
+                                }`}
+                              >
+                                <div className="flex gap-3">
+                                  <div className="w-[70px] h-[70px] rounded-sm bg-muted shrink-0 overflow-hidden
+                                                  flex items-center justify-center">
+                                    {p.image_url
+                                      ? <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                      : <Icon className="w-5 h-5 text-muted-foreground/60" />}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-start gap-1.5">
+                                      <button onClick={() => openPlaceCard(p)}
+                                        className="font-display text-[15px] leading-snug text-left flex-1
+                                                   hover:text-primary transition-colors">
+                                        {p.name}
+                                      </button>
+                                      <button onClick={() => unpin(p.id)} aria-label="Usuń z tablicy"
+                                        className="text-muted-foreground/50 hover:text-destructive shrink-0
+                                                   opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                    <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
+                                      {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
+                                        .filter(Boolean).join(' · ') || '—'}
+                                    </div>
+                                    {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
+                                        wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
+                                    <div className="flex gap-1.5 mt-2">
+                                      {ZONES.map((z) => (
+                                        <button key={z.id} onClick={() => movePlace(p.id, z.id)}
+                                          className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                                            p.priority === z.id
+                                              ? z.id === 'must' ? 'bg-primary text-primary-foreground'
+                                                : z.id === 'nice' ? 'bg-dusty-blue text-dusty-blue-foreground'
+                                                : 'bg-clay text-clay-foreground'
+                                              : 'text-muted-foreground hover:bg-muted'
+                                          }`}>
+                                          {z.short}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          </div>
+                          ))}
+                          {zonePlaces.length === 0 && (
+                            <p className="text-[13px] text-muted-foreground px-3 py-10 text-center text-balance">
+                              {zone.hint}
+                            </p>
+                          )}
+                        </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[12px] text-muted-foreground mt-3">
+                  Wagę zmienisz pigułką na kartce. Przeciąganie też działa — upuść kartkę
+                  na inną, żeby ustawić kolejność w kolumnie.
+                </p>
+              </div>
+            )}
+
             {/* Nagłówek wyjazdu. Wcześniej w jednym rzędzie stało siedem rzeczy o
                 różnej wadze: dane wyjazdu, przełączniki, statystyki i czynności.
                 Teraz po lewej to, co opisuje wyjazd, po prawej to, co się z nim
@@ -1309,141 +1468,6 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
               </div>
             )}
 
-            {places.length > 0 && (
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                    Tablica miejsc
-                  </h3>
-                  <button onClick={() => setGrouped((v) => !v)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    {grouped ? 'Pokaż jako jedną listę' : 'Grupuj wg kategorii'}
-                  </button>
-                </div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  {ZONES.map((zone) => {
-                    const zonePlaces = places.filter((p) => p.priority === zone.id);
-                    return (
-                      <div
-                        key={zone.id}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const id = e.dataTransfer.getData('text/plain');
-                          if (id) movePlace(id, zone.id);
-                        }}
-                        className={`rounded-md min-h-[160px] border border-border transition-colors ${
-                          zone.id === 'rejected' ? 'bg-muted/30' : 'bg-card'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border">
-                          <span className="flex items-center gap-2.5">
-                            <span className={`w-2 h-2 rounded-full ${
-                              zone.id === 'must' ? 'bg-primary'
-                                : zone.id === 'nice' ? 'bg-dusty-blue' : 'bg-clay'
-                            }`} />
-                            <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
-                              {zone.label}
-                            </span>
-                          </span>
-                          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
-                            {zonePlaces.length}
-                          </span>
-                        </div>
-                        <div className="p-3">
-                        <div className="space-y-2">
-                          {(grouped ? groupByCategory(zonePlaces) : [{ cat: 'all', label: '', items: zonePlaces }]).map((group) => (
-                          <div key={group.cat} className="space-y-2">
-                            {grouped && group.label && (
-                              <div className="flex items-center justify-between px-1 pt-1">
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                  {group.label}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground">{group.items.length}</span>
-                              </div>
-                            )}
-                          {group.items.map((p) => {
-                            const Icon = CATEGORY_ICON[p.category] || MapPin;
-                            return (
-                              <div
-                                key={p.id}
-                                draggable
-                                onDragStart={(e) => e.dataTransfer.setData('text/plain', p.id)}
-                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onDrop={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  const id = e.dataTransfer.getData('text/plain');
-                                  if (id && id !== p.id) movePlace(id, zone.id, p.id);
-                                }}
-                                className={`group rounded-md border border-border bg-background p-3 cursor-grab
-                                            active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow ${
-                                  zone.id === 'rejected' ? 'opacity-70' : ''
-                                }`}
-                              >
-                                <div className="flex gap-3">
-                                  <div className="w-[70px] h-[70px] rounded-sm bg-muted shrink-0 overflow-hidden
-                                                  flex items-center justify-center">
-                                    {p.image_url
-                                      ? <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
-                                      : <Icon className="w-5 h-5 text-muted-foreground/60" />}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-start gap-1.5">
-                                      <button onClick={() => openPlaceCard(p)}
-                                        className="font-display text-[15px] leading-snug text-left flex-1
-                                                   hover:text-primary transition-colors">
-                                        {p.name}
-                                      </button>
-                                      <button onClick={() => unpin(p.id)} aria-label="Usuń z tablicy"
-                                        className="text-muted-foreground/50 hover:text-destructive shrink-0
-                                                   opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                    <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
-                                      {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
-                                        .filter(Boolean).join(' · ') || '—'}
-                                    </div>
-                                    {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
-                                        wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
-                                    <div className="flex gap-1.5 mt-2">
-                                      {ZONES.map((z) => (
-                                        <button key={z.id} onClick={() => movePlace(p.id, z.id)}
-                                          className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                                            p.priority === z.id
-                                              ? z.id === 'must' ? 'bg-primary text-primary-foreground'
-                                                : z.id === 'nice' ? 'bg-dusty-blue text-dusty-blue-foreground'
-                                                : 'bg-clay text-clay-foreground'
-                                              : 'text-muted-foreground hover:bg-muted'
-                                          }`}>
-                                          {z.short}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                          </div>
-                          ))}
-                          {zonePlaces.length === 0 && (
-                            <p className="text-[13px] text-muted-foreground px-3 py-10 text-center text-balance">
-                              {zone.hint}
-                            </p>
-                          )}
-                        </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-2">
-                  Przeciągnij kartkę między kolumnami, żeby zmienić jej wagę, albo upuść na inną kartkę, żeby ustawić kolejność.
-                </p>
-              </div>
-            )}
 
             <div className="border-t pt-4 space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-2">
