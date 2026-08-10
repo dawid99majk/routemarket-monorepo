@@ -156,6 +156,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   /** Który dzień planu jest pokazany. Projekt pokazuje jeden dzień naraz, bo
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
   const [planDay, setPlanDay] = useState(0);
+  const [publishing, setPublishing] = useState(false);
   /** Zakładka z adresu. Tablica i plan to dwa widoki tych samych danych, a nie
    *  dwie sekcje jednej długiej strony — inaczej "Plan" w pasku niczego nie robi. */
   const [searchParams] = useSearchParams();
@@ -192,7 +193,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       await (supabase as any).rpc('claim_pending_trip_shares');
       const { data } = await (supabase as any)
         .from('trip_projects')
-        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds')
+        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
       // Wejście z kreatora (?project=...) ma otworzyć świeżo utworzoną tablicę,
@@ -245,6 +246,36 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       setPlan(null);
     })();
   }, [activeId]);
+
+  /**
+   * Publikacja zapisuje też nazwę autora do wyświetlania. Bierzemy ją stąd, bo
+   * użytkownik zna własne imię — widok publiczny nie musi wtedy w ogóle sięgać
+   * do tabeli kont, a adres e-mail nigdzie nie wycieka.
+   */
+  const togglePublic = async () => {
+    if (!active) return;
+    setPublishing(true);
+    const nowe = !(active as any).is_public;
+    let autor: string | null = null;
+    if (nowe) {
+      const { data: ud } = await supabase.auth.getUser();
+      const pelne = (ud.user?.user_metadata as any)?.full_name as string | undefined;
+      if (pelne) {
+        const cz = pelne.trim().split(/\s+/);
+        autor = cz.length > 1 ? `${cz[0]} ${cz[1][0]}.` : cz[0];
+      }
+    }
+    const { error } = await (supabase as any).from('trip_projects').update({
+      is_public: nowe,
+      published_at: nowe ? new Date().toISOString() : null,
+      ...(nowe ? { author_display: autor } : {}),
+    }).eq('id', active.id);
+    setPublishing(false);
+    if (error) return toast.error(error.message);
+    setProjects((prev) => prev.map((p) =>
+      p.id === active.id ? { ...p, is_public: nowe, copy_count: (p as any).copy_count ?? 0 } as any : p));
+    toast.success(nowe ? 'Tablica jest teraz publiczna' : 'Tablica znów jest prywatna');
+  };
 
   const createProject = async () => {
     // Ciche wyjście zostawiało użytkownika z wrażeniem, że przycisk nie działa
@@ -1476,9 +1507,32 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             )}
 
 
+            {/* Publikacja tablicy. Osobno od udostępniania imiennego, bo to inna
+                decyzja: tam wpuszczasz konkretną osobę, tutaj każdego zalogowanego. */}
+            <div className="border-t pt-4">
+              <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-4">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold">Tablica publiczna</h3>
+                  <p className="text-[13px] text-muted-foreground mt-1 text-pretty">
+                    {active?.is_public
+                      ? `Każdy zalogowany widzi tę tablicę i może ją skopiować do siebie.${
+                          active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
+                      : 'Widzisz ją tylko Ty i osoby, którym ją udostępniłeś. Po opublikowaniu każdy zalogowany będzie mógł ją skopiować do swoich wyjazdów.'}
+                  </p>
+                </div>
+                <Button size="sm" variant={active?.is_public ? 'outline' : 'default'}
+                  disabled={publishing} onClick={togglePublic}
+                  className={active?.is_public ? 'shrink-0' : 'shrink-0 bg-primary hover:bg-primary/90'}>
+                  {publishing
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : active?.is_public ? 'Cofnij publikację' : 'Opublikuj'}
+                </Button>
+              </div>
+            </div>
+
             <div className="border-t pt-4 space-y-2">
               <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-primary" /> Udostępnij tablicę
+                <Share2 className="w-4 h-4 text-primary" /> Udostępnij imiennie
               </h3>
               <div className="flex gap-2">
                 <Input

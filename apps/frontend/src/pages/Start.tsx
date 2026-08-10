@@ -20,6 +20,10 @@ interface Place {
   catalog_id: string | null;
 }
 interface SavedPlan { project_id: string; start_date: string | null; plan: any; created_at: string }
+interface PublicBoard {
+  id: string; name: string; destination: string | null; days: number | null;
+  author_display: string | null; copy_count: number; place_count: number;
+}
 
 /** Pięć klimatów z projektu, w tej samej kolejności. */
 const CLIMATES = ['family', 'couple', 'business', 'friends', 'solo'] as const;
@@ -80,6 +84,8 @@ export default function Start() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
   const [plans, setPlans] = useState<SavedPlan[]>([]);
+  const [boards, setBoards] = useState<PublicBoard[]>([]);
+  const [copying, setCopying] = useState<string | null>(null);
 
   const [city, setCity] = useState('');
   const [term, setTerm] = useState('');
@@ -110,6 +116,29 @@ export default function Start() {
     setPlaces(pl ?? []);
     setPlans(sp ?? []);
     setLoading(false);
+
+    // Publiczne tablice dobieramy pod kierunek aktywnego wyjazdu — cudza tablica
+    // z innego kraju nie jest inspiracją, tylko szumem. Bez aktywnego wyjazdu
+    // pokazujemy najczęściej kopiowane.
+    const cel = (pr ?? [])[0]?.destination as string | undefined;
+    let q = (supabase as any).from('trip_projects')
+      .select('id, name, destination, days, author_display, copy_count')
+      .eq('is_public', true).neq('user_id', u.id)
+      .order('copy_count', { ascending: false }).limit(3);
+    if (cel) q = q.ilike('destination', `%${cel}%`);
+    const { data: pubs } = await q;
+
+    if (pubs?.length) {
+      const { data: cnt } = await (supabase as any)
+        .from('trip_project_places').select('project_id')
+        .in('project_id', pubs.map((b: any) => b.id));
+      setBoards(pubs.map((b: any) => ({
+        ...b,
+        place_count: (cnt ?? []).filter((c: any) => c.project_id === b.id).length,
+      })));
+    } else {
+      setBoards([]);
+    }
   }, [navigate]);
 
   useEffect(() => { load(); }, [load]);
@@ -199,6 +228,16 @@ export default function Start() {
       toast.info('Nie rozpoznałem terminu — wyjazd zapisany jako szkic. Datę ustawisz na tablicy.');
     }
     navigate('/odkrywaj');
+  };
+
+  const copyBoard = async (b: PublicBoard) => {
+    setCopying(b.id);
+    const { data, error } = await (supabase as any).rpc('copy_public_board', { p_source: b.id });
+    setCopying(null);
+    if (error) return toast.error(error.message);
+    toast.success(`„${b.name}” trafiła do Twoich wyjazdów`);
+    if (data) navigate('/plany');
+    else load();
   };
 
   const statusOf = (p: Project): { label: string; variant: 'default' | 'outline' } => {
@@ -425,12 +464,13 @@ export default function Start() {
         )}
 
         {projects.length > 0 && (
-          <section className="mt-10">
+          <div className="mt-10 grid lg:grid-cols-2 gap-5 items-start">
+          <section>
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="font-display text-[18px]">Twoje wyjazdy</h2>
               <span className="font-mono text-[13px] tabular-nums text-muted-foreground">{projects.length}</span>
             </div>
-            <div className="mt-4 space-y-2.5 max-w-[640px]">
+            <div className="mt-4 space-y-2.5">
               {projects.map((p) => {
                 const st = statusOf(p);
                 return (
@@ -457,6 +497,50 @@ export default function Start() {
               })}
             </div>
           </section>
+
+          {/* Tablice od podróżników. Pokazujemy je tylko wtedy, gdy ktoś naprawdę
+              coś opublikował — pusta sekcja z zachętą sugerowałaby społeczność,
+              której jeszcze nie ma. */}
+          {boards.length > 0 && (
+            <section>
+              <div className="flex items-baseline justify-between gap-4">
+                <h2 className="font-display text-[18px]">Tablice od podróżników</h2>
+                {active?.destination && (
+                  <span className="text-[13px] text-muted-foreground">{active.destination}</span>
+                )}
+              </div>
+              <div className="mt-4 space-y-2.5">
+                {boards.map((b) => (
+                  <div key={b.id}
+                    className="flex items-center gap-3.5 rounded-md border border-border bg-card px-4 py-3.5">
+                    <span className="w-10 h-10 rounded-full bg-accent/25 border border-border shrink-0
+                                     flex items-center justify-center text-[12px] font-medium">
+                      {(b.author_display || 'Podróżnik').split(/\s+/).slice(0, 2)
+                        .map((x) => x[0]).join('').toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-[16px] leading-snug truncate">{b.name}</div>
+                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5 truncate">
+                        {[b.author_display || 'Podróżnik',
+                          `${b.place_count} ${plural(b.place_count, 'miejsce', 'miejsca', 'miejsc')}`,
+                          b.copy_count > 0
+                            ? `${b.copy_count} ${plural(b.copy_count, 'kopia', 'kopie', 'kopii')}`
+                            : null,
+                        ].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" disabled={copying === b.id}
+                      onClick={() => copyBoard(b)} className="shrink-0">
+                      {copying === b.id
+                        ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Kopiuję…</>
+                        : 'Skopiuj'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          </div>
         )}
       </main>
     </div>
