@@ -476,7 +476,7 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
 
         const [wiki, photos] = await Promise.all([
           fetchWikiCard(matched?.wikipedia),
-          fetchNearbyPhotos(pl.name, lat, lng, 3)
+          fetchNearbyPhotos(pl.name, lat, lng, 3, undefined, matched?.wikipedia)
         ]);
 
         return {
@@ -941,6 +941,25 @@ const COMMONS_UA = 'RouteMarket/1.0 (+https://routemarket.io)';
 const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite)/i;
 
 /**
+ * Nazwy prosto z aparatu ("DSC_0431", "IMG 2207", "P1010823"). Taki plik nie mówi
+ * o miejscu nic — to czyjaś pamiątka z wakacji, równie dobrze zbliżenie twarzy.
+ * Przy zdjęciu wiodącym miejsca nie chcemy zgadywać, co jest na kadrze.
+ */
+const CAMERA_DUMP = /\b(dsc[_\s-]?\d|dscn\d|img[_\s-]?\d|imgp\d|p\d{7}|photo[_\s-]?\d|cimg\d|_mg_\d)/i;
+
+const stripDiacritics = (t: string) =>
+  t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * Rodzaje obiektów rozpoznawane po tytule artykułu. W gęstej starówce artykuł
+ * o ulicy leży kilkadziesiąt metrów od kościoła i wygrywał samą odległością —
+ * "Kościół Garnizonowy" dostawał zdjęcie ulicy św. Elżbiety. Jeśli tytuł mówi
+ * o innym rodzaju obiektu niż nazwa miejsca, to nie jest ten sam obiekt.
+ */
+const WIKI_KIND = ['ulica', 'plac', 'parafia', 'kamienica', 'pomnik', 'most', 'dworzec',
+  'park', 'cmentarz', 'hotel', 'teatr', 'synagoga', 'street', 'square', 'monument'];
+
+/**
  * Słowa, które same z siebie nie identyfikują miejsca. Nazwa złożona wyłącznie
  * z nich ("Sandy beach", "Stary rynek") pasuje w Commons do czegokolwiek na
  * świecie, więc takiego trafienia nie wolno przyjąć bez potwierdzenia położeniem.
@@ -973,7 +992,7 @@ async function commonsQuery(params: Record<string, string>): Promise<any[]> {
 function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null, nameTokens: string[] | null): string[] {
   return pages
     .sort((a, b) => (a.index ?? 99) - (b.index ?? 99))
-    .filter((p) => !PHOTO_JUNK.test(p.title || ''))
+    .filter((p) => !PHOTO_JUNK.test(p.title || '') && !CAMERA_DUMP.test(p.title || ''))
     .filter((p) => {
       const c = p.coordinates?.[0];
       if (c) return !origin || kmApart(origin, { lat: c.lat, lng: c.lon }) < 25;
@@ -989,19 +1008,86 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
 }
 
 /**
- * Zdjęcia miejsca z Wikimedia Commons. Samo szukanie po współrzędnych łapało
- * cokolwiek w promieniu 250 m — przy opisie amfiteatru pokazywało sąsiedni mur.
- * Dlatego najpierw pytamy o nazwę (to daje zdjęcia właściwego obiektu), a dopiero
- * potem uzupełniamy tym, co leży obok.
+ * Zdjęcie wiodące z artykułu Wikipedii o tym miejscu. Artykuł ma jedno zdjęcie
+ * wybrane przez ludzi i to prawie zawsze reprezentacyjne ujęcie obiektu. Szukamy
+ * przez geosearch po współrzędnych, bo nazwa bywa nijaka: "Rynek" trafi w setkę
+ * rynków w Polsce, ale artykuł z geotagiem czterdzieści metrów stąd to na pewno
+ * ten właściwy.
  */
-async function fetchNearbyPhotos(name: string, lat?: number, lng?: number, limit = 4): Promise<string[]> {
-  const origin = lat != null && lng != null ? { lat, lng } : null;
-  const tokens = distinctiveTokens(name);
+async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }): Promise<string[]> {
+  const tokens = stripDiacritics(name).split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
+  const nameKinds = WIKI_KIND.filter((k) => stripDiacritics(name).includes(k));
+  for (const lang of ['pl', 'en']) {
+    try {
+      const url = `https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({
+        format: 'json', action: 'query', generator: 'geosearch',
+        ggscoord: `${origin.lat}|${origin.lng}`, ggsradius: '600', ggslimit: '20',
+        prop: 'pageimages|coordinates', piprop: 'original'
+      });
+      const res = await fetch(url, { headers: { 'User-Agent': COMMONS_UA }, signal: AbortSignal.timeout(9000) });
+      if (!res.ok) continue;
+      const pages: any[] = Object.values(((await res.json()) as any)?.query?.pages || {});
 
-  const [byName, byGeo] = await Promise.all([
-    tokens.length > 0
+      const scored = pages
+        .filter((pg) => pg.original?.source)
+        .map((pg) => {
+          const title = stripDiacritics(pg.title || '');
+          const c = pg.coordinates?.[0];
+          const km = c ? kmApart(origin, { lat: c.lat, lng: c.lon }) : 9;
+          const hits = tokens.filter((t) => title.includes(t)).length;
+          const clash = WIKI_KIND.some((k) => title.includes(k) && !nameKinds.includes(k));
+          return { pg, hits, km, clash };
+        })
+        // Artykuł musi pasować nazwą. Samo "leży blisko" nie wystarcza — w
+        // starówce w promieniu stu metrów jest kilkanaście obiektów z własnym
+        // artykułem i każdy z nich byłby wtedy równie dobrym kandydatem.
+        .filter((r) => r.hits > 0 && !r.clash)
+        .sort((a, b) => b.hits - a.hits || a.km - b.km);
+
+      const best = scored[0]?.pg?.original?.source as string | undefined;
+      if (best && !PHOTO_JUNK.test(best) && /\.(jpg|jpeg|png)$/i.test(best.split('?')[0])) {
+        return [best];
+      }
+    } catch { /* brak artykułu w tym języku — próbujemy następnego */ }
+  }
+  return [];
+}
+
+/**
+ * Zdjęcia miejsca. Kolejność źródeł jest tu najważniejsza, bo pierwsze zdjęcie
+ * ląduje jako duże na karcie miejsca:
+ *   1. zdjęcie wiodące z Wikipedii — wybrane przez człowieka,
+ *   2. wyszukiwanie po nazwie w Commons,
+ *   3. dopiero na końcu to, co leży obok.
+ * Punkt trzeci dostał twardy warunek: tytuł pliku musi zawierać słowo z nazwy
+ * miejsca albo nazwę miasta. Wcześniej brał cokolwiek w promieniu 250 m, przez co
+ * Rynek we Wrocławiu miał jako zdjęcie główne zbliżenie twarzy przypadkowego
+ * turysty — plik miał geotag z płyty rynku i to wystarczało.
+ */
+async function fetchNearbyPhotos(
+  name: string, lat?: number, lng?: number, limit = 4, city?: string, wikipediaTag?: string
+): Promise<string[]> {
+  const origin = lat != null && lng != null ? { lat, lng } : null;
+
+  // Jeśli OSM podaje artykuł wprost, to jest odpowiedź pewna i nie ma po co
+  // dobierać artykułu po nazwie i odległości.
+  let tagged: string[] = [];
+  if (wikipediaTag) {
+    const card = await fetchWikiCard(wikipediaTag).catch(() => ({} as any));
+    if (card.image && !PHOTO_JUNK.test(card.image)) tagged = [card.image];
+  }
+  let tokens = distinctiveTokens(name);
+
+  // Nazwa złożona z samych słów pospolitych ("Rynek", "Stare Miasto") nie nadaje
+  // się do szukania sama, ale z miastem owszem — "Rynek Wrocław" to już konkret.
+  const searchPhrase = tokens.length > 0 ? name : city ? `${name} ${city}` : '';
+  if (tokens.length === 0 && city) tokens = distinctiveTokens(city);
+
+  const [byWiki, byName, byGeo] = await Promise.all([
+    origin ? wikiLeadPhotos(name, origin).catch(() => []) : Promise.resolve([]),
+    searchPhrase
       ? commonsQuery({
-          action: 'query', generator: 'search', gsrsearch: name, gsrnamespace: '6',
+          action: 'query', generator: 'search', gsrsearch: searchPhrase, gsrnamespace: '6',
           gsrlimit: String(limit + 4), prop: 'imageinfo|coordinates',
           iiprop: 'url', iiurlwidth: '800'
         }).then((p) => usablePhotos(p, origin, tokens)).catch(() => [])
@@ -1009,13 +1095,13 @@ async function fetchNearbyPhotos(name: string, lat?: number, lng?: number, limit
     origin
       ? commonsQuery({
           action: 'query', generator: 'geosearch', ggscoord: `${lat}|${lng}`,
-          ggsradius: '250', ggslimit: String(limit + 4), ggsnamespace: '6',
+          ggsradius: '250', ggslimit: String(limit + 6), ggsnamespace: '6',
           prop: 'imageinfo', iiprop: 'url', iiurlwidth: '800'
-        }).then((p) => usablePhotos(p, null, null)).catch(() => [])
+        }).then((p) => usablePhotos(p, null, tokens.length > 0 ? tokens : null)).catch(() => [])
       : Promise.resolve([])
   ]);
 
-  return [...new Set([...byName, ...byGeo])].slice(0, limit);
+  return [...new Set([...tagged, ...byWiki, ...byName, ...byGeo])].slice(0, limit);
 }
 
 /**
@@ -1288,7 +1374,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
     const BATCH = 5;
     for (let i = 0; i < candidates.length; i += BATCH) {
       const batch = candidates.slice(i, i + BATCH);
-      const photoSets = await Promise.all(batch.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 3)));
+      const photoSets = await Promise.all(batch.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 3, city)));
       await Promise.all(batch.map(async (p, j) => {
         const d = byName.get(p.name.trim().toLowerCase());
         const tags = Array.isArray(d?.vibe_tags)
@@ -1335,6 +1421,43 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
   } catch (err: any) {
     console.error('[catalog/seed] Error:', err);
     return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Przebudowa galerii dla miejsc już zapisanych w katalogu. Zdjęcia dobrane starą
+ * regułą zostały w bazie i sama poprawka doboru ich nie ruszy — trzeba je nadpisać.
+ * Idzie partiami, bo Commons i Wikipedia nie lubią wielu równoległych zapytań.
+ */
+app.post('/catalog/refresh-photos', async (c) => {
+  try {
+    const { city, limit = 500 } = await c.req.json().catch(() => ({})) as { city?: string; limit?: number };
+    const rows = await repo.listCatalogAll(city?.trim() || null, limit);
+
+    const changed: { name: string; before: number; after: number }[] = [];
+    const BATCH = 5;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH);
+      const sets = await Promise.all(
+        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 3, r.city).catch(() => []))
+      );
+      await Promise.all(batch.map(async (r: any, j: number) => {
+        const next = sets[j];
+        const prev: string[] = Array.isArray(r.photos) ? r.photos : [];
+        // Pustej galerii nie zapisujemy: brak zdjęcia jest lepszy niż złe zdjęcie,
+        // ale kasowanie działającej galerii przez chwilowy błąd sieci już nie.
+        if (next.length === 0) return;
+        if (JSON.stringify(next) === JSON.stringify(prev)) return;
+        await repo.updateCatalogPlace(r.id, { photos: next, updated_at: new Date().toISOString() });
+        changed.push({ name: r.name, before: prev.length, after: next.length });
+      }));
+    }
+    console.log(`[catalog/refresh-photos] sprawdzono ${rows.length}, podmieniono ${changed.length}`);
+    return c.json({ checked: rows.length, updated: changed.length, changed });
+  } catch (e: any) {
+    console.error('[catalog/refresh-photos]', e);
+    return c.json({ error: e.message }, 500);
   }
 });
 

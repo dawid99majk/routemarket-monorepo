@@ -73,6 +73,15 @@ export class RouteBuilderRepository {
     await supabase.from('place_catalog').update({ vibe_tags: tags }).eq('id', id);
   }
 
+  /** Cały katalog albo jedno miasto — do zadań przebudowujących zapisane dane. */
+  async listCatalogAll(city: string | null, limit = 500): Promise<any[]> {
+    let q = supabase.from('place_catalog').select('id, name, city, lat, lng, photos').limit(limit);
+    if (city) q = q.ilike('city', city);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  }
+
   async listCatalogByCity(city: string, limit = 40): Promise<any[]> {
     const { data } = await supabase
       .from('place_catalog').select('*')
