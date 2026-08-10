@@ -177,7 +177,7 @@ export default function PlacePage() {
   const buckets: [Bucket, string, string][] = [
     ['must', 'Na pewno', 'bg-primary text-primary-foreground border-primary'],
     ['nice', 'Być może', 'bg-dusty-blue text-dusty-blue-foreground border-dusty-blue'],
-    ['rejected', 'Nie tym razem', 'bg-muted text-muted-foreground border-border'],
+    ['rejected', 'Nie tym razem', 'bg-clay text-clay-foreground border-clay'],
   ];
 
   return (

@@ -84,6 +84,12 @@
     --sage-foreground: 60 12% 97%;
     --dusty-blue: 200 30% 48%;         /* mineral blue — technical data */
     --dusty-blue-foreground: 60 12% 97%;
+    /* glina — trzeci kolor decyzji obok sage i dusty-blue. Nasycenie 35% trzyma
+       go w tej samej rodzinie co tamte dwa (28% i 30%), a jasność 45% leży
+       między nimi. Kontrast z białym tekstem 4.75, czyli AA. Świadomie nie jest
+       to --destructive: odrzucenie miejsca jest odwracalne i nie jest błędem. */
+    --clay: 16 35% 45%;
+    --clay-foreground: 60 12% 97%;
     --moss: 75 25% 42%;                /* third nature accent */
     --moss-foreground: 60 12% 97%;
     --tan: 22 60% 58%;
@@ -157,6 +163,8 @@
     --sage-foreground: 60 6% 11%;
     --dusty-blue: 203 25% 62%;
     --dusty-blue-foreground: 60 6% 11%;
+    --clay: 16 32% 62%;                /* kontrast z ciemnym tekstem 5.94 */
+    --clay-foreground: 60 6% 11%;
     --tan: 33 35% 60%;
     --tan-foreground: 60 6% 11%;
     --ink: 42 31% 94%;

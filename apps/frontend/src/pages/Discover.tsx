@@ -333,10 +333,15 @@ export default function Discover() {
               const mk = marks[p.id];
               const duration = formatDuration(p.visit_minutes);
               return (
+                /* Bez transformacji na hoverze. Przesunięcie o piksel promuje kartę do
+                   własnej warstwy kompozycji, a w układzie wielokolumnowym to znany powód
+                   kart, które przy najechaniu gasną. Cień i ramka dają ten sam sygnał bez
+                   ruszania warstw. Z tego samego powodu przejście dotyczy tylko cienia
+                   i koloru, a nie wszystkiego jak leci. */
                 <article
                   key={p.id}
                   className="group mb-5 break-inside-avoid rounded-md border border-border bg-card overflow-hidden
-                             transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-token-md"
+                             transition-[box-shadow,border-color] duration-200 hover:border-foreground/25 hover:shadow-token-md"
                 >
                   <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block w-full text-left">
                     <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
@@ -387,7 +392,7 @@ export default function Discover() {
                     {([
                       ['must', 'Na pewno', 'bg-primary text-primary-foreground'],
                       ['nice', 'Może', 'bg-dusty-blue text-dusty-blue-foreground'],
-                      ['rejected', 'Nie', 'bg-muted text-muted-foreground'],
+                      ['rejected', 'Nie', 'bg-clay text-clay-foreground'],
                     ] as const).map(([b, label, active], i) => (
                       <button
                         key={b}

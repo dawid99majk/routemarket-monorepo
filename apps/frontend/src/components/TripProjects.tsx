@@ -1274,7 +1274,7 @@ export default function TripProjects() {
                         className={`rounded-md p-2.5 min-h-[120px] border border-border bg-card border-t-2 transition-colors ${
                           zone.id === 'must' ? 'border-t-primary'
                             : zone.id === 'nice' ? 'border-t-dusty-blue'
-                            : 'border-t-border bg-muted/30'
+                            : 'border-t-clay bg-muted/30'
                         }`}
                       >
                         <div className="flex items-baseline justify-between mb-2 px-1">

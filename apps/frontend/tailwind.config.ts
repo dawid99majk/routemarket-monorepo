@@ -108,6 +108,10 @@ export default {
           DEFAULT: "hsl(var(--dusty-blue))",
           foreground: "hsl(var(--dusty-blue-foreground))",
         },
+        clay: {
+          DEFAULT: "hsl(var(--clay))",
+          foreground: "hsl(var(--clay-foreground))",
+        },
         tan: {
           DEFAULT: "hsl(var(--tan))",
           foreground: "hsl(var(--tan-foreground))",
