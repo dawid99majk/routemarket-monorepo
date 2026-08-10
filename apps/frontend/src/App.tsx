@@ -21,6 +21,7 @@ const GaTracker = () => {
 const GlobeLab = lazy(() => import("./pages/GlobeLab"));
 const MyRoutes = lazy(() => import("./pages/MyRoutes"));
 const PlacePage = lazy(() => import("./pages/PlacePage"));
+const Start = lazy(() => import('./pages/Start'));
 const Discover = lazy(() => import("./pages/Discover"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const Collections = lazy(() => import("./pages/Collections"));
@@ -96,6 +97,7 @@ const App = () => (
                   {/* Authenticated routes */}
                   <Route path="/kolekcje" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
                   <Route path="/kolekcja/:slug" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
+                  <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/ulubione" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
                   <Route path="/miejsce/:slug" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />

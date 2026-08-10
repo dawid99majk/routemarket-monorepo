@@ -10,7 +10,7 @@ export default function AuthCallback() {
       if (error || !session) {
         navigate('/auth/error?msg=' + encodeURIComponent(error?.message || 'Authentication failed'));
       } else {
-        navigate('/');
+        navigate('/start');
       }
     });
   }, [navigate]);

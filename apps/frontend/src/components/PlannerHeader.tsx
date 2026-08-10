@@ -8,6 +8,7 @@ interface PlannerHeaderProps {
 }
 
 const TABS = [
+  { label: 'Start', path: '/start' },
   { label: 'Odkrywaj', path: '/odkrywaj' },
   { label: 'Tablica', path: '/plany' },
   { label: 'Plan', path: '/plany?widok=plan' },
@@ -29,7 +30,8 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
   return (
     <header className="sticky top-0 z-20 h-16 border-b border-border bg-background/85 backdrop-blur-[8px]">
       <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center gap-6">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
+        {/* Zalogowany użytkownik wraca logotypem na Start, nie na stronę sprzedażową. */}
+        <button onClick={() => navigate('/start')} className="flex items-center gap-2 shrink-0">
           <span className="font-display text-[19px] tracking-tight">Routemarket</span>
           <span className="font-narrow uppercase tracking-[0.18em] text-[9px] text-muted-foreground
                            border border-border rounded-full px-2 py-0.5">

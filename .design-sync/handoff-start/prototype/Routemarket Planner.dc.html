@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Archivo+Narrow:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_ds/routemarket-design-system-a2a8e391-1182-467d-881f-903f0f158524/styles.css">
+<script src="_ds/routemarket-design-system-a2a8e391-1182-467d-881f-903f0f158524/_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: hsl(var(--background)); }
+  a { color: hsl(var(--dusty-blue)); text-decoration: underline; text-underline-offset: 2px; }
+  a:hover { color: hsl(var(--primary)); }
+  ::selection { background: hsl(var(--primary) / .22); }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: hsl(var(--background)); font-family: 'Inter', sans-serif; color: hsl(var(--ink));">
+
+  <header style="position: sticky; top: 0; z-index: 50; height: 64px; display: flex; align-items: center; gap: 32px; padding: 0 40px; background: hsl(var(--background) / .88); backdrop-filter: blur(8px); border-bottom: 1px solid hsl(var(--border));">
+    <div style="display: flex; align-items: baseline; gap: 8px;">
+      <span style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 19px; letter-spacing: -0.02em;">Routemarket</span>
+      <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); border: 1px solid hsl(var(--primary) / .34); border-radius: 999px; padding: 2px 7px;">Planner</span>
+    </div>
+    <nav style="display: flex; gap: 4px; margin-left: 8px;">
+      <button onClick="{{ goHome }}" style="{{ tabHome }}">Start</button>
+      <button onClick="{{ goDiscover }}" style="{{ tabDiscover }}">Odkrywaj</button>
+      <button onClick="{{ goBoard }}" style="{{ tabBoard }}">Tablica</button>
+      <button onClick="{{ goPlan }}" style="{{ tabPlan }}">Plan</button>
+    </nav>
+    <div style="flex: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: hsl(var(--muted-foreground));">Durrës · 3 dni · z dziećmi</div>
+      <div style="display: flex; align-items: center; gap: 8px; padding-left: 20px; border-left: 1px solid hsl(var(--border));">
+        <div style="width: 28px; height: 28px; border-radius: 999px; background: hsl(var(--accent) / .55); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: hsl(var(--foreground));">MK</div>
+      </div>
+    </div>
+  </header>
+
+  <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+
+    <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px;">
+      <h1 style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 34px; letter-spacing: -0.02em; margin: 0;">Dzień dobry, Marcin</h1>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: hsl(var(--muted-foreground));">Do wyjazdu do Durrës · 33 dni</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 400px; gap: 20px; margin-bottom: 20px; align-items: stretch;">
+
+      <section style="display: flex; flex-direction: column; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 28px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+          <span style="display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: hsl(var(--primary));"></span>
+          <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary));">Trwa planowanie</span>
+        </div>
+        <h2 style="font-family: 'Fraunces', serif; font-weight: 400; font-size: 30px; letter-spacing: -0.02em; margin: 0 0 6px;">Durrës z dziećmi</h2>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: hsl(var(--muted-foreground)); margin-bottom: 22px;">Albania · 12–14 września · 3 popołudnia · współdzielone z Anią</div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid hsl(var(--border) / .55); border-bottom: 1px solid hsl(var(--border) / .55); margin-bottom: 22px;">
+          <div style="padding: 16px 0;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 6px;">Na pewno</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; font-variant-numeric: tabular-nums;">{{ savedCount }}</div>
+          </div>
+          <div style="padding: 16px 0; border-left: 1px solid hsl(var(--border) / .55); padding-left: 20px;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 6px;">Być może</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; font-variant-numeric: tabular-nums;">{{ maybeCount }}</div>
+          </div>
+          <div style="padding: 16px 0; border-left: 1px solid hsl(var(--border) / .55); padding-left: 20px;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 6px;">Dni ułożone</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 22px; font-variant-numeric: tabular-nums;">3 z 3</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; margin-bottom: 22px;">
+          <sc-for list="{{ heroThumbs }}" as="t" hint-placeholder-count="6">
+            <div style="{{ t.style }}"></div>
+          </sc-for>
+        </div>
+
+        <div style="display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; background: hsl(var(--muted)); border: 1px solid hsl(var(--primary) / .22); border-radius: 4px; margin-bottom: 22px;">
+          <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); border: 1px solid hsl(var(--primary) / .34); border-radius: 999px; padding: 3px 8px; white-space: nowrap;">Agent</span>
+          <p style="margin: 0; font-size: 14px; line-height: 1.5; color: hsl(var(--text-secondary)); text-wrap: pretty;">Plan na trzy popołudnia jest gotowy. Dzień 2 ma dwa przejazdy autem — jeśli chcecie spokojniej, zamienię park Adriatik na promenadę.</p>
+        </div>
+
+        <div style="margin-top: auto; display: flex; gap: 10px;">
+          <x-import component-from-global-scope="RouteMarket.Button" onClick="{{ goPlan }}" hint-size="auto,40px">Otwórz plan ↗</x-import>
+          <x-import component-from-global-scope="RouteMarket.Button" variant="outline" onClick="{{ goDiscover }}" hint-size="auto,40px">Dodaj więcej miejsc</x-import>
+          <x-import component-from-global-scope="RouteMarket.Button" variant="ghost" onClick="{{ goBoard }}" hint-size="auto,40px">Tablica</x-import>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; background: hsl(var(--ink)); border-radius: 6px; padding: 28px;">
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary-light)); margin-bottom: 14px;">Nowy wyjazd</div>
+        <h2 style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 26px; line-height: 1.15; letter-spacing: -0.02em; color: hsl(var(--background)); margin: 0 0 22px;">Dokąd tym razem?</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+          <input placeholder="Miasto lub region" style="width: 100%; box-sizing: border-box; background: hsl(var(--primary-foreground) / .07); border: 1px solid hsl(var(--primary-foreground) / .2); border-radius: var(--radius-sm); padding: 12px 14px; font-family: 'Inter', sans-serif; font-size: 14px; color: hsl(var(--background)); outline: none;">
+          <input placeholder="Termin — np. 12–14 września" style="width: 100%; box-sizing: border-box; background: hsl(var(--primary-foreground) / .07); border: 1px solid hsl(var(--primary-foreground) / .2); border-radius: var(--radius-sm); padding: 12px 14px; font-family: 'Inter', sans-serif; font-size: 14px; color: hsl(var(--background)); outline: none;">
+        </div>
+
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary-foreground) / .62); margin-bottom: 10px;">Klimat wyjazdu</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px;">
+          <sc-for list="{{ climates }}" as="c" hint-placeholder-count="5">
+            <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+          </sc-for>
+        </div>
+
+        <button onClick="{{ goDiscover }}" style="margin-top: auto; width: 100%; background: hsl(var(--primary-light)); color: hsl(var(--ink)); border: none; border-radius: var(--radius-sm); padding: 13px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;" style-hover="background:hsl(var(--primary-light) / .88);">Zacznij planować →</button>
+        <p style="margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: hsl(var(--primary-foreground) / .74);">Agent zaproponuje pierwsze miejsca na podstawie klimatu i długości pobytu.</p>
+      </section>
+    </div>
+
+    <section style="margin-bottom: 20px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 6px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid hsl(var(--border) / .55);">
+        <div>
+          <h3 style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px; margin: 0 0 3px;">Wymaga decyzji</h3>
+          <p style="margin: 0; font-size: 13px; color: hsl(var(--muted-foreground));">Miejsca w „być może" blokują agentowi ułożenie ostatecznej trasy.</p>
+        </div>
+        <button onClick="{{ goBoard }}" style="background: none; border: none; font-family: 'Inter', sans-serif; font-size: 14px; color: hsl(var(--muted-foreground)); cursor: pointer;" style-hover="color:hsl(var(--ink));">Cała tablica ↗</button>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;">
+        <sc-for list="{{ undecided }}" as="p" hint-placeholder-count="3">
+          <div style="{{ p.cellStyle }}">
+            <div style="display: flex; gap: 14px; margin-bottom: 14px;">
+              <div style="{{ p.tileStyle }}"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div onClick="{{ p.onOpen }}" style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 16px; line-height: 1.25; margin-bottom: 4px; cursor: pointer;">{{ p.name }}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground));">{{ p.duration }} · {{ p.from }}</div>
+              </div>
+            </div>
+            <p style="margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: hsl(var(--text-secondary)); text-wrap: pretty;">{{ p.agent }}</p>
+            <div style="display: flex; gap: 6px;">
+              <button onClick="{{ p.onYes }}" style="{{ p.miniYes }}">Na pewno</button>
+              <button onClick="{{ p.onNo }}" style="{{ p.miniNo }}">Nie tym razem</button>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noUndecided }}" hint-placeholder-val="{{ false }}">
+          <div style="grid-column: 1 / -1; padding: 32px 24px; text-align: center; font-size: 14px; color: hsl(var(--muted-foreground));">Wszystko rozstrzygnięte. Agent ma komplet danych do ułożenia planu.</div>
+        </sc-if>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+      <section>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+          <h3 style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px; margin: 0;">Twoje wyjazdy</h3>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: hsl(var(--muted-foreground));">3</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <sc-for list="{{ trips }}" as="t" hint-placeholder-count="3">
+            <div style="{{ t.rowStyle }}">
+              <div style="{{ t.tile }}"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 16px; margin-bottom: 3px;">{{ t.name }}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground));">{{ t.meta }}</div>
+              </div>
+              <x-import component-from-global-scope="RouteMarket.Badge" variant="{{ t.badgeVariant }}" hint-size="auto,22px">{{ t.status }}</x-import>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px;">
+          <h3 style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 18px; margin: 0;">Tablice od podróżników</h3>
+          <span style="font-size: 13px; color: hsl(var(--muted-foreground));">Albania</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <sc-for list="{{ shared }}" as="s" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 14px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 14px 16px;">
+              <div style="{{ s.avatar }}">{{ s.initials }}</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 16px; margin-bottom: 3px;">{{ s.title }}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground));">{{ s.meta }}</div>
+              </div>
+              <x-import component-from-global-scope="RouteMarket.Button" variant="outline" size="sm" hint-size="auto,32px">Skopiuj</x-import>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isDiscover }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; margin-bottom: 28px;">
+      <div style="max-width: 560px;">
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); margin-bottom: 10px;">Wyjazd · Durrës, Albania · 12–14 września</div>
+        <h1 style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 10px;">Atrakcje na trzy popołudnia</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 1.55; color: hsl(var(--text-secondary)); text-wrap: pretty;">Zapisuj co Cię interesuje. Kiedy tablica będzie pełna, agent ułoży z niej realny plan — po 3–4 godziny dziennie, w tempie dla sześciolatka.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground));">{{ savedCount }} zapisanych · {{ maybeCount }} do rozważenia</div>
+        <x-import component-from-global-scope="RouteMarket.Button" onClick="{{ goPlan }}" hint-size="auto,40px">Zbuduj plan z tablicy ↗</x-import>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 4px; margin-bottom: 16px;">
+      <div style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 12px;">
+        <span style="color: hsl(var(--muted-foreground)); font-size: 15px;">⌕</span>
+        <input value="{{ query }}" onChange="{{ setQuery }}" placeholder="Szukaj: plaża, ruiny, deszczowy dzień…" style="width: 100%; border: none; background: transparent; outline: none; font-family: 'Inter', sans-serif; font-size: 15px; color: hsl(var(--ink)); padding: 10px 0;">
+      </div>
+      <div style="width: 1px; height: 24px; background: hsl(var(--border));"></div>
+      <div style="display: flex; gap: 6px; padding-right: 4px;">
+        <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+          <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px; padding: 12px 16px; background: hsl(var(--muted)); border: 1px solid hsl(var(--primary) / .22); border-radius: 4px;">
+      <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); border: 1px solid hsl(var(--primary) / .34); border-radius: 999px; padding: 3px 8px; white-space: nowrap;">Agent</span>
+      <p style="margin: 0; font-size: 14px; color: hsl(var(--text-secondary)); line-height: 1.5;">{{ agentTip }}</p>
+    </div>
+
+    <div style="columns: 4; column-gap: 20px;">
+      <sc-for list="{{ visible }}" as="p" hint-placeholder-count="12">
+        <div style="break-inside: avoid; margin-bottom: 20px;">
+          <div onClick="{{ p.onOpen }}" style="background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 6px; overflow: hidden; cursor: pointer; transition: box-shadow 200ms, border-color 200ms, transform 200ms;" style-hover="transform:translateY(-1px);border-color:hsl(var(--muted-foreground) / .38);box-shadow:0 1px 2px rgba(33,59,49,.1),0 8px 24px rgba(33,59,49,.08);">
+            <div style="{{ p.photoStyle }}">
+              <span style="font-size: 18px; color: hsl(var(--foreground) / .3);">⌑</span>
+              <div style="position: absolute; left: 10px; bottom: 10px; font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: hsl(var(--foreground) / .62);">{{ p.kind }}</div>
+              <div style="{{ p.badgeStyle }}">{{ p.badge }}</div>
+            </div>
+            <div style="padding: 14px 14px 12px;">
+              <h3 style="margin: 0 0 6px; font-family: 'Fraunces', serif; font-weight: 500; font-size: 16px; line-height: 1.25; letter-spacing: -0.01em;">{{ p.name }}</h3>
+              <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: hsl(var(--muted-foreground)); text-wrap: pretty;">{{ p.note }}</p>
+              <div style="display: flex; gap: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-variant-numeric: tabular-nums; color: hsl(var(--text-secondary));">
+                <span>{{ p.duration }}</span>
+                <span style="color: hsl(var(--muted-foreground));">{{ p.hours }}</span>
+              </div>
+            </div>
+            <div style="display: flex; border-top: 1px solid hsl(var(--border) / .55);">
+              <button onClick="{{ p.onYes }}" style="{{ p.yesStyle }}">Na pewno</button>
+              <button onClick="{{ p.onMaybe }}" style="{{ p.maybeStyle }}">Może</button>
+              <button onClick="{{ p.onNo }}" style="{{ p.noStyle }}">Nie</button>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1160px; margin: 0 auto; padding: 28px 40px 96px;">
+    <div style="padding-bottom: 12px;"><x-import component-from-global-scope="RouteMarket.Button" variant="ghost" size="sm" onClick="{{ goDiscover }}" hint-size="auto,32px">← Wróć do odkrywania</x-import></div>
+
+    <div style="display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: start;">
+      <div>
+        <div style="{{ detail.photoStyle }}">
+          <span style="font-size: 28px; color: hsl(var(--foreground) / .3);">⌑</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px;">
+          <div style="{{ detail.thumbA }}"></div>
+          <div style="{{ detail.thumbB }}"></div>
+          <div style="{{ detail.thumbC }}"></div>
+        </div>
+
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); margin-bottom: 10px;">{{ detail.eyebrow }}</div>
+        <h1 style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 42px; line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 16px;">{{ detail.name }}</h1>
+        <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.6; color: hsl(var(--text-secondary)); max-width: 60ch; text-wrap: pretty;">{{ detail.long }}</p>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border));">
+          <div style="padding: 20px 0; border-right: 1px solid hsl(var(--border) / .55);">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 8px;">Czas zwiedzania</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; font-variant-numeric: tabular-nums;">{{ detail.duration }}</div>
+          </div>
+          <div style="padding: 20px 0 20px 24px; border-right: 1px solid hsl(var(--border) / .55);">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 8px;">Godziny otwarcia</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; font-variant-numeric: tabular-nums;">{{ detail.hours }}</div>
+          </div>
+          <div style="padding: 20px 0 20px 24px;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 8px;">Od bazy</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; font-variant-numeric: tabular-nums;">{{ detail.fromBase }}</div>
+          </div>
+        </div>
+
+        <h2 style="font-family: 'Fraunces', serif; font-weight: 400; font-size: 22px; margin: 40px 0 18px; letter-spacing: -0.01em;">Co mówią rodzice</h2>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <sc-for list="{{ detail.reviews }}" as="r" hint-placeholder-count="3">
+            <div style="background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 18px 20px;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <div style="{{ r.avatarStyle }}"></div>
+                <span style="font-size: 14px; font-weight: 500;">{{ r.who }}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground));">{{ r.when }}</span>
+              </div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: hsl(var(--text-secondary)); text-wrap: pretty;">{{ r.text }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <aside style="position: sticky; top: 88px; display: flex; flex-direction: column; gap: 20px;">
+        <div style="background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 20px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 14px;">Do tablicy · Durrës</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button onClick="{{ detail.onYes }}" style="{{ detail.yesStyle }}">Na pewno</button>
+            <button onClick="{{ detail.onMaybe }}" style="{{ detail.maybeStyle }}">Być może</button>
+            <button onClick="{{ detail.onNo }}" style="{{ detail.noStyle }}">Nie tym razem</button>
+          </div>
+        </div>
+
+        <div style="background: hsl(var(--muted)); border: 1px solid hsl(var(--primary) / .22); border-radius: 6px; padding: 20px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); margin-bottom: 12px;">Agent radzi</div>
+          <p style="margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: hsl(var(--text-secondary)); text-wrap: pretty;">{{ detail.agent }}</p>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--primary));">{{ detail.coords }}</div>
+        </div>
+
+        <div style="border: 1px solid hsl(var(--border)); border-radius: 6px; padding: 20px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 12px;">W okolicy · 10 min pieszo</div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <sc-for list="{{ detail.nearby }}" as="n" hint-placeholder-count="3">
+              <div onClick="{{ n.onOpen }}" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                <div style="{{ n.thumb }}"></div>
+                <div>
+                  <div style="font-size: 14px; font-weight: 500; line-height: 1.3;">{{ n.name }}</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground));">{{ n.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px;">
+      <div>
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); margin-bottom: 10px;">Tablica wyjazdu</div>
+        <h1 style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 38px; letter-spacing: -0.02em; margin: 0;">Durrës z dziećmi</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center;">
+          <div style="width: 30px; height: 30px; border-radius: 999px; background: hsl(var(--accent) / .55); border: 2px solid hsl(var(--background)); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: hsl(var(--foreground));">MK</div>
+          <div style="width: 30px; height: 30px; border-radius: 999px; background: hsl(var(--primary) / .34); border: 2px solid hsl(var(--background)); margin-left: -8px; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: hsl(var(--foreground));">AK</div>
+          <span style="font-size: 13px; color: hsl(var(--muted-foreground)); margin-left: 12px;">Współdzielona z Anią</span>
+        </div>
+        <x-import component-from-global-scope="RouteMarket.Button" onClick="{{ goPlan }}" hint-size="auto,40px">Ułóż plan na 3 dni ↗</x-import>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start;">
+      <sc-for list="{{ buckets }}" as="b" hint-placeholder-count="3">
+        <section style="{{ b.colStyle }}">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid hsl(var(--border) / .55);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="{{ b.dotStyle }}"></span>
+              <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--text-secondary));">{{ b.label }}</span>
+            </div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground));">{{ b.count }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px;">
+            <sc-for list="{{ b.items }}" as="p" hint-placeholder-count="3">
+              <div style="display: flex; gap: 12px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 5px; padding: 10px;">
+                <div style="{{ p.tileStyle }}"></div>
+                <div style="flex: 1; min-width: 0;">
+                  <div onClick="{{ p.onOpen }}" style="font-size: 14px; font-weight: 500; line-height: 1.3; margin-bottom: 4px; cursor: pointer;">{{ p.name }}</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 8px;">{{ p.duration }} · {{ p.hours }}</div>
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button onClick="{{ p.onYes }}" style="{{ p.miniYes }}">Na pewno</button>
+                    <button onClick="{{ p.onMaybe }}" style="{{ p.miniMaybe }}">Może</button>
+                    <button onClick="{{ p.onNo }}" style="{{ p.miniNo }}">Nie</button>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ b.empty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 24px 12px; text-align: center; font-size: 13px; color: hsl(var(--muted-foreground)); line-height: 1.5;">{{ b.emptyText }}</div>
+            </sc-if>
+          </div>
+        </section>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px;">
+      <div style="max-width: 620px;">
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary)); margin-bottom: 10px;">Plan wygenerowany · z 9 zapisanych miejsc</div>
+        <h1 style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 38px; letter-spacing: -0.02em; margin: 0 0 10px;">Trzy popołudnia w Durrës</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 1.55; color: hsl(var(--text-secondary));">Start po 14:00, po 3–4 godziny, przerwa na lody w środku każdego dnia.</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <x-import component-from-global-scope="RouteMarket.Button" variant="outline" hint-size="auto,40px">Przelicz plan</x-import>
+        <x-import component-from-global-scope="RouteMarket.Button" hint-size="auto,40px">Pobierz GPX ↓</x-import>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+      <sc-for list="{{ dayTabs }}" as="d" hint-placeholder-count="3">
+        <button onClick="{{ d.onClick }}" style="{{ d.style }}">
+          <span style="display: block; font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: .7; margin-bottom: 4px;">{{ d.date }}</span>
+          <span style="display: block; font-size: 15px; font-weight: 500;">{{ d.title }}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 520px; gap: 28px; align-items: start;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 16px; background: hsl(var(--warning) / .14); border: 1px solid hsl(var(--warning) / .32); border-radius: 4px;">
+          <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--warning-foreground)); border: 1px solid hsl(var(--warning) / .45); border-radius: 999px; padding: 3px 8px; white-space: nowrap;">Realizm</span>
+          <p style="margin: 0; font-size: 14px; color: hsl(var(--text-secondary)); line-height: 1.5;">{{ day.warning }}</p>
+        </div>
+
+        <div style="border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); overflow: hidden;">
+          <sc-for list="{{ day.stops }}" as="s" hint-placeholder-count="4">
+            <div style="display: grid; grid-template-columns: 84px 1fr; border-bottom: 1px solid hsl(var(--border) / .55);">
+              <div style="padding: 20px 0 20px 20px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-variant-numeric: tabular-nums; color: hsl(var(--ink));">{{ s.time }}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 4px;">{{ s.length }}</div>
+              </div>
+              <div style="display: flex; gap: 14px; padding: 20px 20px 20px 0;">
+                <div style="{{ s.pinBadge }}">{{ s.n }}</div>
+                <div style="flex: 1;">
+                  <div style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 17px; letter-spacing: -0.01em; margin-bottom: 6px;">{{ s.name }}</div>
+                  <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.55; color: hsl(var(--text-secondary)); text-wrap: pretty;">{{ s.why }}</p>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <sc-for list="{{ s.tags }}" as="t" hint-placeholder-count="2">
+                      <x-import component-from-global-scope="RouteMarket.Badge" variant="secondary" hint-size="auto,22px">{{ t }}</x-import>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display: grid; grid-template-columns: 84px 1fr; background: hsl(var(--muted));">
+            <div style="padding: 16px 0 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: hsl(var(--muted-foreground));">Razem</div>
+            <div style="padding: 16px 20px 16px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: hsl(var(--text-secondary));">{{ day.total }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: sticky; top: 88px;">
+        <div style="position: relative; height: 480px; border: 1px solid hsl(var(--border)); border-radius: 6px; overflow: hidden; background: hsl(var(--muted));">
+          <div style="{{ mapGrid }}"></div>
+          <div style="{{ seaStyle }}"></div>
+          <sc-for list="{{ day.pins }}" as="p" hint-placeholder-count="4">
+            <div style="{{ p.style }}">{{ p.n }}</div>
+          </sc-for>
+          <div style="position: absolute; left: 16px; bottom: 16px; padding: 12px 14px; background: hsl(var(--background) / .72); backdrop-filter: blur(12px) saturate(1.1); border: 1px solid hsl(var(--border)); border-radius: 4px;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin-bottom: 6px;">Trasa pieszo</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-variant-numeric: tabular-nums;">{{ day.walk }}</div>
+          </div>
+          <div style="position: absolute; right: 16px; top: 16px; padding: 8px 12px; background: hsl(var(--background) / .72); backdrop-filter: blur(12px); border: 1px solid hsl(var(--border)); border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: hsl(var(--text-secondary));">41.32340° N, 19.44580° E</div>
+        </div>
+
+        <div style="margin-top: 20px; background: hsl(var(--ink)); border-radius: 6px; padding: 22px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: hsl(var(--primary-light)); margin-bottom: 12px;">Eksport</div>
+          <p style="margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: hsl(var(--primary-foreground) / .78); text-wrap: pretty;">Plik GPX z {{ day.stopCount }} punktami i śladem pieszym. Wgraj na zegarek albo otwórz w nawigacji Routemarket.</p>
+          <div style="display: flex; gap: 10px;">
+            <button style="flex: 1; background: hsl(var(--primary-light)); color: hsl(var(--ink)); border: none; border-radius: var(--radius-sm); padding: 11px 14px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;" style-hover="background:hsl(var(--primary-light) / .88);">Pobierz GPX</button>
+            <button style="flex: 1; background: none; color: hsl(var(--background)); border: 1px solid hsl(var(--primary-foreground) / .25); border-radius: var(--radius-sm); padding: 11px 14px; font-family: 'Inter', sans-serif; font-size: 14px; cursor: pointer;" style-hover="border-color:hsl(var(--primary-light));">Otwórz nawigację</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+const PLACES = [
+  { id:'amf', name:'Amfiteatr w Durrës', kind:'Zabytek', tint:'hsl(var(--primary) / .16)', h:200, note:'Rzymska arena w środku miasta, zejście po schodach i chłodne korytarze.', duration:'1 g 30 min', hours:'09:00–17:00', badge:'Dla dzieci', from:'8 min pieszo',
+    long:'Największy amfiteatr na Bałkanach leży wprost pomiędzy kamienicami starego Durrës. Wejście prowadzi w dół, w cień — po godzinie na słońcu to ulga. Dzieci lubią kryptę z mozaiką i przejścia pod trybunami.',
+    agent:'Zaplanuj tu drugą część popołudnia — po 15:00 trybuny są w cieniu, a kolejka znika.', coords:'41.31280° N, 19.45010° E' },
+  { id:'currila', name:'Plaża Currila', kind:'Plaża', tint:'hsl(var(--dusty-blue) / .18)', h:240, note:'Kamienista zatoczka na północ od portu, spokojniejsza niż główna promenada.', duration:'2 g', hours:'Całą dobę', badge:'Płytko', from:'12 min autem',
+    long:'Currila to seria małych zatok pod klifem. Woda wypłyca się łagodnie, fal prawie nie ma po południu. Kamienie — warto zabrać buty do wody.',
+    agent:'Najlepsza na zakończenie dnia: słońce schodzi nad wodę około 18:30.', coords:'41.32770° N, 19.43420° E' },
+  { id:'wieza', name:'Wieża Wenecka', kind:'Zabytek', tint:'hsl(var(--accent) / .22)', h:180, note:'Fragment murów obronnych, dziś taras z widokiem na port.', duration:'40 min', hours:'10:00–22:00', badge:'Widok', from:'5 min pieszo',
+    long:'Okrągła baszta zamykająca dawne mury miejskie. Na górze jest kawiarnia i widok na cały port — dobre miejsce na przerwę w połowie spaceru.',
+    agent:'Krótki przystanek, wpasuje się między dwa większe punkty.', coords:'41.31090° N, 19.44280° E' },
+  { id:'muzeum', name:'Muzeum Archeologiczne', kind:'Muzeum', tint:'hsl(var(--primary) / .16)', h:170, note:'Kompaktowe, klimatyzowane, dobre na godzinę deszczu lub upału.', duration:'1 g', hours:'09:00–16:00 · pon. nieczynne', badge:'Klimatyzacja', from:'10 min pieszo',
+    long:'Zbiór z illiryjskiego i rzymskiego Durrës, w tym mozaiki i biżuteria. Cała ekspozycja mieści się na jednym poziomie, więc obchód z dzieckiem trwa realnie godzinę.',
+    agent:'Trzymam to jako plan awaryjny na dzień z deszczem — w poniedziałek nieczynne.', coords:'41.31410° N, 19.44680° E' },
+  { id:'promenada', name:'Promenada Durrës', kind:'Spacer', tint:'hsl(var(--dusty-blue) / .18)', h:220, note:'Szeroki deptak wzdłuż wody, place zabaw i lodziarnie co 200 m.', duration:'1 g 15 min', hours:'Całą dobę', badge:'Wózek OK', from:'Przy bazie',
+    long:'Deptak ciągnie się kilka kilometrów wzdłuż plaży miejskiej. Nawierzchnia równa, po zmroku oświetlona, w połowie drogi karuzele i mały park.',
+    agent:'Naturalne domknięcie każdego dnia — wraca pod sam hotel.', coords:'41.30820° N, 19.44120° E' },
+  { id:'rodon', name:'Przylądek Rodonit', kind:'Wycieczka', tint:'hsl(var(--accent) / .22)', h:260, note:'Zamek Skanderbega i pusta plaża, godzina drogi w jedną stronę.', duration:'4 g', hours:'Całą dobę', badge:'Cały dzień', from:'55 min autem',
+    long:'Ruiny nadmorskiego zamku na cyplu, obok kościół z XV wieku i szeroka piaszczysta plaża bez zabudowy. Ostatnie kilometry to droga szutrowa.',
+    agent:'Za długie na popołudnie po 3–4 godziny. Zostawiam w „być może” na wypadek zmiany planów.', coords:'41.59420° N, 19.44980° E' },
+  { id:'forum', name:'Forum bizantyjskie', kind:'Zabytek', tint:'hsl(var(--primary) / .16)', h:160, note:'Krąg kolumn odsłonięty w centrum, otwarty i darmowy.', duration:'25 min', hours:'Całą dobę', badge:'Bezpłatne', from:'6 min pieszo',
+    long:'Odkryty w latach 60. okrągły plac z kolumnami, dziś zieleń i ławki wokół. Mija się go po drodze z amfiteatru na promenadę.',
+    agent:'Nie planuję osobno — leży dokładnie na trasie między dwoma innymi punktami.', coords:'41.31220° N, 19.44520° E' },
+  { id:'akwarium', name:'Akwarium Durrës', kind:'Atrakcja', tint:'hsl(var(--dusty-blue) / .18)', h:190, note:'Małe, ale całe pod dachem. Rekiny w jednym zbiorniku, karmienie o 16:00.', duration:'50 min', hours:'10:00–19:00', badge:'Dla dzieci', from:'15 min autem',
+    long:'Kilkanaście zbiorników z fauną Adriatyku, tunel i część dotykowa. Rozmiarem to raczej ekspozycja niż park — dobrze, bo nie męczy.',
+    agent:'Wejście na 15:40 łapie karmienie o 16:00.', coords:'41.29650° N, 19.46330° E' },
+  { id:'bazar', name:'Bazar rybny', kind:'Jedzenie', tint:'hsl(var(--accent) / .22)', h:170, note:'Hala targowa z lodem i wodą na posadzce, obok smażalnie.', duration:'45 min', hours:'07:00–18:00', badge:'Kolacja', from:'9 min pieszo',
+    long:'Rano handel, po południu spokojniej. Naokoło kilkanaście lokali, które smażą to, co wskażesz w hali.',
+    agent:'Dobre na wczesną kolację przed powrotem na promenadę.', coords:'41.31350° N, 19.44860° E' },
+  { id:'park', name:'Park zabaw Adriatik', kind:'Atrakcja', tint:'hsl(var(--primary) / .16)', h:200, note:'Dmuchańce, tor gokartowy dla małych, cień z zadaszeń.', duration:'1 g 30 min', hours:'16:00–23:00', badge:'Dla dzieci', from:'20 min autem',
+    long:'Sezonowy park rozrywki przy plaży w Golem. Otwiera się dopiero po 16:00, kiedy schodzi upał.',
+    agent:'Otwarcie o 16:00 zjada połowę popołudnia — proponuję na ostatni dzień.', coords:'41.26980° N, 19.49110° E' },
+  { id:'golem', name:'Plaża Golem', kind:'Plaża', tint:'hsl(var(--dusty-blue) / .18)', h:230, note:'Piasek zamiast kamieni, leżaki i płytkie wejście do wody.', duration:'2 g 30 min', hours:'Całą dobę', badge:'Piasek', from:'18 min autem',
+    long:'Szeroki, piaszczysty pas na południe od Durrës. Woda wypłyca się na kilkadziesiąt metrów, co przy dziecku zmienia wszystko.',
+    agent:'Zestawiam z parkiem Adriatik — dzieli je 6 minut.', coords:'41.27540° N, 19.48200° E' },
+  { id:'kalaja', name:'Mury Kalaja', kind:'Spacer', tint:'hsl(var(--accent) / .22)', h:180, note:'Odcinek starych murów, po których da się przejść nad dachami.', duration:'35 min', hours:'Całą dobę', badge:'Widok', from:'7 min pieszo',
+    long:'Zachowany fragment obwarowań, wąskie przejście z widokiem na dachy starego miasta i port. Bez barierek w kilku miejscach.',
+    agent:'Krótkie, ale bez barierek — z małym dzieckiem tylko za rękę.', coords:'41.31180° N, 19.44410° E' }
+];
+
+const DAYS = [
+  { date:'12 września', title:'Stare miasto', walk:'3,8 km · +46 m', total:'3 g 25 min · powrót 18:05',
+    warning:'Trzy punkty na 3,5 godziny. Zmieściłby się czwarty, ale amfiteatr i mury to dużo schodów jak na jedno popołudnie.',
+    stops:[
+      { n:1, time:'14:20', length:'1 g 30 min', name:'Amfiteatr w Durrës', why:'Zejście w cień zaraz po najgorętszej porze. Krypta z mozaiką jest po lewej od wejścia.', tags:['Dla dzieci','Cień'], x:34, y:44 },
+      { n:2, time:'16:05', length:'25 min', name:'Forum bizantyjskie', why:'Po drodze, siedem minut pieszo. Ławki i miejsce na kanapkę.', tags:['Po drodze','Bezpłatne'], x:52, y:38 },
+      { n:3, time:'16:45', length:'40 min', name:'Wieża Wenecka', why:'Taras nad portem, kawa dla dorosłych, lody na dole.', tags:['Widok','Przerwa'], x:63, y:56 },
+      { n:4, time:'17:35', length:'30 min', name:'Promenada Durrës', why:'Powrót wzdłuż wody pod hotel. Plac zabaw w połowie drogi.', tags:['Wózek OK'], x:78, y:72 }
+    ] },
+  { date:'13 września', title:'Woda i piasek', walk:'2,1 km · +8 m', total:'3 g 50 min · powrót 18:40',
+    warning:'Dzień z dwoma przejazdami autem. Golem i park dzieli 6 minut, więc kolejność ma znaczenie.',
+    stops:[
+      { n:1, time:'14:00', length:'2 g 30 min', name:'Plaża Golem', why:'Piaszczyste, płytkie wejście. Leżaki od strony południowej są tańsze.', tags:['Piasek','Płytko'], x:28, y:62 },
+      { n:2, time:'16:40', length:'1 g 30 min', name:'Park zabaw Adriatik', why:'Otwiera się o 16:00, więc trafiacie zaraz po otwarciu, bez kolejek.', tags:['Dla dzieci'], x:58, y:48 },
+      { n:3, time:'18:15', length:'25 min', name:'Bazar rybny', why:'Wczesna kolacja w drodze powrotnej do miasta.', tags:['Kolacja'], x:74, y:34 }
+    ] },
+  { date:'14 września', title:'Ostatnie popołudnie', walk:'2,6 km · +22 m', total:'3 g 10 min · powrót 17:50',
+    warning:'Muzeum zamyka o 16:00 — to jedyny punkt dnia z twardym limitem. Reszta jest elastyczna.',
+    stops:[
+      { n:1, time:'14:15', length:'1 g', name:'Muzeum Archeologiczne', why:'Klimatyzacja i jeden poziom ekspozycji. Zamknięcie o 16:00.', tags:['Klimatyzacja','Deszcz'], x:40, y:30 },
+      { n:2, time:'15:30', length:'35 min', name:'Mury Kalaja', why:'Przejście nad dachami. Kilka odcinków bez barierek.', tags:['Widok','Za rękę'], x:56, y:44 },
+      { n:3, time:'16:20', length:'2 g', name:'Plaża Currila', why:'Ostatnie kąpanie i zachód słońca nad wodą po 18:30.', tags:['Zachód słońca'], x:70, y:66 }
+    ] }
+];
+
+const FILTERS = ['Wszystko','Z dziećmi','Do 1 godziny','Pieszo od bazy','Na deszcz'];
+
+class Component extends DCLogic {
+  state = {
+    climate: 'Z dziećmi',
+    screen: 'home',
+    openId: 'amf',
+    query: '',
+    filter: 'Wszystko',
+    day: 0,
+    marks: { amf:'yes', currila:'yes', wieza:'yes', promenada:'yes', muzeum:'yes', golem:'yes', park:'yes', bazar:'yes', kalaja:'yes', forum:'maybe', rodon:'maybe', akwarium:'maybe' }
+  };
+
+  mark(id, v) {
+    this.setState(s => ({ marks: { ...s.marks, [id]: s.marks[id] === v ? null : v } }));
+  }
+
+  btn(active, tone) {
+    const tones = {
+      yes:   { bg:'hsl(var(--primary))', fg:'hsl(var(--primary-foreground))' },
+      maybe: { bg:'hsl(var(--dusty-blue))', fg:'hsl(var(--primary-foreground))' },
+      no:    { bg:'hsl(var(--border))', fg:'hsl(var(--text-secondary))' }
+    };
+    const t = tones[tone];
+    return {
+      flex: 1, border: 'none', borderRight: '1px solid hsl(var(--border) / .55)', padding: '10px 4px', cursor: 'pointer',
+      fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap',
+      background: active ? t.bg : 'transparent', color: active ? t.fg : 'hsl(var(--muted-foreground))',
+      transition: 'background 120ms, color 120ms'
+    };
+  }
+
+  sideBtn(active, tone) {
+    const b = this.btn(active, tone);
+    return { ...b, borderRight: 'none', border: active ? 'none' : '1px solid hsl(var(--border))', borderRadius: '3px', padding: '12px', fontSize: '14px', textAlign: 'center' };
+  }
+
+  miniBtn(active, tone) {
+    const b = this.btn(active, tone);
+    return { ...b, flex: 'none', border: active ? 'none' : '1px solid hsl(var(--border))', borderRadius: '999px', padding: '4px 9px', fontSize: '11px' };
+  }
+
+  photo(tint, h) {
+    return { position: 'relative', height: h + 'px', background: tint, display: 'grid', placeItems: 'center',
+      backgroundImage: 'repeating-linear-gradient(0deg, rgba(43,43,38,.05) 0 1px, transparent 1px 22px), repeating-linear-gradient(90deg, rgba(43,43,38,.05) 0 1px, transparent 1px 22px)' };
+  }
+
+  decorate(p) {
+    const m = this.state.marks[p.id];
+    return {
+      ...p,
+      photoStyle: this.photo(p.tint, p.h),
+      badgeStyle: { position: 'absolute', right: '10px', top: '10px', background: 'hsl(var(--card) / .9)', border: '1px solid hsl(var(--border))', borderRadius: '999px', padding: '4px 9px', fontFamily: "'Archivo Narrow', sans-serif", fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'hsl(var(--text-secondary))' },
+      tileStyle: { width: '52px', height: '52px', flex: 'none', borderRadius: '4px', background: p.tint },
+      onOpen: () => this.setState({ screen: 'detail', openId: p.id }),
+      onYes: (e) => { e.stopPropagation(); this.mark(p.id, 'yes'); },
+      onMaybe: (e) => { e.stopPropagation(); this.mark(p.id, 'maybe'); },
+      onNo: (e) => { e.stopPropagation(); this.mark(p.id, 'no'); },
+      yesStyle: this.btn(m === 'yes', 'yes'),
+      maybeStyle: this.btn(m === 'maybe', 'maybe'),
+      noStyle: { ...this.btn(m === 'no', 'no'), borderRight: 'none' },
+      miniYes: this.miniBtn(m === 'yes', 'yes'),
+      miniMaybe: this.miniBtn(m === 'maybe', 'maybe'),
+      miniNo: this.miniBtn(m === 'no', 'no')
+    };
+  }
+
+  tab(name, label) {
+    const on = this.state.screen === name || (name === 'discover' && this.state.screen === 'detail');
+    return { border: 'none', background: on ? 'hsl(var(--secondary))' : 'transparent', color: on ? 'hsl(var(--ink))' : 'hsl(var(--muted-foreground))',
+      borderRadius: '3px', padding: '8px 14px', fontFamily: "'Inter', sans-serif", fontSize: '14px', fontWeight: on ? 500 : 400, cursor: 'pointer' };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const marks = s.marks;
+    const q = s.query.trim().toLowerCase();
+    const byFilter = {
+      'Z dziećmi': p => ['Dla dzieci','Płytko','Piasek','Wózek OK'].includes(p.badge),
+      'Do 1 godziny': p => !p.duration.startsWith('1 g 3') && !p.duration.startsWith('2') && !p.duration.startsWith('4'),
+      'Pieszo od bazy': p => p.from.includes('pieszo') || p.from.includes('bazie'),
+      'Na deszcz': p => ['Muzeum','Atrakcja'].includes(p.kind)
+    };
+    const visible = PLACES
+      .filter(p => !q || (p.name + ' ' + p.kind + ' ' + p.note).toLowerCase().includes(q))
+      .filter(p => s.filter === 'Wszystko' || byFilter[s.filter](p))
+      .map(p => this.decorate(p));
+
+    const cur = PLACES.find(p => p.id === s.openId) || PLACES[0];
+    const m = marks[cur.id];
+    const nearby = PLACES.filter(p => p.id !== cur.id && p.from.includes('pieszo')).slice(0, 3).map(p => ({
+      name: p.name, meta: p.duration + ' · ' + p.from,
+      thumb: { width: '44px', height: '44px', flex: 'none', borderRadius: '4px', background: p.tint },
+      onOpen: () => this.setState({ openId: p.id })
+    }));
+
+    const bucketDef = [
+      { key: 'yes',   label: 'Na pewno',  dot: 'hsl(var(--primary))', empty: 'Nic tu jeszcze nie ma.' },
+      { key: 'maybe', label: 'Być może',  dot: 'hsl(var(--dusty-blue))', empty: 'Miejsca, co do których się wahacie.' },
+      { key: 'no',    label: 'Nie',       dot: 'hsl(var(--muted-foreground) / .5)', empty: 'Odrzucone zostają tu — bez usuwania.' }
+    ];
+
+    const day = DAYS[s.day];
+
+    const undecided = PLACES.filter(p => marks[p.id] === 'maybe').slice(0, 3).map(p => ({
+      ...this.decorate(p),
+      cellStyle: { padding: '20px 24px', borderRight: '1px solid hsl(var(--border) / .55)' }
+    }));
+
+    return {
+      isHome: s.screen === 'home',
+      goHome: () => this.setState({ screen: 'home' }),
+      tabHome: this.tab('home'),
+      heroThumbs: PLACES.filter(p => marks[p.id] === 'yes').slice(0, 6).map(p => ({
+        style: { flex: 1, height: '56px', borderRadius: '4px', background: p.tint }
+      })),
+      climates: ['Z dziećmi','We dwoje','Delegacja','Ze znajomymi','Solo'].map(c => ({
+        label: c,
+        onClick: () => this.setState({ climate: c }),
+        style: { border: '1px solid ' + (s.climate === c ? 'hsl(var(--primary-light))' : 'hsl(var(--primary-foreground) / .2)'),
+          background: s.climate === c ? 'hsl(var(--primary-light))' : 'transparent',
+          color: s.climate === c ? 'hsl(var(--ink))' : 'hsl(var(--primary-foreground) / .78)', borderRadius: '999px',
+          padding: '6px 13px', fontFamily: "'Inter', sans-serif", fontSize: '13px', cursor: 'pointer' }
+      })),
+      undecided,
+      noUndecided: undecided.length === 0,
+      trips: [
+        { name: 'Durrës z dziećmi', meta: '12–14 września 2026 · 9 miejsc · plan gotowy', status: 'Aktywny', tint: 'hsl(var(--dusty-blue) / .18)', tone: 'yes' },
+        { name: 'Kotor w cztery dni', meta: 'maj 2026 · 14 miejsc · GPX pobrany', status: 'Zakończony', tint: 'hsl(var(--primary) / .16)', tone: 'done' },
+        { name: 'Praga', meta: 'bez terminu · 3 miejsca', status: 'Szkic', tint: 'hsl(var(--accent) / .22)', tone: 'draft' }
+      ].map(t => ({
+        ...t,
+        rowStyle: { display: 'flex', alignItems: 'center', gap: '14px', background: 'hsl(var(--card))', border: '1px solid ' + (t.tone === 'yes' ? 'hsl(var(--primary) / .34)' : 'hsl(var(--border))'), borderRadius: '6px', padding: '14px 16px' },
+        tile: { width: '48px', height: '48px', flex: 'none', borderRadius: '4px', background: t.tint },
+        badgeVariant: t.tone === 'yes' ? 'default' : 'outline'
+      })),
+      shared: [
+        { title: 'Durrës z 5-latkiem', meta: 'Anna K. · 11 miejsc · 4 kopie', initials: 'AK', bg: 'hsl(var(--primary) / .34)' },
+        { title: 'Riwiera albańska w sześć dni', meta: 'Piotr M. · 23 miejsca · 31 kopii', initials: 'PM', bg: 'hsl(var(--accent) / .55)' },
+        { title: 'Tirana po godzinach', meta: 'Lena W. · 9 miejsc · 12 kopii', initials: 'LW', bg: 'hsl(var(--dusty-blue) / .18)' }
+      ].map(x => ({
+        ...x,
+        avatar: { width: '40px', height: '40px', flex: 'none', borderRadius: '999px', background: x.bg, display: 'grid', placeItems: 'center', fontSize: '12px', fontWeight: 600, color: 'hsl(var(--text-secondary))' }
+      })),
+      isDiscover: s.screen === 'discover',
+      isDetail: s.screen === 'detail',
+      isBoard: s.screen === 'board',
+      isPlan: s.screen === 'plan',
+      goDiscover: () => this.setState({ screen: 'discover' }),
+      goBoard: () => this.setState({ screen: 'board' }),
+      goPlan: () => this.setState({ screen: 'plan' }),
+      tabDiscover: this.tab('discover'),
+      tabBoard: this.tab('board'),
+      tabPlan: this.tab('plan'),
+
+      query: s.query,
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      filters: FILTERS.map(f => ({
+        label: f,
+        onClick: () => this.setState({ filter: f }),
+        style: { border: '1px solid ' + (s.filter === f ? 'hsl(var(--ink))' : 'hsl(var(--border))'), background: s.filter === f ? 'hsl(var(--ink))' : 'transparent',
+          color: s.filter === f ? 'hsl(var(--primary-foreground))' : 'hsl(var(--text-secondary))', borderRadius: '999px', padding: '7px 13px',
+          fontFamily: "'Inter', sans-serif", fontSize: '13px', cursor: 'pointer' }
+      })),
+      savedCount: Object.values(marks).filter(v => v === 'yes').length,
+      maybeCount: Object.values(marks).filter(v => v === 'maybe').length,
+      agentTip: 'Przy 3–4 godzinach dziennie zmieścicie realnie 9 z 12 zapisanych miejsc. Przylądek Rodonit wymaga osobnego dnia — zostawiłem go w „być może”.',
+      visible,
+
+      detail: {
+        ...cur,
+        eyebrow: (cur.kind + ' · Durrës · ' + cur.from).toUpperCase(),
+        photoStyle: { ...this.photo(cur.tint, 380), borderRadius: '6px', marginBottom: '12px' },
+        thumbA: { height: '96px', borderRadius: '4px', background: cur.tint, opacity: .8 },
+        thumbB: { height: '96px', borderRadius: '4px', background: 'hsl(var(--secondary))' },
+        thumbC: { height: '96px', borderRadius: '4px', background: cur.tint, opacity: .55 },
+        fromBase: cur.from,
+        onYes: () => this.mark(cur.id, 'yes'),
+        onMaybe: () => this.mark(cur.id, 'maybe'),
+        onNo: () => this.mark(cur.id, 'no'),
+        yesStyle: this.sideBtn(m === 'yes', 'yes'),
+        maybeStyle: this.sideBtn(m === 'maybe', 'maybe'),
+        noStyle: this.sideBtn(m === 'no', 'no'),
+        nearby,
+        reviews: [
+          { who: 'Marta, z 6-latkiem', when: 'sierpień 2026', text: 'Weszliśmy o 15:30 i połowa obiektu była już w cieniu. Mały biegał po korytarzach pod trybunami przez czterdzieści minut.',
+            avatarStyle: { width: '28px', height: '28px', borderRadius: '999px', background: 'hsl(var(--accent) / .55)' } },
+          { who: 'Tomasz', when: 'lipiec 2026', text: 'Bilety tylko gotówką, kasa po lewej stronie wejścia. Nawierzchnia nierówna, wózek trzeba zostawić na górze.',
+            avatarStyle: { width: '28px', height: '28px', borderRadius: '999px', background: 'hsl(var(--primary) / .34)' } },
+          { who: 'Aleksandra', when: 'czerwiec 2026', text: 'Godzina spokojnie wystarcza. Obok jest kawiarnia z lodami, co ratowało sytuację w drodze powrotnej.',
+            avatarStyle: { width: '28px', height: '28px', borderRadius: '999px', background: 'hsl(var(--dusty-blue) / .18)' } }
+        ]
+      },
+
+      buckets: bucketDef.map(b => {
+        const items = PLACES.filter(p => marks[p.id] === b.key).map(p => this.decorate(p));
+        return {
+          label: b.label, count: items.length, items, empty: items.length === 0, emptyText: b.empty,
+          colStyle: { background: b.key === 'no' ? 'hsl(var(--muted))' : 'hsl(var(--primary-foreground))', border: '1px solid hsl(var(--border))', borderRadius: '6px' },
+          dotStyle: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '999px', background: b.dot }
+        };
+      }),
+
+      dayTabs: DAYS.map((d, i) => ({
+        date: d.date, title: d.title,
+        onClick: () => this.setState({ day: i }),
+        style: { flex: 1, textAlign: 'left', border: '1px solid ' + (i === s.day ? 'hsl(var(--ink))' : 'hsl(var(--border))'),
+          background: i === s.day ? 'hsl(var(--card))' : 'transparent', color: 'hsl(var(--ink))', borderRadius: '4px',
+          padding: '14px 16px', fontFamily: "'Inter', sans-serif", cursor: 'pointer' }
+      })),
+      day: {
+        ...day,
+        stopCount: day.stops.length,
+        stops: day.stops.map(st => ({ ...st, pinBadge: { width: '26px', height: '26px', flex: 'none', borderRadius: '999px', background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))', display: 'grid', placeItems: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' } })),
+        pins: day.stops.map(st => ({
+          n: st.n,
+          style: { position: 'absolute', left: st.x + '%', top: st.y + '%', transform: 'translate(-50%,-50%)',
+            width: '30px', height: '30px', borderRadius: '999px', background: 'hsl(var(--ink))', color: 'hsl(var(--background))',
+            display: 'grid', placeItems: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '13px',
+            boxShadow: '0 2px 8px rgba(33,59,49,.28)' }
+        }))
+      },
+      mapGrid: { position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(0deg, rgba(43,43,38,.06) 0 1px, transparent 1px 34px), repeating-linear-gradient(90deg, rgba(43,43,38,.06) 0 1px, transparent 1px 34px)' },
+      seaStyle: { position: 'absolute', left: '-10%', bottom: '-30%', width: '90%', height: '70%', background: 'hsl(var(--dusty-blue) / .18)', borderRadius: '50% 60% 0 0', transform: 'rotate(-8deg)' }
+    };
+  }
+}
+
+</script>
+</body>
+</html>
