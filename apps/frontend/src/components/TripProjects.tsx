@@ -62,9 +62,9 @@ interface DiscoveredPlace {
 
 /** Strefy tablicy — kartkę przeciąga się między nimi. */
 const ZONES: { id: Priority; label: string; hint: string }[] = [
-  { id: 'must', label: 'Chcę zobaczyć', hint: 'Te miejsca planer wstawi w pierwszej kolejności' },
-  { id: 'nice', label: 'Może', hint: 'Wypełnią luki, jeśli zostanie czas' },
-  { id: 'rejected', label: 'Odrzucone', hint: 'Pomijane przy planowaniu' }
+  { id: 'must', label: 'Na pewno', hint: 'Te miejsca planer wstawi w pierwszej kolejności' },
+  { id: 'nice', label: 'Być może', hint: 'Wypełnią luki, jeśli zostanie czas' },
+  { id: 'rejected', label: 'Nie tym razem', hint: 'Pomijane przy planowaniu' }
 ];
 
 const CATEGORY_ICON: Record<string, any> = {
@@ -1251,7 +1251,9 @@ export default function TripProjects() {
             {places.length > 0 && (
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold">Tablica miejsc</h3>
+                  <h3 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                    Tablica miejsc
+                  </h3>
                   <button onClick={() => setGrouped((v) => !v)}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                     {grouped ? 'Pokaż jako jedną listę' : 'Grupuj wg kategorii'}
@@ -1269,13 +1271,19 @@ export default function TripProjects() {
                           const id = e.dataTransfer.getData('text/plain');
                           if (id) movePlace(id, zone.id);
                         }}
-                        className={`rounded-md p-2.5 min-h-[120px] transition-colors ${
-                          zone.id === 'rejected' ? 'bg-muted/40' : 'bg-muted/60'
+                        className={`rounded-md p-2.5 min-h-[120px] border border-border bg-card border-t-2 transition-colors ${
+                          zone.id === 'must' ? 'border-t-primary'
+                            : zone.id === 'nice' ? 'border-t-dusty-blue'
+                            : 'border-t-border bg-muted/30'
                         }`}
                       >
                         <div className="flex items-baseline justify-between mb-2 px-1">
-                          <span className="text-xs font-semibold">{zone.label}</span>
-                          <span className="text-[11px] text-muted-foreground">{zonePlaces.length}</span>
+                          <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                            {zone.label}
+                          </span>
+                          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                            {String(zonePlaces.length).padStart(2, '0')}
+                          </span>
                         </div>
                         <div className="space-y-2">
                           {(grouped ? groupByCategory(zonePlaces) : [{ cat: 'all', label: '', items: zonePlaces }]).map((group) => (
@@ -1302,7 +1310,7 @@ export default function TripProjects() {
                                   const id = e.dataTransfer.getData('text/plain');
                                   if (id && id !== p.id) movePlace(id, zone.id, p.id);
                                 }}
-                                className={`rounded-md border bg-background overflow-hidden cursor-grab active:cursor-grabbing ${
+                                className={`rounded-md border border-border bg-background overflow-hidden cursor-grab active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow ${
                                   zone.id === 'rejected' ? 'opacity-60' : ''
                                 }`}
                               >
@@ -1313,7 +1321,7 @@ export default function TripProjects() {
                                 <div className="p-2 space-y-1">
                                   <div className="flex items-start gap-1.5">
                                     <Icon className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />
-                                    <span className="text-xs font-medium leading-snug flex-1">{p.name}</span>
+                                    <span className="font-display text-[13px] leading-snug flex-1">{p.name}</span>
                                     <button onClick={() => unpin(p.id)}
                                       className="text-muted-foreground hover:text-red-500 shrink-0">
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1324,7 +1332,9 @@ export default function TripProjects() {
                                   )}
                                   <div className="flex items-center gap-2">
                                     {p.visit_minutes && (
-                                      <span className="text-[10px] text-muted-foreground">{p.visit_minutes} min</span>
+                                      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                                        {p.visit_minutes} min
+                                      </span>
                                     )}
                                     {p.website && (
                                       <a href={p.website} target="_blank" rel="noopener noreferrer"
@@ -1470,10 +1480,14 @@ export default function TripProjects() {
               <div className="space-y-4">
                 {(plan.days || []).map((day: any) => (
                   <div key={day.day} className="rounded-md border overflow-hidden">
-                    <div className="bg-muted/60 px-4 py-2 text-sm font-semibold flex items-center justify-between gap-2">
-                      <span>
-                        Dzień {day.day}
-                        {day.weekday && <span className="font-normal text-muted-foreground"> · {day.weekday} {day.date}</span>}
+                    <div className="bg-muted/60 border-l-2 border-l-primary px-4 py-2.5 flex items-center justify-between gap-2">
+                      <span className="flex items-baseline gap-2.5">
+                        <span className="font-display text-[17px]">Dzień {day.day}</span>
+                        {day.weekday && (
+                          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                            {day.weekday} · {day.date}
+                          </span>
+                        )}
                       </span>
                       <button
                         onClick={() => buildRouteFrom(day.items || [], `dzień ${day.day}`)}
@@ -1507,22 +1521,38 @@ export default function TripProjects() {
                         if (minutes === 0 && km === 0) return null;
                         const exact = dayRoutes[day.day];
                         const measured = exact && exact !== 'loading' ? exact : null;
+                        // Realizm dnia: zwiedzanie plus marsz. Powyzej dziewieciu godzin
+                        // na nogach plan przestaje byc planem wypoczynku, wiec mowimy o tym
+                        // wprost, zamiast zostawiac uzytkownika z sama liczba.
+                        const walkMin = measured ? measured.h * 60 : (km / 4.5) * 60;
+                        const loadH = (minutes + walkMin) / 60;
                         return (
+                          <>
+                          {loadH > 9 && (
+                            <div className="flex items-start gap-2 px-4 py-2.5 bg-warning/60 border-b border-warning/40">
+                              <AlertTriangle className="w-3.5 h-3.5 text-warning-foreground shrink-0 mt-0.5" />
+                              <p className="text-xs text-warning-foreground leading-relaxed">
+                                Ten dzień to <strong className="font-mono tabular-nums">{loadH.toFixed(1)} h</strong> na
+                                nogach razem z dojściami. Realnie zwiedza się jakieś siedem, osiem — rozważ przeniesienie
+                                jednego punktu na inny dzień.
+                              </p>
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-xs text-muted-foreground border-b">
-                            <span>Zwiedzanie: <strong className="text-foreground">{(minutes / 60).toFixed(1)} h</strong></span>
+                            <span>Zwiedzanie: <strong className="font-mono tabular-nums text-foreground">{(minutes / 60).toFixed(1)} h</strong></span>
                             {measured ? (
                               <>
-                                <span>Do przejścia: <strong className="text-foreground">{measured.km.toFixed(1)} km</strong></span>
-                                <span>Marsz: <strong className="text-foreground">{Math.round(measured.h * 60)} min</strong></span>
+                                <span>Do przejścia: <strong className="font-mono tabular-nums text-foreground">{measured.km.toFixed(1)} km</strong></span>
+                                <span>Marsz: <strong className="font-mono tabular-nums text-foreground">{Math.round(measured.h * 60)} min</strong></span>
                                 <span className="text-primary">przeliczone po chodnikach</span>
                               </>
                             ) : (
                               <>
-                                {km > 0 && <span>Do przejścia: <strong className="text-foreground">ok. {km.toFixed(1)} km</strong></span>}
-                                {km > 0 && <span>Marsz: <strong className="text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
+                                {km > 0 && <span>Do przejścia: <strong className="font-mono tabular-nums text-foreground">ok. {km.toFixed(1)} km</strong></span>}
+                                {km > 0 && <span>Marsz: <strong className="font-mono tabular-nums text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
                               </>
                             )}
-                            <span>Punktów: <strong className="text-foreground">{items.length}</strong></span>
+                            <span>Punktów: <strong className="font-mono tabular-nums text-foreground">{items.length}</strong></span>
                             {items.filter((it: any) => it.lat != null).length >= 2 && !measured && (
                               <button
                                 onClick={() => recalcDay(day)}
@@ -1535,6 +1565,7 @@ export default function TripProjects() {
                               </button>
                             )}
                           </div>
+                          </>
                         );
                       })()}
 
@@ -1542,10 +1573,17 @@ export default function TripProjects() {
                         const suggested = it.source === 'suggested';
                         const alreadyPinned = places.some((p) => p.name === it.name);
   return (
-                          <div key={i} className="flex gap-3 px-4 py-2 text-sm items-start hover:bg-muted/40 transition-colors">
-                            <span className="font-mono text-xs text-muted-foreground pt-0.5 w-12 shrink-0">{it.time}</span>
+                          <div key={i} className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
+                            <span className="font-mono text-xs tabular-nums text-muted-foreground pt-0.5 w-12 shrink-0">
+                              {it.time}
+                            </span>
+                            <span className="relative w-px bg-border self-stretch shrink-0" aria-hidden>
+                              <span className={`absolute -left-[3px] top-1.5 w-[7px] h-[7px] rounded-full ${
+                                suggested ? 'bg-dusty-blue' : 'bg-primary'
+                              }`} />
+                            </span>
                             <div className="min-w-0 flex-1">
-                              <div className="font-medium flex items-center gap-2 flex-wrap">
+                              <div className="font-display text-[15px] flex items-center gap-2 flex-wrap">
                                 <button
                                   onClick={() => openPlaceCard(it)}
                                   className="text-left hover:text-primary hover:underline decoration-dotted underline-offset-2"
@@ -1601,16 +1639,40 @@ export default function TripProjects() {
                   </div>
                 )}
 
-                <Button
-                  variant="outline"
-                  onClick={() => buildRouteFrom((plan.days || []).flatMap((d: any) => d.items || []), 'cały wyjazd')}
-                  className="w-full"
-                >
-                  <Wand2 className="w-4 h-4 mr-2" /> Zrób jedną trasę z całego wyjazdu
-                </Button>
+                {/* Karta eksportu na ciemnym tle — jedyne miejsce w produkcie, gdzie
+                    kolorem akcji jest primary-light, bo sage nie ma na ciemnym kontrastu. */}
+                {(() => {
+                  const days = plan.days || [];
+                  const allItems = days.flatMap((d: any) => d.items || []);
+                  const totalMin = allItems.reduce((sum: number, it: any) => sum + (it.minutes || 0), 0);
+                  return (
+                    <div className="rounded-md bg-foreground text-background p-5">
+                      <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-background/60">
+                        Gotowy plan
+                      </p>
+                      <h3 className="font-display font-light text-[24px] leading-tight mt-2">
+                        Zamień go w jedną trasę
+                      </h3>
+                      <div className="flex gap-6 mt-4 font-mono text-[12px] tabular-nums text-background/70">
+                        <span>{days.length} {days.length === 1 ? 'dzień' : 'dni'}</span>
+                        <span>{allItems.length} punktów</span>
+                        {totalMin > 0 && <span>{(totalMin / 60).toFixed(1)} h zwiedzania</span>}
+                      </div>
+                      <button
+                        onClick={() => buildRouteFrom(allItems, 'cały wyjazd')}
+                        className="mt-5 w-full rounded-sm bg-primary-light text-foreground py-2.5 text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center"
+                      >
+                        <Wand2 className="w-4 h-4 mr-2" /> Zrób jedną trasę z całego wyjazdu
+                      </button>
+                      <p className="text-[11px] text-background/50 mt-2.5 text-center">
+                        Trasę pobierzesz jako GPX w widoku kreatora.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 {plan.question && (
-                  <div className="rounded-md border border-primary/30 bg-primary/10/60 p-3 text-sm text-primary">
+                  <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
                     {plan.question}
                   </div>
                 )}
