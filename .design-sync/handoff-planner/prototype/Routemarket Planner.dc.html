@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600&family=Archivo+Narrow:wght@500;600&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #F4F1EA; }
+  a { color: #6B8A9A; text-decoration: underline; text-underline-offset: 2px; }
+  a:hover { color: #7A8B6F; }
+  ::selection { background: #DCE3D6; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #F4F1EA; font-family: 'Inter Tight', sans-serif; color: #2B2B28;">
+
+  <header style="position: sticky; top: 0; z-index: 50; height: 64px; display: flex; align-items: center; gap: 32px; padding: 0 40px; background: rgba(244,241,234,0.88); backdrop-filter: blur(8px); border-bottom: 1px solid #E4DFD3;">
+    <div style="display: flex; align-items: baseline; gap: 8px;">
+      <span style="font-family: 'Archivo', sans-serif; font-weight: 500; font-size: 19px; letter-spacing: -0.02em;">Routemarket</span>
+      <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #7A8B6F; border: 1px solid #C3CEBB; border-radius: 999px; padding: 2px 7px;">Planner</span>
+    </div>
+    <nav style="display: flex; gap: 4px; margin-left: 8px;">
+      <button onClick="{{ goDiscover }}" style="{{ tabDiscover }}">Odkrywaj</button>
+      <button onClick="{{ goBoard }}" style="{{ tabBoard }}">Tablica</button>
+      <button onClick="{{ goPlan }}" style="{{ tabPlan }}">Plan</button>
+    </nav>
+    <div style="flex: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #6E6E66;">Durrës · 3 dni · z dziećmi</div>
+      <div style="display: flex; align-items: center; gap: 8px; padding-left: 20px; border-left: 1px solid #E4DFD3;">
+        <div style="width: 28px; height: 28px; border-radius: 999px; background: #D4B896; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #4A4136;">MK</div>
+      </div>
+    </div>
+  </header>
+
+  <sc-if value="{{ isDiscover }}" hint-placeholder-val="{{ true }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; margin-bottom: 28px;">
+      <div style="max-width: 560px;">
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7A8B6F; margin-bottom: 10px;">Wyjazd · Durrës, Albania · 12–14 września</div>
+        <h1 style="font-family: 'Archivo', sans-serif; font-weight: 300; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 10px;">Atrakcje na trzy popołudnia</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #55554E; text-wrap: pretty;">Zapisuj co Cię interesuje. Kiedy tablica będzie pełna, agent ułoży z niej realny plan — po 3–4 godziny dziennie, w tempie dla sześciolatka.</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: #6E6E66;">{{ savedCount }} zapisanych · {{ maybeCount }} do rozważenia</div>
+        <button onClick="{{ goPlan }}" style="background: #2B2B28; color: #F7F5EF; border: none; border-radius: 3px; padding: 11px 18px; font-family: 'Inter Tight', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;" style-hover="background:#3B3B36;">Zbuduj plan z tablicy ↗</button>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; padding: 8px; background: #FBF9F4; border: 1px solid #E4DFD3; border-radius: 4px; margin-bottom: 16px;">
+      <div style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 12px;">
+        <span style="color: #8C8C82; font-size: 15px;">⌕</span>
+        <input value="{{ query }}" onChange="{{ setQuery }}" placeholder="Szukaj: plaża, ruiny, deszczowy dzień…" style="width: 100%; border: none; background: transparent; outline: none; font-family: 'Inter Tight', sans-serif; font-size: 15px; color: #2B2B28; padding: 10px 0;">
+      </div>
+      <div style="width: 1px; height: 24px; background: #E4DFD3;"></div>
+      <div style="display: flex; gap: 6px; padding-right: 4px;">
+        <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+          <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px; padding: 12px 16px; background: #EEF1EA; border: 1px solid #DCE3D6; border-radius: 4px;">
+      <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #5F7355; border: 1px solid #C3CEBB; border-radius: 999px; padding: 3px 8px; white-space: nowrap;">Agent</span>
+      <p style="margin: 0; font-size: 14px; color: #44443E; line-height: 1.5;">{{ agentTip }}</p>
+    </div>
+
+    <div style="columns: 4; column-gap: 20px;">
+      <sc-for list="{{ visible }}" as="p" hint-placeholder-count="12">
+        <div style="break-inside: avoid; margin-bottom: 20px;">
+          <div onClick="{{ p.onOpen }}" style="background: #FBF9F4; border: 1px solid #E4DFD3; border-radius: 6px; overflow: hidden; cursor: pointer; transition: box-shadow 200ms, border-color 200ms, transform 200ms;" style-hover="transform:translateY(-1px);border-color:#D2CBBB;box-shadow:0 1px 2px rgba(60,52,38,.08),0 8px 24px rgba(60,52,38,.07);">
+            <div style="{{ p.photoStyle }}">
+              <span style="font-size: 18px; color: rgba(43,43,40,0.28);">⌑</span>
+              <div style="position: absolute; left: 10px; bottom: 10px; font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(43,43,40,0.55);">{{ p.kind }}</div>
+              <div style="{{ p.badgeStyle }}">{{ p.badge }}</div>
+            </div>
+            <div style="padding: 14px 14px 12px;">
+              <h3 style="margin: 0 0 6px; font-family: 'Archivo', sans-serif; font-weight: 500; font-size: 16px; line-height: 1.25; letter-spacing: -0.01em;">{{ p.name }}</h3>
+              <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #6E6E66; text-wrap: pretty;">{{ p.note }}</p>
+              <div style="display: flex; gap: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-variant-numeric: tabular-nums; color: #55554E;">
+                <span>{{ p.duration }}</span>
+                <span style="color: #8C8C82;">{{ p.hours }}</span>
+              </div>
+            </div>
+            <div style="display: flex; border-top: 1px solid #EFEAE0;">
+              <button onClick="{{ p.onYes }}" style="{{ p.yesStyle }}">Na pewno</button>
+              <button onClick="{{ p.onMaybe }}" style="{{ p.maybeStyle }}">Może</button>
+              <button onClick="{{ p.onNo }}" style="{{ p.noStyle }}">Nie</button>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1160px; margin: 0 auto; padding: 28px 40px 96px;">
+    <button onClick="{{ goDiscover }}" style="background: none; border: none; padding: 0 0 20px; font-family: 'Inter Tight', sans-serif; font-size: 14px; color: #6E6E66; cursor: pointer;">← Wróć do odkrywania</button>
+
+    <div style="display: grid; grid-template-columns: 1fr 380px; gap: 40px; align-items: start;">
+      <div>
+        <div style="{{ detail.photoStyle }}">
+          <span style="font-size: 28px; color: rgba(43,43,40,0.25);">⌑</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px;">
+          <div style="{{ detail.thumbA }}"></div>
+          <div style="{{ detail.thumbB }}"></div>
+          <div style="{{ detail.thumbC }}"></div>
+        </div>
+
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7A8B6F; margin-bottom: 10px;">{{ detail.eyebrow }}</div>
+        <h1 style="font-family: 'Archivo', sans-serif; font-weight: 300; font-size: 42px; line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 16px;">{{ detail.name }}</h1>
+        <p style="margin: 0 0 32px; font-size: 17px; line-height: 1.6; color: #44443E; max-width: 60ch; text-wrap: pretty;">{{ detail.long }}</p>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #E4DFD3; border-bottom: 1px solid #E4DFD3;">
+          <div style="padding: 20px 0; border-right: 1px solid #EFEAE0;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #8C8C82; margin-bottom: 8px;">Czas zwiedzania</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; font-variant-numeric: tabular-nums;">{{ detail.duration }}</div>
+          </div>
+          <div style="padding: 20px 0 20px 24px; border-right: 1px solid #EFEAE0;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #8C8C82; margin-bottom: 8px;">Godziny otwarcia</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; font-variant-numeric: tabular-nums;">{{ detail.hours }}</div>
+          </div>
+          <div style="padding: 20px 0 20px 24px;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #8C8C82; margin-bottom: 8px;">Od bazy</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 19px; font-variant-numeric: tabular-nums;">{{ detail.fromBase }}</div>
+          </div>
+        </div>
+
+        <h2 style="font-family: 'Archivo', sans-serif; font-weight: 400; font-size: 22px; margin: 40px 0 18px; letter-spacing: -0.01em;">Co mówią rodzice</h2>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <sc-for list="{{ detail.reviews }}" as="r" hint-placeholder-count="3">
+            <div style="background: #FBF9F4; border: 1px solid #E4DFD3; border-radius: 6px; padding: 18px 20px;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <div style="{{ r.avatarStyle }}"></div>
+                <span style="font-size: 14px; font-weight: 500;">{{ r.who }}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8C8C82;">{{ r.when }}</span>
+              </div>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #44443E; text-wrap: pretty;">{{ r.text }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <aside style="position: sticky; top: 88px; display: flex; flex-direction: column; gap: 20px;">
+        <div style="background: #FBF9F4; border: 1px solid #E4DFD3; border-radius: 6px; padding: 20px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #8C8C82; margin-bottom: 14px;">Do tablicy · Durrës</div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button onClick="{{ detail.onYes }}" style="{{ detail.yesStyle }}">Na pewno</button>
+            <button onClick="{{ detail.onMaybe }}" style="{{ detail.maybeStyle }}">Być może</button>
+            <button onClick="{{ detail.onNo }}" style="{{ detail.noStyle }}">Nie tym razem</button>
+          </div>
+        </div>
+
+        <div style="background: #EEF1EA; border: 1px solid #DCE3D6; border-radius: 6px; padding: 20px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #5F7355; margin-bottom: 12px;">Agent radzi</div>
+          <p style="margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: #44443E; text-wrap: pretty;">{{ detail.agent }}</p>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5F7355;">{{ detail.coords }}</div>
+        </div>
+
+        <div style="border: 1px solid #E4DFD3; border-radius: 6px; padding: 20px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #8C8C82; margin-bottom: 12px;">W okolicy · 10 min pieszo</div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <sc-for list="{{ detail.nearby }}" as="n" hint-placeholder-count="3">
+              <div onClick="{{ n.onOpen }}" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                <div style="{{ n.thumb }}"></div>
+                <div>
+                  <div style="font-size: 14px; font-weight: 500; line-height: 1.3;">{{ n.name }}</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8C8C82;">{{ n.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px;">
+      <div>
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7A8B6F; margin-bottom: 10px;">Tablica wyjazdu</div>
+        <h1 style="font-family: 'Archivo', sans-serif; font-weight: 300; font-size: 38px; letter-spacing: -0.02em; margin: 0;">Durrës z dziećmi</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center;">
+          <div style="width: 30px; height: 30px; border-radius: 999px; background: #D4B896; border: 2px solid #F4F1EA; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #4A4136;">MK</div>
+          <div style="width: 30px; height: 30px; border-radius: 999px; background: #C3CEBB; border: 2px solid #F4F1EA; margin-left: -8px; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #45513E;">AK</div>
+          <span style="font-size: 13px; color: #6E6E66; margin-left: 12px;">Współdzielona z Anią</span>
+        </div>
+        <button onClick="{{ goPlan }}" style="background: #7A8B6F; color: #FBFAF6; border: none; border-radius: 3px; padding: 11px 18px; font-family: 'Inter Tight', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;" style-hover="background:#68785E;">Ułóż plan na 3 dni ↗</button>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start;">
+      <sc-for list="{{ buckets }}" as="b" hint-placeholder-count="3">
+        <section style="{{ b.colStyle }}">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid #EFEAE0;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="{{ b.dotStyle }}"></span>
+              <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #44443E;">{{ b.label }}</span>
+            </div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: #8C8C82;">{{ b.count }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px;">
+            <sc-for list="{{ b.items }}" as="p" hint-placeholder-count="3">
+              <div style="display: flex; gap: 12px; background: #FBF9F4; border: 1px solid #E4DFD3; border-radius: 5px; padding: 10px;">
+                <div style="{{ p.tileStyle }}"></div>
+                <div style="flex: 1; min-width: 0;">
+                  <div onClick="{{ p.onOpen }}" style="font-size: 14px; font-weight: 500; line-height: 1.3; margin-bottom: 4px; cursor: pointer;">{{ p.name }}</div>
+                  <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8C8C82; margin-bottom: 8px;">{{ p.duration }} · {{ p.hours }}</div>
+                  <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button onClick="{{ p.onYes }}" style="{{ p.miniYes }}">Na pewno</button>
+                    <button onClick="{{ p.onMaybe }}" style="{{ p.miniMaybe }}">Może</button>
+                    <button onClick="{{ p.onNo }}" style="{{ p.miniNo }}">Nie</button>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ b.empty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 24px 12px; text-align: center; font-size: 13px; color: #8C8C82; line-height: 1.5;">{{ b.emptyText }}</div>
+            </sc-if>
+          </div>
+        </section>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1280px; margin: 0 auto; padding: 40px 40px 96px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px;">
+      <div style="max-width: 620px;">
+        <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #7A8B6F; margin-bottom: 10px;">Plan wygenerowany · z 9 zapisanych miejsc</div>
+        <h1 style="font-family: 'Archivo', sans-serif; font-weight: 300; font-size: 38px; letter-spacing: -0.02em; margin: 0 0 10px;">Trzy popołudnia w Durrës</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #55554E;">Start po 14:00, po 3–4 godziny, przerwa na lody w środku każdego dnia.</p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button style="background: none; border: 1px solid #D2CBBB; border-radius: 3px; padding: 11px 16px; font-family: 'Inter Tight', sans-serif; font-size: 14px; color: #2B2B28; cursor: pointer;" style-hover="border-color:#2B2B28;">Przelicz plan</button>
+        <button style="background: #2B2B28; color: #F7F5EF; border: none; border-radius: 3px; padding: 11px 18px; font-family: 'Inter Tight', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;" style-hover="background:#3B3B36;">Pobierz GPX ↓</button>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 24px;">
+      <sc-for list="{{ dayTabs }}" as="d" hint-placeholder-count="3">
+        <button onClick="{{ d.onClick }}" style="{{ d.style }}">
+          <span style="display: block; font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; opacity: .7; margin-bottom: 4px;">{{ d.date }}</span>
+          <span style="display: block; font-size: 15px; font-weight: 500;">{{ d.title }}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 520px; gap: 28px; align-items: start;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 16px; background: #F7EFE4; border: 1px solid #E8DAC5; border-radius: 4px;">
+          <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #7A6444; border: 1px solid #DCC7A8; border-radius: 999px; padding: 3px 8px; white-space: nowrap;">Realizm</span>
+          <p style="margin: 0; font-size: 14px; color: #44443E; line-height: 1.5;">{{ day.warning }}</p>
+        </div>
+
+        <div style="border: 1px solid #E4DFD3; border-radius: 6px; background: #FBF9F4; overflow: hidden;">
+          <sc-for list="{{ day.stops }}" as="s" hint-placeholder-count="4">
+            <div style="display: grid; grid-template-columns: 84px 1fr; border-bottom: 1px solid #EFEAE0;">
+              <div style="padding: 20px 0 20px 20px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-variant-numeric: tabular-nums; color: #2B2B28;">{{ s.time }}</div>
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8C8C82; margin-top: 4px;">{{ s.length }}</div>
+              </div>
+              <div style="display: flex; gap: 14px; padding: 20px 20px 20px 0;">
+                <div style="{{ s.pinBadge }}">{{ s.n }}</div>
+                <div style="flex: 1;">
+                  <div style="font-family: 'Archivo', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: -0.01em; margin-bottom: 6px;">{{ s.name }}</div>
+                  <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.55; color: #55554E; text-wrap: pretty;">{{ s.why }}</p>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <sc-for list="{{ s.tags }}" as="t" hint-placeholder-count="2">
+                      <span style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #5F7355; background: #EEF1EA; border: 1px solid #DCE3D6; border-radius: 999px; padding: 3px 9px;">{{ t }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display: grid; grid-template-columns: 84px 1fr; background: #F6F3EC;">
+            <div style="padding: 16px 0 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #8C8C82;">Razem</div>
+            <div style="padding: 16px 20px 16px 0; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: #55554E;">{{ day.total }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: sticky; top: 88px;">
+        <div style="position: relative; height: 480px; border: 1px solid #E4DFD3; border-radius: 6px; overflow: hidden; background: #EDEFEA;">
+          <div style="{{ mapGrid }}"></div>
+          <div style="{{ seaStyle }}"></div>
+          <sc-for list="{{ day.pins }}" as="p" hint-placeholder-count="4">
+            <div style="{{ p.style }}">{{ p.n }}</div>
+          </sc-for>
+          <div style="position: absolute; left: 16px; bottom: 16px; padding: 12px 14px; background: rgba(244,241,234,0.72); backdrop-filter: blur(12px) saturate(1.1); border: 1px solid #E4DFD3; border-radius: 4px;">
+            <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #6E6E66; margin-bottom: 6px;">Trasa pieszo</div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; font-variant-numeric: tabular-nums;">{{ day.walk }}</div>
+          </div>
+          <div style="position: absolute; right: 16px; top: 16px; padding: 8px 12px; background: rgba(244,241,234,0.72); backdrop-filter: blur(12px); border: 1px solid #E4DFD3; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55554E;">41.32340° N, 19.44580° E</div>
+        </div>
+
+        <div style="margin-top: 20px; background: #2B2B28; border-radius: 6px; padding: 22px;">
+          <div style="font-family: 'Archivo Narrow', sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #A8B49E; margin-bottom: 12px;">Eksport</div>
+          <p style="margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: #D8D4C8; text-wrap: pretty;">Plik GPX z {{ day.stopCount }} punktami i śladem pieszym. Wgraj na zegarek albo otwórz w nawigacji Routemarket.</p>
+          <div style="display: flex; gap: 10px;">
+            <button style="flex: 1; background: #F4F1EA; color: #2B2B28; border: none; border-radius: 3px; padding: 11px 14px; font-family: 'Inter Tight', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;">Pobierz GPX</button>
+            <button style="flex: 1; background: none; color: #F4F1EA; border: 1px solid #55554E; border-radius: 3px; padding: 11px 14px; font-family: 'Inter Tight', sans-serif; font-size: 14px; cursor: pointer;" style-hover="border-color:#A8B49E;">Otwórz nawigację</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+const PLACES = [
+  { id:'amf', name:'Amfiteatr w Durrës', kind:'Zabytek', tint:'#DCE3D6', h:200, note:'Rzymska arena w środku miasta, zejście po schodach i chłodne korytarze.', duration:'1 g 30 min', hours:'09:00–17:00', badge:'Dla dzieci', from:'8 min pieszo',
+    long:'Największy amfiteatr na Bałkanach leży wprost pomiędzy kamienicami starego Durrës. Wejście prowadzi w dół, w cień — po godzinie na słońcu to ulga. Dzieci lubią kryptę z mozaiką i przejścia pod trybunami.',
+    agent:'Zaplanuj tu drugą część popołudnia — po 15:00 trybuny są w cieniu, a kolejka znika.', coords:'41.31280° N, 19.45010° E' },
+  { id:'currila', name:'Plaża Currila', kind:'Plaża', tint:'#DCE6EA', h:240, note:'Kamienista zatoczka na północ od portu, spokojniejsza niż główna promenada.', duration:'2 g', hours:'Całą dobę', badge:'Płytko', from:'12 min autem',
+    long:'Currila to seria małych zatok pod klifem. Woda wypłyca się łagodnie, fal prawie nie ma po południu. Kamienie — warto zabrać buty do wody.',
+    agent:'Najlepsza na zakończenie dnia: słońce schodzi nad wodę około 18:30.', coords:'41.32770° N, 19.43420° E' },
+  { id:'wieza', name:'Wieża Wenecka', kind:'Zabytek', tint:'#E8DAC5', h:180, note:'Fragment murów obronnych, dziś taras z widokiem na port.', duration:'40 min', hours:'10:00–22:00', badge:'Widok', from:'5 min pieszo',
+    long:'Okrągła baszta zamykająca dawne mury miejskie. Na górze jest kawiarnia i widok na cały port — dobre miejsce na przerwę w połowie spaceru.',
+    agent:'Krótki przystanek, wpasuje się między dwa większe punkty.', coords:'41.31090° N, 19.44280° E' },
+  { id:'muzeum', name:'Muzeum Archeologiczne', kind:'Muzeum', tint:'#DCE3D6', h:170, note:'Kompaktowe, klimatyzowane, dobre na godzinę deszczu lub upału.', duration:'1 g', hours:'09:00–16:00 · pon. nieczynne', badge:'Klimatyzacja', from:'10 min pieszo',
+    long:'Zbiór z illiryjskiego i rzymskiego Durrës, w tym mozaiki i biżuteria. Cała ekspozycja mieści się na jednym poziomie, więc obchód z dzieckiem trwa realnie godzinę.',
+    agent:'Trzymam to jako plan awaryjny na dzień z deszczem — w poniedziałek nieczynne.', coords:'41.31410° N, 19.44680° E' },
+  { id:'promenada', name:'Promenada Durrës', kind:'Spacer', tint:'#DCE6EA', h:220, note:'Szeroki deptak wzdłuż wody, place zabaw i lodziarnie co 200 m.', duration:'1 g 15 min', hours:'Całą dobę', badge:'Wózek OK', from:'Przy bazie',
+    long:'Deptak ciągnie się kilka kilometrów wzdłuż plaży miejskiej. Nawierzchnia równa, po zmroku oświetlona, w połowie drogi karuzele i mały park.',
+    agent:'Naturalne domknięcie każdego dnia — wraca pod sam hotel.', coords:'41.30820° N, 19.44120° E' },
+  { id:'rodon', name:'Przylądek Rodonit', kind:'Wycieczka', tint:'#E8DAC5', h:260, note:'Zamek Skanderbega i pusta plaża, godzina drogi w jedną stronę.', duration:'4 g', hours:'Całą dobę', badge:'Cały dzień', from:'55 min autem',
+    long:'Ruiny nadmorskiego zamku na cyplu, obok kościół z XV wieku i szeroka piaszczysta plaża bez zabudowy. Ostatnie kilometry to droga szutrowa.',
+    agent:'Za długie na popołudnie po 3–4 godziny. Zostawiam w „być może” na wypadek zmiany planów.', coords:'41.59420° N, 19.44980° E' },
+  { id:'forum', name:'Forum bizantyjskie', kind:'Zabytek', tint:'#DCE3D6', h:160, note:'Krąg kolumn odsłonięty w centrum, otwarty i darmowy.', duration:'25 min', hours:'Całą dobę', badge:'Bezpłatne', from:'6 min pieszo',
+    long:'Odkryty w latach 60. okrągły plac z kolumnami, dziś zieleń i ławki wokół. Mija się go po drodze z amfiteatru na promenadę.',
+    agent:'Nie planuję osobno — leży dokładnie na trasie między dwoma innymi punktami.', coords:'41.31220° N, 19.44520° E' },
+  { id:'akwarium', name:'Akwarium Durrës', kind:'Atrakcja', tint:'#DCE6EA', h:190, note:'Małe, ale całe pod dachem. Rekiny w jednym zbiorniku, karmienie o 16:00.', duration:'50 min', hours:'10:00–19:00', badge:'Dla dzieci', from:'15 min autem',
+    long:'Kilkanaście zbiorników z fauną Adriatyku, tunel i część dotykowa. Rozmiarem to raczej ekspozycja niż park — dobrze, bo nie męczy.',
+    agent:'Wejście na 15:40 łapie karmienie o 16:00.', coords:'41.29650° N, 19.46330° E' },
+  { id:'bazar', name:'Bazar rybny', kind:'Jedzenie', tint:'#E8DAC5', h:170, note:'Hala targowa z lodem i wodą na posadzce, obok smażalnie.', duration:'45 min', hours:'07:00–18:00', badge:'Kolacja', from:'9 min pieszo',
+    long:'Rano handel, po południu spokojniej. Naokoło kilkanaście lokali, które smażą to, co wskażesz w hali.',
+    agent:'Dobre na wczesną kolację przed powrotem na promenadę.', coords:'41.31350° N, 19.44860° E' },
+  { id:'park', name:'Park zabaw Adriatik', kind:'Atrakcja', tint:'#DCE3D6', h:200, note:'Dmuchańce, tor gokartowy dla małych, cień z zadaszeń.', duration:'1 g 30 min', hours:'16:00–23:00', badge:'Dla dzieci', from:'20 min autem',
+    long:'Sezonowy park rozrywki przy plaży w Golem. Otwiera się dopiero po 16:00, kiedy schodzi upał.',
+    agent:'Otwarcie o 16:00 zjada połowę popołudnia — proponuję na ostatni dzień.', coords:'41.26980° N, 19.49110° E' },
+  { id:'golem', name:'Plaża Golem', kind:'Plaża', tint:'#DCE6EA', h:230, note:'Piasek zamiast kamieni, leżaki i płytkie wejście do wody.', duration:'2 g 30 min', hours:'Całą dobę', badge:'Piasek', from:'18 min autem',
+    long:'Szeroki, piaszczysty pas na południe od Durrës. Woda wypłyca się na kilkadziesiąt metrów, co przy dziecku zmienia wszystko.',
+    agent:'Zestawiam z parkiem Adriatik — dzieli je 6 minut.', coords:'41.27540° N, 19.48200° E' },
+  { id:'kalaja', name:'Mury Kalaja', kind:'Spacer', tint:'#E8DAC5', h:180, note:'Odcinek starych murów, po których da się przejść nad dachami.', duration:'35 min', hours:'Całą dobę', badge:'Widok', from:'7 min pieszo',
+    long:'Zachowany fragment obwarowań, wąskie przejście z widokiem na dachy starego miasta i port. Bez barierek w kilku miejscach.',
+    agent:'Krótkie, ale bez barierek — z małym dzieckiem tylko za rękę.', coords:'41.31180° N, 19.44410° E' }
+];
+
+const DAYS = [
+  { date:'12 września', title:'Stare miasto', walk:'3,8 km · +46 m', total:'3 g 25 min · powrót 18:05',
+    warning:'Trzy punkty na 3,5 godziny. Zmieściłby się czwarty, ale amfiteatr i mury to dużo schodów jak na jedno popołudnie.',
+    stops:[
+      { n:1, time:'14:20', length:'1 g 30 min', name:'Amfiteatr w Durrës', why:'Zejście w cień zaraz po najgorętszej porze. Krypta z mozaiką jest po lewej od wejścia.', tags:['Dla dzieci','Cień'], x:34, y:44 },
+      { n:2, time:'16:05', length:'25 min', name:'Forum bizantyjskie', why:'Po drodze, siedem minut pieszo. Ławki i miejsce na kanapkę.', tags:['Po drodze','Bezpłatne'], x:52, y:38 },
+      { n:3, time:'16:45', length:'40 min', name:'Wieża Wenecka', why:'Taras nad portem, kawa dla dorosłych, lody na dole.', tags:['Widok','Przerwa'], x:63, y:56 },
+      { n:4, time:'17:35', length:'30 min', name:'Promenada Durrës', why:'Powrót wzdłuż wody pod hotel. Plac zabaw w połowie drogi.', tags:['Wózek OK'], x:78, y:72 }
+    ] },
+  { date:'13 września', title:'Woda i piasek', walk:'2,1 km · +8 m', total:'3 g 50 min · powrót 18:40',
+    warning:'Dzień z dwoma przejazdami autem. Golem i park dzieli 6 minut, więc kolejność ma znaczenie.',
+    stops:[
+      { n:1, time:'14:00', length:'2 g 30 min', name:'Plaża Golem', why:'Piaszczyste, płytkie wejście. Leżaki od strony południowej są tańsze.', tags:['Piasek','Płytko'], x:28, y:62 },
+      { n:2, time:'16:40', length:'1 g 30 min', name:'Park zabaw Adriatik', why:'Otwiera się o 16:00, więc trafiacie zaraz po otwarciu, bez kolejek.', tags:['Dla dzieci'], x:58, y:48 },
+      { n:3, time:'18:15', length:'25 min', name:'Bazar rybny', why:'Wczesna kolacja w drodze powrotnej do miasta.', tags:['Kolacja'], x:74, y:34 }
+    ] },
+  { date:'14 września', title:'Ostatnie popołudnie', walk:'2,6 km · +22 m', total:'3 g 10 min · powrót 17:50',
+    warning:'Muzeum zamyka o 16:00 — to jedyny punkt dnia z twardym limitem. Reszta jest elastyczna.',
+    stops:[
+      { n:1, time:'14:15', length:'1 g', name:'Muzeum Archeologiczne', why:'Klimatyzacja i jeden poziom ekspozycji. Zamknięcie o 16:00.', tags:['Klimatyzacja','Deszcz'], x:40, y:30 },
+      { n:2, time:'15:30', length:'35 min', name:'Mury Kalaja', why:'Przejście nad dachami. Kilka odcinków bez barierek.', tags:['Widok','Za rękę'], x:56, y:44 },
+      { n:3, time:'16:20', length:'2 g', name:'Plaża Currila', why:'Ostatnie kąpanie i zachód słońca nad wodą po 18:30.', tags:['Zachód słońca'], x:70, y:66 }
+    ] }
+];
+
+const FILTERS = ['Wszystko','Z dziećmi','Do 1 godziny','Pieszo od bazy','Na deszcz'];
+
+class Component extends DCLogic {
+  state = {
+    screen: 'discover',
+    openId: 'amf',
+    query: '',
+    filter: 'Wszystko',
+    day: 0,
+    marks: { amf:'yes', currila:'yes', wieza:'yes', promenada:'yes', muzeum:'yes', golem:'yes', park:'yes', bazar:'yes', kalaja:'yes', forum:'maybe', rodon:'maybe', akwarium:'maybe' }
+  };
+
+  mark(id, v) {
+    this.setState(s => ({ marks: { ...s.marks, [id]: s.marks[id] === v ? null : v } }));
+  }
+
+  btn(active, tone) {
+    const tones = {
+      yes:   { bg:'#7A8B6F', fg:'#FBFAF6' },
+      maybe: { bg:'#6B8A9A', fg:'#FBFAF6' },
+      no:    { bg:'#E4DFD3', fg:'#55554E' }
+    };
+    const t = tones[tone];
+    return {
+      flex: 1, border: 'none', borderRight: '1px solid #EFEAE0', padding: '10px 4px', cursor: 'pointer',
+      fontFamily: "'Inter Tight', sans-serif", fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap',
+      background: active ? t.bg : 'transparent', color: active ? t.fg : '#8C8C82',
+      transition: 'background 120ms, color 120ms'
+    };
+  }
+
+  sideBtn(active, tone) {
+    const b = this.btn(active, tone);
+    return { ...b, borderRight: 'none', border: active ? 'none' : '1px solid #E4DFD3', borderRadius: '3px', padding: '12px', fontSize: '14px', textAlign: 'center' };
+  }
+
+  miniBtn(active, tone) {
+    const b = this.btn(active, tone);
+    return { ...b, flex: 'none', border: active ? 'none' : '1px solid #E4DFD3', borderRadius: '999px', padding: '4px 9px', fontSize: '11px' };
+  }
+
+  photo(tint, h) {
+    return { position: 'relative', height: h + 'px', background: tint, display: 'grid', placeItems: 'center',
+      backgroundImage: 'repeating-linear-gradient(0deg, rgba(43,43,40,.045) 0 1px, transparent 1px 22px), repeating-linear-gradient(90deg, rgba(43,43,40,.045) 0 1px, transparent 1px 22px)' };
+  }
+
+  decorate(p) {
+    const m = this.state.marks[p.id];
+    return {
+      ...p,
+      photoStyle: this.photo(p.tint, p.h),
+      badgeStyle: { position: 'absolute', right: '10px', top: '10px', background: 'rgba(251,249,244,.9)', border: '1px solid rgba(43,43,40,.08)', borderRadius: '999px', padding: '4px 9px', fontFamily: "'Archivo Narrow', sans-serif", fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: '#55554E' },
+      tileStyle: { width: '52px', height: '52px', flex: 'none', borderRadius: '4px', background: p.tint },
+      onOpen: () => this.setState({ screen: 'detail', openId: p.id }),
+      onYes: (e) => { e.stopPropagation(); this.mark(p.id, 'yes'); },
+      onMaybe: (e) => { e.stopPropagation(); this.mark(p.id, 'maybe'); },
+      onNo: (e) => { e.stopPropagation(); this.mark(p.id, 'no'); },
+      yesStyle: this.btn(m === 'yes', 'yes'),
+      maybeStyle: this.btn(m === 'maybe', 'maybe'),
+      noStyle: { ...this.btn(m === 'no', 'no'), borderRight: 'none' },
+      miniYes: this.miniBtn(m === 'yes', 'yes'),
+      miniMaybe: this.miniBtn(m === 'maybe', 'maybe'),
+      miniNo: this.miniBtn(m === 'no', 'no')
+    };
+  }
+
+  tab(name, label) {
+    const on = this.state.screen === name || (name === 'discover' && this.state.screen === 'detail');
+    return { border: 'none', background: on ? '#E7E2D6' : 'transparent', color: on ? '#2B2B28' : '#6E6E66',
+      borderRadius: '3px', padding: '8px 14px', fontFamily: "'Inter Tight', sans-serif", fontSize: '14px', fontWeight: on ? 500 : 400, cursor: 'pointer' };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const marks = s.marks;
+    const q = s.query.trim().toLowerCase();
+    const byFilter = {
+      'Z dziećmi': p => ['Dla dzieci','Płytko','Piasek','Wózek OK'].includes(p.badge),
+      'Do 1 godziny': p => !p.duration.startsWith('1 g 3') && !p.duration.startsWith('2') && !p.duration.startsWith('4'),
+      'Pieszo od bazy': p => p.from.includes('pieszo') || p.from.includes('bazie'),
+      'Na deszcz': p => ['Muzeum','Atrakcja'].includes(p.kind)
+    };
+    const visible = PLACES
+      .filter(p => !q || (p.name + ' ' + p.kind + ' ' + p.note).toLowerCase().includes(q))
+      .filter(p => s.filter === 'Wszystko' || byFilter[s.filter](p))
+      .map(p => this.decorate(p));
+
+    const cur = PLACES.find(p => p.id === s.openId) || PLACES[0];
+    const m = marks[cur.id];
+    const nearby = PLACES.filter(p => p.id !== cur.id && p.from.includes('pieszo')).slice(0, 3).map(p => ({
+      name: p.name, meta: p.duration + ' · ' + p.from,
+      thumb: { width: '44px', height: '44px', flex: 'none', borderRadius: '4px', background: p.tint },
+      onOpen: () => this.setState({ openId: p.id })
+    }));
+
+    const bucketDef = [
+      { key: 'yes',   label: 'Na pewno',  dot: '#7A8B6F', empty: 'Nic tu jeszcze nie ma.' },
+      { key: 'maybe', label: 'Być może',  dot: '#6B8A9A', empty: 'Miejsca, co do których się wahacie.' },
+      { key: 'no',    label: 'Nie',       dot: '#C7C0B0', empty: 'Odrzucone zostają tu — bez usuwania.' }
+    ];
+
+    const day = DAYS[s.day];
+
+    return {
+      isDiscover: s.screen === 'discover',
+      isDetail: s.screen === 'detail',
+      isBoard: s.screen === 'board',
+      isPlan: s.screen === 'plan',
+      goDiscover: () => this.setState({ screen: 'discover' }),
+      goBoard: () => this.setState({ screen: 'board' }),
+      goPlan: () => this.setState({ screen: 'plan' }),
+      tabDiscover: this.tab('discover'),
+      tabBoard: this.tab('board'),
+      tabPlan: this.tab('plan'),
+
+      query: s.query,
+      setQuery: (e) => this.setState({ query: e.target.value }),
+      filters: FILTERS.map(f => ({
+        label: f,
+        onClick: () => this.setState({ filter: f }),
+        style: { border: '1px solid ' + (s.filter === f ? '#2B2B28' : '#E4DFD3'), background: s.filter === f ? '#2B2B28' : 'transparent',
+          color: s.filter === f ? '#F7F5EF' : '#55554E', borderRadius: '999px', padding: '7px 13px',
+          fontFamily: "'Inter Tight', sans-serif", fontSize: '13px', cursor: 'pointer' }
+      })),
+      savedCount: Object.values(marks).filter(v => v === 'yes').length,
+      maybeCount: Object.values(marks).filter(v => v === 'maybe').length,
+      agentTip: 'Przy 3–4 godzinach dziennie zmieścicie realnie 9 z 12 zapisanych miejsc. Przylądek Rodonit wymaga osobnego dnia — zostawiłem go w „być może”.',
+      visible,
+
+      detail: {
+        ...cur,
+        eyebrow: (cur.kind + ' · Durrës · ' + cur.from).toUpperCase(),
+        photoStyle: { ...this.photo(cur.tint, 380), borderRadius: '6px', marginBottom: '12px' },
+        thumbA: { height: '96px', borderRadius: '4px', background: cur.tint, opacity: .8 },
+        thumbB: { height: '96px', borderRadius: '4px', background: '#E7E2D6' },
+        thumbC: { height: '96px', borderRadius: '4px', background: cur.tint, opacity: .55 },
+        fromBase: cur.from,
+        onYes: () => this.mark(cur.id, 'yes'),
+        onMaybe: () => this.mark(cur.id, 'maybe'),
+        onNo: () => this.mark(cur.id, 'no'),
+        yesStyle: this.sideBtn(m === 'yes', 'yes'),
+        maybeStyle: this.sideBtn(m === 'maybe', 'maybe'),
+        noStyle: this.sideBtn(m === 'no', 'no'),
+        nearby,
+        reviews: [
+          { who: 'Marta, z 6-latkiem', when: 'sierpień 2026', text: 'Weszliśmy o 15:30 i połowa obiektu była już w cieniu. Mały biegał po korytarzach pod trybunami przez czterdzieści minut.',
+            avatarStyle: { width: '28px', height: '28px', borderRadius: '999px', background: '#D4B896' } },
+          { who: 'Tomasz', when: 'lipiec 2026', text: 'Bilety tylko gotówką, kasa po lewej stronie wejścia. Nawierzchnia nierówna, wózek trzeba zostawić na górze.',
+            avatarStyle: { width: '28px', height: '28px', borderRadius: '999px', background: '#C3CEBB' } },
+          { who: 'Aleksandra', when: 'czerwiec 2026', text: 'Godzina spokojnie wystarcza. Obok jest kawiarnia z lodami, co ratowało sytuację w drodze powrotnej.',
+            avatarStyle: { width: '28px', height: '28px', borderRadius: '999px', background: '#DCE6EA' } }
+        ]
+      },
+
+      buckets: bucketDef.map(b => {
+        const items = PLACES.filter(p => marks[p.id] === b.key).map(p => this.decorate(p));
+        return {
+          label: b.label, count: items.length, items, empty: items.length === 0, emptyText: b.empty,
+          colStyle: { background: b.key === 'no' ? '#F0EDE5' : '#F7F5EF', border: '1px solid #E4DFD3', borderRadius: '6px' },
+          dotStyle: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '999px', background: b.dot }
+        };
+      }),
+
+      dayTabs: DAYS.map((d, i) => ({
+        date: d.date, title: d.title,
+        onClick: () => this.setState({ day: i }),
+        style: { flex: 1, textAlign: 'left', border: '1px solid ' + (i === s.day ? '#2B2B28' : '#E4DFD3'),
+          background: i === s.day ? '#FBF9F4' : 'transparent', color: '#2B2B28', borderRadius: '4px',
+          padding: '14px 16px', fontFamily: "'Inter Tight', sans-serif", cursor: 'pointer' }
+      })),
+      day: {
+        ...day,
+        stopCount: day.stops.length,
+        stops: day.stops.map(st => ({ ...st, pinBadge: { width: '26px', height: '26px', flex: 'none', borderRadius: '999px', background: '#7A8B6F', color: '#FBFAF6', display: 'grid', placeItems: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' } })),
+        pins: day.stops.map(st => ({
+          n: st.n,
+          style: { position: 'absolute', left: st.x + '%', top: st.y + '%', transform: 'translate(-50%,-50%)',
+            width: '30px', height: '30px', borderRadius: '999px', background: '#2B2B28', color: '#F4F1EA',
+            display: 'grid', placeItems: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '13px',
+            boxShadow: '0 2px 8px rgba(43,43,40,.28)' }
+        }))
+      },
+      mapGrid: { position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(0deg, rgba(43,43,40,.05) 0 1px, transparent 1px 34px), repeating-linear-gradient(90deg, rgba(43,43,40,.05) 0 1px, transparent 1px 34px)' },
+      seaStyle: { position: 'absolute', left: '-10%', bottom: '-30%', width: '90%', height: '70%', background: '#DCE6EA', borderRadius: '50% 60% 0 0', transform: 'rotate(-8deg)' }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

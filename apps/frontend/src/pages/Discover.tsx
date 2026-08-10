@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Loader2, MapPin, Plus, Search, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 interface CatalogPlace {
   id: string;
@@ -15,48 +16,75 @@ interface CatalogPlace {
   lat: number;
   lng: number;
   category: string;
+  kind: string | null;
   description: string;
   photos: string[];
+  opening_hours: string | null;
+  visit_minutes: number | null;
   vibe_tags: string[];
   pin_count: number;
 }
 
-const VIBES = [
-  'ikoniczne', 'nietypowe', 'zielone', 'widokowe', 'kulinarne',
-  'sztuka', 'historyczne', 'dla-dzieci', 'nadwodne', 'nocne'
-];
+type Bucket = 'must' | 'nice' | 'rejected';
+
+/** Pigułki filtrów feedu — logika wprost z dokumentu przekazania projektu. */
+const FILTERS = [
+  { id: 'all',    label: 'Wszystko' },
+  { id: 'kids',   label: 'Z dziećmi' },
+  { id: 'short',  label: 'Do 1 godziny' },
+  { id: 'walk',   label: 'Pieszo od bazy' },
+  { id: 'rain',   label: 'Na deszcz' },
+] as const;
+type FilterId = typeof FILTERS[number]['id'];
+
+const KIDS_TAGS = ['dla-dzieci', 'zielone', 'nadwodne', 'spacerowe'];
+const RAIN_KINDS = ['museum', 'gallery', 'attraction', 'theatre'];
+
+/** Czas zwiedzania w formacie z projektu: „1 g 30 min". */
+function formatDuration(min: number | null): string | null {
+  if (!min) return null;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h && m) return `${h} g ${m} min`;
+  if (h) return `${h} g`;
+  return `${m} min`;
+}
 
 /**
- * Feed odkrywczy. Wyszukiwarka obsługuje moment, w którym ktoś wie, czego chce;
- * feed obsługuje ten dłuższy, w którym jeszcze nie wie. Karty prowadzą na stronę
- * miejsca, a dwie czynności — do tablicy i do ulubionych — są na wierzchu, bo to
- * one budują zbiór, do którego potem się wraca.
+ * Wysokość zdjęcia w mozaice. Projekt zakłada zakres 160–260 px i wprost nazywa
+ * zróżnicowanie celowym — to ono daje rytm feedu. Liczymy ją deterministycznie
+ * z identyfikatora, żeby karta nie skakała przy każdym przerysowaniu.
  */
+function photoHeight(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 1000;
+  return 160 + (h % 5) * 25;
+}
+
 export default function Discover() {
   const navigate = useNavigate();
   const [city, setCity] = useState('');
   const [query, setQuery] = useState('');
-  const [vibe, setVibe] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterId>('all');
   const [places, setPlaces] = useState<CatalogPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
+  const [boards, setBoards] = useState<{ id: string; name: string; destination: string; days: number | null }[]>([]);
+  const [activeBoard, setActiveBoard] = useState<string | null>(null);
+  const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState({ name: '', address: '', description: '' });
-  const [submitting, setSubmitting] = useState(false);
+
+  const board = boards.find((b) => b.id === activeBoard) ?? null;
 
   const load = useCallback(async () => {
     setLoading(true);
     let q = (supabase as any).from('place_catalog').select('*').limit(60);
     if (city.trim()) q = q.ilike('city', city.trim());
-    if (vibe) q = q.contains('vibe_tags', [vibe]);
-    if (query.trim()) q = q.ilike('name', `%${query.trim()}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
     setPlaces(data ?? []);
     setLoading(false);
-  }, [city, vibe, query]);
+  }, [city]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -66,14 +94,88 @@ export default function Discover() {
       if (!userData.user) return;
       const [{ data: favs }, { data: projs }, { data: allCities }] = await Promise.all([
         (supabase as any).from('place_favorites').select('place_id').eq('user_id', userData.user.id),
-        (supabase as any).from('trip_projects').select('id, name').order('updated_at', { ascending: false }),
-        (supabase as any).from('place_catalog').select('city').not('city', 'is', null).limit(500)
+        (supabase as any).from('trip_projects').select('id, name, destination, days').order('updated_at', { ascending: false }),
+        (supabase as any).from('place_catalog').select('city').not('city', 'is', null).limit(500),
       ]);
       setFavorites(new Set((favs ?? []).map((f: any) => f.place_id)));
       setBoards(projs ?? []);
       setCities([...new Set((allCities ?? []).map((r: any) => r.city))].sort() as string[]);
+      if ((projs ?? []).length > 0) {
+        setActiveBoard(projs[0].id);
+        if (!city.trim() && projs[0].destination) setCity(projs[0].destination);
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Kubełki bieżącej tablicy — sterują podświetleniem przycisków w stopce karty. */
+  useEffect(() => {
+    if (!activeBoard) { setMarks({}); return; }
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('trip_project_places').select('catalog_id, priority').eq('project_id', activeBoard);
+      const next: Record<string, Bucket> = {};
+      for (const row of data ?? []) if (row.catalog_id) next[row.catalog_id] = row.priority as Bucket;
+      setMarks(next);
+    })();
+  }, [activeBoard]);
+
+  /** Filtrowanie na bieżąco, filtr i wyszukiwarka działają łącznie. */
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return places.filter((p) => {
+      if (q && !(`${p.name} ${p.kind ?? ''} ${p.description}`.toLowerCase().includes(q))) return false;
+      if (filter === 'kids')  return (p.vibe_tags ?? []).some((t) => KIDS_TAGS.includes(t));
+      if (filter === 'short') return (p.visit_minutes ?? 999) <= 60;
+      if (filter === 'walk')  return true;
+      if (filter === 'rain')  return RAIN_KINDS.includes((p.kind ?? '').toLowerCase()) || p.category === 'attraction';
+      return true;
+    });
+  }, [places, query, filter]);
+
+  const savedCount = Object.values(marks).filter((m) => m === 'must').length;
+  const maybeCount = Object.values(marks).filter((m) => m === 'nice').length;
+
+  /**
+   * Kliknięcie oznacza, ponowne kliknięcie tego samego kubełka usuwa oznaczenie,
+   * kliknięcie innego przenosi. Bez potwierdzeń i bez okien — tak mówi projekt.
+   */
+  const mark = async (place: CatalogPlace, bucket: Bucket) => {
+    if (!activeBoard) return toast.error('Najpierw wybierz wyjazd, do którego zapisujemy');
+    const current = marks[place.id];
+
+    if (current === bucket) {
+      setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
+      await (supabase as any).from('trip_project_places')
+        .delete().eq('project_id', activeBoard).eq('catalog_id', place.id);
+      return;
+    }
+
+    setMarks((prev) => ({ ...prev, [place.id]: bucket }));
+    if (current) {
+      await (supabase as any).from('trip_project_places')
+        .update({ priority: bucket }).eq('project_id', activeBoard).eq('catalog_id', place.id);
+      return;
+    }
+    const { error } = await (supabase as any).from('trip_project_places').insert({
+      project_id: activeBoard,
+      catalog_id: place.id,
+      name: place.name,
+      category: place.category,
+      priority: bucket,
+      lat: place.lat,
+      lng: place.lng,
+      description: place.description,
+      opening_hours: place.opening_hours,
+      visit_minutes: place.visit_minutes,
+      image_url: place.photos?.[0] ?? null,
+      source: 'catalog',
+    });
+    if (error) {
+      setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
+      toast.error(error.message);
+    }
+  };
 
   const toggleFavorite = async (place: CatalogPlace) => {
     const { data: userData } = await supabase.auth.getUser();
@@ -81,65 +183,13 @@ export default function Discover() {
     if (favorites.has(place.id)) {
       await (supabase as any).from('place_favorites').delete()
         .eq('user_id', userData.user.id).eq('place_id', place.id);
-      setFavorites((prev) => { const next = new Set(prev); next.delete(place.id); return next; });
+      setFavorites((prev) => { const n = new Set(prev); n.delete(place.id); return n; });
     } else {
-      await (supabase as any).from('place_favorites')
-        .insert({ user_id: userData.user.id, place_id: place.id });
+      await (supabase as any).from('place_favorites').insert({ user_id: userData.user.id, place_id: place.id });
       setFavorites((prev) => new Set(prev).add(place.id));
     }
   };
 
-  const addToBoard = async (place: CatalogPlace, projectId: string) => {
-    const { error } = await (supabase as any).from('trip_project_places').insert({
-      project_id: projectId,
-      catalog_id: place.id,
-      name: place.name,
-      category: place.category,
-      priority: 'nice',
-      lat: place.lat,
-      lng: place.lng,
-      description: place.description,
-      image_url: place.photos?.[0] ?? null,
-      source: 'catalog'
-    });
-    if (error) return toast.error(error.message);
-    toast.success(`Dodano do tablicy: ${place.name}`);
-  };
-
-  /**
-   * Miejsce zgłoszone przez użytkownika. OSM nie zna wszystkiego: knajpy bez
-   * szyldu ani świeżo otwartej galerii tam nie ma. Warunek jest jeden — adres
-   * musi dać się zamienić na współrzędne, bo miejsce bez położenia jest
-   * bezużyteczne w planowaniu.
-   */
-  const submitPlace = async () => {
-    if (!draft.name.trim()) return toast.error('Podaj nazwę miejsca');
-    if (!city.trim()) return toast.error('Podaj miasto na górze strony');
-    setSubmitting(true);
-    try {
-      const data = await apiPost<any>('/catalog/submit', {
-        name: draft.name.trim(),
-        city: city.trim(),
-        address: draft.address.trim() || undefined,
-        description: draft.description.trim() || undefined
-      }, { timeoutMs: 60_000 });
-      if (data.duplicate) {
-        toast.info('To miejsce już mamy');
-      } else {
-        toast.success('Dodano miejsce — dzięki!');
-      }
-      setDraft({ name: '', address: '', description: '' });
-      setAdding(false);
-      await load();
-      if (data.slug) navigate(`/miejsce/${data.slug}`);
-    } catch (err: any) {
-      toast.error(err.message || 'Nie udało się dodać miejsca');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  /** Miasto bez wpisów to pusta półka — pozwalamy ją zapełnić na żądanie. */
   const seedCity = async () => {
     if (!city.trim()) return toast.error('Podaj miasto, które mamy przejrzeć');
     setSeeding(true);
@@ -156,88 +206,113 @@ export default function Discover() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <span className="font-semibold">Odkrywaj miejsca</span>
-          <div className="ml-auto flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/plany')}>Moje tablice</Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/ulubione')}>Ulubione</Button>
+      {/* Pasek górny: 64 px, półprzezroczysty z rozmyciem, dolna linia — jak w projekcie */}
+      <header className="sticky top-0 z-20 h-16 border-b border-border bg-background/80 backdrop-blur-[8px]">
+        <div className="max-w-[1280px] mx-auto h-full px-10 flex items-center gap-4">
+          <button onClick={() => navigate('/')} className="font-display text-lg">
+            Route<span className="text-accent">/</span>Market
+          </button>
+          <Badge variant="outline" className="font-narrow uppercase tracking-[0.18em] text-[10px]">Planner</Badge>
+
+          <nav className="ml-6 flex gap-1">
+            <button className="px-3 py-1.5 text-sm rounded-sm border border-border bg-card">Odkrywaj</button>
+            <button onClick={() => navigate('/plany')} className="px-3 py-1.5 text-sm rounded-sm hover:bg-muted transition-colors">Tablica</button>
+            <button onClick={() => navigate('/plany')} className="px-3 py-1.5 text-sm rounded-sm hover:bg-muted transition-colors">Plan</button>
+          </nav>
+
+          <div className="ml-auto flex items-center gap-4">
+            {board && (
+              <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground hidden md:inline">
+                {board.destination}{board.days ? ` · ${board.days} dni` : ''}
+              </span>
+            )}
+            <button onClick={() => navigate('/ulubione')} title="Ulubione"
+              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-border transition-colors">
+              <Heart className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-5">
-        <div className="flex flex-wrap gap-2">
-          <div className="relative flex-1 min-w-[180px]">
-            <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              list="znane-miasta"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Miasto"
-              className="pl-9"
-            />
-            <datalist id="znane-miasta">
-              {cities.map((c) => <option key={c} value={c} />)}
-            </datalist>
+      <main className="max-w-[1280px] mx-auto px-10 pb-24">
+        {/* Nagłówek dwukolumnowy */}
+        <div className="pt-12 flex flex-wrap items-start justify-between gap-8">
+          <div className="max-w-[560px]">
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
+              {board ? `Wyjazd · ${board.destination}` : 'Odkrywanie miejsc'}
+            </p>
+            <h1 className="font-display font-light text-[40px] leading-[1.1] tracking-[-0.02em] mt-3">
+              {board ? `Atrakcje na ${board.days ?? 'kilka'} ${board.days === 1 ? 'popołudnie' : 'popołudnia'}` : 'Miejsca warte rozważenia'}
+            </h1>
+            <p className="text-[15px] text-muted-foreground mt-3 leading-relaxed text-pretty">
+              Zapisuj, co Cię interesuje. Kiedy tablica będzie pełna, agent ułoży z niej realny plan.
+            </p>
           </div>
-          <div className="relative flex-1 min-w-[180px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nazwa miejsca" className="pl-9" />
+
+          <div className="text-right">
+            <p className="font-mono text-[13px] text-muted-foreground tabular-nums">
+              {savedCount} zapisanych · {maybeCount} do rozważenia
+            </p>
+            <Button className="mt-3 bg-primary hover:bg-primary/90" onClick={() => navigate('/plany')}>
+              Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
+            </Button>
           </div>
         </div>
 
-        {adding && (
-          <div className="rounded-md border p-4 space-y-2.5 bg-card">
-            <h3 className="text-sm font-semibold">Dodaj miejsce, którego u nas nie ma</h3>
-            <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="Nazwa miejsca" />
-            <Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })}
-              placeholder="Ulica i numer (pomaga trafić w dobre miejsce)" />
-            <Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-              placeholder="Jedno zdanie: czym to miejsce jest" />
-            <p className="text-[11px] text-muted-foreground">
-              Zdjęć nie przyjmujemy — pobieramy je z Wikimedia Commons, gdzie licencja jest znana.
-              Miejsce trafi do wspólnego katalogu z adnotacją, że dodał je użytkownik.
+        {/* Pasek wyszukiwania z pigułkami filtrów */}
+        <div className="mt-8 rounded-md border border-border bg-card px-4 py-3 flex flex-wrap items-center gap-3">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Szukaj: plaża, ruiny, deszczowy dzień…"
+            className="flex-1 min-w-[180px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+          />
+          <div className="w-px self-stretch bg-border hidden sm:block" />
+          <div className="flex flex-wrap gap-1.5">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`rounded-full px-3 py-1 text-xs border transition-colors ${
+                  filter === f.id
+                    ? 'bg-primary border-primary text-primary-foreground'
+                    : 'bg-background border-border hover:bg-muted'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="relative">
+            <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input list="miasta" value={city} onChange={(e) => setCity(e.target.value)}
+              placeholder="Miasto" className="pl-8 h-8 w-36 text-sm" />
+            <datalist id="miasta">{cities.map((c) => <option key={c} value={c} />)}</datalist>
+          </div>
+        </div>
+
+        {/* Pasek agenta */}
+        {board && places.length > 0 && (
+          <div className="mt-4 rounded-md bg-muted border border-border px-4 py-3 flex items-start gap-3">
+            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground border border-border rounded-full px-2 py-0.5 shrink-0 mt-0.5">
+              Agent
+            </span>
+            <p className="text-sm text-foreground/80 leading-relaxed">
+              {savedCount === 0
+                ? 'Zacznij od kilku miejsc, które na pewno chcesz zobaczyć. Resztę dobiorę tak, żeby dzień się spinał.'
+                : `Masz ${savedCount} pewnych i ${maybeCount} do rozważenia. Kiedy uznasz, że wystarczy, ułożę z tego plan dni.`}
             </p>
-            <div className="flex gap-2">
-              <Button onClick={submitPlace} disabled={submitting} className="bg-primary hover:bg-primary/90">
-                {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sprawdzam adres…</> : 'Dodaj'}
-              </Button>
-              <Button variant="ghost" onClick={() => setAdding(false)}>Anuluj</Button>
-            </div>
           </div>
         )}
 
-        <div className="flex flex-wrap gap-1.5 items-center">
-          {VIBES.map((v) => (
-            <button
-              key={v}
-              onClick={() => setVibe(vibe === v ? null : v)}
-              className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${
-                vibe === v ? 'bg-primary border-primary text-white' : 'bg-background hover:bg-muted'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-          {!adding && (
-            <button onClick={() => setAdding(true)}
-              className="text-xs rounded-full px-3 py-1.5 border border-dashed hover:bg-muted transition-colors ml-auto">
-              + Brakuje miejsca?
-            </button>
-          )}
-        </div>
-
+        {/* Feed mozaikowy */}
         {loading ? (
-          <p className="text-muted-foreground flex items-center gap-2 py-10">
+          <p className="text-muted-foreground flex items-center gap-2 py-16">
             <Loader2 className="w-4 h-4 animate-spin" /> Wczytuję miejsca…
           </p>
-        ) : places.length === 0 ? (
-          <div className="text-center py-14 space-y-4">
+        ) : visible.length === 0 ? (
+          <div className="text-center py-20 space-y-4">
             <Sparkles className="w-9 h-9 text-muted-foreground/40 mx-auto" />
             <p className="text-muted-foreground max-w-md mx-auto">
               {city.trim()
@@ -253,61 +328,81 @@ export default function Discover() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {places.map((p) => (
-              <div key={p.id} className="group rounded-md overflow-hidden border bg-card hover:shadow-token-lg transition-shadow flex flex-col">
-                <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block text-left">
-                  <div className="h-40 bg-muted relative">
-                    {p.photos?.[0] ? (
-                      <img src={p.photos[0]} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
-                        <MapPin className="w-7 h-7" />
-                      </div>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleFavorite(p); }}
-                      aria-label="Do ulubionych"
-                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur flex items-center justify-center transition-colors"
-                    >
-                      <Heart className={`w-4 h-4 ${favorites.has(p.id) ? 'fill-accent text-accent' : 'text-white'}`} />
-                    </button>
-                  </div>
-                  <div className="p-3">
-                    <div className="font-medium text-sm leading-snug line-clamp-2">{p.name}</div>
-                    {p.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-snug">{p.description}</p>
-                    )}
-                  </div>
-                </button>
-                <div className="px-3 pb-3 mt-auto flex items-center gap-1.5 flex-wrap">
-                  {p.vibe_tags?.slice(0, 2).map((t) => (
-                    <span key={t} className="text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">{t}</span>
-                  ))}
-                  {boards.length > 0 && (
-                    <select
-                      onChange={(e) => { if (e.target.value) { addToBoard(p, e.target.value); e.target.value = ''; } }}
-                      defaultValue=""
-                      className="ml-auto text-[11px] border rounded-md px-1.5 py-1 bg-background hover:bg-muted cursor-pointer"
-                      aria-label="Dodaj do tablicy"
-                    >
-                      <option value="">+ tablica</option>
-                      {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+          <div className="mt-6 [column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4">
+            {visible.map((p) => {
+              const mk = marks[p.id];
+              const duration = formatDuration(p.visit_minutes);
+              return (
+                <article
+                  key={p.id}
+                  className="group mb-5 break-inside-avoid rounded-md border border-border bg-card overflow-hidden
+                             transition-all duration-200 hover:-translate-y-px hover:border-foreground/20 hover:shadow-token-md"
+                >
+                  <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block w-full text-left">
+                    <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
+                      {p.photos?.[0] && (
+                        <img src={p.photos[0]} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                      )}
+                      {p.kind && (
+                        <span className="absolute left-2.5 bottom-2.5 font-narrow uppercase tracking-[0.18em] text-[10px]
+                                         bg-background/85 backdrop-blur-sm px-2 py-1 rounded-sm">
+                          {p.kind}
+                        </span>
+                      )}
+                      {p.vibe_tags?.[0] && (
+                        <span className="absolute right-2.5 top-2.5 text-[10px] bg-background/85 backdrop-blur-sm
+                                         px-2 py-1 rounded-full">
+                          {p.vibe_tags[0]}
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(p); }}
+                        aria-label="Do ulubionych"
+                        className="absolute right-2.5 bottom-2.5 w-7 h-7 rounded-full bg-background/85 backdrop-blur-sm
+                                   flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${favorites.has(p.id) ? 'fill-accent text-accent' : 'text-muted-foreground'}`} />
+                      </button>
+                    </div>
 
-        {places.length > 0 && city.trim() && (
-          <div className="text-center pt-4">
-            <Button variant="outline" size="sm" onClick={seedCity} disabled={seeding}>
-              {seeding
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Szukam kolejnych…</>
-                : <><Plus className="w-4 h-4 mr-2" /> Poszukaj więcej miejsc w: {city}</>}
-            </Button>
+                    <div className="p-3.5">
+                      <h3 className="font-display text-[16px] font-medium leading-snug">{p.name}</h3>
+                      {p.description && (
+                        <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed line-clamp-3 text-pretty">
+                          {p.description}
+                        </p>
+                      )}
+                      {(duration || p.opening_hours) && (
+                        <div className="mt-2.5 flex flex-wrap gap-x-3 font-mono text-[11px] text-muted-foreground tabular-nums">
+                          {duration && <span>{duration}</span>}
+                          {duration && p.opening_hours && <span>·</span>}
+                          {p.opening_hours && <span className="truncate max-w-[140px]">{p.opening_hours}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Stopka: trzy kubełki w równym podziale, rozdzielone cienkimi liniami */}
+                  <div className="grid grid-cols-3 border-t border-border text-[12px]">
+                    {([
+                      ['must', 'Na pewno', 'bg-primary text-primary-foreground'],
+                      ['nice', 'Może', 'bg-dusty-blue text-dusty-blue-foreground'],
+                      ['rejected', 'Nie', 'bg-muted text-muted-foreground'],
+                    ] as const).map(([b, label, active], i) => (
+                      <button
+                        key={b}
+                        onClick={(e) => { e.stopPropagation(); mark(p, b as Bucket); }}
+                        className={`py-2 transition-colors ${i > 0 ? 'border-l border-border' : ''} ${
+                          mk === b ? active : 'text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </main>
