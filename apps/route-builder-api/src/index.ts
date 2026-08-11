@@ -1385,10 +1385,93 @@ app.post('/catalog/seed', async (c) => {
     etapy.overpass = Date.now() - tEtap;
     if (candidates.length === 0) return c.json({ city, added: 0, places: [] });
 
+    // Model nie odzywa się na tym etapie. Pomiar pokazał, że jedno zapytanie
+    // o opisy dla wszystkich miejsc naraz zjadało siedemdziesiąt procent czasu
+    // (23,4 s z 33,1 s dla Gdańska), a przez ten czas użytkownik nie widział nic.
+    // Fakty z OpenStreetMap wystarczą, żeby pokazać karty; opisy dochodzą osobno
+    // przez /catalog/enrich.
+
+    // Zdjęcia partiami: Commons nie lubi czterdziestu równoległych zapytań
+    const saved: any[] = [];
+    tEtap = Date.now();
+    const BATCH = 5;
+    for (let i = 0; i < candidates.length; i += BATCH) {
+      const batch = candidates.slice(i, i + BATCH);
+      const photoSets = await Promise.all(batch.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 3, city)));
+      await Promise.all(batch.map(async (p, j) => {
+        const slug = placeSlug(p.name, city, p.lat, p.lng);
+        const row = {
+          slug,
+          name: p.name,
+          city,
+          lat: p.lat,
+          lng: p.lng,
+          category: p.kind === 'restaurant' || p.kind === 'cafe' ? 'food' : 'attraction',
+          kind: p.kind,
+          description: '',
+          photos: photoSets[j] || [],
+          opening_hours: p.openingHours ?? null,
+          website: p.website ?? null,
+          visit_minutes: null,
+          osm_id: p.id,
+          vibe_tags: [] as string[],
+          updated_at: new Date().toISOString()
+        };
+        try {
+          const existing = await repo.findCatalogPlace(p.id, slug);
+          if (existing) {
+            const patch: Record<string, unknown> = { updated_at: row.updated_at };
+            if ((!existing.photos || existing.photos.length === 0) && row.photos.length) patch.photos = row.photos;
+            await repo.updateCatalogPlace(existing.id, patch);
+            saved.push(existing);
+          } else {
+            saved.push(await repo.insertCatalogPlace(row));
+          }
+        } catch (err: any) {
+          console.warn(`[catalog/seed] Pominięte "${p.name}": ${err.message}`);
+        }
+      }));
+    }
+
+    etapy.zdjecia_i_zapis = Date.now() - tEtap;
+    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc w ${Date.now() - t0} ms ` +
+      `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
+    // needs_enrich mówi klientowi, że warto od razu poprosić o opisy.
+    return c.json({
+      city, added: saved.length, needs_enrich: saved.length > 0,
+      center: { lat: center.lat, lng: center.lng }
+    });
+  } catch (err: any) {
+    console.error('[catalog/seed] Error:', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Drugi etap zbierania: opisy, znaczniki klimatu i czas zwiedzania dla miejsc,
+ * które mają już fakty z OpenStreetMap, ale nie mają jeszcze treści. Rozdzielone
+ * od /catalog/seed, bo to zapytanie do modelu trwa dwadzieścia kilka sekund i nie
+ * ma powodu, żeby użytkownik patrzył przez ten czas na pustą stronę — karty mogą
+ * już stać, a opisy dochodzą do nich w tle.
+ */
+app.post('/catalog/enrich', async (c) => {
+  try {
+    const { city, limit = 24 } = await c.req.json() as { city: string; limit?: number };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+
+    const wszystkie = await repo.listCatalogAll(city.trim(), 200);
+    const doOpisania = wszystkie
+      .filter((m: any) => !m.description || String(m.description).trim() === '')
+      .slice(0, limit);
+    if (doOpisania.length === 0) return c.json({ city, enriched: 0 });
+
     const prompt = `Opisujesz miejsca w mieście ${city} dla serwisu planowania wyjazdów.
 
 Miejsca (nazwy skopiuj DOKŁADNIE):
-${candidates.map((p, i) => `${i + 1}. ${p.name} (${p.kind})`).join('\n')}
+${doOpisania.map((p: any, i: number) => `${i + 1}. ${p.name}${p.kind ? ` (${p.kind})` : ''}`).join('\n')}
 
 Dla każdego zwróć:
 - "name": nazwa dokładnie jak wyżej
@@ -1399,7 +1482,6 @@ Dla każdego zwróć:
 Jeśli jakiegoś miejsca nie kojarzysz, opisz je na podstawie jego rodzaju — nie wymyślaj faktów.
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
-    tEtap = Date.now();
     const data = await callGeminiTracked(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -1428,77 +1510,42 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
           maxOutputTokens: 16384
         }
       },
-      { operation: 'catalog-seed', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+      { operation: 'catalog-enrich', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
     );
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let described: any[] = [];
+    let opisane: any[] = [];
     try {
       const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
       const first = cleaned.indexOf('{');
       const last = cleaned.lastIndexOf('}');
-      if (first >= 0 && last > first) described = JSON.parse(cleaned.slice(first, last + 1)).places || [];
-    } catch (err) {
-      console.warn('[catalog/seed] Nie udało się sparsować opisów, zapisuję same fakty z OSM');
-    }
-    const byName = new Map(described.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
-
-    // Zdjęcia partiami: Commons nie lubi czterdziestu równoległych zapytań
-    const saved: any[] = [];
-    etapy.model = Date.now() - tEtap;
-    tEtap = Date.now();
-    const BATCH = 5;
-    for (let i = 0; i < candidates.length; i += BATCH) {
-      const batch = candidates.slice(i, i + BATCH);
-      const photoSets = await Promise.all(batch.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 3, city)));
-      await Promise.all(batch.map(async (p, j) => {
-        const d = byName.get(p.name.trim().toLowerCase());
-        const tags = Array.isArray(d?.vibe_tags)
-          ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)
-          : [];
-        const slug = placeSlug(p.name, city, p.lat, p.lng);
-        const row = {
-          slug,
-          name: p.name,
-          city,
-          lat: p.lat,
-          lng: p.lng,
-          category: p.kind === 'restaurant' || p.kind === 'cafe' ? 'food' : 'attraction',
-          kind: p.kind,
-          description: d?.description || '',
-          photos: photoSets[j] || [],
-          opening_hours: p.openingHours ?? null,
-          website: p.website ?? null,
-          visit_minutes: d?.visit_minutes ?? null,
-          osm_id: p.id,
-          vibe_tags: tags,
-          updated_at: new Date().toISOString()
-        };
-        try {
-          const existing = await repo.findCatalogPlace(p.id, slug);
-          if (existing) {
-            const patch: Record<string, unknown> = { updated_at: row.updated_at };
-            if (!existing.description && row.description) patch.description = row.description;
-            if ((!existing.photos || existing.photos.length === 0) && row.photos.length) patch.photos = row.photos;
-            if ((!existing.vibe_tags || existing.vibe_tags.length === 0) && tags.length) patch.vibe_tags = tags;
-            await repo.updateCatalogPlace(existing.id, patch);
-            saved.push(existing);
-          } else {
-            saved.push(await repo.insertCatalogPlace(row));
-          }
-        } catch (err: any) {
-          console.warn(`[catalog/seed] Pominięte "${p.name}": ${err.message}`);
-        }
-      }));
+      if (first >= 0 && last > first) opisane = JSON.parse(cleaned.slice(first, last + 1)).places || [];
+    } catch {
+      console.warn('[catalog/enrich] Nie udało się sparsować odpowiedzi');
     }
 
-    etapy.zdjecia_i_zapis = Date.now() - tEtap;
-    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc w ${Date.now() - t0} ms ` +
-      `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
-    return c.json({ city, added: saved.length, center: { lat: center.lat, lng: center.lng } });
-  } catch (err: any) {
-    console.error('[catalog/seed] Error:', err);
-    return c.json({ error: err.message }, 500);
+    const wgNazwy = new Map(opisane.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
+    let zmienione = 0;
+    for (const m of doOpisania) {
+      const d = wgNazwy.get(String(m.name).trim().toLowerCase());
+      if (!d?.description) continue;
+      const tags = Array.isArray(d.vibe_tags)
+        ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)
+        : [];
+      await repo.updateCatalogPlace(m.id, {
+        description: d.description,
+        vibe_tags: tags,
+        visit_minutes: d.visit_minutes ?? m.visit_minutes ?? null,
+        updated_at: new Date().toISOString()
+      });
+      zmienione++;
+    }
+
+    console.log(`[catalog/enrich] ${city}: opisano ${zmienione} z ${doOpisania.length}`);
+    return c.json({ city, enriched: zmienione });
+  } catch (e: any) {
+    console.error('[catalog/enrich]', e);
+    return c.json({ error: e.message }, 500);
   }
 });
 

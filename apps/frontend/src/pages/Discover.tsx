@@ -85,6 +85,10 @@ export default function Discover() {
   const [cities, setCities] = useState<string[]>([]);
   const [initials, setInitials] = useState<string | null>(null);
   const [zbieraneSekundy, setZbieraneSekundy] = useState(0);
+  const [opisyWToku, setOpisyWToku] = useState(false);
+  /** Ile kart pokazujemy. Rośnie przy przewijaniu, nie przy każdym zapytaniu. */
+  const [ileWidocznych, setIleWidocznych] = useState(24);
+  const wartownik = useRef<HTMLDivElement | null>(null);
   /** Miasta, dla których zbieranie już ruszyło — żeby nie powtórzyć go w kółko. */
   const proboweane = useRef<Set<string>>(new Set());
 
@@ -120,7 +124,7 @@ export default function Discover() {
     const c = (cityOverride ?? city).trim();
     const seq = ++loadSeq.current;
     setLoading(true);
-    let q = (supabase as any).from('place_catalog').select('*').limit(60);
+    let q = (supabase as any).from('place_catalog').select('*').limit(Math.max(60, ileWidocznych + 24));
     if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
     // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
@@ -131,7 +135,7 @@ export default function Discover() {
     if (seq !== loadSeq.current) return;
     setPlaces(data ?? []);
     setLoading(false);
-  }, [city]);
+  }, [city, ileWidocznych]);
 
   // Odpytujemy po chwili przerwy w pisaniu, a nie po każdym znaku.
   useEffect(() => {
@@ -183,6 +187,9 @@ export default function Discover() {
       return true;
     });
   }, [places, query, filter]);
+
+  /** Widoczny wycinek. Filtrowanie idzie po całości, przycinamy dopiero na końcu. */
+  const widoczne = useMemo(() => visible.slice(0, ileWidocznych), [visible, ileWidocznych]);
 
   const savedCount = Object.values(marks).filter((m) => m === 'must').length;
   const maybeCount = Object.values(marks).filter((m) => m === 'nice').length;
@@ -258,6 +265,28 @@ export default function Discover() {
     seedCity();
   }, [city, places.length, loading, seeding, board?.destination]);
 
+  /**
+   * Doładowywanie przy przewijaniu. Obserwator na końcu listy podnosi limit,
+   * zamiast czekać na kliknięcie „pokaż więcej" — przy feedzie mozaikowym przycisk
+   * na dole i tak trzeba najpierw znaleźć.
+   */
+  // Efekt musi się powtórzyć, kiedy wartownik pojawi się w drzewie. Przy pustym
+  // zestawie zależności podpinał się raz, przy montowaniu — a wtedy elementu
+  // jeszcze nie było, bo renderuje się dopiero, gdy jest co doładowywać.
+  const jestCoDoladowac = ileWidocznych < visible.length;
+  useEffect(() => {
+    const el = wartownik.current;
+    if (!el || !jestCoDoladowac) return;
+    const obs = new IntersectionObserver((wpisy) => {
+      if (wpisy[0]?.isIntersecting) setIleWidocznych((n) => n + 24);
+    }, { rootMargin: '600px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [jestCoDoladowac]);
+
+  // Zmiana miasta albo filtra zaczyna oglądanie od początku.
+  useEffect(() => { setIleWidocznych(24); }, [city, filter, query]);
+
   const seedCity = async () => {
     if (!city.trim()) return toast.error('Podaj miasto, które mamy przejrzeć');
     setSeeding(true);
@@ -266,12 +295,23 @@ export default function Discover() {
       // Pole dostaje nazwę w postaci, w jakiej miejsca faktycznie zapisano — inaczej
       // filtr dalej szukałby tego, co użytkownik wpisał, a nie tego, co jest w bazie.
       if (data.city) setCity(data.city);
+      await load(data.city || city);
+
+      // Opisy dochodzą osobno, bo to zapytanie do modelu trwa dwadzieścia kilka
+      // sekund. Karty stoją już z nazwami, godzinami i zdjęciami; treść dosypuje
+      // się do nich w tle, bez blokowania ekranu.
+      if (data.needs_enrich) {
+        setOpisyWToku(true);
+        apiPost<any>('/catalog/enrich', { city: data.city || city.trim() }, { timeoutMs: 180_000 })
+          .then(() => load(data.city || city))
+          .catch((e) => console.warn('Nie udało się dociągnąć opisów:', e))
+          .finally(() => setOpisyWToku(false));
+      }
       toast.success(
         data.added > 0
           ? `Dodano ${data.added} ${data.added === 1 ? 'miejsce' : 'miejsc'} w: ${data.city}`
           : `Nie znalazłem nowych miejsc w: ${data.city}`
       );
-      await load(data.city || city);
     } catch (err: any) {
       toast.error(err.message || 'Nie udało się zebrać miejsc');
     } finally {
@@ -413,7 +453,7 @@ export default function Discover() {
           </div>
         ) : (
           <div className="mt-6 [column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4">
-            {visible.map((p) => {
+            {widoczne.map((p) => {
               const mk = marks[p.id];
               const duration = formatDuration(p.visit_minutes);
               return (
@@ -493,6 +533,27 @@ export default function Discover() {
               );
             })}
           </div>
+        )}
+
+        {/* Wartownik doładowywania i informacja o dociąganych opisach. */}
+        {/* Doładowywanie idzie samo przy przewijaniu, ale przycisk zostaje: obserwator
+            przecięć milczy w części przeglądarek wbudowanych w aplikacje i w widokach
+            o zerowej wysokości okna, a wtedy lista kończyłaby się bez wyjścia. */}
+        {widoczne.length < visible.length && (
+          <div ref={wartownik} className="py-10 flex flex-col items-center gap-3">
+            <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+              {widoczne.length} z {visible.length}
+            </span>
+            <Button variant="outline" onClick={() => setIleWidocznych((n) => n + 24)}>
+              Pokaż więcej miejsc
+            </Button>
+          </div>
+        )}
+        {opisyWToku && (
+          <p className="py-6 text-center text-[13px] text-muted-foreground flex items-center justify-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Karty są już gotowe — dociągam do nich opisy i czas zwiedzania.
+          </p>
         )}
       </main>
     </div>
