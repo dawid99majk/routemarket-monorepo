@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, Loader2, MapPin, Plus, Trash2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import PlannerHeader from '@/components/PlannerHeader';
 import Logo from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -71,23 +72,18 @@ export default function MyRoutes() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/start')}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <Logo />
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/plany')} className="mr-2">Plany</Button>
+      <PlannerHeader />
+
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-4">
+        {/* "Nowy wyjazd" zszedł z paska do treści przy scalaniu nawigacji —
+            zakładki są wspólne dla całej aplikacji, a ten przycisk dotyczy
+            wyłącznie tego ekranu. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="font-display font-light text-[32px] leading-tight">Moje trasy</h1>
           <Button size="sm" onClick={() => navigate('/plany')} className="bg-primary hover:bg-primary/90">
             <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
           </Button>
         </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-4">
-        <h1 className="text-2xl font-bold">Moje trasy</h1>
 
         {loading && (
           <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">

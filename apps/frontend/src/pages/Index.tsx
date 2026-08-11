@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { utworzWyjazd } from '@/lib/newTrip';
+import PlannerHeader from '@/components/PlannerHeader';
 import { toast } from 'sonner';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
@@ -52,19 +53,11 @@ const DNI = [
   },
 ];
 
-const GPX_PRZYKLAD = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Routemarket">
-  <metadata>
-    <name>Durrës · dzień 1</name>
-    <time>2026-09-12T12:20:00Z</time>
-  </metadata>
+const GPX_PRZYKLAD = `<gpx version="1.1" creator="Routemarket">
+  <metadata><name>Durrës · dzień 1</name></metadata>
   <wpt lat="41.31278" lon="19.44139">
     <name>Amfiteatr w Durrës</name>
     <desc>14:20 · 1 g 30 min</desc>
-  </wpt>
-  <wpt lat="41.32340" lon="19.44580">
-    <name>Wieża Wenecka</name>
-    <desc>16:45 · 40 min</desc>
   </wpt>
   <trk><name>Trasa pieszo · 3,8 km</name></trk>
 </gpx>`;
@@ -161,6 +154,14 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Zalogowany dostaje ten sam pasek co w całej aplikacji. Wcześniej strona
+          główna miała własną nawigację kotwicową, więc po wejściu tutaj z planera
+          znikały wszystkie zakładki i trzeba było szukać drogi powrotnej.
+          Niezalogowany widzi nawigację sprzedażową — zakładki planera nie miałyby
+          dla niego sensu, bo każda prowadzi do ekranu za logowaniem. */}
+      {user && <PlannerHeader />}
+
+      {!user && (
       <header className="sticky top-0 z-30 h-[68px] border-b border-border bg-background/85 backdrop-blur-[8px]">
         <div className="max-w-[1280px] mx-auto h-full px-10 flex items-center gap-8">
           <a href="#gora" className="font-display text-[20px] font-medium shrink-0">Routemarket</a>
@@ -171,21 +172,14 @@ export default function Index() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            {user ? (
-              <Button size="sm" onClick={() => navigate('/start')} className="bg-primary hover:bg-primary/90">
-                Przejdź do planera
-              </Button>
-            ) : (
-              <>
-                <Button size="sm" variant="ghost" onClick={() => navigate('/auth')}>Zaloguj się</Button>
-                <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90">
-                  Zaplanuj wyjazd
-                </Button>
-              </>
-            )}
+            <Button size="sm" variant="ghost" onClick={() => navigate('/auth')}>Zaloguj się</Button>
+            <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90">
+              Zaplanuj wyjazd
+            </Button>
           </div>
         </div>
       </header>
+      )}
 
       <main id="gora" className="max-w-[1280px] mx-auto px-10">
         {/* 1. Hero */}
@@ -342,8 +336,13 @@ export default function Index() {
           </div>
 
           <div className="rounded-md bg-primary-foreground/[0.05] border border-primary-foreground/15 overflow-hidden">
-            <div className="px-5 py-3 border-b border-primary-foreground/15">
+            <div className="px-5 py-3 border-b border-primary-foreground/15 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="font-mono text-[12px] text-primary-light">durres-dzien-1.gpx</span>
+              {/* Podpis, bo bez niego wycinek pliku czyta się jak kod, który wyciekł
+                  na stronę, zamiast jak dowód, że plan wychodzi w otwartym formacie. */}
+              <span className="text-[12px] text-primary-foreground/55">
+                fragment pliku, który pobierasz
+              </span>
             </div>
             <pre className="px-5 py-4 font-mono text-[12px] leading-relaxed text-primary-foreground/80
                             whitespace-pre-wrap [overflow-wrap:anywhere]">{GPX_PRZYKLAD}</pre>

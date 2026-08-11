@@ -25,8 +25,20 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
   const { pathname, search } = useLocation();
   const here = pathname + search;
 
-  const isActive = (path: string) =>
-    path.includes('?') ? here === path : pathname === path && !search.includes('widok=plan');
+  /**
+   * Zakładka świeci się także na ekranach, które do niej należą, choć mają własny
+   * adres: karta miejsca i ulubione to nadal odkrywanie, moje trasy wychodzą
+   * z planu. Bez tego wchodząc w szczegóły miejsca użytkownik traci informację,
+   * w której części aplikacji się znajduje.
+   */
+  const isActive = (path: string) => {
+    if (path.includes('?')) return here === path;
+    if (path === '/plany') return pathname === '/plany' && !search.includes('widok=plan');
+    if (path === '/odkrywaj') {
+      return pathname === '/odkrywaj' || pathname.startsWith('/miejsce/') || pathname === '/ulubione';
+    }
+    return pathname === path;
+  };
 
   return (
     <header className="sticky top-0 z-20 h-16 border-b border-border bg-background/85 backdrop-blur-[8px]">
