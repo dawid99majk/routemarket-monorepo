@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -77,16 +77,38 @@ export default function Discover() {
 
   const board = boards.find((b) => b.id === activeBoard) ?? null;
 
-  const load = useCallback(async () => {
+  /**
+   * Miasto dopasowujemy zawierając, nie na równość. Wpisane "nowy york" nigdy nie
+   * zrówna się z "New York", które zapisuje geokoder — a to była przyczyna pustej
+   * listy po wyszukaniu: rekordy powstawały, tylko filtr ich nie widział.
+   *
+   * Nazwę można podać wprost, bo po zasianiu znamy postać znormalizowaną wcześniej,
+   * niż stan zdąży się odświeżyć.
+   */
+  const loadSeq = useRef(0);
+
+  const load = useCallback(async (cityOverride?: string) => {
+    const c = (cityOverride ?? city).trim();
+    const seq = ++loadSeq.current;
     setLoading(true);
     let q = (supabase as any).from('place_catalog').select('*').limit(60);
-    if (city.trim()) q = q.ilike('city', city.trim());
+    if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
+    // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
+    // pustej listy po wyszukaniu: wpisanie "nowy york" wysyłało dziewięć zapytań,
+    // po jednym na znak, a wracały w dowolnej kolejności. Wynik dla "nowy yor"
+    // potrafił dotrzeć po wyniku dla pełnej nazwy i wyczyścić listę. Odświeżenie
+    // strony pomagało, bo puszczało jedno zapytanie zamiast dziewięciu.
+    if (seq !== loadSeq.current) return;
     setPlaces(data ?? []);
     setLoading(false);
   }, [city]);
 
-  useEffect(() => { load(); }, [load]);
+  // Odpytujemy po chwili przerwy w pisaniu, a nie po każdym znaku.
+  useEffect(() => {
+    const t = setTimeout(() => { load(); }, 300);
+    return () => clearTimeout(t);
+  }, [load]);
 
   useEffect(() => {
     (async () => {
@@ -195,8 +217,15 @@ export default function Discover() {
     setSeeding(true);
     try {
       const data = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 24 }, { timeoutMs: 180_000 });
-      toast.success(`Dodano ${data.added} miejsc w: ${data.city}`);
-      await load();
+      // Pole dostaje nazwę w postaci, w jakiej miejsca faktycznie zapisano — inaczej
+      // filtr dalej szukałby tego, co użytkownik wpisał, a nie tego, co jest w bazie.
+      if (data.city) setCity(data.city);
+      toast.success(
+        data.added > 0
+          ? `Dodano ${data.added} ${data.added === 1 ? 'miejsce' : 'miejsc'} w: ${data.city}`
+          : `Nie znalazłem nowych miejsc w: ${data.city}`
+      );
+      await load(data.city || city);
     } catch (err: any) {
       toast.error(err.message || 'Nie udało się zebrać miejsc');
     } finally {
