@@ -62,6 +62,14 @@ function photoHeight(id: string): number {
   return 160 + (h % 5) * 25;
 }
 
+/** Odmiana po liczbie: 1 popołudnie, 2-4 popołudnia, 5+ i „kilka" popołudni. */
+function popoludnia(n: number | null | undefined): string {
+  if (n == null) return 'popołudni';
+  if (n === 1) return 'popołudnie';
+  const j = n % 10, d = n % 100;
+  return j >= 2 && j <= 4 && (d < 12 || d > 14) ? 'popołudnia' : 'popołudni';
+}
+
 export default function Discover() {
   const navigate = useNavigate();
   const [city, setCity] = useState('');
@@ -76,6 +84,9 @@ export default function Discover() {
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
   const [initials, setInitials] = useState<string | null>(null);
+  const [zbieraneSekundy, setZbieraneSekundy] = useState(0);
+  /** Miasta, dla których zbieranie już ruszyło — żeby nie powtórzyć go w kółko. */
+  const proboweane = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     (async () => {
@@ -88,6 +99,12 @@ export default function Discover() {
   }, []);
 
   const board = boards.find((b) => b.id === activeBoard) ?? null;
+
+  useEffect(() => {
+    if (!seeding) { setZbieraneSekundy(0); return; }
+    const t = setInterval(() => setZbieraneSekundy((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [seeding]);
 
   /**
    * Miasto dopasowujemy zawierając, nie na równość. Wpisane "nowy york" nigdy nie
@@ -224,6 +241,23 @@ export default function Discover() {
     }
   };
 
+  /**
+   * Świeżo założony wyjazd trafia tu z pustym katalogiem. Kazanie użytkownikowi
+   * kliknąć jeszcze raz "Zbierz miejsca" było zbędnym krokiem tuż po tym, jak
+   * właśnie powiedział, dokąd jedzie. Zbieramy sami, ale tylko dla miasta jego
+   * wyjazdu — nie dla czegokolwiek, co wpisze w filtr — i tylko raz na miasto.
+   */
+  useEffect(() => {
+    const c = city.trim();
+    const cel = board?.destination?.trim();
+    if (!c || !cel || loading || seeding) return;
+    if (places.length > 0) return;
+    if (c.toLowerCase() !== cel.toLowerCase()) return;
+    if (proboweane.current.has(c.toLowerCase())) return;
+    proboweane.current.add(c.toLowerCase());
+    seedCity();
+  }, [city, places.length, loading, seeding, board?.destination]);
+
   const seedCity = async () => {
     if (!city.trim()) return toast.error('Podaj miasto, które mamy przejrzeć');
     setSeeding(true);
@@ -265,7 +299,7 @@ export default function Discover() {
               {board ? `Wyjazd · ${board.destination}` : 'Odkrywanie miejsc'}
             </p>
             <h1 className="font-display font-light text-[40px] leading-[1.1] tracking-[-0.02em] mt-3">
-              {board ? `Atrakcje na ${board.days ?? 'kilka'} ${board.days === 1 ? 'popołudnie' : 'popołudnia'}` : 'Miejsca warte rozważenia'}
+              {board ? `Atrakcje na ${board.days ?? 'kilka'} ${popoludnia(board.days)}` : 'Miejsca warte rozważenia'}
             </h1>
             <p className="text-[15px] text-muted-foreground mt-3 leading-relaxed text-pretty">
               Zapisuj, co Cię interesuje. Kiedy tablica będzie pełna, agent ułoży z niej realny plan.
@@ -336,6 +370,33 @@ export default function Discover() {
           </p>
         ) : visible.length === 0 ? (
           <div className="text-center py-20 space-y-4">
+            {seeding ? (
+              <>
+                <Loader2 className="w-9 h-9 text-primary/60 mx-auto animate-spin" />
+                <p className="font-display text-[20px]">Zbieram miejsca w: {city.trim()}</p>
+                <p className="text-muted-foreground max-w-md mx-auto text-pretty">
+                  Przeglądam otwarte dane o atrakcjach, sprawdzam godziny otwarcia i dobieram zdjęcia.
+                </p>
+                {/* Licznik zamiast udawanych etapów — postępu z serwera nie mamy,
+                    a upływ czasu i widełki są prawdziwe. */}
+                <p className="font-mono text-[13px] tabular-nums text-muted-foreground">
+                  {zbieraneSekundy} s · zwykle 40–60 s
+                </p>
+                <div className="grid gap-4 max-w-4xl mx-auto pt-4
+                                [grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr))]">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="rounded-md border border-border overflow-hidden">
+                      <div className="h-[120px] bg-muted animate-pulse" />
+                      <div className="p-3 space-y-2">
+                        <div className="h-3 bg-muted rounded animate-pulse" />
+                        <div className="h-3 w-2/3 bg-muted rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
             <Sparkles className="w-9 h-9 text-muted-foreground/40 mx-auto" />
             <p className="text-muted-foreground max-w-md mx-auto">
               {city.trim()
@@ -343,11 +404,11 @@ export default function Discover() {
                 : 'Wpisz miasto, żeby zobaczyć, co w nim jest.'}
             </p>
             {city.trim() && (
-              <Button onClick={seedCity} disabled={seeding} className="bg-primary hover:bg-primary/90">
-                {seeding
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Przeglądam miasto…</>
-                  : <>Zbierz miejsca dla: {city}</>}
+              <Button onClick={seedCity} className="bg-primary hover:bg-primary/90">
+                Zbierz miejsca dla: {city}
               </Button>
+            )}
+              </>
             )}
           </div>
         ) : (

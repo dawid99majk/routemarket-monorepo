@@ -4,6 +4,8 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { utworzWyjazd } from '@/lib/newTrip';
+import { toast } from 'sonner';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
 const KLIMATY = [
@@ -101,6 +103,7 @@ export default function Index() {
   const [cel, setCel] = useState('');
   const [klimat, setKlimat] = useState('family');
   const [tablice, setTablice] = useState<Tablica[]>([]);
+  const [zakladam, setZakladam] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -121,10 +124,26 @@ export default function Index() {
    * ale feed wymaga konta — więc zamiast udawać, że go nie wymaga, zapamiętujemy
    * zamiar i wracamy do niego zaraz po zalogowaniu.
    */
-  const zacznij = () => {
-    if (!cel.trim()) return;
-    sessionStorage.setItem('rm_zamiar', JSON.stringify({ cel: cel.trim(), klimat }));
-    navigate(user ? '/start?nowy=1' : '/auth');
+  /**
+   * Wpisanie miasta ma od razu zaczynać planowanie, a nie prowadzić do kolejnego
+   * formularza z tym samym pytaniem. Zalogowanemu zakładamy wyjazd tu i teraz
+   * i przenosimy prosto do miejsc; niezalogowany odkłada zamiar na czas logowania.
+   */
+  const zacznij = async () => {
+    if (!cel.trim() || zakladam) return;
+    if (!user) {
+      sessionStorage.setItem('rm_zamiar', JSON.stringify({ cel: cel.trim(), klimat }));
+      return navigate('/auth');
+    }
+    setZakladam(true);
+    try {
+      await utworzWyjazd({ cel: cel.trim(), klimat });
+      navigate('/odkrywaj?nowy=1');
+    } catch (e: any) {
+      toast.error(e.message || 'Nie udało się założyć wyjazdu');
+    } finally {
+      setZakladam(false);
+    }
   };
 
   const poleDestynacji = (
@@ -133,8 +152,9 @@ export default function Index() {
         onKeyDown={(e) => e.key === 'Enter' && zacznij()}
         placeholder="Dokąd jedziesz?"
         className="flex-1 min-w-0 bg-transparent px-3 h-11 text-[16px] outline-none placeholder:text-muted-foreground" />
-      <Button onClick={zacznij} className="bg-primary hover:bg-primary/90 shrink-0 h-11 px-5">
-        Zacznij planować
+      <Button onClick={zacznij} disabled={zakladam}
+        className="bg-primary hover:bg-primary/90 shrink-0 h-11 px-5">
+        {zakladam ? 'Zakładam…' : 'Zacznij planować'}
       </Button>
     </div>
   );

@@ -4,6 +4,7 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
+import { utworzWyjazd } from '@/lib/newTrip';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
@@ -156,12 +157,18 @@ export default function Start() {
     const raw = sessionStorage.getItem('rm_zamiar');
     if (!raw) return;
     sessionStorage.removeItem('rm_zamiar');
-    try {
-      const { cel, klimat } = JSON.parse(raw);
-      if (cel) setCity(cel);
-      if (klimat) setClimate(klimat);
-    } catch { /* uszkodzony zapis pomijamy */ }
-  }, []);
+    (async () => {
+      try {
+        const { cel, klimat } = JSON.parse(raw);
+        if (!cel) return;
+        // Ktoś wpisał miasto na landingu i po drodze musiał się zalogować.
+        // Dokończenie za niego jest sensem tego przeniesienia — wypełnione pole
+        // i tak kazałoby kliknąć drugi raz to samo.
+        await utworzWyjazd({ cel, klimat: klimat || 'family' });
+        navigate('/odkrywaj?nowy=1');
+      } catch { /* uszkodzony zapis albo nieudany zapis pomijamy */ }
+    })();
+  }, [navigate]);
 
   const active = projects[0] ?? null;
   const activePlaces = useMemo(
