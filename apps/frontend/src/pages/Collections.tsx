@@ -196,7 +196,7 @@ export default function Collections() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/start')}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <span className="font-semibold">Moje kolekcje</span>

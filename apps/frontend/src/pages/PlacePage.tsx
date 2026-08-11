@@ -163,14 +163,20 @@ export default function PlacePage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-      <Loader2 className="w-5 h-5 animate-spin mr-2" /> Wczytuję miejsce…
+    <div className="min-h-screen bg-background">
+      <PlannerHeader />
+      <div className="flex items-center justify-center py-32 text-muted-foreground">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Wczytuję miejsce…
+      </div>
     </div>
   );
   if (!place) return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <p className="text-muted-foreground">Nie znaleziono takiego miejsca.</p>
-      <Button onClick={() => navigate('/odkrywaj')}>Wróć do odkrywania</Button>
+    <div className="min-h-screen bg-background">
+      <PlannerHeader />
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <p className="text-muted-foreground">Nie znaleziono takiego miejsca.</p>
+        <Button onClick={() => navigate('/odkrywaj')}>Wróć do odkrywania</Button>
+      </div>
     </div>
   );
 
