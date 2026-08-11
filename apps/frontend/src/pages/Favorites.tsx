@@ -4,6 +4,7 @@ import { ArrowLeft, Heart, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import PlannerHeader from '@/components/PlannerHeader';
 
 /**
  * Ulubione: zbiór miejsca poza jakimkolwiek wyjazdem. Ktoś zapisuje kawiarnię w
@@ -61,17 +62,7 @@ export default function Favorites() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <span className="font-semibold">Ulubione miejsca</span>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => navigate('/odkrywaj')}>
-            Odkrywaj
-          </Button>
-        </div>
-      </header>
+      <PlannerHeader />
 
       <main className="max-w-6xl mx-auto px-4 py-6">
         {loading ? (

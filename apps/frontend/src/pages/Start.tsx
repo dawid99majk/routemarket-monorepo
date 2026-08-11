@@ -143,6 +143,22 @@ export default function Start() {
 
   useEffect(() => { load(); }, [load]);
 
+  /**
+   * Zamiar z landingu. Ktoś wpisał tam miasto i wybrał klimat, po czym musiał się
+   * zalogować — bez tego przeniesienia trafiłby na pusty formularz i musiał wpisać
+   * to samo drugi raz.
+   */
+  useEffect(() => {
+    const raw = sessionStorage.getItem('rm_zamiar');
+    if (!raw) return;
+    sessionStorage.removeItem('rm_zamiar');
+    try {
+      const { cel, klimat } = JSON.parse(raw);
+      if (cel) setCity(cel);
+      if (klimat) setClimate(klimat);
+    } catch { /* uszkodzony zapis pomijamy */ }
+  }, []);
+
   const active = projects[0] ?? null;
   const activePlaces = useMemo(
     () => places.filter((p) => p.project_id === active?.id),

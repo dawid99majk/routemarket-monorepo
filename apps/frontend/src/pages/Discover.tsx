@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import PlannerHeader from '@/components/PlannerHeader';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +75,17 @@ export default function Discover() {
   const [activeBoard, setActiveBoard] = useState<string | null>(null);
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
+  const [initials, setInitials] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const pelne = (data.user?.user_metadata as any)?.full_name as string | undefined;
+      setInitials(pelne
+        ? pelne.split(/\s+/).slice(0, 2).map((c) => c[0]).join('').toUpperCase()
+        : (data.user?.email ?? '').slice(0, 2).toUpperCase() || null);
+    })();
+  }, []);
 
   const board = boards.find((b) => b.id === activeBoard) ?? null;
 
@@ -236,32 +248,14 @@ export default function Discover() {
   return (
     <div className="min-h-screen bg-background">
       {/* Pasek górny: 64 px, półprzezroczysty z rozmyciem, dolna linia — jak w projekcie */}
-      <header className="sticky top-0 z-20 h-16 border-b border-border bg-background/80 backdrop-blur-[8px]">
-        <div className="max-w-[1280px] mx-auto h-full px-10 flex items-center gap-4">
-          <button onClick={() => navigate('/')} className="font-display text-lg">
-            Route<span className="text-accent">/</span>Market
-          </button>
-          <Badge variant="outline" className="font-narrow uppercase tracking-[0.18em] text-[10px]">Planner</Badge>
-
-          <nav className="ml-6 flex gap-1">
-            <button className="px-3 py-1.5 text-sm rounded-sm border border-border bg-card">Odkrywaj</button>
-            <button onClick={() => navigate('/plany')} className="px-3 py-1.5 text-sm rounded-sm hover:bg-muted transition-colors">Tablica</button>
-            <button onClick={() => navigate('/plany')} className="px-3 py-1.5 text-sm rounded-sm hover:bg-muted transition-colors">Plan</button>
-          </nav>
-
-          <div className="ml-auto flex items-center gap-4">
-            {board && (
-              <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground hidden md:inline">
-                {board.destination}{board.days ? ` · ${board.days} dni` : ''}
-              </span>
-            )}
-            <button onClick={() => navigate('/ulubione')} title="Ulubione"
-              className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-border transition-colors">
-              <Heart className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* Wspólny pasek zamiast własnego. Ten nagłówek miał inny logotyp, brakowało
+          w nim zakładki Start, a "Plan" prowadził na tablicę zamiast do planu —
+          przez co ta sama zakładka robiła co innego zależnie od tego, skąd się
+          w nią kliknęło. */}
+      <PlannerHeader
+        context={board ? [board.destination, board.days ? `${board.days} dni` : null].filter(Boolean).join(' · ') : null}
+        initials={initials}
+      />
 
       <main className="max-w-[1280px] mx-auto px-10 pb-24">
         {/* Nagłówek dwukolumnowy */}

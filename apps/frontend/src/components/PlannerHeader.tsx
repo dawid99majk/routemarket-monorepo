@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Heart } from 'lucide-react';
 
 interface PlannerHeaderProps {
   /** Kontekst aktywnego wyjazdu po prawej, np. "Durrës · 3 dni · z dziećmi". */
@@ -56,6 +57,10 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
               {context}
             </span>
           )}
+          <button onClick={() => navigate('/ulubione')} title="Ulubione" aria-label="Ulubione"
+            className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-border transition-colors">
+            <Heart className="w-4 h-4 text-muted-foreground" />
+          </button>
           {initials && (
             <button onClick={() => navigate('/profile')}
               className="w-9 h-9 rounded-full bg-tan/30 border border-border flex items-center justify-center

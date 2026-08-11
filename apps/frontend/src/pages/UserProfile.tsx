@@ -212,10 +212,10 @@ export default function UserProfile() {
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mr-4"><ArrowLeft className="w-4 h-4 mr-1" /> {t('common.home')}</Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/start')} className="mr-4"><ArrowLeft className="w-4 h-4 mr-1" /> {t('common.home')}</Button>
             <Logo size="sm" />
           </div>
-          <Button variant="ghost" size="sm" onClick={async () => { await logout(); navigate('/'); }} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+          <Button variant="ghost" size="sm" onClick={async () => { await logout(); navigate('/start'); }} className="text-destructive hover:text-destructive hover:bg-destructive/10">
             <LogOut className="w-4 h-4 mr-1" /> {t('common.logout')}
           </Button>
         </div>

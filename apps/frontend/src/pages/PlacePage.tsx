@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import PlannerHeader from '@/components/PlannerHeader';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -182,6 +183,12 @@ export default function PlacePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Strona miejsca nie miała paska w ogóle: jedynym wyjściem był przycisk
+          "wróć do odkrywania", więc z karty miejsca nie dało się przejść na
+          tablicę ani do planu bez cofania się. */}
+      <PlannerHeader
+        context={board ? `${board.name} · ${board.destination}` : null}
+      />
       <main className="max-w-[1160px] mx-auto px-6 pt-8 pb-24">
         <button onClick={() => navigate('/odkrywaj')}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">

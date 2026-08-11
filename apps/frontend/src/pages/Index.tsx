@@ -1,161 +1,433 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Compass, MapPin, Route as RouteIcon, Sparkles, Wand2 } from 'lucide-react';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
-/**
- * Strona główna planera. Poprzednia wersja była witryną sklepu z trasami —
- * po odejściu od modelu marketplace nie miała już czego sprzedawać.
- */
+/** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
+const KLIMATY = [
+  { id: 'family', label: 'z dziećmi' },
+  { id: 'couple', label: 'we dwoje' },
+  { id: 'business', label: 'w delegację' },
+  { id: 'friends', label: 'ze znajomymi' },
+  { id: 'solo', label: 'sam' },
+];
+
+const KROKI = [
+  ['01', 'Powiedz, dokąd i z kim',
+    'Miasto, termin i klimat wyjazdu. Agent od razu podsuwa pierwsze miejsca, także takie, których nie miałeś na liście.'],
+  ['02', 'Zapisuj, co Cię interesuje',
+    'Feed atrakcji ze zdjęciem, czasem zwiedzania i godzinami otwarcia. Jedno kliknięcie odkłada miejsce na tablicę.'],
+  ['03', 'Rozstrzygnij wątpliwości',
+    'Tablica ma trzy kubełki: na pewno, być może, nie. Odrzucone nie znikają — zawsze możesz je przywrócić.'],
+  ['04', 'Odbierz gotową trasę',
+    'Plan na każdy dzień z godzinami, kolejnością i czasem dojazdu. Na końcu plik GPX do zegarka albo nawigacji.'],
+];
+
+const PLAN_DEMO = [
+  ['14:20', 'Amfiteatr w Durrës', '1 g 30 min · cień po 15:00'],
+  ['16:05', 'Forum bizantyjskie', '25 min · 7 min pieszo'],
+  ['16:45', 'Wieża Wenecka', '40 min · taras nad portem'],
+  ['17:35', 'Promenada Durrës', '30 min · powrót pod hotel'],
+];
+
+const DNI = [
+  {
+    tytul: 'Dzień 1 — stare miasto', meta: '3 g 25 min · 3,8 km pieszo',
+    przystanki: ['Amfiteatr', 'Forum bizantyjskie', 'Wieża Wenecka', 'Promenada'],
+    realizm: 'Trzy punkty na 3,5 godziny. Zmieściłby się czwarty, ale amfiteatr i mury to dużo schodów jak na jedno popołudnie.',
+  },
+  {
+    tytul: 'Dzień 2 — woda i piasek', meta: '3 g 50 min · 2 przejazdy autem',
+    przystanki: ['Plaża Golem', 'Park zabaw Adriatik', 'Bazar rybny'],
+    realizm: 'Dzień z dwoma przejazdami autem. Golem i park dzieli 6 minut, więc kolejność ma znaczenie.',
+  },
+  {
+    tytul: 'Dzień 3 — ostatnie popołudnie', meta: '3 g 10 min · 2,6 km pieszo',
+    przystanki: ['Muzeum Archeologiczne', 'Mury Kalaja', 'Plaża Currila'],
+    realizm: 'Muzeum zamyka o 16:00 — to jedyny punkt dnia z twardym limitem. Reszta jest elastyczna.',
+  },
+];
+
+const GPX_PRZYKLAD = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Routemarket">
+  <metadata>
+    <name>Durrës · dzień 1</name>
+    <time>2026-09-12T12:20:00Z</time>
+  </metadata>
+  <wpt lat="41.31278" lon="19.44139">
+    <name>Amfiteatr w Durrës</name>
+    <desc>14:20 · 1 g 30 min</desc>
+  </wpt>
+  <wpt lat="41.32340" lon="19.44580">
+    <name>Wieża Wenecka</name>
+    <desc>16:45 · 40 min</desc>
+  </wpt>
+  <trk><name>Trasa pieszo · 3,8 km</name></trk>
+</gpx>`;
+
+const KANALY = [
+  ['Zegarek i licznik', 'Garmin, Suunto, Coros, Wahoo — standardowy GPX z punktami trasy i śladem.'],
+  ['Twoja aplikacja mapowa', 'Organic Maps, Komoot, Gaia, Locus. Plik otwiera się bez konwersji.'],
+  ['Nawigacja Routemarket', 'Wbudowane prowadzenie od punktu do punktu, z godzinami z planu. Mapa pobiera się przed wyjazdem i działa bez zasięgu.'],
+];
+
+const FAQ = [
+  ['Skąd biorą się miejsca?',
+    'Z otwartych baz danych o atrakcjach, opinii podróżników i tablic publikowanych przez użytkowników. Godziny otwarcia i czas zwiedzania są weryfikowane przed pokazaniem w feedzie.'],
+  ['Czy agent nie wciśnie mi za dużo na jeden dzień?',
+    'Odwrotnie — kiedy plan przestaje być realny, pisze o tym wprost i proponuje, co przenieść. Możesz zadać własne ograniczenie, na przykład maksymalnie cztery godziny dziennie.'],
+  ['Czy działa poza Europą?',
+    'Tak. Planer jest globalny, interfejs dostępny w kilku językach, a odległości i czasy liczone lokalnym transportem.'],
+  ['Co z aplikacją na telefon?',
+    'Wersja przeglądarkowa działa na telefonie już teraz. Aplikacje iOS i Android, z pobieraniem map do trybu offline, są w przygotowaniu.'],
+];
+
+const NAWIGACJA = [
+  ['Jak to działa', '#jak-to-dziala'],
+  ['Przykładowy plan', '#przyklad'],
+  ['Nawigacja i GPX', '#gpx'],
+  ['Tablice', '#tablice'],
+];
+
+interface Tablica {
+  id: string; name: string; author_display: string | null; copy_count: number; place_count: number;
+}
+
 export default function Index() {
   const navigate = useNavigate();
-  // Wcześniej strona pytała Supabase samodzielnie, a stan startowy brzmiał
-  // „niezalogowany". Przez moment po wejściu zalogowany użytkownik widział
-  // przycisk logowania, a kliknięcie CTA w tym oknie wyrzucało go na /auth.
-  const { user, loading } = useAuth();
-  const loggedIn = !!user;
+  const { user } = useAuth();
+  const [cel, setCel] = useState('');
+  const [klimat, setKlimat] = useState('family');
+  const [tablice, setTablice] = useState<Tablica[]>([]);
 
-  const start = () => {
-    if (loading) return;
-    navigate(loggedIn ? '/plany' : '/auth');
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any).from('trip_projects')
+        .select('id, name, author_display, copy_count')
+        .eq('is_public', true).order('copy_count', { ascending: false }).limit(3);
+      if (!data?.length) return setTablice([]);
+      const { data: miejsca } = await (supabase as any).from('trip_project_places')
+        .select('project_id').in('project_id', data.map((b: any) => b.id));
+      setTablice(data.map((b: any) => ({
+        ...b, place_count: (miejsca ?? []).filter((m: any) => m.project_id === b.id).length,
+      })));
+    })();
+  }, []);
+
+  /**
+   * Jedna droga z obu pól destynacji. Projekt zakłada planowanie bez rejestracji,
+   * ale feed wymaga konta — więc zamiast udawać, że go nie wymaga, zapamiętujemy
+   * zamiar i wracamy do niego zaraz po zalogowaniu.
+   */
+  const zacznij = () => {
+    if (!cel.trim()) return;
+    sessionStorage.setItem('rm_zamiar', JSON.stringify({ cel: cel.trim(), klimat }));
+    navigate(user ? '/start?nowy=1' : '/auth');
   };
+
+  const poleDestynacji = (
+    <div className="flex gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
+      <input value={cel} onChange={(e) => setCel(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && zacznij()}
+        placeholder="Dokąd jedziesz?"
+        className="flex-1 min-w-0 bg-transparent px-3 h-11 text-[16px] outline-none placeholder:text-muted-foreground" />
+      <Button onClick={zacznij} className="bg-primary hover:bg-primary/90 shrink-0 h-11 px-5">
+        Zacznij planować
+      </Button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo />
-          <div className="flex items-center gap-2">
-            {/* Dopóki sesja się nie rozstrzygnie, nie pokazujemy żadnego z wariantów —
-                mignięcie „Zaloguj się" u zalogowanego wyglądało jak wylogowanie. */}
-            {loading ? null : loggedIn ? (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/plany')}>Plany</Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/odkrywaj')}>Odkrywaj</Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/ulubione')}>Ulubione</Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/kolekcje')}>Kolekcje</Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/my-routes')}>Moje trasy</Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>Profil</Button>
-              </>
+      <header className="sticky top-0 z-30 h-[68px] border-b border-border bg-background/85 backdrop-blur-[8px]">
+        <div className="max-w-[1280px] mx-auto h-full px-10 flex items-center gap-8">
+          <a href="#gora" className="font-display text-[20px] font-medium shrink-0">Routemarket</a>
+          <nav className="hidden lg:flex items-center gap-6">
+            {NAWIGACJA.map(([label, href]) => (
+              <a key={href} href={href}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors">{label}</a>
+            ))}
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            {user ? (
+              <Button size="sm" onClick={() => navigate('/start')} className="bg-primary hover:bg-primary/90">
+                Przejdź do planera
+              </Button>
             ) : (
-              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>Zaloguj się</Button>
+              <>
+                <Button size="sm" variant="ghost" onClick={() => navigate('/auth')}>Zaloguj się</Button>
+                <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90">
+                  Zaplanuj wyjazd
+                </Button>
+              </>
             )}
-            <Button size="sm" onClick={start} className="bg-primary hover:bg-primary/90">
-              <Wand2 className="w-4 h-4 mr-1.5" /> Zaplanuj wyjazd
-            </Button>
           </div>
         </div>
       </header>
 
-      <main>
-        {/* Hero w układzie z projektu marki: tekstura konturowa, nadtytuł z separatorem,
-            wyrównanie do lewej i pasek danych w mono pod włosową linią. Redakcyjny spokój
-            zamiast wyśrodkowanej reklamy. */}
-        <section className="relative overflow-hidden">
-          <img
-            src="/contour.svg"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-16 -right-24 w-[700px] max-w-none opacity-50 select-none"
-          />
-          <div className="relative max-w-6xl mx-auto px-6 pt-24 pb-20">
-            <p className="font-narrow uppercase text-muted-foreground text-xs tracking-[0.32em]">
-              Planer wyjazdów · od zbierania do trasy
-            </p>
-
-            <h1 className="font-display font-light mt-6 max-w-4xl text-[clamp(2.75rem,7vw,5.5rem)] leading-[0.98] tracking-[-0.035em] text-balance">
-              Wyjazdy układane pod Ciebie,<br />nie pod średnią<span className="text-primary">.</span>
+      <main id="gora" className="max-w-[1280px] mx-auto px-10">
+        {/* 1. Hero */}
+        <section className="pt-[88px] pb-[72px] grid gap-10 [grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))] items-start">
+          <div>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary">Planner wyjazdów</p>
+            <h1 className="font-display font-light mt-4 text-balance leading-[1.04] tracking-[-0.03em]
+                           text-[clamp(38px,4.4vw,62px)]">
+              Zbierz miejsca. Resztę ułoży agent.
             </h1>
-
-            <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-foreground/80 text-pretty">
-              Zbieraj miejsca, które chcesz zobaczyć — tygodniami albo w jeden wieczór.
-              Kiedy będziesz gotowy, ułożymy z nich dni i wyznaczymy przebieg.
+            <p className="text-[18px] leading-relaxed text-foreground/80 mt-6 max-w-[52ch] text-pretty">
+              Wyszukujesz atrakcje i wrzucasz je na tablicę wyjazdu — „na pewno", „być może", „nie".
+              Agent układa z nich plan na każdy dzień, z realnymi godzinami i czasem dojazdu,
+              i oddaje gotowy plik GPX do zegarka albo nawigacji.
             </p>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Button size="lg" onClick={start} className="bg-primary hover:bg-primary/90">
-                <CalendarDays className="w-4 h-4 mr-2" /> Zacznij zbierać miejsca
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate(loggedIn ? '/odkrywaj' : '/auth')}>
-                <Sparkles className="w-4 h-4 mr-2" /> Przeglądaj miejsca
-              </Button>
+            <div className="mt-8">{poleDestynacji}</div>
+
+            <div className="flex flex-wrap items-center gap-2 mt-5">
+              <span className="text-sm text-muted-foreground mr-1">Jadę</span>
+              {KLIMATY.map((k) => (
+                <button key={k.id} onClick={() => setKlimat(k.id)}
+                  className={`rounded-full px-3.5 py-1.5 text-[13px] border transition-colors ${
+                    klimat === k.id
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : 'border-border hover:bg-muted'
+                  }`}>
+                  {k.label}
+                </button>
+              ))}
             </div>
 
-            {/* Pasek danych: żadnych wymyślonych liczb — same fakty o produkcie,
-                złożone monospacem z cyframi tabelarycznymi, jak chce dokument marki. */}
-            <div className="mt-20 pt-8 border-t border-border flex flex-wrap gap-x-14 gap-y-6 font-mono text-[13px]">
-              <div>
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Miejsca</div>
-                <div className="mt-1.5 text-foreground">OpenStreetMap</div>
-              </div>
-              <div>
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Na wyjściu</div>
-                <div className="mt-1.5 text-foreground">GPX · przewodnik</div>
-              </div>
-              <div>
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Zbieranie</div>
-                <div className="mt-1.5 text-foreground">bez limitu</div>
-              </div>
-              <div className="sm:ml-auto max-w-xs">
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Zasada</div>
-                <div className="mt-1.5 leading-relaxed text-foreground/80">
-                  „Tablica czeka, plan powstaje wtedy, kiedy jesteś gotowy."
-                </div>
-              </div>
-            </div>
+            <p className="font-mono text-[12px] text-muted-foreground mt-6">
+              Bez karty · plan gotowy w kilka minut · działa też offline w terenie
+            </p>
           </div>
-        </section>
 
-        <section className="max-w-5xl mx-auto px-4 pb-24 grid gap-6 sm:grid-cols-3">
-          {[
-            {
-              Icon: Compass,
-              title: 'Agent, który zna teren',
-              text: 'Zamiast odpytywać Cię z kilometrów, sam sprawdza, co jest w zasięgu, i proponuje warianty o różnym charakterze.'
-            },
-            {
-              Icon: MapPin,
-              title: 'Miejsca, które istnieją',
-              text: 'Punkty pochodzą z OpenStreetMap i mają realne współrzędne oraz godziny otwarcia — nie z wyobraźni modelu.'
-            },
-            {
-              Icon: RouteIcon,
-              title: 'Plan, który się spina',
-              text: 'Trasa jest sprawdzana pod kątem dystansu i czasu. Jeśli coś się nie mieści, dowiesz się wprost.'
-            }
-          ].map(({ Icon, title, text }) => (
-            <div key={title} className="rounded-md border p-6">
-              <Icon className="w-6 h-6 text-primary" />
-              <h2 className="font-semibold mt-4">{title}</h2>
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{text}</p>
+          {/* Podgląd planu — to jest cały argument produktu, nie ozdoba */}
+          <div className="w-full max-w-[520px] justify-self-end rounded-md bg-card border border-border shadow-token-lg overflow-hidden">
+            <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-muted-foreground">
+                  Plan wygenerowany
+                </p>
+                <h2 className="font-display text-[20px] mt-1.5">Durrës · dzień 1</h2>
+              </div>
+              <span className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1">3 g 25 min</span>
             </div>
-          ))}
-        </section>
-
-        <section className="border-t bg-muted/30">
-          <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-            <Sparkles className="w-8 h-8 text-primary mx-auto" />
-            <h2 className="text-2xl font-bold mt-4">Zacznij od jednego miejsca</h2>
-            <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
-              Wpisz „Tirana" i dorzuć pierwszą rzecz, którą chcesz zobaczyć. Resztę możesz dokładać tygodniami —
-              tablica poczeka, a plan powstanie wtedy, kiedy będziesz gotowy.
-            </p>
-            <Button size="lg" onClick={start} className="mt-6 bg-primary hover:bg-primary/90">
-              Zacznij zbierać miejsca
-            </Button>
+            <div className="px-6 pb-5 space-y-3.5">
+              {PLAN_DEMO.map(([godz, nazwa, meta], i) => (
+                <div key={nazwa} className="grid grid-cols-[62px_1fr] gap-3 items-start">
+                  <span className="font-mono text-[12px] tabular-nums text-muted-foreground pt-1">{godz}</span>
+                  <div className="flex items-start gap-3">
+                    <span className="w-[22px] h-[22px] rounded-full bg-primary text-primary-foreground shrink-0
+                                     flex items-center justify-center text-[11px] font-medium mt-0.5">{i + 1}</span>
+                    <div className="min-w-0">
+                      <div className="font-display text-[15px] leading-snug">{nazwa}</div>
+                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">{meta}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-muted px-6 py-3.5 flex items-center justify-between gap-3 border-t border-border">
+              <span className="font-mono text-[12px] tabular-nums text-muted-foreground">3,8 km pieszo · +46 m</span>
+              <span className="font-mono text-[11px] rounded-full bg-primary text-primary-foreground px-3 py-1">
+                durres-dzien-1.gpx
+              </span>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t">
-        <div className="max-w-5xl mx-auto px-4 py-8 flex flex-wrap gap-4 justify-between text-sm text-muted-foreground">
-          <span>© {new Date().getFullYear()} RouteMarket</span>
-          <div className="flex gap-4">
-            <button onClick={() => navigate('/legal/terms')} className="hover:text-foreground">Regulamin</button>
-            <button onClick={() => navigate('/legal/privacy')} className="hover:text-foreground">Prywatność</button>
-            <button onClick={() => navigate('/contact')} className="hover:text-foreground">Kontakt</button>
+      {/* 2. Jak to działa */}
+      <section id="jak-to-dziala" className="bg-card border-y border-border">
+        <div className="max-w-[1280px] mx-auto px-10 py-20">
+          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Jak to działa</p>
+          <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
+            Cztery kroki od pomysłu do trasy w zegarku
+          </h2>
+          <div className="mt-12 border-t border-border grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))]">
+            {KROKI.map(([nr, tytul, opis], i) => (
+              <div key={nr} className={`pt-6 pb-2 px-6 ${i > 0 ? 'md:border-l border-border' : 'md:pl-0'}`}>
+                <span className="font-mono text-[13px] tabular-nums text-primary">{nr}</span>
+                <h3 className="font-display text-[20px] mt-3 leading-snug">{tytul}</h3>
+                <p className="text-[14px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{opis}</p>
+              </div>
+            ))}
           </div>
+        </div>
+      </section>
+
+      {/* 3. Prawdziwy przykład */}
+      <section id="przyklad" className="max-w-[1280px] mx-auto px-10 py-[88px]
+                                        grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
+        <div className="lg:sticky lg:top-[100px] max-w-[460px]">
+          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Prawdziwy przykład</p>
+          <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
+            Trzy popołudnia w Durrës, z sześciolatkiem
+          </h2>
+          <p className="text-[16px] leading-relaxed text-foreground/80 mt-5 text-pretty">
+            Dwanaście obejrzanych miejsc, dziewięć zapisanych, trzy odrzucone. Agent dostał jedno
+            ograniczenie: start po czternastej, maksymalnie cztery godziny dziennie.
+          </p>
+          <p className="text-[16px] leading-relaxed text-foreground/80 mt-4 text-pretty">
+            Przylądek Rodonit sam wypadł z planu — godzina drogi w jedną stronę nie mieści się
+            w takim popołudniu. Agent to napisał wprost, zamiast wcisnąć go na siłę.
+          </p>
+          <Button variant="outline" className="mt-7" onClick={() => navigate(user ? '/plany?widok=plan' : '/auth')}>
+            Zobacz cały plan <ArrowUpRight className="w-4 h-4 ml-1.5" />
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          {DNI.map((d) => (
+            <div key={d.tytul} className="rounded-md bg-card border border-border p-6">
+              <h3 className="font-display text-[20px] leading-snug">{d.tytul}</h3>
+              <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">{d.meta}</p>
+              <div className="flex flex-wrap gap-1.5 mt-4">
+                {d.przystanki.map((p) => (
+                  <span key={p} className="rounded-full bg-muted px-3 py-1 text-[12px] text-foreground/75">{p}</span>
+                ))}
+              </div>
+              <div className="mt-5 rounded-md bg-warning/15 border border-warning/30 px-4 py-3.5 flex items-start gap-3">
+                <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground
+                                 border border-warning/45 rounded-full px-2.5 py-1 shrink-0">Realizm</span>
+                <p className="text-[13px] leading-relaxed text-warning-foreground text-pretty">{d.realizm}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 4. Nawigacja i GPX */}
+      <section id="gpx" className="bg-foreground text-background">
+        <div className="max-w-[1280px] mx-auto px-10 py-[88px]
+                        grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
+          <div>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary-light">Nawigacja i GPX</p>
+            <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
+              Plan kończy się plikiem, nie zakładką w przeglądarce
+            </h2>
+            <p className="text-[16px] leading-relaxed text-primary-foreground/75 mt-5 max-w-[46ch] text-pretty">
+              Trasa wychodzi z Routemarket w formacie, który rozumie sprzęt — nie tylko nasza strona.
+            </p>
+            <div className="mt-8">
+              {KANALY.map(([tytul, opis], i) => (
+                <div key={tytul} className={`py-5 ${i > 0 ? 'border-t border-primary-foreground/15' : ''}`}>
+                  <h3 className="font-display text-[17px]">{tytul}</h3>
+                  <p className="text-[14px] leading-relaxed text-primary-foreground/70 mt-1.5 text-pretty">{opis}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-md bg-primary-foreground/[0.05] border border-primary-foreground/15 overflow-hidden">
+            <div className="px-5 py-3 border-b border-primary-foreground/15">
+              <span className="font-mono text-[12px] text-primary-light">durres-dzien-1.gpx</span>
+            </div>
+            <pre className="px-5 py-4 font-mono text-[12px] leading-relaxed text-primary-foreground/80
+                            whitespace-pre-wrap [overflow-wrap:anywhere]">{GPX_PRZYKLAD}</pre>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Tablice od podróżników — tylko gdy naprawdę są */}
+      {tablice.length > 0 && (
+        <section id="tablice" className="max-w-[1280px] mx-auto px-10 py-[88px]">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <div className="max-w-[560px]">
+              <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
+                Tablice od podróżników
+              </p>
+              <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
+                Nie zaczynaj od pustej tablicy
+              </h2>
+              <p className="text-[16px] leading-relaxed text-foreground/80 mt-4 text-pretty">
+                Skopiuj tablicę kogoś, kto był tam przed tobą, i wyrzuć z niej to, co do ciebie nie
+                pasuje. Twoje tablice możesz współdzielić z osobą, z którą jedziesz.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => navigate(user ? '/start' : '/auth')}>
+              Przeglądaj tablice
+            </Button>
+          </div>
+
+          <div className="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))]">
+            {tablice.map((t) => (
+              <button key={t.id} onClick={() => navigate(user ? '/start' : '/auth')}
+                className="text-left rounded-md bg-card border border-border overflow-hidden
+                           hover:shadow-token-md transition-shadow">
+                <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-[168px]">
+                  <div className="row-span-2 bg-primary/15" />
+                  <div className="bg-dusty-blue/20" />
+                  <div className="bg-accent/20" />
+                </div>
+                <div className="p-5">
+                  <h3 className="font-display text-[18px] leading-snug">{t.name}</h3>
+                  <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">
+                    {t.place_count} miejsc{t.copy_count > 0 ? ` · ${t.copy_count} kopii` : ''}
+                  </p>
+                  <div className="flex items-center gap-2.5 mt-4">
+                    <span className="w-7 h-7 rounded-full bg-accent/55 flex items-center justify-center
+                                     text-[11px] font-medium">
+                      {(t.author_display || 'Podróżnik').split(/\s+/).slice(0, 2).map((x) => x[0]).join('').toUpperCase()}
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">{t.author_display || 'Podróżnik'}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 6. Częste pytania */}
+      <section className="bg-card border-y border-border">
+        <div className="max-w-[1280px] mx-auto px-10 py-20
+                        grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))] items-start">
+          <div>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Częste pytania</p>
+            <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight">Zanim zaczniesz</h2>
+          </div>
+          <div>
+            {FAQ.map(([q, a], i) => (
+              <div key={q} className={`py-6 ${i > 0 ? 'border-t border-border' : 'pt-0'}`}>
+                <h3 className="font-display text-[18px] leading-snug">{q}</h3>
+                <p className="text-[15px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Końcowe CTA */}
+      <section className="max-w-[1280px] mx-auto px-10 py-24 text-center">
+        <h2 className="font-display font-light mx-auto max-w-[18ch] text-balance leading-tight
+                       text-[clamp(34px,3.6vw,48px)]">
+          Dokąd jedziesz w tym roku?
+        </h2>
+        <p className="text-[16px] leading-relaxed text-foreground/80 mt-5 max-w-[52ch] mx-auto text-pretty">
+          Wpisz miasto i zobacz pierwsze propozycje. Konto założysz dopiero, kiedy będziesz chciał
+          zapisać tablicę.
+        </p>
+        <div className="mt-8 flex justify-center">
+          <div className="w-full max-w-[520px]">{poleDestynacji}</div>
+        </div>
+      </section>
+
+      <footer className="border-t border-border">
+        <div className="max-w-[1280px] mx-auto px-10 py-11 flex flex-wrap items-center gap-6">
+          <span className="font-display text-[18px] font-medium">Routemarket</span>
+          <nav className="flex flex-wrap items-center gap-5">
+            <a href="#jak-to-dziala" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Jak to działa</a>
+            <a href="#gpx" className="text-sm text-muted-foreground hover:text-foreground transition-colors">GPX</a>
+            <a href="#tablice" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Tablice</a>
+            <button onClick={() => navigate('/legal/privacy')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Prywatność</button>
+            <button onClick={() => navigate('/contact')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Kontakt</button>
+          </nav>
+          <span className="ml-auto font-mono text-[12px] text-muted-foreground">
+            Aplikacje iOS i Android — wkrótce
+          </span>
         </div>
       </footer>
     </div>
