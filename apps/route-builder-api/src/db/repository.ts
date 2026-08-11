@@ -82,6 +82,20 @@ export class RouteBuilderRepository {
     return data ?? [];
   }
 
+  /** Podpowiedzi z katalogu: dopasowanie po fragmencie nazwy, opcjonalnie w mieście. */
+  async searchCatalogByName(query: string, city: string | null, limit = 6): Promise<any[]> {
+    let q = supabase
+      .from('place_catalog')
+      .select('id, slug, name, city, lat, lng, category, kind, photos, visit_minutes, opening_hours, website, description')
+      .ilike('name', `%${query}%`)
+      .order('pin_count', { ascending: false })
+      .limit(limit);
+    if (city) q = q.ilike('city', `%${city}%`);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  }
+
   async listCatalogByCity(city: string, limit = 40): Promise<any[]> {
     const { data } = await supabase
       .from('place_catalog').select('*')

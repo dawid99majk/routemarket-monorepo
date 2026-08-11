@@ -1492,6 +1492,82 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
 
 /**
+ * Podpowiedzi nazw miejsc. Osobno od /discover-places, bo tamten punkt pyta model
+ * i odpowiada po kilkunastu, czasem dwudziestu kilku sekundach — co jest w porządku
+ * dla pytania "gdzie zjeść z dzieckiem", a absurdalne dla kogoś, kto wpisuje
+ * "Eiffel" i wie, czego szuka. Tutaj nie ma modelu: najpierw własny katalog,
+ * potem nazwy z OpenStreetMap w okolicy miasta.
+ */
+app.post('/places/suggest', async (c) => {
+  try {
+    const { query, city, limit = 6 } = await c.req.json() as
+      { query: string; city?: string; limit?: number };
+    const q = (query || '').trim();
+    if (q.length < 2) return c.json({ suggestions: [] });
+
+    const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const wynik: any[] = [];
+    const widziane = new Set<string>();
+
+    const dodaj = (m: any) => {
+      const k = norm(m.name || '');
+      if (!k || widziane.has(k)) return;
+      widziane.add(k);
+      wynik.push(m);
+    };
+
+    // 1. Katalog — natychmiast, bo to nasza baza i mamy w niej zdjęcia i opisy.
+    try {
+      const zKatalogu = await repo.searchCatalogByName(q, city?.trim() || null, limit);
+      for (const m of zKatalogu) dodaj({ ...m, source: 'catalog' });
+    } catch (err) {
+      console.warn('[places/suggest] katalog:', err);
+    }
+
+    // 2. OpenStreetMap — dla nazw, których jeszcze nie mamy u siebie. Wynik
+    //    ograniczamy do okolicy miasta, żeby "Rynek" nie przyniósł rynku
+    //    z drugiego końca Europy.
+    if (wynik.length < limit && city?.trim()) {
+      try {
+        const centrum = await geocodingService.geocodeSettlement(city.trim());
+        const url = 'https://nominatim.openstreetmap.org/search?' + new URLSearchParams({
+          q, format: 'jsonv2', limit: String(limit * 2), addressdetails: '1',
+          viewbox: [centrum.lng - 0.35, centrum.lat + 0.25, centrum.lng + 0.35, centrum.lat - 0.25].join(','),
+          bounded: '1',
+        });
+        const res = await fetch(url, {
+          headers: { 'User-Agent': COMMONS_UA },
+          signal: AbortSignal.timeout(6000),
+        });
+        if (res.ok) {
+          const dane = await res.json() as any[];
+          for (const d of dane) {
+            if (wynik.length >= limit) break;
+            const nazwa = String(d.name || d.display_name || '').split(',')[0].trim();
+            if (!nazwa) continue;
+            dodaj({
+              id: null, slug: null, name: nazwa, city: city.trim(),
+              lat: Number(d.lat), lng: Number(d.lon),
+              category: 'attraction', kind: d.type || d.category || null,
+              photos: [], visit_minutes: null, opening_hours: null,
+              description: null, source: 'osm',
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[places/suggest] OSM:', err);
+      }
+    }
+
+    return c.json({ suggestions: wynik.slice(0, limit) });
+  } catch (e: any) {
+    console.error('[places/suggest]', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
+/**
  * Przebudowa galerii dla miejsc już zapisanych w katalogu. Zdjęcia dobrane starą
  * regułą zostały w bazie i sama poprawka doboru ich nie ruszy — trzeba je nadpisać.
  * Idzie partiami, bo Commons i Wikipedia nie lubią wielu równoległych zapytań.

@@ -152,6 +152,8 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
   const [grouped, setGrouped] = useState(false);
+  const [podpowiedzi, setPodpowiedzi] = useState<any[]>([]);
+  const [pokazPodpowiedzi, setPokazPodpowiedzi] = useState(false);
   const [planning, setPlanning] = useState(false);
   /** Sekundy od startu planowania. Samo kółko przy zapytaniu trwającym minutę
    *  wygląda jak zawieszenie — licznik dowodzi, że coś się dzieje. */
@@ -313,6 +315,44 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     setActiveId(data.id);
     setCreating(false);
     setForm({ name: '', destination: '', days: '', hours: '', tripType: '' });
+  };
+
+  /**
+   * Podpowiedzi nazw w trakcie pisania. Pełne wyszukiwanie pyta model i trwa
+   * kilkanaście do dwudziestu kilku sekund — to sensowne przy "gdzie zjeść
+   * z dzieckiem", ale nie przy kimś, kto wpisuje "Eiffel" i wie, czego chce.
+   * Ten punkt końcowy nie woła modelu i odpowiada w ćwierć sekundy.
+   */
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2 || !active?.destination) { setPodpowiedzi([]); return; }
+    let aktualne = true;
+    const t = setTimeout(async () => {
+      try {
+        const d = await apiPost<any>('/places/suggest',
+          { query: q, city: active.destination, limit: 6 }, { timeoutMs: 12_000 });
+        if (aktualne) setPodpowiedzi(d.suggestions ?? []);
+      } catch { if (aktualne) setPodpowiedzi([]); }
+    }, 300);
+    return () => { aktualne = false; clearTimeout(t); };
+  }, [query, active?.destination]);
+
+  /** Podpowiedź trafia na tablicę bez pytania modelu — mamy już wszystkie dane. */
+  const przypnijPodpowiedz = async (sug: any, priority: Priority) => {
+    setPokazPodpowiedzi(false);
+    setQuery('');
+    await pin({
+      name: sug.name,
+      lat: sug.lat,
+      lng: sug.lng,
+      category: sug.category || 'attraction',
+      description: sug.description ?? undefined,
+      opening_hours: sug.opening_hours ?? undefined,
+      visit_minutes: sug.visit_minutes ?? undefined,
+      website: sug.website ?? undefined,
+      image_url: sug.photos?.[0] ?? undefined,
+      photos: sug.photos ?? [],
+    } as any, priority);
   };
 
   const search = async (q: string) => {
@@ -1343,15 +1383,60 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 <Search className="w-4 h-4 absolute left-3 text-muted-foreground" />
                 <Input
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && search(query)}
+                  onChange={(e) => { setQuery(e.target.value); setPokazPodpowiedzi(true); }}
+                  onFocus={() => setPokazPodpowiedzi(true)}
+                  onBlur={() => setTimeout(() => setPokazPodpowiedzi(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { setPokazPodpowiedzi(false); search(query); }
+                    if (e.key === 'Escape') setPokazPodpowiedzi(false);
+                  }}
                   placeholder={`Czego szukasz w: ${active.destination}?`}
                   className="pl-9 pr-24"
                 />
-                <Button size="sm" onClick={() => search(query)} disabled={searching || !query.trim()}
+                <Button size="sm" onClick={() => { setPokazPodpowiedzi(false); search(query); }}
+                  disabled={searching || !query.trim()}
                   className="absolute right-1 bg-primary hover:bg-primary/90">
                   {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Szukaj'}
                 </Button>
+
+                {pokazPodpowiedzi && podpowiedzi.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
+                                  bg-popover shadow-token-lg overflow-hidden">
+                    {podpowiedzi.map((sug, i) => (
+                      <div key={`${sug.name}-${i}`}
+                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted transition-colors
+                                   border-b border-border last:border-b-0">
+                        <div className="w-9 h-9 rounded-sm bg-muted shrink-0 overflow-hidden">
+                          {sug.photos?.[0] && (
+                            <img src={sug.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm truncate">{sug.name}</div>
+                          <div className="font-mono text-[11px] tabular-nums text-muted-foreground truncate">
+                            {[sug.kind, sug.visit_minutes ? formatMinutes(sug.visit_minutes) : null,
+                              sug.source === 'catalog' ? 'w katalogu' : null].filter(Boolean).join(' · ') || sug.city}
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <Button size="sm" className="h-7 bg-primary hover:bg-primary/90"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => przypnijPodpowiedz(sug, 'must')}>
+                            Na pewno
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => przypnijPodpowiedz(sug, 'nice')}>
+                            Może
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="px-3 py-2 bg-muted/50 text-[11px] text-muted-foreground">
+                      Nie ma tego, czego szukasz? Naciśnij „Szukaj" — agent przejrzy miasto dokładniej.
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {(SUGGESTION_SETS[active.trip_type || ''] ?? SUGGESTION_SETS.default).map((sug) => (
