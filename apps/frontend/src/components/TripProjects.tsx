@@ -153,6 +153,15 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
   const [grouped, setGrouped] = useState(false);
   const [planning, setPlanning] = useState(false);
+  /** Sekundy od startu planowania. Samo kółko przy zapytaniu trwającym minutę
+   *  wygląda jak zawieszenie — licznik dowodzi, że coś się dzieje. */
+  const [planSekundy, setPlanSekundy] = useState(0);
+
+  useEffect(() => {
+    if (!planning) { setPlanSekundy(0); return; }
+    const t = setInterval(() => setPlanSekundy((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [planning]);
   /** Który dzień planu jest pokazany. Projekt pokazuje jeden dzień naraz, bo
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
   const [planDay, setPlanDay] = useState(0);
@@ -162,7 +171,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   const [searchParams] = useSearchParams();
   const view = searchParams.get('widok') === 'plan' ? 'plan' : 'tablica';
   const [plan, setPlan] = useState<any | null>(null);
-  const [planForm, setPlanForm] = useState({ start: '17:00', end: '21:00', date: '', dinner: '20:00' });
+  // Okno domyślne to pełny dzień zwiedzania. Wcześniejsze 17:00-21:00 pochodziło
+  // z przykładu "trzy popołudnia" i dla kogoś planującego cały dzień z dziećmi
+  // dawało plan na późny wieczór.
+  const [planForm, setPlanForm] = useState({ start: '09:00', end: '17:00', date: '', dinner: '' });
   // Data w formularzu zostaje stringiem 'yyyy-MM-dd' — kalendarz potrzebuje obiektu Date
   const planDate = (() => {
     if (!planForm.date) return undefined;
@@ -331,9 +343,12 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     // być jednym bytem z własną stroną, a nie trzema niezależnymi wierszami.
     // Nieudany zapis katalogu nie może blokować przypięcia — tablica jest
     // ważniejsza niż porządek w katalogu.
-    let catalogId: string | null = null;
-    try {
-      const cat = await apiPost<any>('/catalog/upsert', {
+    // Kolejność ma znaczenie dla odczucia szybkości. Wcześniej czekaliśmy na wpis
+    // do katalogu, zanim cokolwiek trafiło na tablicę — a to jest zapytanie do API,
+    // które potrafi trwać sekundy. Kliknięcie wyglądało wtedy na nieskuteczne
+    // i ludzie klikali drugi raz. Teraz miejsce ląduje na tablicy od razu,
+    // a katalog dopisuje się w tle i dosyła identyfikator.
+    const wpiszDoKatalogu = () => apiPost<any>('/catalog/upsert', {
         name: place.name,
         lat: place.lat,
         lng: place.lng,
@@ -346,16 +361,13 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         website: place.website,
         visit_minutes: place.visit_minutes
       });
-      catalogId = cat?.id ?? null;
-    } catch (err) {
-      console.warn('Nie udało się dopisać miejsca do katalogu:', err);
-    }
+
+    setResults((prev) => prev.filter((r) => r.name !== place.name));
 
     const { data, error } = await (supabase as any)
       .from('trip_project_places')
       .insert({
         project_id: active.id,
-        catalog_id: catalogId,
         name: place.name,
         category: place.category,
         priority,
@@ -370,10 +382,23 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       })
       .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id')
       .single();
-    if (error) return toast.error(error.message);
+    if (error) {
+      setResults((prev) => [place, ...prev]);
+      return toast.error(error.message);
+    }
     setPlaces((prev) => [...prev, data]);
-    setResults((prev) => prev.filter((r) => r.name !== place.name));
     toast.success(`Dodano: ${place.name}`);
+
+    // Katalog dopisujemy po fakcie. Nieudany zapis nie ma prawa cofnąć przypięcia —
+    // tablica jest ważniejsza niż porządek w katalogu.
+    wpiszDoKatalogu()
+      .then(async (cat: any) => {
+        if (!cat?.id) return;
+        await (supabase as any).from('trip_project_places')
+          .update({ catalog_id: cat.id }).eq('id', data.id);
+        setPlaces((prev) => prev.map((x) => (x.id === data.id ? { ...x, catalog_id: cat.id } : x)));
+      })
+      .catch((err) => console.warn('Nie udało się dopisać miejsca do katalogu:', err));
   };
 
   const unpin = async (id: string) => {
@@ -955,11 +980,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             </Button>
           )}
           {active && mustCount > 0 && view === 'tablica' && (
-            <Button onClick={() => buildPlan()} disabled={planning}
+            <Button onClick={() => navigate('/plany?widok=plan')}
               className="bg-primary hover:bg-primary/90">
-              {planning
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
-                : <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>}
+              Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
             </Button>
           )}
         </div>
@@ -1882,7 +1905,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 <Button
                   className="mt-6 bg-primary hover:bg-primary/90"
                   disabled={mustCount === 0 || planning}
-                  onClick={() => (mustCount > 0 ? buildPlan() : navigate('/plany'))}
+                  onClick={() => navigate(mustCount > 0 ? '/plany?widok=plan' : '/plany')}
                 >
                   {planning
                     ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
@@ -1964,9 +1987,27 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                   </Button>
                 </div>
                 {planning && (
-                  <p className="text-xs text-muted-foreground">
-                    Sprawdzam godziny otwarcia i układam dni…
-                  </p>
+                  <div className="rounded-md border border-border bg-muted/40 px-4 py-3.5 flex items-start gap-3">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[13px]">
+                        Sprawdzam godziny otwarcia, liczę dojścia i układam dni.
+                      </p>
+                      {/* Licznik zamiast wymyślonych etapów. Postępu z serwera nie
+                          dostajemy, więc udawany pasek "krok 2 z 4" byłby teatrem —
+                          upływ czasu i widełki są prawdziwe i wystarczą, żeby nie
+                          brać zapytania za zawieszenie. */}
+                      <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1">
+                        {planSekundy} s · zwykle trwa 40–90 s
+                      </p>
+                      {planSekundy > 100 && (
+                        <p className="text-[12px] text-muted-foreground mt-1.5 text-pretty">
+                          Dłużej niż zwykle. Nie odświeżaj strony — plan dojdzie albo
+                          zobaczysz komunikat o błędzie.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
