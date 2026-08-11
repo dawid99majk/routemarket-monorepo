@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
@@ -91,6 +92,9 @@ export default function Start() {
   const [term, setTerm] = useState('');
   const [climate, setClimate] = useState<string>('family');
   const [creating, setCreating] = useState(false);
+  const [podglad, setPodglad] = useState<any[]>([]);
+  const [zbieram, setZbieram] = useState(false);
+  const [sprawdzone, setSprawdzone] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
@@ -218,6 +222,41 @@ export default function Start() {
     if (error) {
       setPlaces((prev) => prev.map((x) => (x.id === p.id ? { ...x, priority: 'nice' } : x)));
       toast.error(error.message);
+    }
+  };
+
+  /**
+   * Miejsca pokazujemy od razu po wpisaniu miasta, jeszcze przed założeniem wyjazdu.
+   * Samo pole z nazwą miasta niczego nie dowodzi — dopóki nic się pod nim nie pojawia,
+   * wpisanie destynacji wygląda jak wypełnianie formularza, a nie jak początek planowania.
+   */
+  useEffect(() => {
+    const c = city.trim();
+    if (c.length < 3) { setPodglad([]); setSprawdzone(null); return; }
+    const t = setTimeout(async () => {
+      const { data } = await (supabase as any).from('place_catalog')
+        .select('id, slug, name, city, kind, category, photos, visit_minutes')
+        .ilike('city', `%${c}%`).order('pin_count', { ascending: false }).limit(8);
+      setPodglad(data ?? []);
+      setSprawdzone(c);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [city]);
+
+  const zbierzMiejsca = async () => {
+    if (!city.trim()) return;
+    setZbieram(true);
+    try {
+      const d = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 12 }, { timeoutMs: 180_000 });
+      const { data } = await (supabase as any).from('place_catalog')
+        .select('id, slug, name, city, kind, category, photos, visit_minutes')
+        .ilike('city', `%${d.city || city.trim()}%`).order('pin_count', { ascending: false }).limit(8);
+      setPodglad(data ?? []);
+      toast.success(`Zebrałem ${d.added} miejsc w: ${d.city}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Nie udało się zebrać miejsc');
+    } finally {
+      setZbieram(false);
     }
   };
 
@@ -419,6 +458,64 @@ export default function Start() {
 
             {noweWyjazdPanel}
           </div>
+        )}
+
+        {/* Podgląd miejsc dla wpisywanej destynacji. Zapisanie któregoś wymaga wyjazdu,
+            więc karty prowadzą do szczegółów, a zapisywanie zaczyna się dopiero
+            w Odkrywaj — po założeniu wyjazdu przyciskiem obok. */}
+        {city.trim().length >= 3 && (
+          <section className="mt-5 rounded-md bg-card border border-border px-7 py-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 className="font-display text-[18px]">
+                {podglad.length > 0 ? `Klasyki w: ${podglad[0].city ?? city.trim()}` : `Miejsca w: ${city.trim()}`}
+              </h2>
+              {podglad.length > 0 && (
+                <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                  {podglad.length} z katalogu
+                </span>
+              )}
+            </div>
+
+            {podglad.length > 0 ? (
+              <div className="mt-5 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,168px),1fr))]">
+                {podglad.map((m) => (
+                  <button key={m.id} onClick={() => navigate(`/miejsce/${m.slug}`)}
+                    className="text-left rounded-md border border-border bg-background overflow-hidden
+                               hover:shadow-token-md transition-shadow">
+                    <div className="h-[92px] bg-muted">
+                      {m.photos?.[0] && (
+                        <img src={m.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <div className="p-2.5">
+                      <div className="font-display text-[13px] leading-snug line-clamp-2">{m.name}</div>
+                      {m.visit_minutes && (
+                        <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
+                          {formatMinutes(m.visit_minutes)}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : sprawdzone === city.trim() ? (
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <p className="text-[14px] text-muted-foreground text-pretty">
+                  Nie mamy jeszcze miejsc dla tej destynacji. Mogę je zebrać — zajmie to kilkadziesiąt sekund.
+                </p>
+                <Button size="sm" onClick={zbierzMiejsca} disabled={zbieram}
+                  className="bg-primary hover:bg-primary/90">
+                  {zbieram
+                    ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Zbieram…</>
+                    : 'Zbierz miejsca'}
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-4 text-[14px] text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Sprawdzam katalog…
+              </p>
+            )}
+          </section>
         )}
 
         {active && (

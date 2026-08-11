@@ -1039,7 +1039,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 bloków — dane wyjazdu, suwak proporcji, wyszukiwarka, wydarzenia
                 i ostrzeżenia — więc tablica zaczynała się poniżej ekranu. Reszta
                 zeszła pod spód: to narzędzia do tablicy, nie sama tablica. */}
-            {places.length > 0 && (
+            {/* Kolumny stoją zawsze, także przy pustej tablicy. Kubełki są tu
+                wyjaśnieniem, co się z tą stroną robi — schowane, zostawiały nowy
+                wyjazd bez żadnej wskazówki. */}
+            {(
               <div>
                 <div className="flex items-center justify-end mb-2">
                   <button onClick={() => setGrouped((v) => !v)}
@@ -1155,9 +1158,24 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                           </div>
                           ))}
                           {zonePlaces.length === 0 && (
-                            <p className="text-[13px] text-muted-foreground px-3 py-10 text-center text-balance">
-                              {zone.hint}
-                            </p>
+                            <div className="space-y-2.5">
+                              {zone.id === 'must' ? (
+                                <button onClick={() => navigate('/odkrywaj')}
+                                  className="w-full h-[104px] rounded-md border border-dashed border-border
+                                             flex flex-col items-center justify-center gap-1.5 text-muted-foreground
+                                             hover:border-primary/50 hover:text-primary transition-colors">
+                                  <Plus className="w-5 h-5" />
+                                  <span className="text-[12px]">Dodaj miejsca</span>
+                                </button>
+                              ) : (
+                                <div className="w-full h-[104px] rounded-md border border-dashed border-border/70" />
+                              )}
+                              <div className="w-full h-[104px] rounded-md border border-dashed border-border/45" />
+                              <div className="w-full h-[104px] rounded-md border border-dashed border-border/25" />
+                              <p className="text-[12px] text-muted-foreground px-1 pt-2 text-center text-balance">
+                                {zone.hint}
+                              </p>
+                            </div>
                           )}
                         </div>
                         </div>
