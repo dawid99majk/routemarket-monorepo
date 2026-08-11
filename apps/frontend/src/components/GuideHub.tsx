@@ -44,7 +44,7 @@ function ArticleCard({ article, onClick }: { article: GuideArticle; onClick: () 
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
             {article.startHere && (
               <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 gap-0.5">
-                <Star className="w-2.5 h-2.5" /> Start here
+                <Star className="w-2.5 h-2.5" /> Zacznij tu
               </Badge>
             )}
             {article.tag && (
@@ -67,7 +67,7 @@ function EmptyState({ query }: { query: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center px-4">
       <Search className="w-10 h-10 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-medium text-foreground mb-1">No guides found</p>
+      <p className="text-sm font-medium text-foreground mb-1">Nic nie znaleziono</p>
       <p className="text-xs text-muted-foreground">
         No results for "<span className="font-medium">{query}</span>". Try a different keyword.
       </p>
@@ -145,7 +145,7 @@ export default function GuideHub() {
       <button
         onClick={() => setOpen(true)}
         className="group fixed right-4 bottom-4 z-[1300] flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-        aria-label="Open Guide Hub"
+        aria-label="Otwórz pomoc"
       >
         <HelpCircle className="w-5 h-5 shrink-0" />
         <span className="overflow-hidden max-w-0 group-hover:max-w-[160px] group-focus-visible:max-w-[160px] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-hover:ml-2 group-focus-visible:ml-2 text-sm font-semibold whitespace-nowrap transition-all duration-300 ease-out">
@@ -178,8 +178,8 @@ export default function GuideHub() {
                       <Sparkles className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <SheetTitle className="text-lg font-bold">Guide Hub</SheetTitle>
-                      <p className="text-xs text-muted-foreground">Learn how to get the most out of RouteMarket</p>
+                      <SheetTitle className="text-lg font-bold">Pomoc</SheetTitle>
+                      <p className="text-xs text-muted-foreground">Jak planować wyjazdy i zabrać plan w teren</p>
                     </div>
                   </div>
                 </SheetHeader>
@@ -192,9 +192,9 @@ export default function GuideHub() {
                       ref={searchRef}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search guides…"
+                      placeholder="Szukaj w pomocy…"
                       className="pl-9 pr-8 h-9 text-sm"
-                      aria-label="Search guides"
+                      aria-label="Szukaj w pomocy"
                     />
                     {searchQuery && (
                       <button
@@ -227,11 +227,11 @@ export default function GuideHub() {
                       <TabsList className="w-full grid grid-cols-2">
                         <TabsTrigger value="explorers" className="text-sm">
                           <Compass className="w-4 h-4 mr-1.5" />
-                          Explorers
+                          Planowanie
                         </TabsTrigger>
                         <TabsTrigger value="creators" className="text-sm">
                           <Palette className="w-4 h-4 mr-1.5" />
-                          Creators
+                          W terenie
                         </TabsTrigger>
                       </TabsList>
                     </div>

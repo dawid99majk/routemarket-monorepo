@@ -94,14 +94,14 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
           <button
             onClick={onBack}
             className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-label="Back to Guide Hub"
+            aria-label="Wróć do pomocy"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
 
           <div className="flex-1 min-w-0">
             <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <span>Guide Hub</span>
+              <span>Pomoc</span>
               <ChevronRight className="w-3 h-3" />
               <span>{tabLabel}</span>
             </nav>
@@ -263,7 +263,7 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
-                      <p className="text-[11px] text-muted-foreground">{r.readingTimeMinutes} min read</p>
+                      <p className="text-[11px] text-muted-foreground">{r.readingTimeMinutes} min czytania</p>
                     </div>
                     <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   </button>
