@@ -1371,11 +1371,18 @@ app.post('/catalog/seed', async (c) => {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
 
+    // Pomiar etapów: bez niego "trwa 40-60 s" jest odczuciem, a nie liczbą.
+    const t0 = Date.now();
+    const etapy: Record<string, number> = {};
+    let tEtap = Date.now();
     const center = await geocodingService.geocodeSettlement(city);
+    etapy.geokoder = Date.now() - tEtap;
     const take = Math.min(40, Math.max(6, limit ?? 24));
+    tEtap = Date.now();
     const candidates = await poiService.fetchCandidates(
       { lat: center.lat, lng: center.lng }, 'city_walk', { radiusKm: 4, limit: take }
     );
+    etapy.overpass = Date.now() - tEtap;
     if (candidates.length === 0) return c.json({ city, added: 0, places: [] });
 
     const prompt = `Opisujesz miejsca w mieście ${city} dla serwisu planowania wyjazdów.
@@ -1392,6 +1399,7 @@ Dla każdego zwróć:
 Jeśli jakiegoś miejsca nie kojarzysz, opisz je na podstawie jego rodzaju — nie wymyślaj faktów.
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
+    tEtap = Date.now();
     const data = await callGeminiTracked(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -1437,6 +1445,8 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
     // Zdjęcia partiami: Commons nie lubi czterdziestu równoległych zapytań
     const saved: any[] = [];
+    etapy.model = Date.now() - tEtap;
+    tEtap = Date.now();
     const BATCH = 5;
     for (let i = 0; i < candidates.length; i += BATCH) {
       const batch = candidates.slice(i, i + BATCH);
@@ -1482,7 +1492,9 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
       }));
     }
 
-    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc`);
+    etapy.zdjecia_i_zapis = Date.now() - tEtap;
+    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc w ${Date.now() - t0} ms ` +
+      `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
     return c.json({ city, added: saved.length, center: { lat: center.lat, lng: center.lng } });
   } catch (err: any) {
     console.error('[catalog/seed] Error:', err);

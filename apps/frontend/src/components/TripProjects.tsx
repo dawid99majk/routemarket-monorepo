@@ -152,6 +152,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
   const [grouped, setGrouped] = useState(false);
+  const [startQuery, setStartQuery] = useState('');
+  const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
+  const [pokazStart, setPokazStart] = useState(false);
   const [podpowiedzi, setPodpowiedzi] = useState<any[]>([]);
   const [pokazPodpowiedzi, setPokazPodpowiedzi] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -207,7 +210,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       await (supabase as any).rpc('claim_pending_trip_shares');
       const { data } = await (supabase as any)
         .from('trip_projects')
-        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count')
+        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count, start_name, start_lat, start_lng')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
       // Wejście z kreatora (?project=...) ma otworzyć świeżo utworzoną tablicę,
@@ -353,6 +356,38 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       image_url: sug.photos?.[0] ?? undefined,
       photos: sug.photos ?? [],
     } as any, priority);
+  };
+
+  useEffect(() => {
+    const q = startQuery.trim();
+    if (q.length < 2 || !active?.destination) { setStartPodpowiedzi([]); return; }
+    let aktualne = true;
+    const t = setTimeout(async () => {
+      try {
+        const d = await apiPost<any>('/places/suggest',
+          { query: q, city: active.destination, limit: 6 }, { timeoutMs: 12_000 });
+        if (aktualne) setStartPodpowiedzi(d.suggestions ?? []);
+      } catch { if (aktualne) setStartPodpowiedzi([]); }
+    }, 300);
+    return () => { aktualne = false; clearTimeout(t); };
+  }, [startQuery, active?.destination]);
+
+  /**
+   * Punkt startowy trafia na projekt, nie na tablicę miejsc. To nie jest atrakcja
+   * do zwiedzania, tylko adres, z którego wychodzicie — planer dostaje go jako bazę
+   * i zaczyna oraz kończy tam każdy dzień.
+   */
+  const ustawStart = async (sug: any | null) => {
+    if (!active) return;
+    const patch = sug
+      ? { start_name: sug.name, start_lat: sug.lat ?? null, start_lng: sug.lng ?? null }
+      : { start_name: null, start_lat: null, start_lng: null };
+    const { error } = await (supabase as any).from('trip_projects').update(patch).eq('id', active.id);
+    if (error) return toast.error(error.message);
+    setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, ...patch } as any : p)));
+    setStartQuery('');
+    setPokazStart(false);
+    toast.success(sug ? `Start: ${sug.name}` : 'Punkt startowy usunięty');
   };
 
   const search = async (q: string) => {
@@ -868,6 +903,11 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         destination: active.destination,
         days: active.days || 1,
         window: { start: planForm.start, end: planForm.end },
+        hotel: (active as any).start_name
+          ? { name: (active as any).start_name,
+              lat: (active as any).start_lat ?? undefined,
+              lng: (active as any).start_lng ?? undefined }
+          : null,
         start_date: planForm.date || undefined,
         hotel: hotel ? { name: hotel.name } : null,
         fill_percent: active.fill_percent ?? 70,
@@ -1102,6 +1142,78 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 bloków — dane wyjazdu, suwak proporcji, wyszukiwarka, wydarzenia
                 i ostrzeżenia — więc tablica zaczynała się poniżej ekranu. Reszta
                 zeszła pod spód: to narzędzia do tablicy, nie sama tablica. */}
+            {/* Punkt startowy nad kubełkami: zanim ktoś zacznie zbierać miejsca,
+                warto wiedzieć, skąd wychodzi — od tego zależy, co w ogóle ma sens. */}
+            <div className="rounded-md border border-border bg-card px-4 py-3.5">
+              {(active as any).start_name ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <MapPin className="w-4 h-4 text-primary shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                      Punkt startowy
+                    </div>
+                    <div className="text-sm truncate">{(active as any).start_name}</div>
+                  </div>
+                  <button onClick={() => { setPokazStart(true); setStartQuery(''); }}
+                    className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+                    Zmień
+                  </button>
+                  <button onClick={() => ustawStart(null)}
+                    className="text-[13px] text-muted-foreground hover:text-destructive transition-colors">
+                    Usuń
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm">Skąd zaczynacie?</div>
+                    <div className="text-[13px] text-muted-foreground">
+                      Hotel, parking, dworzec — planer zacznie i skończy tam każdy dzień.
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
+                    Ustaw punkt startowy
+                  </Button>
+                </div>
+              )}
+
+              {pokazStart && (
+                <div className="relative mt-3">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input autoFocus value={startQuery}
+                    onChange={(e) => setStartQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Escape' && setPokazStart(false)}
+                    placeholder={`Nazwa hotelu, parkingu albo dworca w: ${active.destination}`}
+                    className="pl-9" />
+                  {startPodpowiedzi.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
+                                    bg-popover shadow-token-lg overflow-hidden">
+                      {startPodpowiedzi.map((sug, i) => (
+                        <button key={`${sug.name}-${i}`} onClick={() => ustawStart(sug)}
+                          className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors
+                                     border-b border-border last:border-b-0">
+                          <div className="text-sm truncate">{sug.name}</div>
+                          <div className="font-mono text-[11px] text-muted-foreground truncate">
+                            {[sug.kind, sug.city].filter(Boolean).join(' · ')}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Nie każdy nocleg jest w OpenStreetMap — nazwa własna wystarczy,
+                      planer i tak dostanie ją jako bazę. */}
+                  {startQuery.trim().length >= 3 && (
+                    <button
+                      onClick={() => ustawStart({ name: startQuery.trim(), lat: null, lng: null })}
+                      className="mt-2 text-[13px] text-primary hover:underline">
+                      Użyj „{startQuery.trim()}" jako nazwy własnej
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Kolumny stoją zawsze, także przy pustej tablicy. Kubełki są tu
                 wyjaśnieniem, co się z tą stroną robi — schowane, zostawiały nowy
                 wyjazd bez żadnej wskazówki. */}
