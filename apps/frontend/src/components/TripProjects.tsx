@@ -1159,6 +1159,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                           ))}
                           {zonePlaces.length === 0 && (
                             <div className="space-y-2.5">
+                              <p className="text-[12px] text-muted-foreground px-1 pb-1 text-pretty">
+                                {zone.hint}
+                              </p>
                               {zone.id === 'must' ? (
                                 <button onClick={() => navigate('/odkrywaj')}
                                   className="w-full h-[104px] rounded-md border border-dashed border-border
@@ -1172,9 +1175,6 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                               )}
                               <div className="w-full h-[104px] rounded-md border border-dashed border-border/45" />
                               <div className="w-full h-[104px] rounded-md border border-dashed border-border/25" />
-                              <p className="text-[12px] text-muted-foreground px-1 pt-2 text-center text-balance">
-                                {zone.hint}
-                              </p>
                             </div>
                           )}
                         </div>
