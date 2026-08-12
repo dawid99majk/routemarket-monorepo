@@ -227,7 +227,8 @@ export default function PlacePage() {
             )}
 
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground mt-8">
-              {[place.kind || place.category, place.city].filter(Boolean).join(' · ')}
+              {[place.kind || place.category,
+                [place.city, place.country].filter(Boolean).join(' / ')].filter(Boolean).join(' · ')}
             </p>
             <h1 className="font-display font-light text-[42px] leading-[1.05] tracking-[-0.02em] mt-3">
               {place.name}

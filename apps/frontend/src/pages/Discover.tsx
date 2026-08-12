@@ -15,6 +15,7 @@ interface CatalogPlace {
   slug: string;
   name: string;
   city: string | null;
+  country: string | null;
   lat: number;
   lng: number;
   category: string;
@@ -552,6 +553,17 @@ export default function Discover() {
 
                     <div className="p-3.5">
                       <h3 className="font-display text-[16px] font-medium leading-snug">{p.name}</h3>
+                      {/* Skąd to miejsce jest. Feed pokazuje też katalog z innych
+                          wyjazdów, więc bez tego wiersza atrakcja z Wrocławia wygląda
+                          przy albańskiej tak samo — a to zupełnie inna decyzja. */}
+                      {p.city && (
+                        <p className={`font-mono text-[11px] mt-1 ${
+                          board?.destination && p.city.toLowerCase() !== board.destination.toLowerCase()
+                            ? 'text-accent' : 'text-muted-foreground'
+                        }`}>
+                          {p.city}{p.country ? ` / ${p.country}` : ''}
+                        </p>
+                      )}
                       {p.description && (
                         <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed line-clamp-3 text-pretty">
                           {p.description}

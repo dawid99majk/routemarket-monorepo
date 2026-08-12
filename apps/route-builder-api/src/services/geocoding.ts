@@ -8,6 +8,8 @@ export interface GeocodedPlace {
   confidence: number;
   source: string;
   provider: string;
+  /** Dwuliterowy kod kraju z Nominatim, np. "pl". Nominatim i tak go zwraca. */
+  countryCode?: string | null;
 }
 
 /**
@@ -196,7 +198,10 @@ export class GeocodingService {
             lng: parseFloat(item.lon),
             confidence: 0.95,
             source: 'nominatim_settlement',
-            provider: 'nominatim'
+            provider: 'nominatim',
+            countryCode: item.address?.country_code
+              ? String(item.address.country_code).toUpperCase()
+              : null
           };
         }
       }

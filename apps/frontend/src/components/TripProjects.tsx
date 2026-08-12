@@ -1195,7 +1195,8 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                                      border-b border-border last:border-b-0">
                           <div className="text-sm truncate">{sug.name}</div>
                           <div className="font-mono text-[11px] text-muted-foreground truncate">
-                            {[sug.kind, sug.city].filter(Boolean).join(' · ')}
+                            {[sug.kind, [sug.city, sug.country].filter(Boolean).join(' / ')]
+                              .filter(Boolean).join(' · ')}
                           </div>
                         </button>
                       ))}

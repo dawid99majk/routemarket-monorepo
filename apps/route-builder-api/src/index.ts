@@ -1404,6 +1404,7 @@ app.post('/catalog/seed', async (c) => {
           slug,
           name: p.name,
           city,
+          country: center.countryCode ?? null,
           lat: p.lat,
           lng: p.lng,
           category: p.kind === 'restaurant' || p.kind === 'cafe' ? 'food' : 'attraction',
@@ -1444,6 +1445,44 @@ app.post('/catalog/seed', async (c) => {
   } catch (err: any) {
     console.error('[catalog/seed] Error:', err);
     return c.json({ error: err.message }, 500);
+  }
+});
+
+
+/**
+ * Uzupełnienie kraju tam, gdzie go brakuje. Kolumna istniała od początku, ale
+ * zbieranie jej nie wypełniało, więc katalog nie potrafił odróżnić Wrocławia
+ * od Berat inaczej niż nazwą miasta — a przy mieszanej liście to za mało.
+ */
+app.post('/catalog/backfill-country', async (c) => {
+  try {
+    const wszystkie = await repo.listCatalogAll(null, 1000);
+    const bezKraju = wszystkie.filter((m: any) => !m.country && m.city);
+    const miasta = [...new Set(bezKraju.map((m: any) => String(m.city)))];
+
+    const wynik: Record<string, string | null> = {};
+    for (const miasto of miasta) {
+      try {
+        const g = await geocodingService.geocodeSettlement(miasto);
+        wynik[miasto] = g.countryCode ?? null;
+      } catch {
+        wynik[miasto] = null;
+      }
+    }
+
+    let zmienione = 0;
+    for (const m of bezKraju) {
+      const kod = wynik[String(m.city)];
+      if (!kod) continue;
+      await repo.updateCatalogPlace(m.id, { country: kod, updated_at: new Date().toISOString() });
+      zmienione++;
+    }
+
+    console.log(`[catalog/backfill-country] uzupełniono ${zmienione} wpisów w ${miasta.length} miastach`);
+    return c.json({ updated: zmienione, cities: wynik });
+  } catch (e: any) {
+    console.error('[catalog/backfill-country]', e);
+    return c.json({ error: e.message }, 500);
   }
 });
 
