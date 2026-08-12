@@ -4,6 +4,7 @@ import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-r
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import PlannerHeader from '@/components/PlannerHeader';
+import DiscoverMap from '@/components/DiscoverMap';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +89,10 @@ export default function Discover() {
   const [opisyWToku, setOpisyWToku] = useState(false);
   /** Ile kart pokazujemy. Rośnie przy przewijaniu, nie przy każdym zapytaniu. */
   const [ileWidocznych, setIleWidocznych] = useState(24);
+  const [pokazMape, setPokazMape] = useState(true);
+  /** Miejsce pod kursorem albo wskazane pinezką — wiąże kartę z punktem na mapie. */
+  const [aktywne, setAktywne] = useState<string | null>(null);
+  const kartyRef = useRef<Record<string, HTMLElement | null>>({});
   const wartownik = useRef<HTMLDivElement | null>(null);
   /** Miasta, dla których zbieranie już ruszyło — żeby nie powtórzyć go w kółko. */
   const proboweane = useRef<Set<string>>(new Set());
@@ -120,10 +125,17 @@ export default function Discover() {
    */
   const loadSeq = useRef(0);
 
-  const load = useCallback(async (cityOverride?: string) => {
+  /**
+   * `ciche` odróżnia dwa przypadki, które wcześniej były jednym. Zmiana miasta ma
+   * prawo pokazać wczytywanie i zacząć listę od nowa. Doładowanie kolejnych kart
+   * nie ma — a robiło dokładnie to: podnosiło stan wczytywania, przez co feed
+   * znikał z drzewa, przewijanie wracało na górę i nowe karty trzeba było szukać
+   * od początku.
+   */
+  const load = useCallback(async (cityOverride?: string, ciche = false) => {
     const c = (cityOverride ?? city).trim();
     const seq = ++loadSeq.current;
-    setLoading(true);
+    if (!ciche) setLoading(true);
     let q = (supabase as any).from('place_catalog').select('*').limit(Math.max(60, ileWidocznych + 24));
     if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
@@ -134,14 +146,21 @@ export default function Discover() {
     // strony pomagało, bo puszczało jedno zapytanie zamiast dziewięciu.
     if (seq !== loadSeq.current) return;
     setPlaces(data ?? []);
-    setLoading(false);
+    if (!ciche) setLoading(false);
   }, [city, ileWidocznych]);
 
-  // Odpytujemy po chwili przerwy w pisaniu, a nie po każdym znaku.
+  // Miasto: odpytujemy po chwili przerwy w pisaniu, a nie po każdym znaku.
   useEffect(() => {
     const t = setTimeout(() => { load(); }, 300);
     return () => clearTimeout(t);
-  }, [load]);
+  }, [city]);
+
+  // Limit: dociągamy po cichu, żeby lista nie zwinęła się pod palcami.
+  const pierwszeWczytanie = useRef(true);
+  useEffect(() => {
+    if (pierwszeWczytanie.current) { pierwszeWczytanie.current = false; return; }
+    load(undefined, true);
+  }, [ileWidocznych]);
 
   useEffect(() => {
     (async () => {
@@ -287,6 +306,11 @@ export default function Discover() {
   // Zmiana miasta albo filtra zaczyna oglądanie od początku.
   useEffect(() => { setIleWidocznych(24); }, [city, filter, query]);
 
+  const zPinezki = (id: string) => {
+    setAktywne(id);
+    kartyRef.current[id]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+
   const seedCity = async () => {
     if (!city.trim()) return toast.error('Podaj miasto, które mamy przejrzeć');
     setSeeding(true);
@@ -350,9 +374,14 @@ export default function Discover() {
             <p className="font-mono text-[13px] text-muted-foreground tabular-nums">
               {savedCount} zapisanych · {maybeCount} do rozważenia
             </p>
-            <Button className="mt-3 bg-primary hover:bg-primary/90" onClick={() => navigate('/plany')}>
-              Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end mt-3">
+              {/* Tablica dostępna też tutaj, nie tylko w pasku: zapisując miejsca
+                  najczęściej chce się sprawdzić, co już się uzbierało. */}
+              <Button variant="outline" onClick={() => navigate('/plany')}>Tablica</Button>
+              <Button className="bg-primary hover:bg-primary/90" onClick={() => navigate('/plany?widok=plan')}>
+                Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -381,6 +410,12 @@ export default function Discover() {
               </button>
             ))}
           </div>
+          <button onClick={() => setPokazMape((v) => !v)}
+            className={`rounded-full px-3 py-1 text-xs border transition-colors ${
+              pokazMape ? 'bg-foreground text-background border-foreground' : 'bg-background border-border hover:bg-muted'
+            }`}>
+            {pokazMape ? 'Ukryj mapę' : 'Pokaż mapę'}
+          </button>
           <div className="relative">
             <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input list="miasta" value={city} onChange={(e) => setCity(e.target.value)}
@@ -452,8 +487,11 @@ export default function Discover() {
             )}
           </div>
         ) : (
-          <div className="mt-6 [column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4">
-            {widoczne.map((p) => {
+          <div className={pokazMape ? 'mt-6 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,44%)] gap-6 items-start' : 'mt-6'}>
+          <div className={pokazMape
+            ? '[column-gap:20px] columns-1 sm:columns-2'
+            : '[column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4'}>
+            {widoczne.map((p, idx) => {
               const mk = marks[p.id];
               const duration = formatDuration(p.visit_minutes);
               return (
@@ -464,13 +502,24 @@ export default function Discover() {
                    i koloru, a nie wszystkiego jak leci. */
                 <article
                   key={p.id}
-                  className="group mb-5 break-inside-avoid rounded-md border border-border bg-card overflow-hidden
-                             transition-[box-shadow,border-color] duration-200 hover:border-foreground/25 hover:shadow-token-md"
+                  ref={(el) => { kartyRef.current[p.id] = el; }}
+                  onMouseEnter={() => setAktywne(p.id)}
+                  onMouseLeave={() => setAktywne(null)}
+                  className={`group mb-5 break-inside-avoid rounded-md border bg-card overflow-hidden
+                             transition-[box-shadow,border-color] duration-200 hover:shadow-token-md ${
+                    aktywne === p.id ? 'border-primary shadow-token-md' : 'border-border hover:border-foreground/25'
+                  }`}
                 >
                   <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block w-full text-left">
                     <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
                       {p.photos?.[0] && (
                         <img src={p.photos[0]} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                      )}
+                      {pokazMape && (
+                        <span className="absolute left-2.5 top-2.5 w-6 h-6 rounded-full bg-foreground text-background
+                                         flex items-center justify-center text-[11px] font-medium">
+                          {idx + 1}
+                        </span>
                       )}
                       {p.kind && (
                         <span className="absolute left-2.5 bottom-2.5 font-narrow uppercase tracking-[0.18em] text-[10px]
@@ -532,6 +581,22 @@ export default function Discover() {
                 </article>
               );
             })}
+          </div>
+
+          {pokazMape && (
+            <aside className="hidden lg:block lg:sticky lg:top-[88px]">
+              <div className="rounded-md border border-border overflow-hidden bg-card">
+                <DiscoverMap
+                  places={widoczne.filter((p) => p.lat != null && p.lng != null)
+                    .map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng }))}
+                  aktywne={aktywne}
+                  onPinClick={zPinezki}
+                  onPinHover={setAktywne}
+                  className="h-[calc(100vh-160px)] w-full"
+                />
+              </div>
+            </aside>
+          )}
           </div>
         )}
 
