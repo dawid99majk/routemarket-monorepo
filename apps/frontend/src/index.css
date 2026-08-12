@@ -410,3 +410,21 @@
   }
 }
 
+/* Fala przez siatkę kafelków przy zbieraniu miejsc. Świadomie na przezroczystości,
+   nie na gradiencie — system projektowy gradientów nie dopuszcza, a przesuwający
+   się połysk i tak jest tu tylko sygnałem "pracuję", nie ozdobą. Każdy kafelek
+   dostaje własne opóźnienie, więc fala idzie przez siatkę zamiast pulsować
+   wszystkim naraz. */
+@keyframes rm-fala {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.rm-shimmer {
+  animation: rm-fala 1.6s ease-in-out infinite;
+}
+
+/* Kto wyłączył animacje w systemie, dostaje statyczne kafelki. */
+@media (prefers-reduced-motion: reduce) {
+  .rm-shimmer { animation: none; opacity: 0.7; }
+}

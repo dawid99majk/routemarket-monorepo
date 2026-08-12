@@ -1645,6 +1645,7 @@ app.post('/places/suggest', async (c) => {
             if (!nazwa) continue;
             dodaj({
               id: null, slug: null, name: nazwa, city: city.trim(),
+              country: centrum.countryCode ?? null,
               lat: Number(d.lat), lng: Number(d.lon),
               category: 'attraction', kind: d.type || d.category || null,
               photos: [], visit_minutes: null, opening_hours: null,

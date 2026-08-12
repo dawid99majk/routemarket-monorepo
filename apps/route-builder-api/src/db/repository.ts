@@ -86,7 +86,7 @@ export class RouteBuilderRepository {
   async searchCatalogByName(query: string, city: string | null, limit = 6): Promise<any[]> {
     let q = supabase
       .from('place_catalog')
-      .select('id, slug, name, city, lat, lng, category, kind, photos, visit_minutes, opening_hours, website, description')
+      .select('id, slug, name, city, country, lat, lng, category, kind, photos, visit_minutes, opening_hours, website, description')
       .ilike('name', `%${query}%`)
       .order('pin_count', { ascending: false })
       .limit(limit);

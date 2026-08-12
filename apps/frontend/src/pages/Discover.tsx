@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
+import SzukanieMiejsc from '@/components/SzukanieMiejsc';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -504,30 +505,7 @@ export default function Discover() {
         ) : visible.length === 0 ? (
           <div className="text-center py-20 space-y-4">
             {seeding ? (
-              <>
-                <Loader2 className="w-9 h-9 text-primary/60 mx-auto animate-spin" />
-                <p className="font-display text-[20px]">Zbieram miejsca w: {city.trim()}</p>
-                <p className="text-muted-foreground max-w-md mx-auto text-pretty">
-                  Przeglądam otwarte dane o atrakcjach, sprawdzam godziny otwarcia i dobieram zdjęcia.
-                </p>
-                {/* Licznik zamiast udawanych etapów — postępu z serwera nie mamy,
-                    a upływ czasu i widełki są prawdziwe. */}
-                <p className="font-mono text-[13px] tabular-nums text-muted-foreground">
-                  {zbieraneSekundy} s · zwykle 40–60 s
-                </p>
-                <div className="grid gap-4 max-w-4xl mx-auto pt-4
-                                [grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr))]">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="rounded-md border border-border overflow-hidden">
-                      <div className="h-[120px] bg-muted animate-pulse" />
-                      <div className="p-3 space-y-2">
-                        <div className="h-3 bg-muted rounded animate-pulse" />
-                        <div className="h-3 w-2/3 bg-muted rounded animate-pulse" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <SzukanieMiejsc miasto={city.trim()} sekundy={zbieraneSekundy} />
             ) : (
               <>
             <Sparkles className="w-9 h-9 text-muted-foreground/40 mx-auto" />
