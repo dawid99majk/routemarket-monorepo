@@ -74,6 +74,21 @@ export class RouteBuilderRepository {
   }
 
   /** Cały katalog albo jedno miasto — do zadań przebudowujących zapisane dane. */
+  /** Miejsca na tablicach, którym brakuje zdjęcia — do uzupełnienia z Commons. */
+  async listBoardPlacesWithoutPhoto(limit = 300): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('trip_project_places')
+      .select('id, name, lat, lng, image_url, project_id, trip_projects(destination)')
+      .is('image_url', null)
+      .limit(limit);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  }
+
+  async setBoardPlacePhoto(id: string, url: string): Promise<void> {
+    await supabase.from('trip_project_places').update({ image_url: url }).eq('id', id);
+  }
+
   async listCatalogAll(city: string | null, limit = 500): Promise<any[]> {
     let q = supabase.from('place_catalog').select('id, name, city, lat, lng, photos').limit(limit);
     if (city) q = q.ilike('city', city);

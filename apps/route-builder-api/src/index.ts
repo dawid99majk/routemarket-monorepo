@@ -1450,6 +1450,43 @@ app.post('/catalog/seed', async (c) => {
 
 
 /**
+ * Zdjęcia dla miejsc na tablicach, które ich nie mają. Część miejsc trafiła na
+ * tablice zanim dobór zdjęć zaczął działać porządnie, a kafelek tablicy bez ani
+ * jednego zdjęcia to trzy kolorowe prostokąty — sygnał, że tablica jest pusta,
+ * choć wcale nie jest.
+ */
+app.post('/board/refresh-photos', async (c) => {
+  try {
+    const { limit = 120 } = await c.req.json().catch(() => ({})) as { limit?: number };
+    const braki = await repo.listBoardPlacesWithoutPhoto(limit);
+    if (braki.length === 0) return c.json({ checked: 0, updated: 0 });
+
+    let uzupelnione = 0;
+    const BATCH = 5;
+    for (let i = 0; i < braki.length; i += BATCH) {
+      const partia = braki.slice(i, i + BATCH);
+      const zestawy = await Promise.all(partia.map((m: any) =>
+        fetchNearbyPhotos(m.name, m.lat ?? undefined, m.lng ?? undefined, 1,
+          m.trip_projects?.destination ?? undefined).catch(() => [])
+      ));
+      await Promise.all(partia.map(async (m: any, j: number) => {
+        const url = zestawy[j]?.[0];
+        if (!url) return;
+        await repo.setBoardPlacePhoto(m.id, url);
+        uzupelnione++;
+      }));
+    }
+
+    console.log(`[board/refresh-photos] sprawdzono ${braki.length}, uzupełniono ${uzupelnione}`);
+    return c.json({ checked: braki.length, updated: uzupelnione });
+  } catch (e: any) {
+    console.error('[board/refresh-photos]', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
+/**
  * Uzupełnienie kraju tam, gdzie go brakuje. Kolumna istniała od początku, ale
  * zbieranie jej nie wypełniało, więc katalog nie potrafił odróżnić Wrocławia
  * od Berat inaczej niż nazwą miasta — a przy mieszanej liście to za mało.

@@ -27,6 +27,7 @@ interface SavedPlan { project_id: string; start_date: string | null; plan: any; 
 interface PublicBoard {
   id: string; name: string; destination: string | null; days: number | null;
   author_display: string | null; copy_count: number; place_count: number;
+  photos?: string[];
 }
 
 /** Pięć klimatów z projektu, w tej samej kolejności. */
@@ -134,13 +135,19 @@ export default function Start() {
     const { data: pubs } = await q;
 
     if (pubs?.length) {
+      // Zdjęcia razem z liczeniem: kafelek bez ani jednego zdjęcia to trzy kolorowe
+      // prostokąty, które wyglądają jak pusta tablica.
       const { data: cnt } = await (supabase as any)
-        .from('trip_project_places').select('project_id')
+        .from('trip_project_places').select('project_id, image_url')
         .in('project_id', pubs.map((b: any) => b.id));
-      setBoards(pubs.map((b: any) => ({
-        ...b,
-        place_count: (cnt ?? []).filter((c: any) => c.project_id === b.id).length,
-      })));
+      setBoards(pubs.map((b: any) => {
+        const swoje = (cnt ?? []).filter((c: any) => c.project_id === b.id);
+        return {
+          ...b,
+          place_count: swoje.length,
+          photos: swoje.filter((c: any) => c.image_url).slice(0, 3).map((c: any) => c.image_url),
+        };
+      }));
     } else {
       setBoards([]);
     }
@@ -632,6 +639,7 @@ export default function Start() {
                       b.copy_count > 0
                         ? `${b.copy_count} ${plural(b.copy_count, 'kopia', 'kopie', 'kopii')}`
                         : null].filter(Boolean).join(' · ')}
+                    zdjecia={b.photos ?? []}
                     autor={b.author_display || 'Podróżnik'}
                     akcja={
                       <Button size="sm" variant="outline" disabled={copying === b.id}

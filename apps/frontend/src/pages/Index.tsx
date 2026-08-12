@@ -106,10 +106,15 @@ export default function Index() {
         .eq('is_public', true).order('copy_count', { ascending: false }).limit(3);
       if (!data?.length) return setTablice([]);
       const { data: miejsca } = await (supabase as any).from('trip_project_places')
-        .select('project_id').in('project_id', data.map((b: any) => b.id));
-      setTablice(data.map((b: any) => ({
-        ...b, place_count: (miejsca ?? []).filter((m: any) => m.project_id === b.id).length,
-      })));
+        .select('project_id, image_url').in('project_id', data.map((b: any) => b.id));
+      setTablice(data.map((b: any) => {
+        const swoje = (miejsca ?? []).filter((m: any) => m.project_id === b.id);
+        return {
+          ...b,
+          place_count: swoje.length,
+          photos: swoje.filter((m: any) => m.image_url).slice(0, 3).map((m: any) => m.image_url),
+        };
+      }));
     })();
   }, []);
 
@@ -378,6 +383,7 @@ export default function Index() {
                 key={t.id}
                 nazwa={t.name}
                 meta={`${t.place_count} miejsc${t.copy_count > 0 ? ` · ${t.copy_count} kopii` : ''}`}
+                zdjecia={t.photos ?? []}
                 autor={t.author_display || 'Podróżnik'}
                 onClick={() => navigate(user ? '/start' : '/auth')}
               />
