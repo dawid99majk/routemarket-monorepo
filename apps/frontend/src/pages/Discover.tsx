@@ -136,7 +136,12 @@ export default function Discover() {
     const c = (cityOverride ?? city).trim();
     const seq = ++loadSeq.current;
     if (!ciche) setLoading(true);
-    let q = (supabase as any).from('place_catalog').select('*').limit(Math.max(60, ileWidocznych + 24));
+    // Stały limit zamiast rosnącego wraz z przewijaniem. Poprzednio doładowanie
+    // podnosiło limit, co dociągało kolejne rekordy, przez co lista rosła, wartownik
+    // znów wpadał w widok i cykl zaczynał się od nowa — strona migała bez końca.
+    // Teraz jedno zapytanie na miasto, a przewijanie wyłącznie odsłania to,
+    // co już jest w pamięci.
+    let q = (supabase as any).from('place_catalog').select('*').limit(200);
     if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
     // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
@@ -147,7 +152,7 @@ export default function Discover() {
     if (seq !== loadSeq.current) return;
     setPlaces(data ?? []);
     if (!ciche) setLoading(false);
-  }, [city, ileWidocznych]);
+  }, [city]);
 
   // Miasto: odpytujemy po chwili przerwy w pisaniu, a nie po każdym znaku.
   useEffect(() => {
@@ -155,12 +160,7 @@ export default function Discover() {
     return () => clearTimeout(t);
   }, [city]);
 
-  // Limit: dociągamy po cichu, żeby lista nie zwinęła się pod palcami.
-  const pierwszeWczytanie = useRef(true);
-  useEffect(() => {
-    if (pierwszeWczytanie.current) { pierwszeWczytanie.current = false; return; }
-    load(undefined, true);
-  }, [ileWidocznych]);
+
 
   useEffect(() => {
     (async () => {
@@ -280,6 +280,10 @@ export default function Discover() {
     if (places.length > 0) return;
     if (c.toLowerCase() !== cel.toLowerCase()) return;
     if (proboweane.current.has(c.toLowerCase())) return;
+    // Twardy bezpiecznik: jedno automatyczne zbieranie na wejście do widoku.
+    // Zbiór nazw sam w sobie nie wystarczy, bo zbieranie może zmienić miasto
+    // w polu, a wtedy nowa nazwa nie byłaby jeszcze w zbiorze.
+    if (proboweane.current.size >= 1) return;
     proboweane.current.add(c.toLowerCase());
     seedCity();
   }, [city, places.length, loading, seeding, board?.destination]);
@@ -318,8 +322,11 @@ export default function Discover() {
       const data = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 24 }, { timeoutMs: 180_000 });
       // Pole dostaje nazwę w postaci, w jakiej miejsca faktycznie zapisano — inaczej
       // filtr dalej szukałby tego, co użytkownik wpisał, a nie tego, co jest w bazie.
-      if (data.city) setCity(data.city);
-      await load(data.city || city);
+      if (data.city) {
+        proboweane.current.add(String(data.city).toLowerCase());
+        setCity(data.city);
+      }
+      await load(data.city || city, true);
 
       // Opisy dochodzą osobno, bo to zapytanie do modelu trwa dwadzieścia kilka
       // sekund. Karty stoją już z nazwami, godzinami i zdjęciami; treść dosypuje
@@ -327,7 +334,7 @@ export default function Discover() {
       if (data.needs_enrich) {
         setOpisyWToku(true);
         apiPost<any>('/catalog/enrich', { city: data.city || city.trim() }, { timeoutMs: 180_000 })
-          .then(() => load(data.city || city))
+          .then(() => load(data.city || city, true))
           .catch((e) => console.warn('Nie udało się dociągnąć opisów:', e))
           .finally(() => setOpisyWToku(false));
       }
