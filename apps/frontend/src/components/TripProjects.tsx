@@ -176,6 +176,12 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
   const [planDay, setPlanDay] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  /**
+   * Podgląd wszystkich tablic: kilka zdjęć i liczba miejsc na wyjazd. `places`
+   * trzyma wyłącznie aktywny wyjazd, więc kafelki pozostałych nie miały skąd wziąć
+   * zdjęć i rysowały same tinty — wyglądały jak puste tablice, którymi nie były.
+   */
+  const [podgladTablic, setPodgladTablic] = useState<Record<string, { zdjecia: string[]; ile: number }>>({});
   /** Zakładka z adresu. Tablica i plan to dwa widoki tych samych danych, a nie
    *  dwie sekcje jednej długiej strony — inaczej "Plan" w pasku niczego nie robi. */
   const [searchParams] = useSearchParams();
@@ -218,6 +224,20 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count, start_name, start_lat, start_lng')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
+
+      if (data?.length) {
+        const { data: miejsca } = await (supabase as any)
+          .from('trip_project_places')
+          .select('project_id, image_url')
+          .in('project_id', data.map((p: any) => p.id));
+        const wg: Record<string, { zdjecia: string[]; ile: number }> = {};
+        for (const m of miejsca ?? []) {
+          const w = (wg[m.project_id] ??= { zdjecia: [], ile: 0 });
+          w.ile++;
+          if (m.image_url && w.zdjecia.length < 3) w.zdjecia.push(m.image_url);
+        }
+        setPodgladTablic(wg);
+      }
       // Wejście z kreatora (?project=...) ma otworzyć świeżo utworzoną tablicę,
       // a nie ostatnio modyfikowaną — inaczej "Zapisz jako projekt" wyglądałoby
       // jakby nic nie zrobiło.
@@ -1120,11 +1140,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         {projects.length > 1 && (
           <div className="grid gap-3 -mt-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,208px),1fr))]">
             {projects.map((p) => {
-              const ile = places.filter((x) => x.project_id === p.id).length;
-              const zdjecia = places
-                .filter((x) => x.project_id === p.id && x.image_url)
-                .slice(0, 3)
-                .map((x) => x.image_url);
+              const podglad = podgladTablic[p.id];
+              const ile = podglad?.ile ?? 0;
+              const zdjecia = podglad?.zdjecia ?? [];
               return (
                 <TablicaKafelek
                   key={p.id}
@@ -2100,8 +2118,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                               Trasa dnia
                             </span>
                             <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
-                              {pts.length} {pts.length === 1 ? 'punkt' : 'punktów'}
-                              {withoutCoords > 0 && ` · ${withoutCoords} bez położenia`}
+                              {/* Liczymy to, co widać, a nie czego brakuje. „Bez położenia"
+                                  brzmiało jak awaria danych, choć znaczy tylko tyle, że
+                                  nie ustaliliśmy współrzędnych tego punktu. */}
+                              {pts.length} z {pts.length + withoutCoords} na mapie
                               {dayTrack && dr && dr !== 'loading' && ` · ${dr.km.toFixed(1)} km`}
                             </span>
                           </div>
@@ -2200,6 +2220,34 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 <h3 className="text-sm font-semibold flex items-center gap-2">
                   <CalendarDays className="w-4 h-4 text-primary" /> Ułóż plan dni
                 </h3>
+                {/* Gotowe okna czasowe. Wybór trybu dnia jednym kliknięciem, zamiast
+                    dłubania w natywnym selektorze godzin — a przy okazji podpowiedź,
+                    że dzień z dziećmi i dzień w delegacji to nie to samo. */}
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ['Standardowy', '09:00', '18:00'],
+                    ['Z dziećmi', '09:00', '16:00'],
+                    ['Intensywny', '08:00', '20:00'],
+                    ['Popołudniowy', '14:00', '21:00'],
+                  ] as const).map(([etykieta, od, doG]) => {
+                    const wybrany = planForm.start === od && planForm.end === doG;
+                    return (
+                      <button key={etykieta}
+                        onClick={() => setPlanForm({ ...planForm, start: od, end: doG })}
+                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                          wybrany
+                            ? 'bg-primary border-primary text-primary-foreground'
+                            : 'border-border hover:bg-muted'
+                        }`}>
+                        {etykieta}
+                        <span className={`font-mono ml-1.5 ${wybrany ? 'opacity-80' : 'text-muted-foreground'}`}>
+                          {od}–{doG}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="grid gap-2 sm:grid-cols-5">
                   <label className="text-xs text-muted-foreground">Od
                     <Input type="time" value={planForm.start}

@@ -95,6 +95,8 @@ export default function Discover() {
   const [pokazMape, setPokazMape] = useState(true);
   /** Miejsce pod kursorem albo wskazane pinezką — wiąże kartę z punktem na mapie. */
   const [aktywne, setAktywne] = useState<string | null>(null);
+  const [obszar, setObszar] = useState<{ pn: number; pd: number; wsch: number; zach: number } | null>(null);
+  const [tylkoZObszaru, setTylkoZObszaru] = useState(true);
   const [startQuery, setStartQuery] = useState('');
   const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
   const [lokalizowanie, setLokalizowanie] = useState(false);
@@ -209,8 +211,25 @@ export default function Discover() {
     });
   }, [places, query, filter]);
 
+  /**
+   * Karty ograniczone do wycinka mapy. Przewijając mapę zawężasz listę obok —
+   * miejsca poza kadrem znikają z niej, bo przy planowaniu dnia liczy się to,
+   * co jest blisko siebie, a nie wszystko, co miasto ma do zaoferowania.
+   * Miejsca bez współrzędnych zostają zawsze: nie da się orzec, czy są w kadrze.
+   */
+  const wObszarze = useMemo(() => {
+    if (!pokazMape || !tylkoZObszaru || !obszar) return visible;
+    // Kadr o zerowej rozpiętości znaczy, że mapa nie ma rozmiaru — filtrowanie
+    // po nim wycięłoby wszystko.
+    if (obszar.pn - obszar.pd < 1e-6 || obszar.wsch - obszar.zach < 1e-6) return visible;
+    return visible.filter((p) => {
+      if (p.lat == null || p.lng == null) return true;
+      return p.lat <= obszar.pn && p.lat >= obszar.pd && p.lng <= obszar.wsch && p.lng >= obszar.zach;
+    });
+  }, [visible, obszar, tylkoZObszaru, pokazMape]);
+
   /** Widoczny wycinek. Filtrowanie idzie po całości, przycinamy dopiero na końcu. */
-  const widoczne = useMemo(() => visible.slice(0, ileWidocznych), [visible, ileWidocznych]);
+  const widoczne = useMemo(() => wObszarze.slice(0, ileWidocznych), [wObszarze, ileWidocznych]);
 
   const savedCount = Object.values(marks).filter((m) => m === 'must').length;
   const maybeCount = Object.values(marks).filter((m) => m === 'nice').length;
@@ -298,7 +317,7 @@ export default function Discover() {
   // Efekt musi się powtórzyć, kiedy wartownik pojawi się w drzewie. Przy pustym
   // zestawie zależności podpinał się raz, przy montowaniu — a wtedy elementu
   // jeszcze nie było, bo renderuje się dopiero, gdy jest co doładowywać.
-  const jestCoDoladowac = ileWidocznych < visible.length;
+  const jestCoDoladowac = ileWidocznych < wObszarze.length;
   useEffect(() => {
     const el = wartownik.current;
     if (!el || !jestCoDoladowac) return;
@@ -499,28 +518,61 @@ export default function Discover() {
           <p className="text-muted-foreground flex items-center gap-2 py-16">
             <Loader2 className="w-4 h-4 animate-spin" /> Wczytuję miejsca…
           </p>
-        ) : visible.length === 0 ? (
+        ) : (
+          <div className={pokazMape ? 'mt-6 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,44%)] gap-6 items-start' : 'mt-6'}>
+          {wObszarze.length === 0 ? (
           <div className="text-center py-20 space-y-4">
             {seeding ? (
               <SzukanieMiejsc miasto={city.trim()} sekundy={zbieraneSekundy} />
             ) : (
               <>
             <Sparkles className="w-9 h-9 text-muted-foreground/40 mx-auto" />
-            <p className="text-muted-foreground max-w-md mx-auto">
-              {city.trim()
-                ? `Nie mamy jeszcze miejsc dla: ${city}. Możemy je zebrać — potrwa to kilkadziesiąt sekund.`
-                : 'Wpisz miasto, żeby zobaczyć, co w nim jest.'}
-            </p>
-            {city.trim() && (
-              <Button onClick={seedCity} className="bg-primary hover:bg-primary/90">
-                Zbierz miejsca dla: {city}
-              </Button>
+            {/* Trzy różne pustki, trzy różne komunikaty. Wcześniej każda dostawała
+                ten sam: "nie mamy miejsc dla tego miasta" — nawet wtedy, gdy miasto
+                miało setkę miejsc, a po prostu żadne nie pasowało do wpisanej frazy.
+                Użytkownik dostawał wtedy przycisk zbierania, który niczego by nie
+                naprawił, bo problemem było zapytanie, nie katalog. */}
+            {places.length > 0 ? (
+              <>
+                <p className="text-muted-foreground max-w-md mx-auto text-pretty">
+                  {query.trim()
+                    ? `Żadne z ${places.length} miejsc nie pasuje do: „${query.trim()}".`
+                    : tylkoZObszaru && obszar && visible.length > 0
+                      ? 'W tym kadrze mapy nie ma żadnego z zapisanych miejsc. Oddal mapę albo pokaż wszystkie.'
+                      : 'Żadne miejsce nie pasuje do wybranego filtra.'}
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {query.trim() && (
+                    <Button variant="outline" onClick={() => setQuery('')}>Wyczyść frazę</Button>
+                  )}
+                  {filter !== FILTERS[0].id && (
+                    <Button variant="outline" onClick={() => setFilter(FILTERS[0].id)}>Pokaż wszystkie</Button>
+                  )}
+                  {tylkoZObszaru && obszar && visible.length > 0 && (
+                    <Button variant="outline" onClick={() => setTylkoZObszaru(false)}>
+                      Nie ograniczaj do mapy
+                    </Button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  {city.trim()
+                    ? `Nie mamy jeszcze miejsc dla: ${city}. Możemy je zebrać — potrwa to kilkadziesiąt sekund.`
+                    : 'Wpisz miasto, żeby zobaczyć, co w nim jest.'}
+                </p>
+                {city.trim() && (
+                  <Button onClick={seedCity} className="bg-primary hover:bg-primary/90">
+                    Zbierz miejsca dla: {city}
+                  </Button>
+                )}
+              </>
             )}
               </>
             )}
           </div>
-        ) : (
-          <div className={pokazMape ? 'mt-6 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,44%)] gap-6 items-start' : 'mt-6'}>
+          ) : (
           <div className={pokazMape
             ? '[column-gap:20px] columns-1 sm:columns-2'
             : '[column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4'}>
@@ -537,6 +589,7 @@ export default function Discover() {
                   key={p.id}
                   ref={(el) => { kartyRef.current[p.id] = el; }}
                   onMouseEnter={() => setAktywne(p.id)}
+                  onFocus={() => setAktywne(p.id)}
                   onMouseLeave={() => setAktywne(null)}
                   className={`group mb-5 break-inside-avoid rounded-md border bg-card overflow-hidden
                              transition-[box-shadow,border-color] duration-200 hover:shadow-token-md ${
@@ -626,6 +679,7 @@ export default function Discover() {
               );
             })}
           </div>
+          )}
 
           {pokazMape && (
             <aside className="hidden lg:block lg:sticky lg:top-[88px] space-y-3">
@@ -685,6 +739,17 @@ export default function Discover() {
                 )}
               </div>
 
+              <label className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3.5 py-2.5
+                                text-[13px] cursor-pointer select-none">
+                <input type="checkbox" checked={tylkoZObszaru}
+                  onChange={(e) => setTylkoZObszaru(e.target.checked)}
+                  className="accent-primary w-4 h-4" />
+                <span className="flex-1">Pokazuj tylko to, co widać na mapie</span>
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {wObszarze.length}
+                </span>
+              </label>
+
               <div className="rounded-md border border-border overflow-hidden bg-card">
                 <DiscoverMap
                   start={(board as any)?.start_name && (board as any)?.start_lat != null
@@ -695,6 +760,9 @@ export default function Discover() {
                   aktywne={aktywne}
                   onPinClick={zPinezki}
                   onPinHover={setAktywne}
+                  onObszar={setObszar}
+                  doKadru={visible.filter((p) => p.lat != null && p.lng != null)
+                    .map((p) => ({ lat: p.lat, lng: p.lng }))}
                   className="h-[calc(100vh-160px)] w-full"
                 />
               </div>
@@ -707,10 +775,10 @@ export default function Discover() {
         {/* Doładowywanie idzie samo przy przewijaniu, ale przycisk zostaje: obserwator
             przecięć milczy w części przeglądarek wbudowanych w aplikacje i w widokach
             o zerowej wysokości okna, a wtedy lista kończyłaby się bez wyjścia. */}
-        {widoczne.length < visible.length && (
+        {widoczne.length < wObszarze.length && (
           <div ref={wartownik} className="py-10 flex flex-col items-center gap-3">
             <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
-              {widoczne.length} z {visible.length}
+              {widoczne.length} z {wObszarze.length}
             </span>
             <Button variant="outline" onClick={() => setIleWidocznych((n) => n + 24)}>
               Pokaż więcej miejsc
