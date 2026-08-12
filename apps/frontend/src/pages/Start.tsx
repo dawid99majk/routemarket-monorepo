@@ -8,6 +8,7 @@ import { utworzWyjazd } from '@/lib/newTrip';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
+import TablicaKafelek from '@/components/TablicaKafelek';
 import { TRIP_PRESETS, EMPTY_AXES } from '@/lib/tripPresets';
 
 type Priority = 'must' | 'nice' | 'rejected';
@@ -590,29 +591,23 @@ export default function Start() {
               <h2 className="font-display text-[18px]">Twoje wyjazdy</h2>
               <span className="font-mono text-[13px] tabular-nums text-muted-foreground">{projects.length}</span>
             </div>
-            <div className="mt-4 space-y-2.5">
+            <div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
               {projects.map((p) => {
                 const st = statusOf(p);
+                const zdjecia = places
+                  .filter((x) => x.project_id === p.id && x.image_url)
+                  .slice(0, 3)
+                  .map((x) => x.image_url);
                 return (
-                  <button key={p.id} onClick={() => navigate('/plany')}
-                    className={`w-full flex items-center gap-3.5 rounded-md border bg-card px-4 py-3.5 text-left
-                                hover:shadow-token-md transition-shadow ${
-                      p.id === active?.id ? 'border-primary/35' : 'border-border'
-                    }`}>
-                    <div className="w-12 h-12 rounded-sm bg-muted shrink-0 overflow-hidden">
-                      {places.find((x) => x.project_id === p.id && x.image_url)?.image_url && (
-                        <img src={places.find((x) => x.project_id === p.id && x.image_url)!.image_url!}
-                          alt="" loading="lazy" className="w-full h-full object-cover" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-display text-[16px] leading-snug truncate">{p.name}</div>
-                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5 truncate">
-                        {metaOf(p)}
-                      </div>
-                    </div>
-                    <Badge variant={st.variant} className="shrink-0">{st.label}</Badge>
-                  </button>
+                  <TablicaKafelek
+                    key={p.id}
+                    nazwa={p.name}
+                    meta={metaOf(p)}
+                    zdjecia={zdjecia}
+                    aktywny={p.id === active?.id}
+                    odznaka={<Badge variant={st.variant} className="shrink-0">{st.label}</Badge>}
+                    onClick={() => navigate('/plany')}
+                  />
                 );
               })}
             </div>
@@ -629,33 +624,25 @@ export default function Start() {
                   <span className="text-[13px] text-muted-foreground">{active.destination}</span>
                 )}
               </div>
-              <div className="mt-4 space-y-2.5">
+              <div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
                 {boards.map((b) => (
-                  <div key={b.id}
-                    className="flex items-center gap-3.5 rounded-md border border-border bg-card px-4 py-3.5">
-                    <span className="w-10 h-10 rounded-full bg-accent/25 border border-border shrink-0
-                                     flex items-center justify-center text-[12px] font-medium">
-                      {(b.author_display || 'Podróżnik').split(/\s+/).slice(0, 2)
-                        .map((x) => x[0]).join('').toUpperCase()}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-display text-[16px] leading-snug truncate">{b.name}</div>
-                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5 truncate">
-                        {[b.author_display || 'Podróżnik',
-                          `${b.place_count} ${plural(b.place_count, 'miejsce', 'miejsca', 'miejsc')}`,
-                          b.copy_count > 0
-                            ? `${b.copy_count} ${plural(b.copy_count, 'kopia', 'kopie', 'kopii')}`
-                            : null,
-                        ].filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                    <Button size="sm" variant="outline" disabled={copying === b.id}
-                      onClick={() => copyBoard(b)} className="shrink-0">
-                      {copying === b.id
-                        ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Kopiuję…</>
-                        : 'Skopiuj'}
-                    </Button>
-                  </div>
+                  <TablicaKafelek
+                    key={b.id}
+                    nazwa={b.name}
+                    meta={[`${b.place_count} ${plural(b.place_count, 'miejsce', 'miejsca', 'miejsc')}`,
+                      b.copy_count > 0
+                        ? `${b.copy_count} ${plural(b.copy_count, 'kopia', 'kopie', 'kopii')}`
+                        : null].filter(Boolean).join(' · ')}
+                    autor={b.author_display || 'Podróżnik'}
+                    akcja={
+                      <Button size="sm" variant="outline" disabled={copying === b.id}
+                        onClick={() => copyBoard(b)}>
+                        {copying === b.id
+                          ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Kopiuję…</>
+                          : 'Skopiuj'}
+                      </Button>
+                    }
+                  />
                 ))}
               </div>
             </section>

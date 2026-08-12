@@ -12,6 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import PlanDayMap from '@/components/PlanDayMap';
+import TablicaKafelek from '@/components/TablicaKafelek';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -1124,32 +1125,22 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             rzeczą, którą się wybiera — a napis w linijce nie wygląda na rzecz.
             Aktywny ma pełną ramkę i kropkę, więc widać go bez czytania. */}
         {projects.length > 1 && (
-          <div className="flex flex-wrap gap-2.5 -mt-2">
+          <div className="grid gap-3 -mt-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,208px),1fr))]">
             {projects.map((p) => {
-              const aktywny = p.id === activeId;
               const ile = places.filter((x) => x.project_id === p.id).length;
+              const zdjecia = places
+                .filter((x) => x.project_id === p.id && x.image_url)
+                .slice(0, 3)
+                .map((x) => x.image_url);
               return (
-                <button
+                <TablicaKafelek
                   key={p.id}
+                  nazwa={p.name}
+                  meta={[p.destination, ile > 0 ? `${ile} miejsc` : null].filter(Boolean).join(' · ') || 'szkic'}
+                  zdjecia={zdjecia}
+                  aktywny={p.id === activeId}
                   onClick={() => setActiveId(p.id)}
-                  className={`rounded-md border px-3.5 py-2.5 text-left min-w-[168px] transition-shadow ${
-                    aktywny
-                      ? 'border-primary bg-card shadow-token-sm'
-                      : 'border-border bg-card/60 hover:shadow-token-sm'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      aktywny ? 'bg-primary' : 'bg-border'
-                    }`} />
-                    <span className={`text-[13px] truncate ${aktywny ? '' : 'text-muted-foreground'}`}>
-                      {p.name}
-                    </span>
-                  </div>
-                  <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
-                    {[p.destination, ile > 0 ? `${ile} miejsc` : null].filter(Boolean).join(' · ') || 'szkic'}
-                  </div>
-                </button>
+                />
               );
             })}
           </div>

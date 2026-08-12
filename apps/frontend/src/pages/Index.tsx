@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { utworzWyjazd } from '@/lib/newTrip';
 import PlannerHeader from '@/components/PlannerHeader';
+import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
@@ -373,28 +374,13 @@ export default function Index() {
 
           <div className="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))]">
             {tablice.map((t) => (
-              <button key={t.id} onClick={() => navigate(user ? '/start' : '/auth')}
-                className="text-left rounded-md bg-card border border-border overflow-hidden
-                           hover:shadow-token-md transition-shadow">
-                <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-[168px]">
-                  <div className="row-span-2 bg-primary/15" />
-                  <div className="bg-dusty-blue/20" />
-                  <div className="bg-accent/20" />
-                </div>
-                <div className="p-5">
-                  <h3 className="font-display text-[18px] leading-snug">{t.name}</h3>
-                  <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">
-                    {t.place_count} miejsc{t.copy_count > 0 ? ` · ${t.copy_count} kopii` : ''}
-                  </p>
-                  <div className="flex items-center gap-2.5 mt-4">
-                    <span className="w-7 h-7 rounded-full bg-accent/55 flex items-center justify-center
-                                     text-[11px] font-medium">
-                      {(t.author_display || 'Podróżnik').split(/\s+/).slice(0, 2).map((x) => x[0]).join('').toUpperCase()}
-                    </span>
-                    <span className="text-[13px] text-muted-foreground">{t.author_display || 'Podróżnik'}</span>
-                  </div>
-                </div>
-              </button>
+              <TablicaKafelek
+                key={t.id}
+                nazwa={t.name}
+                meta={`${t.place_count} miejsc${t.copy_count > 0 ? ` · ${t.copy_count} kopii` : ''}`}
+                autor={t.author_display || 'Podróżnik'}
+                onClick={() => navigate(user ? '/start' : '/auth')}
+              />
             ))}
           </div>
         </section>
