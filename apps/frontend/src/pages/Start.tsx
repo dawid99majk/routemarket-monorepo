@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { utworzWyjazd } from '@/lib/newTrip';
+import { nazwaUzytkownika, inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
@@ -102,11 +103,9 @@ export default function Start() {
     const { data: userData } = await supabase.auth.getUser();
     const u = userData.user;
     if (!u) { navigate('/auth'); return; }
-    const fullName = (u.user_metadata as any)?.full_name as string | undefined;
-    setImie(fullName?.split(/\s+/)[0] ?? null);
-    setInitials(fullName
-      ? fullName.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
-      : (u.email ?? '??').slice(0, 2).toUpperCase());
+    const nazwa = await nazwaUzytkownika();
+    setImie(nazwa?.split(/\s+/)[0] ?? null);
+    setInitials(await inicjalyUzytkownika());
 
     const [{ data: pr }, { data: pl }, { data: sp }] = await Promise.all([
       (supabase as any).from('trip_projects')

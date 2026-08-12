@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase } from '@/integrations/supabase/client';
 import PlanDayMap from '@/components/PlanDayMap';
 import TablicaKafelek from '@/components/TablicaKafelek';
+import { podpisPubliczny } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -277,15 +278,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     if (!active) return;
     setPublishing(true);
     const nowe = !(active as any).is_public;
-    let autor: string | null = null;
-    if (nowe) {
-      const { data: ud } = await supabase.auth.getUser();
-      const pelne = (ud.user?.user_metadata as any)?.full_name as string | undefined;
-      if (pelne) {
-        const cz = pelne.trim().split(/\s+/);
-        autor = cz.length > 1 ? `${cz[0]} ${cz[1][0]}.` : cz[0];
-      }
-    }
+    const autor = nowe ? await podpisPubliczny() : null;
     const { error } = await (supabase as any).from('trip_projects').update({
       is_public: nowe,
       published_at: nowe ? new Date().toISOString() : null,

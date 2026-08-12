@@ -12,6 +12,8 @@ export interface PinPlace {
 
 interface DiscoverMapProps {
   places: PinPlace[];
+  /** Punkt startowy wyjazdu — hotel, parking, dworzec. Rysowany inaczej niż atrakcje. */
+  start?: { name: string; lat: number; lng: number } | null;
   /** Miejsce pod kursorem albo wybrane na liście — jego pinezka jest wyróżniona. */
   aktywne?: string | null;
   onPinClick?: (id: string) => void;
@@ -43,7 +45,7 @@ function pinIcon(numer: number, wyroznione: boolean) {
  * spojrzenie wystarczy, żeby powiązać kafelek z punktem na mapie — bez tego
  * mapa jest ozdobą, a nie narzędziem.
  */
-function DiscoverMapInner({ places, aktywne, onPinClick, onPinHover, className = '' }: DiscoverMapProps) {
+function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, className = '' }: DiscoverMapProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const warstwa = useRef<L.LayerGroup | null>(null);
@@ -75,7 +77,35 @@ function DiscoverMapInner({ places, aktywne, onPinClick, onPinHover, className =
     markery.current.clear();
 
     const zPolozeniem = places.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
-    if (zPolozeniem.length === 0) return;
+
+    // Punkt startowy dostaje własny znacznik: kropla zamiast koła i kolor akcentu,
+    // żeby nie dało się go pomylić z ponumerowaną atrakcją. Rysujemy go nawet wtedy,
+    // gdy atrakcji jeszcze nie ma — bo wtedy jest jedyną rzeczą na mapie.
+    if (start && Number.isFinite(start.lat) && Number.isFinite(start.lng)) {
+      L.marker([start.lat, start.lng], {
+        zIndexOffset: 1000,
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="position:relative;width:30px;height:38px">
+            <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+              background:hsl(22 60% 58%);border:2px solid hsl(60 12% 97%);
+              box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>
+            <div style="position:absolute;top:7px;left:9px;width:12px;height:12px;border-radius:50%;
+              background:hsl(60 12% 97%)"></div>
+          </div>`,
+          iconSize: [30, 38],
+          iconAnchor: [15, 34],
+        }),
+      }).addTo(w).bindTooltip(`Start: ${start.name}`, { direction: 'top', offset: [0, -34] });
+    }
+
+    if (zPolozeniem.length === 0) {
+      if (start && Number.isFinite(start.lat)) {
+        map.setView([start.lat, start.lng], 14, { animate: false });
+        dopasowane.current = `start:${start.lat},${start.lng}`;
+      }
+      return;
+    }
 
     zPolozeniem.forEach((p, i) => {
       const m = L.marker([p.lat, p.lng], { icon: pinIcon(i + 1, p.id === aktywne) })
@@ -89,14 +119,15 @@ function DiscoverMapInner({ places, aktywne, onPinClick, onPinHover, className =
 
     // Kadrujemy tylko wtedy, gdy zmienił się zestaw miejsc. Przy samym najechaniu
     // na kartę mapa nie ma prawa uciekać spod kursora.
-    const podpis = zPolozeniem.map((p) => p.id).join(',');
+    const podpis = zPolozeniem.map((p) => p.id).join(',') + `|${start?.lat ?? ''},${start?.lng ?? ''}`;
     if (podpis !== dopasowane.current) {
       dopasowane.current = podpis;
       map.invalidateSize();
-      map.fitBounds(L.latLngBounds(zPolozeniem.map((p) => [p.lat, p.lng] as [number, number])).pad(0.15),
-        { animate: false });
+      const punkty = zPolozeniem.map((p) => [p.lat, p.lng] as [number, number]);
+      if (start && Number.isFinite(start.lat)) punkty.push([start.lat, start.lng]);
+      map.fitBounds(L.latLngBounds(punkty).pad(0.15), { animate: false });
     }
-  }, [places, aktywne, onPinClick, onPinHover]);
+  }, [places, start, aktywne, onPinClick, onPinHover]);
 
   return <div ref={boxRef} className={className} />;
 }

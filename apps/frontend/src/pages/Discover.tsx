@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import SzukanieMiejsc from '@/components/SzukanieMiejsc';
+import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -104,11 +105,7 @@ export default function Discover() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getUser();
-      const pelne = (data.user?.user_metadata as any)?.full_name as string | undefined;
-      setInitials(pelne
-        ? pelne.split(/\s+/).slice(0, 2).map((c) => c[0]).join('').toUpperCase()
-        : (data.user?.email ?? '').slice(0, 2).toUpperCase() || null);
+      setInitials(await inicjalyUzytkownika());
     })();
   }, []);
 
@@ -638,7 +635,12 @@ export default function Discover() {
                 {(board as any)?.start_name ? (
                   <div className="flex items-center gap-2.5">
                     <MapPin className="w-4 h-4 text-primary shrink-0" />
-                    <span className="text-sm truncate flex-1">{(board as any).start_name}</span>
+                    <span className="text-sm truncate flex-1">
+                      {(board as any).start_name}
+                      {(board as any).start_lat == null && (
+                        <span className="text-[12px] text-muted-foreground"> · bez położenia, nie ma go na mapie</span>
+                      )}
+                    </span>
                     <button onClick={() => zapiszStart('', null, null)}
                       className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
                       zmień
@@ -685,6 +687,9 @@ export default function Discover() {
 
               <div className="rounded-md border border-border overflow-hidden bg-card">
                 <DiscoverMap
+                  start={(board as any)?.start_name && (board as any)?.start_lat != null
+                    ? { name: (board as any).start_name, lat: (board as any).start_lat, lng: (board as any).start_lng }
+                    : null}
                   places={widoczne.filter((p) => p.lat != null && p.lng != null)
                     .map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng }))}
                   aktywne={aktywne}
