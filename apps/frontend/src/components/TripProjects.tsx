@@ -149,6 +149,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   const [shareEmail, setShareEmail] = useState('');
   const [sharing, setSharing] = useState(false);
   const [editingType, setEditingType] = useState(false);
+  const [prefsOtwarte, setPrefsOtwarte] = useState(false);
+  /** Jedno narzędzie naraz. Trzy rozwinięte paski zajmowały ekran bez powodu. */
+  const [rozwiniete, setRozwiniete] = useState<'szukaj' | 'wydarzenia' | null>(null);
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
   const [grouped, setGrouped] = useState(false);
@@ -1117,21 +1120,38 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             wyjeździe pigułka powtarzała nazwę stojącą wyżej jako tytuł, a przy
             kilku wypełniona kolorem konkurowała z kubełkami — stąd sama kreska
             pod aktywnym. */}
+        {/* Wyjazdy jako kafelki, nie rząd podkreślonych napisów. Tablica jest tu
+            rzeczą, którą się wybiera — a napis w linijce nie wygląda na rzecz.
+            Aktywny ma pełną ramkę i kropkę, więc widać go bez czytania. */}
         {projects.length > 1 && (
-          <div className="flex flex-wrap gap-x-5 gap-y-2 -mt-3">
-            {projects.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setActiveId(p.id)}
-                className={`text-[13px] pb-1 border-b-2 transition-colors ${
-                  p.id === activeId
-                    ? 'border-b-foreground text-foreground'
-                    : 'border-b-transparent text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2.5 -mt-2">
+            {projects.map((p) => {
+              const aktywny = p.id === activeId;
+              const ile = places.filter((x) => x.project_id === p.id).length;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setActiveId(p.id)}
+                  className={`rounded-md border px-3.5 py-2.5 text-left min-w-[168px] transition-shadow ${
+                    aktywny
+                      ? 'border-primary bg-card shadow-token-sm'
+                      : 'border-border bg-card/60 hover:shadow-token-sm'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      aktywny ? 'bg-primary' : 'bg-border'
+                    }`} />
+                    <span className={`text-[13px] truncate ${aktywny ? '' : 'text-muted-foreground'}`}>
+                      {p.name}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
+                    {[p.destination, ile > 0 ? `${ile} miejsc` : null].filter(Boolean).join(' · ') || 'szkic'}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -1419,53 +1439,103 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
               </div>
             </div>
 
-            {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
-            <div className="rounded-md border bg-muted/30 px-4 py-3">
-              <div className="flex items-baseline justify-between gap-3 mb-2">
-                <span className="text-sm font-medium">Ile czasu zaplanować</span>
-                <span className="text-sm font-semibold text-primary tabular-nums">
-                  {active.fill_percent ?? 70}%
-                </span>
-              </div>
-              <Slider
-                value={[active.fill_percent ?? 70]}
-                min={0}
-                max={100}
-                step={5}
-                onValueChange={(v) => setProjects((prev) =>
-                  prev.map((p) => (p.id === active.id ? { ...p, fill_percent: v[0] } : p)))}
-                onValueCommit={(v) => saveFillPercent(v[0])}
-              />
-              {/* Pasek zajętości: liczby same nie mówią nic, dopóki nie widać,
-                  ile czasu w ogóle jest do rozdysponowania. */}
-              {budget && (
-                <div className="mt-3">
-                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
-                      }`}
-                      style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
-                    <strong className="text-foreground">{places.length}</strong> miejsc ({mustCount} koniecznie) ·{' '}
-                    Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
-                    {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
-                    {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
-                    {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> — więcej, niż da się przejść</span>}
-                  </p>
+            {/* Narzędzia tablicy jako trzy małe karty. Wcześniej były trzema pasami
+                na całą szerokość, rozwiniętymi na stałe — zajmowały pół ekranu,
+                choć korzysta się z nich rzadko i pojedynczo. */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <button onClick={() => setPrefsOtwarte(true)}
+                className="rounded-md border border-border bg-card px-4 py-3 text-left
+                           hover:shadow-token-md transition-shadow">
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                  Preferencje tablicy
                 </div>
-              )}
+                <div className="text-sm mt-1">
+                  Wypełnienie {active.fill_percent ?? 70}%
+                  {active.days ? ` · ${active.days} dni` : ''}
+                </div>
+              </button>
 
-              <p className="text-[11px] leading-snug text-muted-foreground mt-2">
-                {(active.fill_percent ?? 70) >= 90
-                  ? 'Dzień wypełniony po brzegi — zdążysz wszędzie, ale bez marginesu na przystanek, który sam się trafi.'
-                  : (active.fill_percent ?? 70) <= 40
-                  ? 'Kilka kotwic i dużo swobody — reszta dnia na wałęsanie się po mieście bez planu.'
-                  : 'Zaplanowane atrakcje wypełnią tyle procent Twojego czasu, resztę zostawiamy na przerwy i włóczenie się po okolicy.'}
-              </p>
+              <button onClick={() => setRozwiniete((v) => (v === 'szukaj' ? null : 'szukaj'))}
+                className={`rounded-md border px-4 py-3 text-left transition-shadow hover:shadow-token-md ${
+                  rozwiniete === 'szukaj' ? 'border-foreground bg-card' : 'border-border bg-card'
+                }`}>
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                  Szukaj miejsc
+                </div>
+                <div className="text-sm mt-1">
+                  {rozwiniete === 'szukaj' ? 'Zwiń wyszukiwanie' : `Dodaj coś w: ${active.destination}`}
+                </div>
+              </button>
+
+              <button onClick={() => setRozwiniete((v) => (v === 'wydarzenia' ? null : 'wydarzenia'))}
+                className={`rounded-md border px-4 py-3 text-left transition-shadow hover:shadow-token-md ${
+                  rozwiniete === 'wydarzenia' ? 'border-foreground bg-card' : 'border-border bg-card'
+                }`}>
+                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                  Wydarzenia
+                </div>
+                <div className="text-sm mt-1">
+                  {events.length > 0 ? `${events.length} w terminie` : 'Sprawdź, co się dzieje'}
+                </div>
+              </button>
             </div>
+
+            <Dialog open={prefsOtwarte} onOpenChange={setPrefsOtwarte}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="font-display text-[20px]">Preferencje tablicy</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
+                  <div className="rounded-md border bg-muted/30 px-4 py-3">
+                    <div className="flex items-baseline justify-between gap-3 mb-2">
+                      <span className="text-sm font-medium">Ile czasu zaplanować</span>
+                      <span className="text-sm font-semibold text-primary tabular-nums">
+                        {active.fill_percent ?? 70}%
+                      </span>
+                    </div>
+                    <Slider
+                      value={[active.fill_percent ?? 70]}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onValueChange={(v) => setProjects((prev) =>
+                        prev.map((p) => (p.id === active.id ? { ...p, fill_percent: v[0] } : p)))}
+                      onValueCommit={(v) => saveFillPercent(v[0])}
+                    />
+                    {/* Pasek zajętości: liczby same nie mówią nic, dopóki nie widać,
+                        ile czasu w ogóle jest do rozdysponowania. */}
+                    {budget && (
+                      <div className="mt-3">
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
+                            }`}
+                            style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
+                          <strong className="text-foreground">{places.length}</strong> miejsc ({mustCount} koniecznie) ·{' '}
+                          Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
+                          {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
+                          {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
+                          {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> — więcej, niż da się przejść</span>}
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="text-[11px] leading-snug text-muted-foreground mt-2">
+                      {(active.fill_percent ?? 70) >= 90
+                        ? 'Dzień wypełniony po brzegi — zdążysz wszędzie, ale bez marginesu na przystanek, który sam się trafi.'
+                        : (active.fill_percent ?? 70) <= 40
+                        ? 'Kilka kotwic i dużo swobody — reszta dnia na wałęsanie się po mieście bez planu.'
+                        : 'Zaplanowane atrakcje wypełnią tyle procent Twojego czasu, resztę zostawiamy na przerwy i włóczenie się po okolicy.'}
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {editingType && (
               <div className="rounded-md bg-muted/50 p-3 space-y-2">
@@ -1491,6 +1561,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
               </div>
             )}
 
+            {rozwiniete === 'szukaj' && (<>
             <div>
               <div className="relative flex items-center">
                 <Search className="w-4 h-4 absolute left-3 text-muted-foreground" />
@@ -1621,6 +1692,8 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 decyzja "zostawiam czy wyrzucam" była zgadywanką. */}
             </>)}
 
+            </>)}
+
             {/* Okno karty miejsca zostaje poza podziałem: otwiera je zarówno kafelek
                 na tablicy, jak i punkt na osi dnia w planie. */}
             <Dialog open={!!placeCard} onOpenChange={(open) => !open && setPlaceCard(null)}>
@@ -1685,7 +1758,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
 
             {view === 'tablica' && (<>
             {/* Wydarzenia: pokazujemy je przy tablicy, bo tam zapada decyzja
-                "dokładam dzień czy nie" — nie w osobnej zakładce. */}
+                "dokładam dzień czy nie" — nie w osobnej zakładce. Rozwijane, bo
+                sprawdza się je raz na wyjazd, a nie przy każdym wejściu. */}
+            {rozwiniete === 'wydarzenia' && (
             <div className="rounded-md border bg-card">
               <div className="flex items-center justify-between px-4 py-2.5 border-b">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1728,6 +1803,8 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 </div>
               )}
             </div>
+
+            )}
 
             {(outliers.length > 0 || duplicates.length > 0) && (
               <div className="rounded-md border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">

@@ -93,6 +93,9 @@ export default function Discover() {
   const [pokazMape, setPokazMape] = useState(true);
   /** Miejsce pod kursorem albo wskazane pinezką — wiąże kartę z punktem na mapie. */
   const [aktywne, setAktywne] = useState<string | null>(null);
+  const [startQuery, setStartQuery] = useState('');
+  const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
+  const [lokalizowanie, setLokalizowanie] = useState(false);
   const kartyRef = useRef<Record<string, HTMLElement | null>>({});
   const wartownik = useRef<HTMLDivElement | null>(null);
   /** Miasta, dla których zbieranie już ruszyło — żeby nie powtórzyć go w kółko. */
@@ -169,7 +172,7 @@ export default function Discover() {
       if (!userData.user) return;
       const [{ data: favs }, { data: projs }, { data: allCities }] = await Promise.all([
         (supabase as any).from('place_favorites').select('place_id').eq('user_id', userData.user.id),
-        (supabase as any).from('trip_projects').select('id, name, destination, days').order('updated_at', { ascending: false }),
+        (supabase as any).from('trip_projects').select('id, name, destination, days, start_name, start_lat, start_lng').order('updated_at', { ascending: false }),
         (supabase as any).from('place_catalog').select('city').not('city', 'is', null).limit(500),
       ]);
       setFavorites(new Set((favs ?? []).map((f: any) => f.place_id)));
@@ -310,6 +313,53 @@ export default function Discover() {
 
   // Zmiana miasta albo filtra zaczyna oglądanie od początku.
   useEffect(() => { setIleWidocznych(24); }, [city, filter, query]);
+
+  useEffect(() => {
+    const q = startQuery.trim();
+    if (q.length < 2 || !board?.destination) { setStartPodpowiedzi([]); return; }
+    let aktualne = true;
+    const t = setTimeout(async () => {
+      try {
+        const d = await apiPost<any>('/places/suggest',
+          { query: q, city: board.destination, limit: 5 }, { timeoutMs: 12_000 });
+        if (aktualne) setStartPodpowiedzi(d.suggestions ?? []);
+      } catch { if (aktualne) setStartPodpowiedzi([]); }
+    }, 300);
+    return () => { aktualne = false; clearTimeout(t); };
+  }, [startQuery, board?.destination]);
+
+  const zapiszStart = async (nazwa: string, lat: number | null, lng: number | null) => {
+    if (!board) return;
+    const { error } = await (supabase as any).from('trip_projects')
+      .update({ start_name: nazwa, start_lat: lat, start_lng: lng }).eq('id', board.id);
+    if (error) return toast.error(error.message);
+    setBoards((prev) => prev.map((b) => (b.id === board.id ? { ...b, start_name: nazwa, start_lat: lat, start_lng: lng } as any : b)));
+    setStartQuery('');
+    setStartPodpowiedzi([]);
+    toast.success(`Start: ${nazwa}`);
+  };
+
+  /**
+   * Położenie z urządzenia. Przeglądarka pyta o zgodę sama i bez niej nic nie
+   * dostajemy — dlatego to osobny przycisk, a nie coś, co dzieje się przy wejściu.
+   */
+  const zUrzadzenia = () => {
+    if (!navigator.geolocation) return toast.error('Ta przeglądarka nie udostępnia położenia');
+    setLokalizowanie(true);
+    navigator.geolocation.getCurrentPosition(
+      (poz) => {
+        setLokalizowanie(false);
+        zapiszStart('Moje położenie', poz.coords.latitude, poz.coords.longitude);
+      },
+      (err) => {
+        setLokalizowanie(false);
+        toast.error(err.code === err.PERMISSION_DENIED
+          ? 'Bez zgody na położenie nie odczytam lokalizacji'
+          : 'Nie udało się odczytać położenia');
+      },
+      { timeout: 10_000 }
+    );
+  };
 
   const zPinezki = (id: string) => {
     setAktywne(id);
@@ -603,7 +653,58 @@ export default function Discover() {
           </div>
 
           {pokazMape && (
-            <aside className="hidden lg:block lg:sticky lg:top-[88px]">
+            <aside className="hidden lg:block lg:sticky lg:top-[88px] space-y-3">
+              {/* Punkt startowy nad mapą: patrząc na pinezki najczęściej chce się
+                  wiedzieć, jak daleko to od miejsca, w którym się nocuje. */}
+              <div className="rounded-md border border-border bg-card px-3.5 py-3">
+                {(board as any)?.start_name ? (
+                  <div className="flex items-center gap-2.5">
+                    <MapPin className="w-4 h-4 text-primary shrink-0" />
+                    <span className="text-sm truncate flex-1">{(board as any).start_name}</span>
+                    <button onClick={() => zapiszStart('', null, null)}
+                      className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                      zmień
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1 min-w-0">
+                        <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input value={startQuery} onChange={(e) => setStartQuery(e.target.value)}
+                          placeholder="Twój hotel, parking, dworzec…" className="pl-8 h-9 text-sm" />
+                      </div>
+                      <Button variant="outline" size="sm" onClick={zUrzadzenia} disabled={lokalizowanie}
+                        className="shrink-0 h-9">
+                        {lokalizowanie ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Moje położenie'}
+                      </Button>
+                    </div>
+                    {startPodpowiedzi.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
+                                      bg-popover shadow-token-lg overflow-hidden">
+                        {startPodpowiedzi.map((sug, i) => (
+                          <button key={`${sug.name}-${i}`}
+                            onClick={() => zapiszStart(sug.name, sug.lat ?? null, sug.lng ?? null)}
+                            className="w-full text-left px-3 py-2 hover:bg-muted transition-colors
+                                       border-b border-border last:border-b-0">
+                            <div className="text-sm truncate">{sug.name}</div>
+                            <div className="font-mono text-[11px] text-muted-foreground truncate">
+                              {[sug.city, sug.country].filter(Boolean).join(' / ')}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {startQuery.trim().length >= 3 && (
+                      <button onClick={() => zapiszStart(startQuery.trim(), null, null)}
+                        className="mt-2 text-[12px] text-primary hover:underline">
+                        Użyj „{startQuery.trim()}" jako nazwy własnej
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="rounded-md border border-border overflow-hidden bg-card">
                 <DiscoverMap
                   places={widoczne.filter((p) => p.lat != null && p.lng != null)
