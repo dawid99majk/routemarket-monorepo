@@ -3,7 +3,7 @@ import { Loader2, Save, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
+import OsPreferencji from '@/components/OsPreferencji';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface RoutePreferenceValues {
@@ -136,23 +136,15 @@ export default function RoutePreferences() {
       </CardHeader>
       <CardContent className="space-y-8">
         {AXES.map((axis) => (
-          <div key={axis.key} className="space-y-2">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-medium text-sm">{axis.title}</span>
-              <span className="text-xs text-muted-foreground">{axis.hint}</span>
-            </div>
-            <Slider
-              value={[values[axis.key]]}
-              onValueChange={([v]) => setValues((prev) => ({ ...prev, [axis.key]: v }))}
-              min={0}
-              max={100}
-              step={10}
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span className={values[axis.key] < 40 ? 'text-primary font-medium' : ''}>{axis.left}</span>
-              <span className={values[axis.key] > 60 ? 'text-primary font-medium' : ''}>{axis.right}</span>
-            </div>
-          </div>
+          <OsPreferencji
+            key={axis.key}
+            tytul={axis.title}
+            lewo={axis.left}
+            prawo={axis.right}
+            podpowiedz={axis.hint}
+            wartosc={values[axis.key]}
+            onChange={(v) => setValues((prev) => ({ ...prev, [axis.key]: v }))}
+          />
         ))}
 
         <div className="flex justify-end gap-2 pt-2 border-t">

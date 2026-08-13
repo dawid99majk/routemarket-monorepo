@@ -8,12 +8,24 @@ interface PlannerHeaderProps {
   initials?: string | null;
 }
 
-const TABS = [
-  { label: 'Start', path: '/start' },
-  { label: 'Odkrywaj', path: '/odkrywaj' },
-  { label: 'Tablica', path: '/plany' },
-  { label: 'Plan', path: '/plany?widok=plan' },
-];
+/**
+ * Zakładki tablicy i planu prowadzą do ostatnio otwartego wyjazdu. Bez tego
+ * kliknięcie "Plan" po wejściu w konkretną tablicę wyrzucałoby na listę wyjazdów,
+ * czyli o krok wstecz zamiast do przodu.
+ */
+function ostatniaTablica(): string | null {
+  try { return localStorage.getItem('rm_ostatnia_tablica'); } catch { return null; }
+}
+
+function zakladki() {
+  const id = ostatniaTablica();
+  return [
+    { label: 'Start', path: '/start' },
+    { label: 'Odkrywaj', path: '/odkrywaj' },
+    { label: 'Tablica', path: id ? `/plany/${id}` : '/plany' },
+    { label: 'Plan', path: id ? `/plany/${id}?widok=plan` : '/plany' },
+  ];
+}
 
 /**
  * Wspólny pasek planera. Wcześniej każdy ekran miał własny nagłówek z przyciskiem
@@ -32,8 +44,8 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
    * w której części aplikacji się znajduje.
    */
   const isActive = (path: string) => {
-    if (path.includes('?')) return here === path;
-    if (path === '/plany') return pathname === '/plany' && !search.includes('widok=plan');
+    if (path.includes('?')) return pathname.startsWith('/plany') && search.includes('widok=plan');
+    if (path.startsWith('/plany')) return pathname.startsWith('/plany') && !search.includes('widok=plan');
     if (path === '/odkrywaj') {
       return pathname === '/odkrywaj' || pathname.startsWith('/miejsce/') || pathname === '/ulubione';
     }
@@ -54,7 +66,7 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
         </button>
 
         <nav className="flex items-center gap-1">
-          {TABS.map((t) => (
+          {zakladki().map((t) => (
             <button key={t.label} onClick={() => navigate(t.path)}
               className={`px-3.5 py-1.5 text-sm rounded-sm transition-colors ${
                 isActive(t.path) ? 'bg-muted font-medium' : 'text-foreground/70 hover:bg-muted/60'

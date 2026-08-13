@@ -305,7 +305,7 @@ export default function Start() {
     setCopying(null);
     if (error) return toast.error(error.message);
     toast.success(`„${b.name}” trafiła do Twoich wyjazdów`);
-    if (data) navigate('/plany');
+    if (data) navigate(`/plany/${data}`);
     else load();
   };
 
@@ -461,12 +461,12 @@ export default function Start() {
               )}
 
               <div className="flex flex-wrap gap-2.5 mt-auto pt-6">
-                <Button onClick={() => navigate(activePlan ? '/plany?widok=plan' : '/plany')}
+                <Button onClick={() => navigate(`/plany/${active.id}${activePlan ? '?widok=plan' : ''}`)}
                   className="bg-primary hover:bg-primary/90">
                   {activePlan ? 'Otwórz plan ↗' : 'Ułóż plan ↗'}
                 </Button>
                 <Button variant="outline" onClick={() => navigate('/odkrywaj')}>Dodaj więcej miejsc</Button>
-                <Button variant="ghost" onClick={() => navigate('/plany')}>Tablica</Button>
+                <Button variant="ghost" onClick={() => navigate(`/plany/${active.id}`)}>Tablica</Button>
               </div>
             </div>
 
@@ -541,7 +541,7 @@ export default function Start() {
                   Miejsca w „być może” blokują agentowi ułożenie ostatecznej trasy.
                 </p>
               </div>
-              <button onClick={() => navigate('/plany')}
+              <button onClick={() => navigate(`/plany/${active.id}`)}
                 className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
                 Cała tablica ↗
               </button>
@@ -581,7 +581,7 @@ export default function Start() {
             )}
             {nice.length > 3 && (
               <div className="border-t border-border px-7 py-3.5 text-center">
-                <button onClick={() => navigate('/plany')}
+                <button onClick={() => navigate(`/plany/${active.id}`)}
                   className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
                   Pokaż wszystkie ({nice.length}) ↗
                 </button>
@@ -612,7 +612,7 @@ export default function Start() {
                     zdjecia={zdjecia}
                     aktywny={p.id === active?.id}
                     odznaka={<Badge variant={st.variant} className="shrink-0">{st.label}</Badge>}
-                    onClick={() => navigate('/plany')}
+                    onClick={() => navigate(`/plany/${p.id}`)}
                   />
                 );
               })}

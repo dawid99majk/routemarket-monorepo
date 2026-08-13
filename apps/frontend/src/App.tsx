@@ -103,6 +103,7 @@ const App = () => (
                   <Route path="/miejsce/:slug" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
+                  <Route path="/plany/:id" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
                   {/* Creator routes */}

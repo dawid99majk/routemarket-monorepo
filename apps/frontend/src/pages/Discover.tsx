@@ -457,8 +457,10 @@ export default function Discover() {
             <div className="flex flex-wrap gap-2 justify-end mt-3">
               {/* Tablica dostępna też tutaj, nie tylko w pasku: zapisując miejsca
                   najczęściej chce się sprawdzić, co już się uzbierało. */}
-              <Button variant="outline" onClick={() => navigate('/plany')}>Tablica</Button>
-              <Button className="bg-primary hover:bg-primary/90" onClick={() => navigate('/plany?widok=plan')}>
+              <Button variant="outline"
+                onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>Tablica</Button>
+              <Button className="bg-primary hover:bg-primary/90"
+                onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}>
                 Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
               </Button>
             </div>

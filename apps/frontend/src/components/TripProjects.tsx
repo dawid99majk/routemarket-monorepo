@@ -15,6 +15,7 @@ import PlanDayMap from '@/components/PlanDayMap';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { podpisPubliczny } from '@/lib/uzytkownik';
 import { AXES, type RoutePreferenceValues } from '@/components/RoutePreferences';
+import OsPreferencji from '@/components/OsPreferencji';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -134,9 +135,16 @@ const SUGGESTION_SETS: Record<string, string[]> = {
 interface TripProjectsProps {
   /** Podaje wyżej kontekst aktywnego wyjazdu, żeby wspólny pasek mógł go pokazać. */
   onContextChange?: (ctx: string | null) => void;
+  /**
+   * Tablica otwarta z adresu. Wcześniej wybór tablicy był stanem wewnątrz strony:
+   * lista kafelków zostawała na ekranie, a treść zmieniała się pod nią, często
+   * poniżej linii wzroku. Teraz tablica jest osobnym miejscem z własnym adresem,
+   * więc kliknięcie przenosi, a nie przestawia coś w tle.
+   */
+  projectId?: string | null;
 }
 
-export default function TripProjects({ onContextChange }: TripProjectsProps = {}) {
+export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<TripProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -209,6 +217,10 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<DiscoveredPlace[]>([]);
 
+  useEffect(() => {
+    if (projectId && projectId !== activeId) setActiveId(projectId);
+  }, [projectId]);
+
   const active = projects.find((p) => p.id === activeId) || null;
 
   useEffect(() => {
@@ -248,7 +260,8 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       // Wejście z kreatora (?project=...) ma otworzyć świeżo utworzoną tablicę,
       // a nie ostatnio modyfikowaną — inaczej "Zapisz jako projekt" wyglądałoby
       // jakby nic nie zrobiło.
-      const requested = new URLSearchParams(window.location.search).get('project');
+      const requested = projectId
+        || new URLSearchParams(window.location.search).get('project');
       const target = requested && data?.some((p: any) => p.id === requested) ? requested : data?.[0]?.id;
       if (target) setActiveId(target);
       const { data: prefs } = await (supabase as any)
@@ -1036,7 +1049,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
       setPlanDay(0);
       // Plan powstaje z tablicy, ale mieszka w swojej zakładce. Bez tego skoku
       // przycisk "ułóż plan" wyglądałby, jakby nic nie zrobił.
-      navigate('/plany?widok=plan');
+      navigate(`/plany/${active.id}?widok=plan`);
       // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
       const { data: saved } = await (supabase as any)
         .from('trip_plans')
@@ -1183,7 +1196,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
             </Button>
           )}
           {active && mustCount > 0 && view === 'tablica' && (
-            <Button onClick={() => navigate('/plany?widok=plan')}
+            <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
               className="bg-primary hover:bg-primary/90">
               Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
             </Button>
@@ -1243,25 +1256,13 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
         {/* Wyjazdy jako kafelki, nie rząd podkreślonych napisów. Tablica jest tu
             rzeczą, którą się wybiera — a napis w linijce nie wygląda na rzecz.
             Aktywny ma pełną ramkę i kropkę, więc widać go bez czytania. */}
-        {projects.length > 1 && (
-          <div className="grid gap-3 -mt-2 [grid-template-columns:repeat(auto-fill,minmax(min(100%,208px),1fr))]">
-            {projects.map((p) => {
-              const podglad = podgladTablic[p.id];
-              const ile = podglad?.ile ?? 0;
-              const zdjecia = podglad?.zdjecia ?? [];
-              return (
-                <TablicaKafelek
-                  key={p.id}
-                  nazwa={p.name}
-                  meta={[p.destination, ile > 0 ? `${ile} miejsc` : null].filter(Boolean).join(' · ') || 'szkic'}
-                  zdjecia={zdjecia}
-                  aktywny={p.id === activeId}
-                  onClick={() => setActiveId(p.id)}
-                />
-              );
-            })}
-          </div>
-        )}
+        {/* Powrót zamiast przełącznika. Lista wyjazdów mieszka teraz pod /plany,
+            a ta strona pokazuje wyłącznie jedną tablicę — dzięki temu widać,
+            którą się otworzyło, bez czytania podświetleń w rzędzie kafelków. */}
+        <button onClick={() => navigate('/plany')}
+          className="text-[13px] text-muted-foreground hover:text-foreground transition-colors -mt-2">
+          ← Wszystkie wyjazdy
+        </button>
 
         {active && (
           <>
@@ -1657,27 +1658,17 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
 
                     {AXES.map((os) => {
                       const wlasne = (active as any)[os.key] as number | null | undefined;
-                      const wartosc = wlasne ?? userPrefs?.[os.key] ?? 50;
                       return (
-                        <div key={os.key}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <span className="text-sm font-medium">{os.title}</span>
-                            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                              {wlasne == null ? 'wg profilu' : `${wartosc}`}
-                            </span>
-                          </div>
-                          <Slider
-                            value={[wartosc]}
-                            min={0} max={100} step={5}
-                            onValueChange={([v]) => ustawOs(os.key, v)}
-                            className="mt-2.5"
-                          />
-                          <div className="flex justify-between gap-4 mt-1.5">
-                            <span className="text-[11px] text-muted-foreground">{os.left}</span>
-                            <span className="text-[11px] text-muted-foreground text-right">{os.right}</span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground/80 mt-1.5 text-pretty">{os.hint}</p>
-                        </div>
+                        <OsPreferencji
+                          key={os.key}
+                          tytul={os.title}
+                          lewo={os.left}
+                          prawo={os.right}
+                          podpowiedz={os.hint}
+                          wartosc={wlasne ?? userPrefs?.[os.key] ?? 50}
+                          wlasna={wlasne != null}
+                          onChange={(v) => ustawOs(os.key, v)}
+                        />
                       );
                     })}
                   </div>
