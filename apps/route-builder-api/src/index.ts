@@ -331,6 +331,55 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
  * karty do przypięcia. Nazwy są dopasowywane do OpenStreetMap, więc karta niesie
  * realne współrzędne i godziny otwarcia, a nie tylko opis od modelu.
  */
+/**
+ * Preferencje jako zdania, nie liczby. Model dostawał w planerze surowe
+ * "pace=100, effort=15" i musiał zgadywać, co znaczy każdy klucz i w którą stronę
+ * rośnie — a kierunki są nieoczywiste: wysokie effort znaczy "chętnie podejdę pod
+ * górę", nie "unikam wysiłku". Wyszukiwanie miało to opisane po ludzku od początku,
+ * planer nie; teraz oba korzystają z jednego źródła.
+ *
+ * Osie w okolicach środka pomijamy: brak zdania to nie jest wskazówka.
+ */
+function opiszPreferencje(prefs: Record<string, number> | null | undefined): string[] {
+  if (!prefs) return [];
+  const OSIE: Record<string, { gora: string; dol: string }> = {
+    pace: {
+      gora: 'Woli mniej miejsc, ale spędzić w każdym więcej czasu.',
+      dol: 'Woli zobaczyć więcej miejsc, nawet krócej w każdym.',
+    },
+    popularity: {
+      gora: 'Woli miejsca niszowe i nieoczywiste niż największe ikony.',
+      dol: 'Chce przede wszystkim klasyków i miejsc must-see.',
+    },
+    wandering: {
+      gora: 'Lubi błądzenie po okolicy — zostaw luz między punktami.',
+      dol: 'Woli trasę konkretną, od punktu do punktu, bez nadkładania drogi.',
+    },
+    dining: {
+      gora: 'W jedzeniu preferuje lokalny street food i tanie, autentyczne miejsca.',
+      dol: 'W jedzeniu preferuje eleganckie restauracje i kawiarnie z górnej półki.',
+    },
+    effort: {
+      gora: 'Podejścia, schody i wzniesienia są mile widziane.',
+      dol: 'Unikaj długiego chodzenia, stromych podejść i schodów.',
+    },
+    crowds: {
+      gora: 'Unika tłumów — doceni miejsca mniej oblegane.',
+      dol: 'Tłumy nie przeszkadzają — popularne miejsca są w porządku.',
+    },
+  };
+
+  const out: string[] = [];
+  for (const [klucz, opis] of Object.entries(OSIE)) {
+    const v = prefs[klucz];
+    if (v == null) continue;
+    if (v > 60) out.push(opis.gora);
+    else if (v < 40) out.push(opis.dol);
+  }
+  return out;
+}
+
+
 app.post('/discover-places', async (c) => {
   try {
     const { query, destination, category, limit, creator_preferences } = await c.req.json() as {
@@ -358,22 +407,7 @@ app.post('/discover-places', async (c) => {
 
     // Obowiązujące preferencje: profil wyjazdu nadpisał już profil użytkownika po
     // stronie klienta, więc tutaj dostajemy gotową, jedną prawdę.
-    const prefHints = creator_preferences ? [
-      creator_preferences.popularity != null && creator_preferences.popularity > 60
-        ? 'Użytkownik woli miejsca niszowe i nieoczywiste niż największe ikony.' : null,
-      creator_preferences.popularity != null && creator_preferences.popularity < 40
-        ? 'Użytkownik chce przede wszystkim klasyków i miejsc must-see.' : null,
-      creator_preferences.dining != null && creator_preferences.dining > 60
-        ? 'W gastronomii preferuje lokalny street food i tanie, autentyczne miejsca.' : null,
-      creator_preferences.dining != null && creator_preferences.dining < 40
-        ? 'W gastronomii preferuje eleganckie restauracje i kawiarnie z górnej półki.' : null,
-      creator_preferences.crowds != null && creator_preferences.crowds > 60
-        ? 'Unika tłumów — doceni miejsca mniej oblegane.' : null,
-      creator_preferences.pace != null && creator_preferences.pace > 60
-        ? 'Woli mniej miejsc, ale spędzić w każdym więcej czasu.' : null,
-      creator_preferences.effort != null && creator_preferences.effort < 40
-        ? 'Unikaj miejsc wymagających długiego chodzenia, stromych podejść i schodów.' : null
-    ].filter(Boolean) : [];
+    const prefHints = opiszPreferencje(creator_preferences);
 
     const prompt = `Jesteś przewodnikiem po mieście ${destination}. Użytkownik szuka: "${query}".
 ${prefHints.length ? `\nZNANE PREFERENCJE TEGO UŻYTKOWNIKA (uwzględnij przy doborze i kolejności):\n${prefHints.map((h) => `- ${h}`).join('\n')}\n` : ''}
@@ -671,11 +705,11 @@ app.post('/plan-trip', async (c) => {
       .map((c) => `- "${c.name}" (${c.kind}${c.openingHours ? `, godziny: ${c.openingHours}` : ''})`)
       .join('\n');
 
-    const prefLines = body.creator_preferences
-      ? Object.entries(body.creator_preferences)
-          .filter(([, v]) => v < 40 || v > 60)
-          .map(([k, v]) => `${k}=${v}`).join(', ')
-      : '';
+    const prefOpisy = opiszPreferencje(body.creator_preferences);
+    const prefLines = prefOpisy.map((o) => `- ${o}`).join('\n');
+    if (prefOpisy.length) {
+      console.log(`[plan-trip] preferencje w podpowiedzi: ${prefOpisy.length} — ${prefOpisy.join(' | ')}`);
+    }
 
     const fixedLines = (body.fixed || [])
       .map((f) => `- ${f.time} ${f.label}${f.minutes ? ` (${f.minutes} min)` : ''}`).join('\n');
@@ -685,7 +719,7 @@ app.post('/plan-trip', async (c) => {
 RAMY: ${dayCount} dni, każdego dnia od ${body.window.start} do ${body.window.end} (${Math.round(minutesPerDay / 60 * 10) / 10} h dziennie, łącznie ${Math.round(budget / 60)} h).
 ${body.hotel?.name ? `BAZA: ${body.hotel.name} — każdy dzień zaczyna się i kończy tutaj.` : ''}
 ${fixedLines ? `STAŁE PUNKTY DNIA (nie do przesunięcia):\n${fixedLines}` : ''}
-${prefLines ? `PREFERENCJE UŻYTKOWNIKA (0-100, 50 to środek): ${prefLines}` : ''}
+${prefLines ? `PREFERENCJE UŻYTKOWNIKA — uwzględnij je przy doborze miejsc, długości postojów i kolejności:\n${prefLines}` : ''}
 
 MIEJSCA PRZYPIĘTE PRZEZ UŻYTKOWNIKA — to KOTWICE planu, nie cały plan
 (dostępność policzona dla Twoich okien czasowych):
