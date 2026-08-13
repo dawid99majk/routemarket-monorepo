@@ -1661,6 +1661,159 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
 
 /**
+ * Rozpoznanie miejsca z wklejonego odnośnika. Ludzie zbierają miejsca tam, gdzie
+ * je znajdą — w mapach Google, w wiadomości od znajomego, w artykule — i przepisywanie
+ * nazwy ręcznie gubi po drodze położenie.
+ *
+ * Adresy pobieramy wyłącznie z krótkiej listy znanych serwisów map i tylko po to,
+ * żeby rozwinąć skrót. Serwer nie ma prawa chodzić pod dowolny adres podany przez
+ * użytkownika: to prosta droga do wyciągania nim rzeczy z sieci wewnętrznej.
+ */
+const DOZWOLONE_HOSTY = new Set([
+  'maps.google.com', 'www.google.com', 'google.com', 'maps.app.goo.gl', 'goo.gl',
+  'www.openstreetmap.org', 'openstreetmap.org', 'osm.org', 'www.osm.org',
+  'maps.apple.com',
+]);
+
+function hostDozwolony(u: string): boolean {
+  try {
+    const url = new URL(u);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+    return DOZWOLONE_HOSTY.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/** Współrzędne z typowych postaci adresów map. */
+function wspolrzedneZAdresu(u: string): { lat: number; lng: number } | null {
+  const wzory = [
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,        // Google, pełny odnośnik miejsca
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,             // Google, widok mapy
+    /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,     // ?q=lat,lng
+    /[?&]ll=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,    // Apple Maps
+    /#map=\d+\/(-?\d+\.\d+)\/(-?\d+\.\d+)/,  // OpenStreetMap
+    /[?&]mlat=(-?\d+\.\d+)&mlon=(-?\d+\.\d+)/, // OpenStreetMap, pinezka
+  ];
+  for (const w of wzory) {
+    const m = u.match(w);
+    if (m) {
+      const lat = Number(m[1]), lng = Number(m[2]);
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+    }
+  }
+  return null;
+}
+
+/** Nazwa z segmentu /place/<nazwa>/ albo z parametru q. */
+function nazwaZAdresu(u: string): string | null {
+  const m = u.match(/\/place\/([^/@?]+)/);
+  if (m) {
+    const nazwa = decodeURIComponent(m[1].replace(/\+/g, ' ')).trim();
+    if (nazwa && !/^-?\d+\.\d+,/.test(nazwa)) return nazwa;
+  }
+  try {
+    const q = new URL(u).searchParams.get('q');
+    if (q && !/^-?\d+\.\d+,/.test(q)) return decodeURIComponent(q.replace(/\+/g, ' ')).trim();
+  } catch { /* nieparsowalny adres pomijamy */ }
+  return null;
+}
+
+app.post('/places/from-link', async (c) => {
+  try {
+    const { link, city } = await c.req.json() as { link: string; city?: string };
+    const wejscie = (link || '').trim();
+    if (!wejscie) return c.json({ error: 'Podaj odnośnik albo nazwę' }, 400);
+
+    let adres = wejscie;
+    let zrodlo = 'tekst';
+
+    if (/^https?:\/\//i.test(wejscie)) {
+      if (!hostDozwolony(wejscie)) {
+        return c.json({
+          error: 'Ten serwis nie jest obsługiwany. Obsługujemy odnośniki z Map Google, OpenStreetMap i Apple Maps.',
+        }, 400);
+      }
+      zrodlo = 'odnośnik';
+      // Skrót rozwijamy tylko wtedy, gdy sam adres nic nie mówi. Przekierowanie
+      // potrafi zgubić parametry — Apple Maps przenosi na stronę bez współrzędnych,
+      // przez które wklejony odnośnik był czytelny.
+      if (!wspolrzedneZAdresu(wejscie) && !nazwaZAdresu(wejscie)) {
+        try {
+          const res = await fetch(wejscie, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
+          if (res.url && hostDozwolony(res.url)) adres = res.url;
+        } catch { /* bez rozwinięcia pracujemy na tym, co podano */ }
+      }
+    }
+
+    const wsp = wspolrzedneZAdresu(adres) ?? wspolrzedneZAdresu(wejscie);
+    const nazwaZLinku = nazwaZAdresu(adres) ?? nazwaZAdresu(wejscie);
+
+    // Ze współrzędnych bierzemy prawdziwą nazwę i adres z OpenStreetMap — nazwa
+    // z odnośnika bywa skrócona albo w innym języku.
+    if (wsp) {
+      try {
+        const url = 'https://nominatim.openstreetmap.org/reverse?' + new URLSearchParams({
+          lat: String(wsp.lat), lon: String(wsp.lng), format: 'jsonv2', addressdetails: '1', zoom: '18',
+        });
+        const res = await fetch(url, { headers: { 'User-Agent': COMMONS_UA }, signal: AbortSignal.timeout(8000) });
+        const d = res.ok ? await res.json() as any : null;
+        const adr = d?.address ?? {};
+        // Odwrotne geokodowanie zwraca to, co akurat stoi pod tymi współrzędnymi:
+        // dla widoku mapy bywa to przypadkowy lokal albo sam numer domu. Nazwa
+        // z odnośnika jest wiarygodniejsza, a gdy jej nie ma, uczciwiej podać
+        // ulicę niż podsunąć cudzą wizytówkę jako nazwę miejsca.
+        const zAdresu = [adr.road, adr.house_number].filter(Boolean).join(' ');
+        const nazwaZOdwrotnego = d?.name && String(d.name).length > 2 && !/^\d+$/.test(String(d.name))
+          ? d.name : null;
+        return c.json({
+          place: {
+            name: nazwaZLinku || nazwaZOdwrotnego || zAdresu || d?.display_name?.split(',')[0] || 'Wskazane miejsce',
+            lat: wsp.lat, lng: wsp.lng,
+            city: adr.city || adr.town || adr.village || adr.municipality || city?.trim() || null,
+            country: adr.country_code ? String(adr.country_code).toUpperCase() : null,
+            kind: d?.type ?? null,
+            category: 'attraction',
+          },
+          source: zrodlo,
+        });
+      } catch {
+        return c.json({
+          place: {
+            name: nazwaZLinku || 'Miejsce bez nazwy', lat: wsp.lat, lng: wsp.lng,
+            city: city?.trim() || null, country: null, kind: null, category: 'attraction',
+          },
+          source: zrodlo,
+        });
+      }
+    }
+
+    // Bez współrzędnych zostaje nazwa — szukamy jej tak samo jak w podpowiedziach.
+    const szukane = nazwaZLinku || (zrodlo === 'tekst' ? wejscie : null);
+    if (!szukane) {
+      return c.json({ error: 'Nie znalazłem w tym odnośniku ani nazwy, ani współrzędnych.' }, 422);
+    }
+
+    const g = await geocodingService.geocodeSinglePoint(
+      city?.trim() ? `${szukane}, ${city.trim()}` : szukane
+    );
+    if (!g?.lat) return c.json({ error: `Nie udało się ustalić położenia dla: ${szukane}` }, 422);
+
+    return c.json({
+      place: {
+        name: szukane, lat: g.lat, lng: g.lng,
+        city: city?.trim() || null, country: null, kind: null, category: 'attraction',
+      },
+      source: zrodlo,
+    });
+  } catch (e: any) {
+    console.error('[places/from-link]', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
+/**
  * Podpowiedzi nazw miejsc. Osobno od /discover-places, bo tamten punkt pyta model
  * i odpowiada po kilkunastu, czasem dwudziestu kilku sekundach — co jest w porządku
  * dla pytania "gdzie zjeść z dzieckiem", a absurdalne dla kogoś, kto wpisuje

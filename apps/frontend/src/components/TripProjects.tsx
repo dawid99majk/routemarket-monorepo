@@ -153,6 +153,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   const [sharing, setSharing] = useState(false);
   const [editingType, setEditingType] = useState(false);
   const [prefsOtwarte, setPrefsOtwarte] = useState(false);
+  const [link, setLink] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [zLinku, setZLinku] = useState<any | null>(null);
   /** Jedno narzędzie naraz. Trzy rozwinięte paski zajmowały ekran bez powodu. */
   const [rozwiniete, setRozwiniete] = useState<'szukaj' | 'wydarzenia' | null>(null);
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
@@ -420,6 +423,38 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     setStartQuery('');
     setPokazStart(false);
     toast.success(sug ? `Start: ${sug.name}` : 'Punkt startowy usunięty');
+  };
+
+  /**
+   * Miejsce z wklejonego odnośnika. Pokazujemy podgląd, zanim cokolwiek trafi
+   * na tablicę — rozpoznanie po adresie bywa przybliżone i lepiej, żeby to
+   * użytkownik potwierdził, że chodziło o to miejsce.
+   */
+  const rozpoznajLink = async () => {
+    if (!link.trim() || !active) return;
+    setLinkBusy(true);
+    setZLinku(null);
+    try {
+      const d = await apiPost<any>('/places/from-link',
+        { link: link.trim(), city: active.destination }, { timeoutMs: 30_000 });
+      setZLinku(d.place);
+    } catch (e: any) {
+      toast.error(e.message || 'Nie udało się rozpoznać tego odnośnika');
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
+  const dodajZLinku = async (priority: Priority) => {
+    if (!zLinku) return;
+    await pin({
+      name: zLinku.name, lat: zLinku.lat, lng: zLinku.lng,
+      category: zLinku.category || 'attraction',
+      description: '', opening_hours: null, website: null,
+      visit_minutes: null, image_url: null, wiki_extract: null,
+    } as any, priority);
+    setZLinku(null);
+    setLink('');
   };
 
   const search = async (q: string) => {
@@ -1688,6 +1723,36 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                   </div>
                 )}
               </div>
+              {/* Wklejenie odnośnika obok szukania po nazwie: miejsca znajduje się
+                  najczęściej gdzie indziej, a przepisywanie nazwy gubi położenie. */}
+              <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+                <div className="flex gap-2">
+                  <Input value={link} onChange={(e) => setLink(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && rozpoznajLink()}
+                    placeholder="Wklej odnośnik z Map Google, OpenStreetMap albo Apple Maps"
+                    className="flex-1" />
+                  <Button variant="outline" onClick={rozpoznajLink} disabled={linkBusy || !link.trim()}>
+                    {linkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Rozpoznaj'}
+                  </Button>
+                </div>
+
+                {zLinku && (
+                  <div className="mt-3 rounded-md border border-border bg-background p-3">
+                    <div className="font-display text-[15px]">{zLinku.name}</div>
+                    <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
+                      {[zLinku.city, zLinku.country].filter(Boolean).join(' / ') || 'bez miasta'}
+                      {zLinku.lat != null && ` · ${Number(zLinku.lat).toFixed(4)}, ${Number(zLinku.lng).toFixed(4)}`}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Button size="sm" onClick={() => dodajZLinku('must')}
+                        className="bg-primary hover:bg-primary/90">Na pewno</Button>
+                      <Button size="sm" variant="outline" onClick={() => dodajZLinku('nice')}>Być może</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setZLinku(null)}>Odrzuć</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {(SUGGESTION_SETS[active.trip_type || ''] ?? SUGGESTION_SETS.default).map((sug) => (
                   <button key={sug} onClick={() => { setQuery(sug); search(sug); }}
