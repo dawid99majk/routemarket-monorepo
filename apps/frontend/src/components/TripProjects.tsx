@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PlanDayMap from '@/components/PlanDayMap';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { podpisPubliczny } from '@/lib/uzytkownik';
+import { AXES, type RoutePreferenceValues } from '@/components/RoutePreferences';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -309,6 +310,20 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     setProjects((prev) => prev.map((p) =>
       p.id === active.id ? { ...p, is_public: nowe, copy_count: (p as any).copy_count ?? 0 } as any : p));
     toast.success(nowe ? 'Tablica jest teraz publiczna' : 'Tablica znów jest prywatna');
+  };
+
+  /**
+   * Oś ustawiona na wyjeździe przykrywa ustawienie z profilu; wyzerowana wraca
+   * do dziedziczenia. Dlatego trzymamy null jako osobną wartość, a nie 50 —
+   * „nie mam zdania" i „chcę dokładnie środek" to dwie różne rzeczy i tylko
+   * pierwsza ma podążać za zmianą ustawień globalnych.
+   */
+  const ustawOs = async (klucz: keyof RoutePreferenceValues, wartosc: number | null) => {
+    if (!active) return;
+    setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, [klucz]: wartosc } as any : p)));
+    const { error } = await (supabase as any).from('trip_projects')
+      .update({ [klucz]: wartosc }).eq('id', active.id);
+    if (error) toast.error(error.message);
   };
 
   const createProject = async () => {
@@ -1076,6 +1091,15 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                 : <><RefreshCw className="w-4 h-4 mr-1.5" /> Przelicz plan</>}
             </Button>
           )}
+          {/* Dodawanie miejsc jako stała akcja nagłówka. Wcześniej jedynym widocznym
+              wejściem był przycisk w pustym kubełku — znikał po dodaniu pierwszego
+              miejsca, więc dołożenie drugiego wymagało domyślenia się, że służy do
+              tego mała karta „Szukaj miejsc" pod kolumnami. */}
+          {active && view === 'tablica' && (
+            <Button variant="outline" onClick={() => navigate(`/odkrywaj?wyjazd=${active.id}`)}>
+              <Plus className="w-4 h-4 mr-1.5" /> Dodaj miejsca
+            </Button>
+          )}
           {active && mustCount > 0 && view === 'tablica' && (
             <Button onClick={() => navigate('/plany?widok=plan')}
               className="bg-primary hover:bg-primary/90">
@@ -1361,7 +1385,7 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                                 {zone.hint}
                               </p>
                               {zone.id === 'must' ? (
-                                <button onClick={() => navigate('/odkrywaj')}
+                                <button onClick={() => navigate(`/odkrywaj?wyjazd=${active.id}`)}
                                   className="w-full h-[104px] rounded-md border border-dashed border-border
                                              flex flex-col items-center justify-center gap-1.5 text-muted-foreground
                                              hover:border-primary/50 hover:text-primary transition-colors">
@@ -1534,6 +1558,46 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                         ? 'Kilka kotwic i dużo swobody — reszta dnia na wałęsanie się po mieście bez planu.'
                         : 'Zaplanowane atrakcje wypełnią tyle procent Twojego czasu, resztę zostawiamy na przerwy i włóczenie się po okolicy.'}
                     </p>
+                  </div>
+
+                  {/* Osie preferencji tego wyjazdu. Te same, które siedzą w profilu,
+                      ale ustawione tutaj dotyczą wyłącznie tej tablicy — bo inaczej
+                      jedzie się z dziećmi w tempie z delegacji. */}
+                  <div className="border-t border-border pt-4 space-y-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 className="font-display text-[17px]">Preferencje tego wyjazdu</h3>
+                      <button
+                        onClick={() => AXES.forEach((os) => ustawOs(os.key, null))}
+                        className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                        Wróć do ustawień z profilu
+                      </button>
+                    </div>
+
+                    {AXES.map((os) => {
+                      const wlasne = (active as any)[os.key] as number | null | undefined;
+                      const wartosc = wlasne ?? userPrefs?.[os.key] ?? 50;
+                      return (
+                        <div key={os.key}>
+                          <div className="flex items-baseline justify-between gap-3">
+                            <span className="text-sm font-medium">{os.title}</span>
+                            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                              {wlasne == null ? 'wg profilu' : `${wartosc}`}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[wartosc]}
+                            min={0} max={100} step={5}
+                            onValueChange={([v]) => ustawOs(os.key, v)}
+                            className="mt-2.5"
+                          />
+                          <div className="flex justify-between gap-4 mt-1.5">
+                            <span className="text-[11px] text-muted-foreground">{os.left}</span>
+                            <span className="text-[11px] text-muted-foreground text-right">{os.right}</span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground/80 mt-1.5 text-pretty">{os.hint}</p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </DialogContent>

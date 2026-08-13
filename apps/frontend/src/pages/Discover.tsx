@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,6 +88,10 @@ export default function Discover() {
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
   const [initials, setInitials] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  /** Wyjazd wskazany z tablicy. Bez tego Odkrywaj brał ostatnio zmieniany,
+   *  więc wejście z tablicy Lipska mogło wylądować w innym mieście. */
+  const wskazanyWyjazd = searchParams.get('wyjazd');
   const [zbieraneSekundy, setZbieraneSekundy] = useState(0);
   const [opisyWToku, setOpisyWToku] = useState(false);
   /** Ile kart pokazujemy. Rośnie przy przewijaniu, nie przy każdym zapytaniu. */
@@ -179,8 +183,9 @@ export default function Discover() {
       setBoards(projs ?? []);
       setCities([...new Set((allCities ?? []).map((r: any) => r.city))].sort() as string[]);
       if ((projs ?? []).length > 0) {
-        setActiveBoard(projs[0].id);
-        if (!city.trim() && projs[0].destination) setCity(projs[0].destination);
+        const wybrany = (wskazanyWyjazd && projs.find((p: any) => p.id === wskazanyWyjazd)) || projs[0];
+        setActiveBoard(wybrany.id);
+        if (wybrany.destination) setCity(wybrany.destination);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

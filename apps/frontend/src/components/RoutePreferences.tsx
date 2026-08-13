@@ -25,7 +25,7 @@ export const DEFAULT_PREFERENCES: RoutePreferenceValues = {
 };
 
 /** Każda oś to jedna decyzja, którą silnik potrafi przełożyć na dobór punktów. */
-const AXES: {
+export const AXES: {
   key: keyof RoutePreferenceValues;
   title: string;
   left: string;
