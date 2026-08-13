@@ -439,8 +439,17 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     setZLinku(null);
     try {
       const d = await apiPost<any>('/places/from-link',
-        { link: link.trim(), city: active.destination }, { timeoutMs: 30_000 });
-      setZLinku(d.place);
+        { link: link.trim(), city: active.destination }, { timeoutMs: 45_000 });
+      // Odnośnik wyszukiwania po obszarze zwraca listę, odnośnik miejsca — jeden punkt.
+      // Listę pokazujemy tam, gdzie miejsca wyłuskane z tekstu: to ta sama czynność.
+      if (Array.isArray(d.places)) {
+        setWyluskane(d.places);
+        setZLinku(null);
+        if (d.places.length === 0) toast.info('W tym obszarze nic nie znalazłem');
+        else toast.success(`Znalazłem ${d.places.length} miejsc w tym obszarze`);
+      } else {
+        setZLinku(d.place);
+      }
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się rozpoznać tego odnośnika');
     } finally {

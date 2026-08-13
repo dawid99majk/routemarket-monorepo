@@ -1705,6 +1705,19 @@ function wspolrzedneZAdresu(u: string): { lat: number; lng: number } | null {
   return null;
 }
 
+/**
+ * Odnośnik wyszukiwania: /maps/search/<fraza>/@lat,lng,zoom. To nie jest jedno
+ * miejsce, tylko obszar z zapytaniem — potraktowany jak punkt zwraca cokolwiek
+ * leży pod środkiem mapy. Przy odnośniku "Atrakcje" wokół Beratu wychodziło
+ * z tego osiedle mieszkaniowe.
+ */
+function zapytanieZAdresu(u: string): string | null {
+  const m = u.match(/\/maps\/search\/([^/@?]+)/);
+  if (!m) return null;
+  const fraza = decodeURIComponent(m[1].replace(/\+/g, ' ')).trim();
+  return fraza && !/^-?\d+\.\d+,/.test(fraza) ? fraza : null;
+}
+
 /** Nazwa z segmentu /place/<nazwa>/ albo z parametru q. */
 function nazwaZAdresu(u: string): string | null {
   const m = u.match(/\/place\/([^/@?]+)/);
@@ -1785,6 +1798,39 @@ app.post('/places/from-link', async (c) => {
 
     const wsp = wspolrzedneZAdresu(adres) ?? wspolrzedneZAdresu(wejscie);
     const nazwaZLinku = nazwaZAdresu(adres) ?? nazwaZAdresu(wejscie);
+    const fraza = zapytanieZAdresu(adres) ?? zapytanieZAdresu(wejscie);
+
+    // Wyszukiwanie po obszarze zwraca listę, nie jeden punkt. Bierzemy prawdziwe
+    // obiekty z OpenStreetMap wokół środka mapy zamiast zgadywać, co użytkownik
+    // miał na myśli pod tymi współrzędnymi.
+    if (fraza && wsp) {
+      const kandydaci = await poiService
+        .fetchCandidates({ lat: wsp.lat, lng: wsp.lng }, 'city_walk', { radiusKm: 6, limit: 40 })
+        .catch(() => [] as any[]);
+
+      const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const slowa = norm(fraza).split(/[^a-z0-9]+/).filter((w) => w.length >= 4);
+      // Frazy ogólne ("atrakcje", "co zobaczyć") nie zawężają — chodzi o wszystko,
+      // co w tej okolicy warto zobaczyć.
+      const OGOLNE = ['atrakcje', 'attractions', 'zwiedzanie', 'zabytki', 'things', 'miejsca'];
+      const ogolne = slowa.length === 0 || slowa.some((w) => OGOLNE.includes(w));
+
+      const dopasowane = ogolne
+        ? kandydaci
+        : kandydaci.filter((k: any) => {
+            const t = norm(`${k.name} ${k.kind ?? ''}`);
+            return slowa.some((w) => t.includes(w));
+          });
+
+      const lista = (dopasowane.length ? dopasowane : kandydaci).slice(0, 20).map((k: any) => ({
+        name: k.name, lat: k.lat, lng: k.lng, kind: k.kind ?? null,
+        opening_hours: k.openingHours ?? null, website: k.website ?? null,
+        category: k.kind === 'restaurant' || k.kind === 'cafe' ? 'food' : 'attraction',
+      }));
+
+      console.log(`[places/from-link] obszar "${fraza}": ${lista.length} miejsc`);
+      return c.json({ places: lista, query: fraza, mode: 'obszar', source: zrodlo });
+    }
 
     // Ze współrzędnych bierzemy prawdziwą nazwę i adres z OpenStreetMap — nazwa
     // z odnośnika bywa skrócona albo w innym języku.
