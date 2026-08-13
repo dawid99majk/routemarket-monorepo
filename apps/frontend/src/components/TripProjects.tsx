@@ -156,6 +156,9 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
   const [link, setLink] = useState('');
   const [linkBusy, setLinkBusy] = useState(false);
   const [zLinku, setZLinku] = useState<any | null>(null);
+  const [wklejony, setWklejony] = useState('');
+  const [wyluskaneBusy, setWyluskaneBusy] = useState(false);
+  const [wyluskane, setWyluskane] = useState<any[] | null>(null);
   /** Jedno narzędzie naraz. Trzy rozwinięte paski zajmowały ekran bez powodu. */
   const [rozwiniete, setRozwiniete] = useState<'szukaj' | 'wydarzenia' | null>(null);
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
@@ -455,6 +458,41 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
     } as any, priority);
     setZLinku(null);
     setLink('');
+  };
+
+  /**
+   * Miejsca z wklejonej treści albo z adresu artykułu. Jedno pole obsługuje oba
+   * przypadki, bo z punktu widzenia użytkownika to ta sama czynność: mam gdzieś
+   * listę miejsc i chcę ją mieć u siebie.
+   */
+  const wyluskaj = async () => {
+    const wejscie = wklejony.trim();
+    if (!wejscie || !active) return;
+    setWyluskaneBusy(true);
+    setWyluskane(null);
+    try {
+      const czyAdres = /^https?:\/\//i.test(wejscie);
+      const d = await apiPost<any>('/places/extract',
+        czyAdres
+          ? { url: wejscie, city: active.destination }
+          : { text: wejscie, city: active.destination },
+        { timeoutMs: 120_000 });
+      setWyluskane(d.places ?? []);
+      if (!d.places?.length) toast.info('Nie znalazłem w tym tekście żadnego miejsca');
+    } catch (e: any) {
+      toast.error(e.message || 'Nie udało się wyłuskać miejsc');
+    } finally {
+      setWyluskaneBusy(false);
+    }
+  };
+
+  const dodajWyluskane = async (m: any, priority: Priority) => {
+    await pin({
+      name: m.name, lat: m.lat, lng: m.lng, category: 'attraction',
+      description: m.note || '', opening_hours: null, website: null,
+      visit_minutes: null, image_url: null, wiki_extract: null,
+    } as any, priority);
+    setWyluskane((prev) => (prev ?? []).filter((x) => x.name !== m.name));
   };
 
   const search = async (q: string) => {
@@ -1749,6 +1787,65 @@ export default function TripProjects({ onContextChange }: TripProjectsProps = {}
                       <Button size="sm" variant="outline" onClick={() => dodajZLinku('nice')}>Być może</Button>
                       <Button size="sm" variant="ghost" onClick={() => setZLinku(null)}>Odrzuć</Button>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Wklejona treść: opis posta, lista z bloga, wiadomość od znajomego.
+                  Z serwisów społecznościowych nic nie pobieramy — treści są tam za
+                  logowaniem, a ich regulaminy zabraniają zbierania danych. Skopiowany
+                  tekst działa tak samo i nie narusza niczyich warunków. */}
+              <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+                <textarea
+                  value={wklejony}
+                  onChange={(e) => setWklejony(e.target.value)}
+                  rows={3}
+                  placeholder="Wklej opis posta, listę z bloga albo adres artykułu — wyłuskam z tego miejsca"
+                  className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm
+                             outline-none focus:border-foreground/30 transition-colors resize-y"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={wyluskaj}
+                    disabled={wyluskaneBusy || wklejony.trim().length < 20}>
+                    {wyluskaneBusy
+                      ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Czytam…</>
+                      : 'Znajdź miejsca w tekście'}
+                  </Button>
+                  {wyluskane && (
+                    <button onClick={() => { setWyluskane(null); setWklejony(''); }}
+                      className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                      wyczyść
+                    </button>
+                  )}
+                </div>
+
+                {wyluskane && wyluskane.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {wyluskane.map((m, i) => (
+                      <div key={`${m.name}-${i}`}
+                        className="rounded-md border border-border bg-background px-3 py-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-display text-[14px] leading-snug">{m.name}</div>
+                            <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">
+                              {[m.kind, m.lat != null
+                                ? `${Number(m.lat).toFixed(3)}, ${Number(m.lng).toFixed(3)}`
+                                : m.poza_zasiegiem ? 'położenie odrzucone — za daleko od miasta' : 'bez położenia',
+                              ].filter(Boolean).join(' · ')}
+                            </div>
+                            {m.note && (
+                              <p className="text-[12px] text-muted-foreground mt-1 text-pretty">{m.note}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <Button size="sm" onClick={() => dodajWyluskane(m, 'must')}
+                              className="bg-primary hover:bg-primary/90 h-7 px-2.5 text-[12px]">Na pewno</Button>
+                            <Button size="sm" variant="outline" onClick={() => dodajWyluskane(m, 'nice')}
+                              className="h-7 px-2.5 text-[12px]">Może</Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

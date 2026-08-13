@@ -1719,6 +1719,46 @@ function nazwaZAdresu(u: string): string | null {
   return null;
 }
 
+/**
+ * Rozwinięcie skróconego odnośnika krok po kroku. Ustawienie redirect: 'follow'
+ * daje tylko adres końcowy, a przy Mapach Google po drodze bywa strona zgody:
+ * końcówka nie mówi wtedy nic, mimo że właściwy adres siedzi w jej parametrze
+ * "continue". Sprawdzamy każdy przystanek i zatrzymujemy się na pierwszym,
+ * z którego da się cokolwiek odczytać.
+ */
+async function rozwinSkrot(start: string): Promise<string> {
+  let biezacy = start;
+  for (let krok = 0; krok < 5; krok++) {
+    if (!hostDozwolony(biezacy) && !biezacy.includes('consent.google.com')) break;
+    let res: Response;
+    try {
+      res = await fetch(biezacy, { redirect: 'manual', signal: AbortSignal.timeout(8000) });
+    } catch {
+      break;
+    }
+
+    const nastepny = res.headers.get('location');
+    if (!nastepny) {
+      // Bez kolejnego przystanku: adres końcowy to wszystko, co mamy.
+      if (res.url && (wspolrzedneZAdresu(res.url) || nazwaZAdresu(res.url))) return res.url;
+      break;
+    }
+
+    const pelny = new URL(nastepny, biezacy).toString();
+    // Strona zgody chowa właściwy adres w parametrze.
+    if (pelny.includes('consent.google.com')) {
+      try {
+        const dalej = new URL(pelny).searchParams.get('continue');
+        if (dalej) { biezacy = dalej; continue; }
+      } catch { /* nieparsowalny adres pomijamy */ }
+    }
+
+    if (wspolrzedneZAdresu(pelny) || nazwaZAdresu(pelny)) return pelny;
+    biezacy = pelny;
+  }
+  return biezacy;
+}
+
 app.post('/places/from-link', async (c) => {
   try {
     const { link, city } = await c.req.json() as { link: string; city?: string };
@@ -1739,10 +1779,7 @@ app.post('/places/from-link', async (c) => {
       // potrafi zgubić parametry — Apple Maps przenosi na stronę bez współrzędnych,
       // przez które wklejony odnośnik był czytelny.
       if (!wspolrzedneZAdresu(wejscie) && !nazwaZAdresu(wejscie)) {
-        try {
-          const res = await fetch(wejscie, { redirect: 'follow', signal: AbortSignal.timeout(8000) });
-          if (res.url && hostDozwolony(res.url)) adres = res.url;
-        } catch { /* bez rozwinięcia pracujemy na tym, co podano */ }
+        adres = await rozwinSkrot(wejscie);
       }
     }
 
@@ -1791,7 +1828,11 @@ app.post('/places/from-link', async (c) => {
     // Bez współrzędnych zostaje nazwa — szukamy jej tak samo jak w podpowiedziach.
     const szukane = nazwaZLinku || (zrodlo === 'tekst' ? wejscie : null);
     if (!szukane) {
-      return c.json({ error: 'Nie znalazłem w tym odnośniku ani nazwy, ani współrzędnych.' }, 422);
+      return c.json({
+        error: zrodlo === 'odnośnik'
+          ? 'Z tego odnośnika nie da się odczytać miejsca. Otwórz go i wklej pełny adres z paska przeglądarki albo samą nazwę miejsca.'
+          : 'Nie znalazłem w tym odnośniku ani nazwy, ani współrzędnych.',
+      }, 422);
     }
 
     const g = await geocodingService.geocodeSinglePoint(
@@ -1808,6 +1849,171 @@ app.post('/places/from-link', async (c) => {
     });
   } catch (e: any) {
     console.error('[places/from-link]', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+
+/**
+ * Wyłuskanie miejsc z wklejonego tekstu albo z artykułu.
+ *
+ * Świadomie nie pobieramy niczego z Instagrama, Facebooka ani Pinteresta. Treści
+ * tam są za logowaniem, ich regulaminy zabraniają zbierania danych, a obejście
+ * tego oznaczałoby albo łamanie warunków, albo proszenie użytkownika o hasło —
+ * i jedno, i drugie odpada. Zamiast tego przyjmujemy tekst, który użytkownik sam
+ * skopiował: opis posta, listę z bloga, wiadomość od znajomego. Działa wszędzie,
+ * bo nie zależy od żadnego serwisu, i nie narusza niczyich warunków.
+ *
+ * Publiczne artykuły pobieramy, bo to zwykłe strony WWW, ale zwracamy z nich
+ * wyłącznie nazwy i położenia — czyli fakty — a nie cudzy tekst.
+ */
+app.post('/places/extract', async (c) => {
+  try {
+    const { text, url, city, limit = 12 } = await c.req.json() as
+      { text?: string; url?: string; city?: string; limit?: number };
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+
+    let tresc = (text || '').trim();
+    let zrodlo = 'tekst';
+
+    if (!tresc && url?.trim()) {
+      const adres = url.trim();
+      let host = '';
+      try { host = new URL(adres).hostname.toLowerCase(); } catch { /* sprawdzimy niżej */ }
+      if (!host) return c.json({ error: 'To nie wygląda na poprawny adres.' }, 400);
+
+      const ZABLOKOWANE = ['instagram.com', 'facebook.com', 'fb.com', 'pinterest.', 'tiktok.com', 'x.com', 'twitter.com'];
+      if (ZABLOKOWANE.some((z) => host.includes(z))) {
+        return c.json({
+          error: 'Tego serwisu nie pobieram — treści są tam za logowaniem, a jego regulamin zabrania zbierania danych. Skopiuj opis posta i wklej go jako tekst; zadziała tak samo.',
+        }, 400);
+      }
+
+      try {
+        const res = await fetch(adres, {
+          headers: { 'User-Agent': COMMONS_UA },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (!res.ok) return c.json({ error: `Strona odpowiedziała błędem ${res.status}.` }, 422);
+        const html = await res.text();
+        // Sam tekst: znaczniki, skrypty i style tylko zaśmiecają wejście modelu.
+        tresc = html
+          .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 12_000);
+        zrodlo = 'artykuł';
+      } catch {
+        return c.json({ error: 'Nie udało się pobrać tej strony.' }, 422);
+      }
+    }
+
+    if (tresc.length < 20) return c.json({ error: 'Za mało treści, żeby cokolwiek z niej wyłuskać.' }, 400);
+
+    const prompt = `Z poniższego tekstu wypisz konkretne miejsca do odwiedzenia${
+      city?.trim() ? ` w mieście ${city.trim()} i okolicy` : ''
+    }.
+
+Zasady:
+- tylko miejsca, które w tekście naprawdę występują; nie dopisuj własnych propozycji,
+- nazwa dokładnie tak, jak w tekście, bez tłumaczenia i bez upiększania,
+- pomiń hotele sieciowe, sklepy sieciowe i rzeczy, których nie da się odwiedzić,
+- jeśli tekst nie wymienia żadnego miejsca, zwróć pustą listę.
+
+Dla każdego miejsca podaj:
+- "name": nazwa
+- "kind": rodzaj jednym słowem (muzeum, park, restauracja, punkt widokowy…)
+- "note": maksymalnie jedno zdanie, dlaczego tekst je wymienia
+
+TEKST:
+${tresc.slice(0, 12_000)}
+
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
+
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              places: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' }, kind: { type: 'string' }, note: { type: 'string' },
+                  },
+                  required: ['name'],
+                },
+              },
+            },
+            required: ['places'],
+          },
+          maxOutputTokens: 4096,
+        },
+      },
+      { operation: 'places-extract', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+    );
+
+    const odp = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let znalezione: any[] = [];
+    try {
+      const czyste = odp.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const a = czyste.indexOf('{'), b = czyste.lastIndexOf('}');
+      if (a >= 0 && b > a) znalezione = JSON.parse(czyste.slice(a, b + 1)).places || [];
+    } catch {
+      console.warn('[places/extract] nie udało się sparsować odpowiedzi');
+    }
+
+    // Współrzędne ustalamy sami — model ich nie zgaduje. Wynik sprawdzamy odległością
+    // od miasta, bo nazwy z tekstu bywają odmienione ("Alfamę" zamiast "Alfama")
+    // i geokoder potrafi wtedy trafić w zupełnie inne miejsce na świecie: przy
+    // pierwszym teście dzielnica Lizbony wylądowała pod Oulu w Finlandii. Punkt
+    // bez położenia jest uczciwszy niż punkt trzy tysiące kilometrów od celu.
+    let centrum: { lat: number; lng: number } | null = null;
+    if (city?.trim()) {
+      try { centrum = await geocodingService.geocodeSettlement(city.trim()); } catch { /* bez kontroli */ }
+    }
+    const kmOdCentrum = (lat: number, lng: number) => {
+      if (!centrum) return 0;
+      const dLat = (lat - centrum.lat) * 111;
+      const dLng = (lng - centrum.lng) * 111 * Math.cos((centrum.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
+
+    let odrzucone = 0;
+    const wynik = await Promise.all(
+      znalezione.slice(0, limit).map(async (m: any) => {
+        const podstawa = { name: m.name, kind: m.kind ?? null, note: m.note ?? null };
+        try {
+          const g = await geocodingService.geocodeSinglePoint(
+            city?.trim() ? `${m.name}, ${city.trim()}` : m.name
+          );
+          if (!g?.lat) return { ...podstawa, lat: null, lng: null };
+          if (kmOdCentrum(g.lat, g.lng) > 60) {
+            odrzucone++;
+            return { ...podstawa, lat: null, lng: null, poza_zasiegiem: true };
+          }
+          return { ...podstawa, lat: g.lat, lng: g.lng };
+        } catch {
+          return { ...podstawa, lat: null, lng: null };
+        }
+      })
+    );
+    if (odrzucone > 0) console.log(`[places/extract] odrzucono ${odrzucone} położeń poza zasięgiem miasta`);
+
+    console.log(`[places/extract] ${zrodlo}: znaleziono ${wynik.length}, z położeniem ${wynik.filter((w) => w.lat != null).length}`);
+    return c.json({ places: wynik, source: zrodlo });
+  } catch (e: any) {
+    console.error('[places/extract]', e);
     return c.json({ error: e.message }, 500);
   }
 });
