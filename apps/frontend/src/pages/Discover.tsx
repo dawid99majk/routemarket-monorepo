@@ -88,7 +88,7 @@ export default function Discover() {
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
   const [initials, setInitials] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   /** Wyjazd wskazany z tablicy. Bez tego Odkrywaj brał ostatnio zmieniany,
    *  więc wejście z tablicy Lipska mogło wylądować w innym mieście. */
   const wskazanyWyjazd = searchParams.get('wyjazd');
@@ -116,6 +116,19 @@ export default function Discover() {
   }, []);
 
   const board = boards.find((b) => b.id === activeBoard) ?? null;
+
+  /**
+   * Zmiana wyjazdu przestawia też miasto. To jedna decyzja użytkownika („pracuję
+   * teraz nad tym wyjazdem"), więc nie ma powodu, żeby wymagała dwóch ruchów —
+   * ani żeby dało się zostawić te dwie rzeczy w sprzeczności.
+   */
+  const przelaczWyjazd = (id: string) => {
+    const w = boards.find((b) => b.id === id);
+    if (!w) return;
+    setActiveBoard(id);
+    if (w.destination) setCity(w.destination);
+    setSearchParams(id ? { wyjazd: id } : {}, { replace: true });
+  };
 
   useEffect(() => {
     if (!seeding) { setZbieraneSekundy(0); return; }
@@ -439,9 +452,37 @@ export default function Discover() {
         {/* Nagłówek dwukolumnowy */}
         <div className="pt-12 flex flex-wrap items-start justify-between gap-8">
           <div className="max-w-[560px]">
-            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
-              {board ? `Wyjazd · ${board.destination}` : 'Odkrywanie miejsc'}
-            </p>
+            {/* Dotąd stał tu zwykły napis „Wyjazd · Paryż", a wyjazd wybierał się sam.
+                Teraz to lista: widać, do czego trafiają zapisy, i można to zmienić
+                bez opuszczania strony. */}
+            {boards.length > 0 ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
+                  Wyjazd
+                </span>
+                <select
+                  value={activeBoard ?? ''}
+                  onChange={(e) => przelaczWyjazd(e.target.value)}
+                  aria-label="Wyjazd, do którego zapisujesz miejsca"
+                  className="rounded-full border border-border bg-card px-3 py-1 text-[13px]
+                             hover:border-primary transition-colors max-w-[320px] truncate"
+                >
+                  {boards.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}{b.destination ? ` · ${b.destination}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button onClick={() => navigate('/start')}
+                  className="text-[13px] text-muted-foreground hover:text-primary transition-colors">
+                  + nowy
+                </button>
+              </div>
+            ) : (
+              <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
+                Odkrywanie miejsc
+              </p>
+            )}
             <h1 className="font-display font-light text-[40px] leading-[1.1] tracking-[-0.02em] mt-3">
               {board ? `Atrakcje na ${board.days ?? 'kilka'} ${popoludnia(board.days)}` : 'Miejsca warte rozważenia'}
             </h1>
