@@ -8,6 +8,9 @@ export interface PinPlace {
   lat: number;
   lng: number;
   visit_minutes?: number | null;
+  /** Kubełek na tablicy. Pole opcjonalne — bez niego pinezka jest neutralna,
+   *  więc Odkrywaj, które kubełków nie zna, działa dokładnie jak wcześniej. */
+  kubelek?: 'must' | 'nice' | 'rejected' | null;
 }
 
 interface DiscoverMapProps {
@@ -30,15 +33,25 @@ interface DiscoverMapProps {
   className?: string;
 }
 
-const kolorTla = (wyroznione: boolean) =>
-  wyroznione ? 'hsl(158 28% 32%)' : 'hsl(60 6% 14%)';
+/** Te same trzy kolory, którymi opisane są kubełki na tablicy. */
+const KOLOR_KUBELKA: Record<string, string> = {
+  must: 'hsl(158 28% 32%)',
+  nice: 'hsl(200 30% 48%)',
+  rejected: 'hsl(60 4% 58%)',
+};
 
-function pinIcon(numer: number, wyroznione: boolean) {
+const kolorTla = (wyroznione: boolean, kubelek?: string | null) => {
+  if (wyroznione) return 'hsl(158 28% 32%)';
+  if (kubelek && KOLOR_KUBELKA[kubelek]) return KOLOR_KUBELKA[kubelek];
+  return 'hsl(60 6% 14%)';
+};
+
+function pinIcon(numer: number, wyroznione: boolean, kubelek?: string | null) {
   const rozmiar = wyroznione ? 34 : 26;
   return L.divIcon({
     className: '',
     html: `<div style="width:${rozmiar}px;height:${rozmiar}px;border-radius:50%;
-      background:${kolorTla(wyroznione)};color:hsl(60 12% 97%);
+      background:${kolorTla(wyroznione, kubelek)};color:hsl(60 12% 97%);
       display:flex;align-items:center;justify-content:center;
       font:500 ${wyroznione ? 13 : 11}px/1 ui-sans-serif,system-ui;
       border:2px solid hsl(60 12% 97%);
@@ -138,7 +151,7 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
     }
 
     zPolozeniem.forEach((p, i) => {
-      const m = L.marker([p.lat, p.lng], { icon: pinIcon(i + 1, p.id === aktywne) })
+      const m = L.marker([p.lat, p.lng], { icon: pinIcon(i + 1, p.id === aktywne, p.kubelek) })
         .addTo(w)
         .bindTooltip(p.name, { direction: 'top', offset: [0, -16] });
       m.on('click', () => onPinClick?.(p.id));

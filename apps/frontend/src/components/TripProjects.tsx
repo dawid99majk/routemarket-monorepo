@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, Bed, CalendarDays, ChevronLeft, ChevronRight, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
@@ -12,6 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import PlanDayMap from '@/components/PlanDayMap';
+import DiscoverMap from '@/components/DiscoverMap';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { podpisPubliczny } from '@/lib/uzytkownik';
 import { AXES, type RoutePreferenceValues } from '@/components/RoutePreferences';
@@ -202,6 +203,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [searchParams] = useSearchParams();
   const view = searchParams.get('widok') === 'plan' ? 'plan' : 'tablica';
   const [plan, setPlan] = useState<any | null>(null);
+  const [odrzuconeOtwarte, setOdrzuconeOtwarte] = useState(false);
+  /** Miejsca dla mapy tablicy: tylko te ze współrzędnymi, odrzucone pomijamy —
+   *  skoro zeszły z kolumn, to i z mapy, żeby nie zaśmiecały obrazu rozrzutu. */
+  const naMapie = useMemo(
+    () => places
+      .filter((x) => x.lat != null && x.lng != null && x.priority !== 'rejected')
+      .map((x) => ({ id: x.id, name: x.name, lat: x.lat, lng: x.lng,
+                     visit_minutes: x.visit_minutes, kubelek: x.priority as any })),
+    [places]);
   /** Wiersz zapisanego planu, do którego dopisujemy przeliczone przebiegi dni. */
   const [planId, setPlanId] = useState<string | null>(null);
   // Okno domyślne to pełny dzień zwiedzania. Wcześniejsze 17:00-21:00 pochodziło
@@ -693,6 +703,18 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       }
     }
     setDayRoutes(zapisane);
+  };
+
+  /**
+   * Wyjście z otwartego planu do listy wszystkich. Lista renderowała się dotąd
+   * pod całym planem, więc przy dwudniowym wyjeździe leżała jakieś dwa ekrany
+   * niżej — technicznie dostępna, praktycznie nie.
+   */
+  const pokazWszystkiePlany = () => {
+    setPlan(null);
+    setPlanId(null);
+    setDayRoutes({});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const recalcDay = async (day: any) => {
@@ -1236,6 +1258,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           <Button size="sm" variant="outline" onClick={() => setCreating((v) => !v)}>
             <Plus className="w-4 h-4 mr-1" /> Nowy plan
           </Button>
+          {active && view === 'plan' && plan && savedPlans.length > 0 && (
+            <Button size="sm" variant="outline" onClick={pokazWszystkiePlany}>
+              <CalendarDays className="w-4 h-4 mr-1.5" /> Wszystkie plany ({savedPlans.length})
+            </Button>
+          )}
           {active && view === 'plan' && plan && (
             <Button size="sm" variant="outline" onClick={buildPlan} disabled={planning}>
               {planning
@@ -1868,8 +1895,45 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     {grouped ? 'bez podziału na kategorie' : 'pogrupuj wg kategorii'}
                   </button>
                 </div>
+                {/* Odrzucone zostają dostępne, ale przestają zajmować kolumnę: przy pięciu
+                    pozycjach na piętnaście tablic to była pusta przestrzeń w najlepszym miejscu. */}
+                {(() => {
+                  const odrzucone = places.filter((x) => x.priority === 'rejected');
+                  if (odrzucone.length === 0) return null;
+                  return (
+                    <div className="rounded-md border border-border bg-muted/40 mb-3">
+                      <button onClick={() => setOdrzuconeOtwarte((v) => !v)}
+                        aria-expanded={odrzuconeOtwarte}
+                        className="w-full flex items-center justify-between px-3 py-2 text-left">
+                        <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                          {odrzucone.length} odrzucone
+                        </span>
+                        <span className="text-[12px] text-muted-foreground">
+                          {odrzuconeOtwarte ? 'zwiń' : 'pokaż'}
+                        </span>
+                      </button>
+                      {odrzuconeOtwarte && (
+                        <div className="flex flex-wrap gap-1.5 px-3 pb-3">
+                          {odrzucone.map((x) => (
+                            <span key={x.id}
+                              className="inline-flex items-center gap-2 rounded-full border border-border
+                                         bg-card pl-3 pr-1.5 py-1 text-[12px]">
+                              {x.name}
+                              <button onClick={() => movePlace(x.id, 'nice')}
+                                title="Wróć do „Być może”"
+                                className="rounded-full px-2 py-0.5 text-[11px] text-muted-foreground
+                                           hover:bg-muted hover:text-foreground transition-colors">
+                                przywróć
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="grid gap-3 md:grid-cols-3">
-                  {ZONES.map((zone) => {
+                  {ZONES.filter((z) => z.id !== 'rejected').map((zone) => {
                     const zonePlaces = places.filter((p) => p.priority === zone.id);
                     return (
                       <div
@@ -1999,6 +2063,42 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       </div>
                     );
                   })}
+                  {/* Trzecia kolumna była kubełkiem „Nie" — na piętnastu tablicach mieściło się
+                      w niej łącznie pięć miejsc, czyli 5% wszystkiego, a zajmowała trzecią część
+                      szerokości. Odrzucone zeszły do zwijanego paska nad kolumnami, a miejsce
+                      zajęła mapa: przy kurowaniu tablicy najczęściej pada pytanie „czy to się
+                      w ogóle da obejść w jeden dzień", a na to odpowiada geografia, nie lista.
+                      Pozostałe dwie kolumny zachowują dotychczasową szerokość. */}
+                  <div className="rounded-md border border-border bg-card overflow-hidden flex flex-col
+                             self-start md:sticky md:top-[88px]">
+                    <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+                      <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                        Rozrzut miejsc
+                      </span>
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {naMapie.length} z {places.length}
+                      </span>
+                    </div>
+                    {naMapie.length > 0 ? (
+                      <>
+                        <DiscoverMap places={naMapie} doKadru={naMapie} className="h-[480px]" />
+                        <div className="flex items-center gap-4 px-3 py-2 border-t border-border">
+                          {[['must', 'na pewno'], ['nice', 'być może']].map(([id, etykieta]) => (
+                            <span key={id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span className={`w-2.5 h-2.5 rounded-full ${
+                                id === 'must' ? 'bg-primary' : 'bg-dusty-blue'}`} />
+                              {etykieta}
+                            </span>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="h-[480px] flex items-center justify-center px-6 text-center
+                                    text-[13px] text-muted-foreground text-pretty">
+                        Mapa pokaże się, gdy na tablicy znajdzie się choć jedno miejsce ze współrzędnymi.
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-3">
                   Wagę zmienisz pigułką na kartce. Przeciąganie też działa — upuść kartkę
@@ -2571,11 +2671,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
             {savedPlans.length > 0 && (
               <div className="border-t pt-4 space-y-2">
-                <h3 className="text-sm font-semibold">Zapisane plany ({savedPlans.length})</h3>
+                <h3 className="text-sm font-semibold">
+                  Wszystkie plany ({savedPlans.length})
+                </h3>
                 {savedPlans.map((sp) => (
                   <div key={sp.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
                     <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <button onClick={() => otworzPlan(sp)} className="flex-1 text-left hover:underline truncate">
+                    <button onClick={() => otworzPlan(sp)}
+                      aria-current={planId === sp.id}
+                      className={`flex-1 text-left truncate ${
+                        planId === sp.id ? 'font-medium text-primary' : 'hover:underline'
+                      }`}>
                       {sp.name}
                       <span className="text-xs text-muted-foreground ml-2">
                         {new Date(sp.created_at).toLocaleDateString('pl-PL')}
