@@ -8,6 +8,9 @@ interface PlanDayMapProps {
   points: PlanPoint[];
   /** Przebieg po chodnikach z przeliczenia dnia. Bez niego rysujemy odcinki proste. */
   track?: [number, number][] | null;
+  /** Kliknięcie pinezki. Bez tego mapa była tylko obrazkiem: kartę miejsca dało
+   *  się otworzyć wyłącznie z listy po lewej, choć pinezka wygląda na klikalną. */
+  onPunkt?: (index: number) => void;
   className?: string;
 }
 
@@ -16,10 +19,12 @@ interface PlanDayMapProps {
  * Numer jest tu treścią, nie ozdobą: po lewej stronie widać oś godzinową, a na
  * mapie ten sam numer, więc od razu wiadomo, w którą stronę idzie dzień.
  */
-function PlanDayMapInner({ points, track, className = '' }: PlanDayMapProps) {
+function PlanDayMapInner({ points, track, onPunkt, className = '' }: PlanDayMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const naPunkt = useRef(onPunkt);
+  naPunkt.current = onPunkt;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -53,16 +58,29 @@ function PlanDayMapInner({ points, track, className = '' }: PlanDayMapProps) {
       }).addTo(layer);
     }
 
+    // Indeks w oryginalnej liście, nie w przefiltrowanej — inaczej kliknięcie
+    // pinezki otwierałoby kartę sąsiada, gdy któryś punkt nie ma współrzędnych.
+    const indeksy = points
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .map(({ i }) => i);
+
     valid.forEach((p, i) => {
-      L.marker(latLngs[i], {
+      const klikalna = !!naPunkt.current;
+      const marker = L.marker(latLngs[i], {
+        keyboard: klikalna,
+        title: klikalna ? `${p.name} — otwórz kartę` : p.name,
         icon: L.divIcon({
           className: '',
           html: `<div style="width:26px;height:26px;border-radius:50%;background:hsl(60 6% 14%);
                  color:hsl(60 12% 97%);display:flex;align-items:center;justify-content:center;
-                 font:500 12px/1 ui-sans-serif,system-ui;box-shadow:0 1px 4px rgba(0,0,0,.3)">${i + 1}</div>`,
+                 font:500 12px/1 ui-sans-serif,system-ui;box-shadow:0 1px 4px rgba(0,0,0,.3);
+                 ${klikalna ? 'cursor:pointer' : ''}">${i + 1}</div>`,
           iconSize: [26, 26], iconAnchor: [13, 13]
         })
       }).addTo(layer).bindTooltip(p.name, { direction: 'top', offset: [0, -14] });
+
+      if (klikalna) marker.on('click', () => naPunkt.current?.(indeksy[i]));
     });
 
     const bounds = track && track.length > 1

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, Bed, CalendarDays, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
+  AlertTriangle, Bed, CalendarDays, ChevronLeft, ChevronRight, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import TablicaKafelek from '@/components/TablicaKafelek';
 import { podpisPubliczny } from '@/lib/uzytkownik';
 import { AXES, type RoutePreferenceValues } from '@/components/RoutePreferences';
 import OsPreferencji from '@/components/OsPreferencji';
+import PasekNarzedziTablicy, { type NarzedzieId } from '@/components/PasekNarzedziTablicy';
 import { apiPost } from '@/lib/api';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -160,15 +161,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [shareEmail, setShareEmail] = useState('');
   const [sharing, setSharing] = useState(false);
   const [editingType, setEditingType] = useState(false);
-  const [prefsOtwarte, setPrefsOtwarte] = useState(false);
   const [link, setLink] = useState('');
   const [linkBusy, setLinkBusy] = useState(false);
   const [zLinku, setZLinku] = useState<any | null>(null);
   const [wklejony, setWklejony] = useState('');
   const [wyluskaneBusy, setWyluskaneBusy] = useState(false);
   const [wyluskane, setWyluskane] = useState<any[] | null>(null);
-  /** Jedno narzędzie naraz. Trzy rozwinięte paski zajmowały ekran bez powodu. */
-  const [rozwiniete, setRozwiniete] = useState<'szukaj' | 'wydarzenia' | null>(null);
+  /** Jedno narzędzie naraz; otwieraniem zajmuje się pasek pod kubełkami. */
+  const [narzedzie, setNarzedzie] = useState<NarzedzieId | null>(null);
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
   const [grouped, setGrouped] = useState(false);
@@ -202,6 +202,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [searchParams] = useSearchParams();
   const view = searchParams.get('widok') === 'plan' ? 'plan' : 'tablica';
   const [plan, setPlan] = useState<any | null>(null);
+  /** Wiersz zapisanego planu, do którego dopisujemy przeliczone przebiegi dni. */
+  const [planId, setPlanId] = useState<string | null>(null);
   // Okno domyślne to pełny dzień zwiedzania. Wcześniejsze 17:00-21:00 pochodziło
   // z przykładu "trzy popołudnia" i dla kogoś planującego cały dzień z dziećmi
   // dawało plan na późny wieczór.
@@ -275,6 +277,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   }, []);
 
   useEffect(() => {
+    setNarzedzie(null);
     if (!activeId) return setPlaces([]);
     // Zmiana planu musi wyczyścić WSZYSTKO, co dotyczyło poprzedniego. Wyniki
     // wyszukiwania dla Lipska wiszące nad tablicą Bukaresztu wyglądały jak
@@ -282,6 +285,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setResults([]);
     setQuery('');
     setPlan(null);
+    setPlanId(null);
+    setDayRoutes({});
     setEvents([]);
     if (active?.destination) loadEvents(active.destination);
     setEditingType(false);
@@ -294,6 +299,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
       setPlaces(data || []);
+      // Na pustej tablicy panel wyszukiwania jest jedyną treścią — nie ma czego
+      // zwijać, a użytkownik i tak zaczyna od dodania pierwszego miejsca.
+      if (!(data || []).length) setNarzedzie('szukaj');
       const { data: plans } = await (supabase as any)
         .from('trip_plans')
         .select('id, name, window_start, window_end, start_date, plan, created_at')
@@ -670,6 +678,23 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    */
   const [dayRoutes, setDayRoutes] = useState<Record<number, { km: number; h: number; track: [number, number][] | null } | 'loading'>>({});
 
+  /**
+   * Otwarcie zapisanego planu przywraca też przebiegi policzone przy poprzednim
+   * podejściu — inaczej mapa wracała do przerywanej linii prostej, choć trasa
+   * była już opłacona i zapisana.
+   */
+  const otworzPlan = (sp: any) => {
+    setPlan(sp.plan);
+    setPlanId(sp.id);
+    const zapisane: Record<number, { km: number; h: number; track: [number, number][] | null }> = {};
+    for (const d of sp.plan?.days || []) {
+      if (Array.isArray(d.track) && d.track.length > 1) {
+        zapisane[d.day] = { km: d.route_km ?? 0, h: d.route_h ?? 0, track: d.track };
+      }
+    }
+    setDayRoutes(zapisane);
+  };
+
   const recalcDay = async (day: any) => {
     const points = (day.items || [])
       .filter((it: any) => it.lat != null && it.lng != null)
@@ -683,18 +708,33 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         route_type: 'city_walk',
         intent: 'popular'
       }, { timeoutMs: 90_000 });
-      setDayRoutes((prev) => ({
-        ...prev,
-        [day.day]: {
-          km: data.distance_km,
-          h: data.duration_h,
-          // Ślad z routera trzymamy przy dniu, żeby mapa obok pokazała ten sam
-          // przebieg, o którym mówią liczby w pasku.
-          track: Array.isArray(data.trackPoints)
-            ? data.trackPoints.map((t: any[]) => [t[0], t[1]] as [number, number])
-            : null
-        }
-      }));
+      const wynik = {
+        km: data.distance_km,
+        h: data.duration_h,
+        // Ślad z routera trzymamy przy dniu, żeby mapa obok pokazała ten sam
+        // przebieg, o którym mówią liczby w pasku.
+        track: Array.isArray(data.trackPoints)
+          ? data.trackPoints.map((t: any[]) => [t[0], t[1]] as [number, number])
+          : null
+      };
+      setDayRoutes((prev) => ({ ...prev, [day.day]: wynik }));
+
+      // Przebieg kosztuje 10 tokenów, a leżał wyłącznie w stanie komponentu —
+      // odświeżenie strony kasowało to, za co użytkownik zapłacił, i kazało
+      // płacić drugi raz. Dopisujemy go do zapisanego planu.
+      if (planId && wynik.track) {
+        const zPrzebiegiem = {
+          ...plan,
+          days: (plan?.days || []).map((d: any) =>
+            d.day === day.day
+              ? { ...d, track: wynik.track, route_km: wynik.km, route_h: wynik.h }
+              : d)
+        };
+        setPlan(zPrzebiegiem);
+        setSavedPlans((prev) => prev.map((sp) =>
+          sp.id === planId ? { ...sp, plan: zPrzebiegiem } : sp));
+        await (supabase as any).from('trip_plans').update({ plan: zPrzebiegiem }).eq('id', planId);
+      }
     } catch (err: any) {
       setDayRoutes((prev) => { const next = { ...prev }; delete next[day.day]; return next; });
       toast.error(err.message || 'Nie udało się przeliczyć dnia');
@@ -766,7 +806,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       website: pinned?.website || null,
       description: pinned?.description || '',
       photos: pinned?.image_url ? [pinned.image_url] : [],
-      source: item.source
+      source: item.source,
+      // Numer pinezki i notatka wędrują do karty: bez nich trzeba było wracać
+      // do listy i szukać po nazwie, o którym punkcie mowa.
+      nr: item.nr ?? null,
+      minutesRaw: item.minutes ?? null
     });
     setCardPhoto(0);
 
@@ -1025,22 +1069,32 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setPlanning(true);
     setPlan(null);
     try {
-      const hotel = places.find((p) => p.category === 'hotel');
+      // Punkt startowy z tablicy ma pierwszeństwo; hotel przypięty jako zwykłe
+      // miejsce jest zapasem, gdy nikt startu nie ustawił.
+      const hotelZTablicy = places.find((p) => p.category === 'hotel');
+      const start = (active as any).start_name
+        ? { name: (active as any).start_name,
+            lat: (active as any).start_lat ?? undefined,
+            lng: (active as any).start_lng ?? undefined }
+        : hotelZTablicy
+          ? { name: hotelZTablicy.name,
+              lat: hotelZTablicy.lat ?? undefined,
+              lng: hotelZTablicy.lng ?? undefined }
+          : null;
       const data = await apiPost<any>('/plan-trip', {
         destination: active.destination,
         days: active.days || 1,
         window: { start: planForm.start, end: planForm.end },
-        hotel: (active as any).start_name
-          ? { name: (active as any).start_name,
-              lat: (active as any).start_lat ?? undefined,
-              lng: (active as any).start_lng ?? undefined }
-          : null,
+        hotel: start,
         start_date: planForm.date || undefined,
-        hotel: hotel ? { name: hotel.name } : null,
         fill_percent: active.fill_percent ?? 70,
         fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
         places: places.map((p) => ({
           name: p.name, category: p.category, priority: p.priority,
+          // Bez tych dwóch pól backend nie ma czym dopasować przypiętych miejsc:
+          // jego pula współrzędnych odrzuca pozycje bez lat/lng, więc zostawały
+          // w niej same propozycje agenta i tylko one trafiały na mapę.
+          lat: p.lat, lng: p.lng,
           opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
         })),
         creator_preferences: mergePreferences(userPrefs, active)
@@ -1063,7 +1117,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         })
         .select('id, name, window_start, window_end, start_date, plan, created_at')
         .single();
-      if (saved) setSavedPlans((prev) => [saved, ...prev]);
+      if (saved) {
+        setSavedPlans((prev) => [saved, ...prev]);
+        setPlanId(saved.id);
+      }
       refreshTokens();
     } catch (err: any) {
       toast.error(err.message);
@@ -1344,6 +1401,461 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               )}
             </div>
 
+            {/* Pasek narzędzi w miejsce trzech luźnych kart i osobnego okna
+                preferencji. Kafel jest teraz zakładką: aktywny ma wypełnienie
+                i dziobek wskazujący panel, otwarte jest zawsze jedno narzędzie.
+                Doszedł czwarty — dostęp; publikacja i udostępnianie leżały dotąd
+                luzem pod paskiem i wydłużały stronę, choć używa się ich raz.
+            
+                Stoi nad kubełkami, nie pod nimi: na końcu strony czytał się jak
+                stopka, a panel otwierał się poza ekranem. Tutaj jest przybornikiem
+                tablicy, przypięte miejsca lądują w kolumnach tuż pod nim. */}
+            <PasekNarzedziTablicy
+              otwarte={narzedzie}
+              onZmiana={setNarzedzie}
+              narzedzia={[
+                {
+                  id: 'prefs' as const,
+                  etykieta: 'Preferencje tablicy',
+                  meta: `Wypełnienie ${active.fill_percent ?? 70}%`,
+                  tytul: 'Jak ma być wypełniony dzień',
+                  opis: 'Te ustawienia dotyczą tego wyjazdu i przykrywają domyślne z profilu.',
+                  tresc: (
+                    <div className="space-y-4">
+                      {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
+                      <div className="rounded-md border bg-muted/30 px-4 py-3">
+                        <div className="flex items-baseline justify-between gap-3 mb-2">
+                          <span className="text-sm font-medium">Ile czasu zaplanować</span>
+                          <span className="text-sm font-semibold text-primary tabular-nums">
+                            {active.fill_percent ?? 70}%
+                          </span>
+                        </div>
+                        <Slider
+                          value={[active.fill_percent ?? 70]}
+                          min={0}
+                          max={100}
+                          step={5}
+                          onValueChange={(v) => setProjects((prev) =>
+                            prev.map((p) => (p.id === active.id ? { ...p, fill_percent: v[0] } : p)))}
+                          onValueCommit={(v) => saveFillPercent(v[0])}
+                        />
+                        {/* Pasek zajętości: liczby same nie mówią nic, dopóki nie widać,
+                            ile czasu w ogóle jest do rozdysponowania. */}
+                        {budget && (
+                          <div className="mt-3">
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
+                                }`}
+                                style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
+                              />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
+                              <strong className="text-foreground">{places.length}</strong> miejsc ({mustCount} koniecznie) ·{' '}
+                              Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
+                              {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
+                              {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
+                              {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> — więcej, niż da się przejść</span>}
+                            </p>
+                          </div>
+                        )}
+
+                        <p className="text-[11px] leading-snug text-muted-foreground mt-2">
+                          {(active.fill_percent ?? 70) >= 90
+                            ? 'Dzień wypełniony po brzegi — zdążysz wszędzie, ale bez marginesu na przystanek, który sam się trafi.'
+                            : (active.fill_percent ?? 70) <= 40
+                            ? 'Kilka kotwic i dużo swobody — reszta dnia na wałęsanie się po mieście bez planu.'
+                            : 'Zaplanowane atrakcje wypełnią tyle procent Twojego czasu, resztę zostawiamy na przerwy i włóczenie się po okolicy.'}
+                        </p>
+                      </div>
+
+                      {/* Osie preferencji tego wyjazdu. Te same, które siedzą w profilu,
+                          ale ustawione tutaj dotyczą wyłącznie tej tablicy — bo inaczej
+                          jedzie się z dziećmi w tempie z delegacji. */}
+                      <div className="border-t border-border pt-4 space-y-5">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <h3 className="font-display text-[17px]">Preferencje tego wyjazdu</h3>
+                          <button
+                            onClick={() => AXES.forEach((os) => ustawOs(os.key, null))}
+                            className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                            Wróć do ustawień z profilu
+                          </button>
+                        </div>
+
+                        {AXES.map((os) => {
+                          const wlasne = (active as any)[os.key] as number | null | undefined;
+                          return (
+                            <OsPreferencji
+                              key={os.key}
+                              tytul={os.title}
+                              lewo={os.left}
+                              prawo={os.right}
+                              podpowiedz={os.hint}
+                              wartosc={wlasne ?? userPrefs?.[os.key] ?? 50}
+                              wlasna={wlasne != null}
+                              onChange={(v) => ustawOs(os.key, v)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  id: 'szukaj' as const,
+                  etykieta: 'Szukaj miejsc',
+                  meta: `Dodaj coś w: ${active.destination}`,
+                  tytul: `Dodaj coś w: ${active.destination}`,
+                  opis: 'Pytaj naturalnie albo wklej to, co już masz — wszystko ląduje w kubełkach poniżej.',
+                  tresc: (
+                    <>
+                <div>
+                  <div className="relative flex items-center">
+                    <Search className="w-4 h-4 absolute left-3 text-muted-foreground" />
+                    <Input
+                      value={query}
+                      onChange={(e) => { setQuery(e.target.value); setPokazPodpowiedzi(true); }}
+                      onFocus={() => setPokazPodpowiedzi(true)}
+                      onBlur={() => setTimeout(() => setPokazPodpowiedzi(false), 150)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { setPokazPodpowiedzi(false); search(query); }
+                        if (e.key === 'Escape') setPokazPodpowiedzi(false);
+                      }}
+                      placeholder={`Czego szukasz w: ${active.destination}?`}
+                      className="pl-9 pr-24"
+                    />
+                    <Button size="sm" onClick={() => { setPokazPodpowiedzi(false); search(query); }}
+                      disabled={searching || !query.trim()}
+                      className="absolute right-1 bg-primary hover:bg-primary/90">
+                      {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Szukaj'}
+                    </Button>
+
+                    {pokazPodpowiedzi && podpowiedzi.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
+                                      bg-popover shadow-token-lg overflow-hidden">
+                        {podpowiedzi.map((sug, i) => (
+                          <div key={`${sug.name}-${i}`}
+                            className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted transition-colors
+                                       border-b border-border last:border-b-0">
+                            <div className="w-9 h-9 rounded-sm bg-muted shrink-0 overflow-hidden">
+                              {sug.photos?.[0] && (
+                                <img src={sug.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm truncate">{sug.name}</div>
+                              <div className="font-mono text-[11px] tabular-nums text-muted-foreground truncate">
+                                {[sug.kind, sug.visit_minutes ? formatMinutes(sug.visit_minutes) : null,
+                                  sug.source === 'catalog' ? 'w katalogu' : null].filter(Boolean).join(' · ') || sug.city}
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <Button size="sm" className="h-7 bg-primary hover:bg-primary/90"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => przypnijPodpowiedz(sug, 'must')}>
+                                Na pewno
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-7"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => przypnijPodpowiedz(sug, 'nice')}>
+                                Może
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="px-3 py-2 bg-muted/50 text-[11px] text-muted-foreground">
+                          Nie ma tego, czego szukasz? Naciśnij „Szukaj" — agent przejrzy miasto dokładniej.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Wklejenie odnośnika obok szukania po nazwie: miejsca znajduje się
+                      najczęściej gdzie indziej, a przepisywanie nazwy gubi położenie. */}
+                  <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+                    <div className="flex gap-2">
+                      <Input value={link} onChange={(e) => setLink(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && rozpoznajLink()}
+                        placeholder="Wklej odnośnik z Map Google, OpenStreetMap albo Apple Maps"
+                        className="flex-1" />
+                      <Button variant="outline" onClick={rozpoznajLink} disabled={linkBusy || !link.trim()}>
+                        {linkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Rozpoznaj'}
+                      </Button>
+                    </div>
+
+                    {zLinku && (
+                      <div className="mt-3 rounded-md border border-border bg-background p-3">
+                        <div className="font-display text-[15px]">{zLinku.name}</div>
+                        <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
+                          {[zLinku.city, zLinku.country].filter(Boolean).join(' / ') || 'bez miasta'}
+                          {zLinku.lat != null && ` · ${Number(zLinku.lat).toFixed(4)}, ${Number(zLinku.lng).toFixed(4)}`}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button size="sm" onClick={() => dodajZLinku('must')}
+                            className="bg-primary hover:bg-primary/90">Na pewno</Button>
+                          <Button size="sm" variant="outline" onClick={() => dodajZLinku('nice')}>Być może</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setZLinku(null)}>Odrzuć</Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Wklejona treść: opis posta, lista z bloga, wiadomość od znajomego.
+                      Z serwisów społecznościowych nic nie pobieramy — treści są tam za
+                      logowaniem, a ich regulaminy zabraniają zbierania danych. Skopiowany
+                      tekst działa tak samo i nie narusza niczyich warunków. */}
+                  <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+                    <textarea
+                      value={wklejony}
+                      onChange={(e) => setWklejony(e.target.value)}
+                      rows={3}
+                      placeholder="Wklej opis posta, listę z bloga albo adres artykułu — wyłuskam z tego miejsca"
+                      className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm
+                                 outline-none focus:border-foreground/30 transition-colors resize-y"
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <Button size="sm" variant="outline" onClick={wyluskaj}
+                        disabled={wyluskaneBusy || wklejony.trim().length < 20}>
+                        {wyluskaneBusy
+                          ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Czytam…</>
+                          : 'Znajdź miejsca w tekście'}
+                      </Button>
+                      {wyluskane && (
+                        <button onClick={() => { setWyluskane(null); setWklejony(''); }}
+                          className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                          wyczyść
+                        </button>
+                      )}
+                    </div>
+
+                    {wyluskane && wyluskane.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {wyluskane.map((m, i) => (
+                          <div key={`${m.name}-${i}`}
+                            className="rounded-md border border-border bg-background px-3 py-2.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-display text-[14px] leading-snug">{m.name}</div>
+                                <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">
+                                  {[m.kind, m.lat != null
+                                    ? `${Number(m.lat).toFixed(3)}, ${Number(m.lng).toFixed(3)}`
+                                    : m.poza_zasiegiem ? 'położenie odrzucone — za daleko od miasta' : 'bez położenia',
+                                  ].filter(Boolean).join(' · ')}
+                                </div>
+                                {m.note && (
+                                  <p className="text-[12px] text-muted-foreground mt-1 text-pretty">{m.note}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-1.5 shrink-0">
+                                <Button size="sm" onClick={() => dodajWyluskane(m, 'must')}
+                                  className="bg-primary hover:bg-primary/90 h-7 px-2.5 text-[12px]">Na pewno</Button>
+                                <Button size="sm" variant="outline" onClick={() => dodajWyluskane(m, 'nice')}
+                                  className="h-7 px-2.5 text-[12px]">Może</Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(SUGGESTION_SETS[active.trip_type || ''] ?? SUGGESTION_SETS.default).map((sug) => (
+                      <button key={sug} onClick={() => { setQuery(sug); search(sug); }}
+                        className="text-xs bg-muted hover:bg-muted/70 rounded-full px-2.5 py-1 text-muted-foreground">
+                        {sug}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {searching && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2 py-4">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Szukam i sprawdzam, czy te miejsca naprawdę istnieją…
+                  </p>
+                )}
+
+                {results.length > 0 && (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {results.map((r) => {
+                      const Icon = CATEGORY_ICON[r.category] || MapPin;
+                      return (
+                        <div key={r.name} className="rounded-md border overflow-hidden bg-background flex flex-col">
+                          {r.image_url && (
+                            <img src={r.image_url} alt="" loading="lazy"
+                              className="w-full h-32 object-cover bg-muted" />
+                          )}
+                          <div className="p-3 space-y-2 flex-1 flex flex-col">
+                            <div className="flex items-start gap-2">
+                              <Icon className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-sm leading-snug">{r.name}</div>
+                                {r.why && <div className="text-xs text-primary mt-0.5">{r.why}</div>}
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed flex-1">
+                              {r.description || r.wiki_extract}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 text-[11px]">
+                              {r.visit_minutes && <Badge variant="secondary">{r.visit_minutes} min</Badge>}
+                              {r.price_hint && (
+                                <Badge variant="secondary" className="gap-1"><Coins className="w-3 h-3" />{r.price_hint}</Badge>
+                              )}
+                              {r.opening_hours && <Badge variant="outline" className="font-normal">{r.opening_hours}</Badge>}
+                            </div>
+                            {r.website && (
+                              <a href={r.website} target="_blank" rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                                <ExternalLink className="w-3 h-3" /> Strona miejsca
+                              </a>
+                            )}
+                            <div className="flex gap-2 pt-1">
+                              <Button size="sm" className="flex-1 bg-primary hover:bg-primary/90 h-8"
+                                onClick={() => pin(r, 'must')}>
+                                <Star className="w-3.5 h-3.5 mr-1" /> Chcę
+                              </Button>
+                              <Button size="sm" variant="outline" className="flex-1 h-8" onClick={() => pin(r, 'nice')}>
+                                Może
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Karta miejsca: propozycje agenta widniały jako sama nazwa, więc
+                    decyzja "zostawiam czy wyrzucam" była zgadywanką. */}
+                    </>
+                  ),
+                },
+                {
+                  id: 'wydarzenia' as const,
+                  etykieta: 'Wydarzenia',
+                  meta: events.length ? `${events.length} w terminie` : 'Sprawdź termin',
+                  tytul: events.length
+                    ? `${events.length} wydarzeń w Twoim terminie`
+                    : 'Brak wydarzeń w terminie',
+                  tresc: (
+                    <>
+                <div className="rounded-md border bg-card">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-primary" />
+                      Co się dzieje w: {active.destination}
+                    </h3>
+                    <button onClick={refreshEvents} disabled={eventsBusy}
+                      className="text-xs text-primary hover:underline disabled:opacity-60 flex items-center gap-1">
+                      {eventsBusy
+                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Szukam…</>
+                        : <>{events.length > 0 ? 'Odśwież' : 'Sprawdź wydarzenia'}</>}
+                    </button>
+                  </div>
+                  {events.length === 0 ? (
+                    <p className="px-4 py-3 text-xs text-muted-foreground">
+                      Wystawy, festiwale i jarmarki z konkretnymi terminami — sprawdzamy je na żądanie,
+                      bo szybko się dezaktualizują.
+                    </p>
+                  ) : (
+                    <div className="divide-y max-h-64 overflow-y-auto">
+                      {events.map((ev) => (
+                        <div key={ev.id} className="px-4 py-2.5 flex items-start gap-3 text-sm">
+                          <span className="font-mono text-[11px] text-muted-foreground shrink-0 pt-0.5 w-[92px]">
+                            {ev.starts_on?.slice(5)}{ev.ends_on && ev.ends_on !== ev.starts_on ? `–${ev.ends_on.slice(5)}` : ''}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium leading-snug">{ev.name}</div>
+                            {ev.description && (
+                              <div className="text-xs text-muted-foreground leading-snug">{ev.description}</div>
+                            )}
+                          </div>
+                          {ev.url && (
+                            <a href={ev.url} target="_blank" rel="noreferrer"
+                              className="text-muted-foreground hover:text-primary shrink-0 mt-0.5" title="Strona wydarzenia">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                    </>
+                  ),
+                },
+                {
+                  id: 'udostepnij' as const,
+                  etykieta: 'Dostęp',
+                  meta: (active as any).is_public
+                    ? 'Publiczna'
+                    : shares.length ? `Ty i ${shares.length} os.` : 'Tylko Ty',
+                  tytul: 'Kto widzi tę tablicę',
+                  tresc: (
+                    <>
+
+                {/* Publikacja tablicy. Osobno od udostępniania imiennego, bo to inna
+                    decyzja: tam wpuszczasz konkretną osobę, tutaj każdego zalogowanego. */}
+                <div className="border-t pt-4">
+                  <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-4">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold">Tablica publiczna</h3>
+                      <p className="text-[13px] text-muted-foreground mt-1 text-pretty">
+                        {active?.is_public
+                          ? `Każdy zalogowany widzi tę tablicę i może ją skopiować do siebie.${
+                              active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
+                          : 'Widzisz ją tylko Ty i osoby, którym ją udostępniłeś. Po opublikowaniu każdy zalogowany będzie mógł ją skopiować do swoich wyjazdów.'}
+                      </p>
+                    </div>
+                    <Button size="sm" variant={active?.is_public ? 'outline' : 'default'}
+                      disabled={publishing} onClick={togglePublic}
+                      className={active?.is_public ? 'shrink-0' : 'shrink-0 bg-primary hover:bg-primary/90'}>
+                      {publishing
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : active?.is_public ? 'Cofnij publikację' : 'Opublikuj'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-2">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Share2 className="w-4 h-4 text-primary" /> Udostępnij imiennie
+                  </h3>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      value={shareEmail}
+                      onChange={(e) => setShareEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && shareProject()}
+                      placeholder="adres e-mail osoby, która ma współtworzyć"
+                      className="flex-1"
+                    />
+                    <Button onClick={shareProject} disabled={sharing || !shareEmail.trim()} variant="outline">
+                      {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Udostępnij'}
+                    </Button>
+                  </div>
+                  {shares.length > 0 && (
+                    <div className="space-y-1">
+                      {shares.map((sh) => (
+                        <div key={sh.id} className="flex items-center gap-2 text-xs p-2 rounded-md bg-muted/50">
+                          <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="flex-1 truncate">{sh.shared_with_email}</span>
+                          <span className="text-muted-foreground">{sh.role === 'editor' ? 'może edytować' : 'podgląd'}</span>
+                          <button onClick={() => revokeShare(sh.id)} className="text-muted-foreground hover:text-red-500">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                    </>
+                  ),
+                },
+              ]}
+            />
+
             {/* Kolumny stoją zawsze, także przy pustej tablicy. Kubełki są tu
                 wyjaśnieniem, co się z tą stroną robi — schowane, zostawiały nowy
                 wyjazd bez żadnej wskazówki. */}
@@ -1548,133 +2060,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </div>
             </div>
 
-            {/* Narzędzia tablicy jako trzy małe karty. Wcześniej były trzema pasami
-                na całą szerokość, rozwiniętymi na stałe — zajmowały pół ekranu,
-                choć korzysta się z nich rzadko i pojedynczo. */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <button onClick={() => setPrefsOtwarte(true)}
-                className="rounded-md border border-border bg-card px-4 py-3 text-left
-                           hover:shadow-token-md transition-shadow">
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                  Preferencje tablicy
-                </div>
-                <div className="text-sm mt-1">
-                  Wypełnienie {active.fill_percent ?? 70}%
-                  {active.days ? ` · ${active.days} dni` : ''}
-                </div>
-              </button>
 
-              <button onClick={() => setRozwiniete((v) => (v === 'szukaj' ? null : 'szukaj'))}
-                className={`rounded-md border px-4 py-3 text-left transition-shadow hover:shadow-token-md ${
-                  rozwiniete === 'szukaj' ? 'border-foreground bg-card' : 'border-border bg-card'
-                }`}>
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                  Szukaj miejsc
-                </div>
-                <div className="text-sm mt-1">
-                  {rozwiniete === 'szukaj' ? 'Zwiń wyszukiwanie' : `Dodaj coś w: ${active.destination}`}
-                </div>
-              </button>
-
-              <button onClick={() => setRozwiniete((v) => (v === 'wydarzenia' ? null : 'wydarzenia'))}
-                className={`rounded-md border px-4 py-3 text-left transition-shadow hover:shadow-token-md ${
-                  rozwiniete === 'wydarzenia' ? 'border-foreground bg-card' : 'border-border bg-card'
-                }`}>
-                <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                  Wydarzenia
-                </div>
-                <div className="text-sm mt-1">
-                  {events.length > 0 ? `${events.length} w terminie` : 'Sprawdź, co się dzieje'}
-                </div>
-              </button>
-            </div>
-
-            <Dialog open={prefsOtwarte} onOpenChange={setPrefsOtwarte}>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle className="font-display text-[20px]">Preferencje tablicy</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
-                  <div className="rounded-md border bg-muted/30 px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-3 mb-2">
-                      <span className="text-sm font-medium">Ile czasu zaplanować</span>
-                      <span className="text-sm font-semibold text-primary tabular-nums">
-                        {active.fill_percent ?? 70}%
-                      </span>
-                    </div>
-                    <Slider
-                      value={[active.fill_percent ?? 70]}
-                      min={0}
-                      max={100}
-                      step={5}
-                      onValueChange={(v) => setProjects((prev) =>
-                        prev.map((p) => (p.id === active.id ? { ...p, fill_percent: v[0] } : p)))}
-                      onValueCommit={(v) => saveFillPercent(v[0])}
-                    />
-                    {/* Pasek zajętości: liczby same nie mówią nic, dopóki nie widać,
-                        ile czasu w ogóle jest do rozdysponowania. */}
-                    {budget && (
-                      <div className="mt-3">
-                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
-                            }`}
-                            style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
-                          />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
-                          <strong className="text-foreground">{places.length}</strong> miejsc ({mustCount} koniecznie) ·{' '}
-                          Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
-                          {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
-                          {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
-                          {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> — więcej, niż da się przejść</span>}
-                        </p>
-                      </div>
-                    )}
-
-                    <p className="text-[11px] leading-snug text-muted-foreground mt-2">
-                      {(active.fill_percent ?? 70) >= 90
-                        ? 'Dzień wypełniony po brzegi — zdążysz wszędzie, ale bez marginesu na przystanek, który sam się trafi.'
-                        : (active.fill_percent ?? 70) <= 40
-                        ? 'Kilka kotwic i dużo swobody — reszta dnia na wałęsanie się po mieście bez planu.'
-                        : 'Zaplanowane atrakcje wypełnią tyle procent Twojego czasu, resztę zostawiamy na przerwy i włóczenie się po okolicy.'}
-                    </p>
-                  </div>
-
-                  {/* Osie preferencji tego wyjazdu. Te same, które siedzą w profilu,
-                      ale ustawione tutaj dotyczą wyłącznie tej tablicy — bo inaczej
-                      jedzie się z dziećmi w tempie z delegacji. */}
-                  <div className="border-t border-border pt-4 space-y-5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <h3 className="font-display text-[17px]">Preferencje tego wyjazdu</h3>
-                      <button
-                        onClick={() => AXES.forEach((os) => ustawOs(os.key, null))}
-                        className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                        Wróć do ustawień z profilu
-                      </button>
-                    </div>
-
-                    {AXES.map((os) => {
-                      const wlasne = (active as any)[os.key] as number | null | undefined;
-                      return (
-                        <OsPreferencji
-                          key={os.key}
-                          tytul={os.title}
-                          lewo={os.left}
-                          prawo={os.right}
-                          podpowiedz={os.hint}
-                          wartosc={wlasne ?? userPrefs?.[os.key] ?? 50}
-                          wlasna={wlasne != null}
-                          onChange={(v) => ustawOs(os.key, v)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
 
             {editingType && (
               <div className="rounded-md bg-muted/50 p-3 space-y-2">
@@ -1700,225 +2086,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </div>
             )}
 
-            {rozwiniete === 'szukaj' && (<>
-            <div>
-              <div className="relative flex items-center">
-                <Search className="w-4 h-4 absolute left-3 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); setPokazPodpowiedzi(true); }}
-                  onFocus={() => setPokazPodpowiedzi(true)}
-                  onBlur={() => setTimeout(() => setPokazPodpowiedzi(false), 150)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') { setPokazPodpowiedzi(false); search(query); }
-                    if (e.key === 'Escape') setPokazPodpowiedzi(false);
-                  }}
-                  placeholder={`Czego szukasz w: ${active.destination}?`}
-                  className="pl-9 pr-24"
-                />
-                <Button size="sm" onClick={() => { setPokazPodpowiedzi(false); search(query); }}
-                  disabled={searching || !query.trim()}
-                  className="absolute right-1 bg-primary hover:bg-primary/90">
-                  {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Szukaj'}
-                </Button>
-
-                {pokazPodpowiedzi && podpowiedzi.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
-                                  bg-popover shadow-token-lg overflow-hidden">
-                    {podpowiedzi.map((sug, i) => (
-                      <div key={`${sug.name}-${i}`}
-                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted transition-colors
-                                   border-b border-border last:border-b-0">
-                        <div className="w-9 h-9 rounded-sm bg-muted shrink-0 overflow-hidden">
-                          {sug.photos?.[0] && (
-                            <img src={sug.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm truncate">{sug.name}</div>
-                          <div className="font-mono text-[11px] tabular-nums text-muted-foreground truncate">
-                            {[sug.kind, sug.visit_minutes ? formatMinutes(sug.visit_minutes) : null,
-                              sug.source === 'catalog' ? 'w katalogu' : null].filter(Boolean).join(' · ') || sug.city}
-                          </div>
-                        </div>
-                        <div className="flex gap-1.5 shrink-0">
-                          <Button size="sm" className="h-7 bg-primary hover:bg-primary/90"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => przypnijPodpowiedz(sug, 'must')}>
-                            Na pewno
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => przypnijPodpowiedz(sug, 'nice')}>
-                            Może
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="px-3 py-2 bg-muted/50 text-[11px] text-muted-foreground">
-                      Nie ma tego, czego szukasz? Naciśnij „Szukaj" — agent przejrzy miasto dokładniej.
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Wklejenie odnośnika obok szukania po nazwie: miejsca znajduje się
-                  najczęściej gdzie indziej, a przepisywanie nazwy gubi położenie. */}
-              <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
-                <div className="flex gap-2">
-                  <Input value={link} onChange={(e) => setLink(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && rozpoznajLink()}
-                    placeholder="Wklej odnośnik z Map Google, OpenStreetMap albo Apple Maps"
-                    className="flex-1" />
-                  <Button variant="outline" onClick={rozpoznajLink} disabled={linkBusy || !link.trim()}>
-                    {linkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Rozpoznaj'}
-                  </Button>
-                </div>
-
-                {zLinku && (
-                  <div className="mt-3 rounded-md border border-border bg-background p-3">
-                    <div className="font-display text-[15px]">{zLinku.name}</div>
-                    <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
-                      {[zLinku.city, zLinku.country].filter(Boolean).join(' / ') || 'bez miasta'}
-                      {zLinku.lat != null && ` · ${Number(zLinku.lat).toFixed(4)}, ${Number(zLinku.lng).toFixed(4)}`}
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      <Button size="sm" onClick={() => dodajZLinku('must')}
-                        className="bg-primary hover:bg-primary/90">Na pewno</Button>
-                      <Button size="sm" variant="outline" onClick={() => dodajZLinku('nice')}>Być może</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setZLinku(null)}>Odrzuć</Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Wklejona treść: opis posta, lista z bloga, wiadomość od znajomego.
-                  Z serwisów społecznościowych nic nie pobieramy — treści są tam za
-                  logowaniem, a ich regulaminy zabraniają zbierania danych. Skopiowany
-                  tekst działa tak samo i nie narusza niczyich warunków. */}
-              <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
-                <textarea
-                  value={wklejony}
-                  onChange={(e) => setWklejony(e.target.value)}
-                  rows={3}
-                  placeholder="Wklej opis posta, listę z bloga albo adres artykułu — wyłuskam z tego miejsca"
-                  className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm
-                             outline-none focus:border-foreground/30 transition-colors resize-y"
-                />
-                <div className="flex items-center gap-2 mt-2">
-                  <Button size="sm" variant="outline" onClick={wyluskaj}
-                    disabled={wyluskaneBusy || wklejony.trim().length < 20}>
-                    {wyluskaneBusy
-                      ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Czytam…</>
-                      : 'Znajdź miejsca w tekście'}
-                  </Button>
-                  {wyluskane && (
-                    <button onClick={() => { setWyluskane(null); setWklejony(''); }}
-                      className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                      wyczyść
-                    </button>
-                  )}
-                </div>
-
-                {wyluskane && wyluskane.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {wyluskane.map((m, i) => (
-                      <div key={`${m.name}-${i}`}
-                        className="rounded-md border border-border bg-background px-3 py-2.5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-display text-[14px] leading-snug">{m.name}</div>
-                            <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">
-                              {[m.kind, m.lat != null
-                                ? `${Number(m.lat).toFixed(3)}, ${Number(m.lng).toFixed(3)}`
-                                : m.poza_zasiegiem ? 'położenie odrzucone — za daleko od miasta' : 'bez położenia',
-                              ].filter(Boolean).join(' · ')}
-                            </div>
-                            {m.note && (
-                              <p className="text-[12px] text-muted-foreground mt-1 text-pretty">{m.note}</p>
-                            )}
-                          </div>
-                          <div className="flex gap-1.5 shrink-0">
-                            <Button size="sm" onClick={() => dodajWyluskane(m, 'must')}
-                              className="bg-primary hover:bg-primary/90 h-7 px-2.5 text-[12px]">Na pewno</Button>
-                            <Button size="sm" variant="outline" onClick={() => dodajWyluskane(m, 'nice')}
-                              className="h-7 px-2.5 text-[12px]">Może</Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {(SUGGESTION_SETS[active.trip_type || ''] ?? SUGGESTION_SETS.default).map((sug) => (
-                  <button key={sug} onClick={() => { setQuery(sug); search(sug); }}
-                    className="text-xs bg-muted hover:bg-muted/70 rounded-full px-2.5 py-1 text-muted-foreground">
-                    {sug}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {searching && (
-              <p className="text-sm text-muted-foreground flex items-center gap-2 py-4">
-                <Loader2 className="w-4 h-4 animate-spin" /> Szukam i sprawdzam, czy te miejsca naprawdę istnieją…
-              </p>
-            )}
-
-            {results.length > 0 && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map((r) => {
-                  const Icon = CATEGORY_ICON[r.category] || MapPin;
-                  return (
-                    <div key={r.name} className="rounded-md border overflow-hidden bg-background flex flex-col">
-                      {r.image_url && (
-                        <img src={r.image_url} alt="" loading="lazy"
-                          className="w-full h-32 object-cover bg-muted" />
-                      )}
-                      <div className="p-3 space-y-2 flex-1 flex flex-col">
-                        <div className="flex items-start gap-2">
-                          <Icon className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-sm leading-snug">{r.name}</div>
-                            {r.why && <div className="text-xs text-primary mt-0.5">{r.why}</div>}
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed flex-1">
-                          {r.description || r.wiki_extract}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5 text-[11px]">
-                          {r.visit_minutes && <Badge variant="secondary">{r.visit_minutes} min</Badge>}
-                          {r.price_hint && (
-                            <Badge variant="secondary" className="gap-1"><Coins className="w-3 h-3" />{r.price_hint}</Badge>
-                          )}
-                          {r.opening_hours && <Badge variant="outline" className="font-normal">{r.opening_hours}</Badge>}
-                        </div>
-                        {r.website && (
-                          <a href={r.website} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                            <ExternalLink className="w-3 h-3" /> Strona miejsca
-                          </a>
-                        )}
-                        <div className="flex gap-2 pt-1">
-                          <Button size="sm" className="flex-1 bg-primary hover:bg-primary/90 h-8"
-                            onClick={() => pin(r, 'must')}>
-                            <Star className="w-3.5 h-3.5 mr-1" /> Chcę
-                          </Button>
-                          <Button size="sm" variant="outline" className="flex-1 h-8" onClick={() => pin(r, 'nice')}>
-                            Może
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Karta miejsca: propozycje agenta widniały jako sama nazwa, więc
-                decyzja "zostawiam czy wyrzucam" była zgadywanką. */}
-            </>)}
 
             </>)}
 
@@ -1927,33 +2094,95 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             <Dialog open={!!placeCard} onOpenChange={(open) => !open && setPlaceCard(null)}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle className="pr-6 text-left leading-snug">{placeCard?.name}</DialogTitle>
+                  <DialogTitle className="pr-6 text-left leading-snug flex items-start gap-2">
+                    {placeCard?.nr != null && (
+                      <span className="w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
+                                       text-[12px] font-medium bg-foreground text-background font-sans">
+                        {placeCard.nr}
+                      </span>
+                    )}
+                    <span className="min-w-0">{placeCard?.name}</span>
+                  </DialogTitle>
                 </DialogHeader>
                 {placeCard && (
                   <div className="space-y-3">
                     {placeCard.photos?.length > 0 && (
                       <div className="relative rounded-md overflow-hidden bg-muted">
+                        {/* Zdjęcia z Commons bywają pionowe, a ramka jest pozioma.
+                            object-cover ucinał wtedy wszystko poza środkiem kadru — z całej
+                            wieży zostawał kawałek muru. Teraz zdjęcie mieści się w całości,
+                            a tło robi jego rozmyta kopia, żeby boki nie świeciły pustką. */}
+                        <div aria-hidden
+                          className="absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-45"
+                          style={{ backgroundImage: `url("${placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}")` }} />
                         <img
                           src={placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}
                           alt={placeCard.name}
-                          className="w-full h-48 object-cover"
+                          className="relative w-full h-56 object-contain"
                           onError={() => setPlaceCard((prev: any) => ({ ...prev, photos: [] }))}
                         />
-                        {placeCard.photos.length > 1 && (
-                          <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                            {placeCard.photos.map((_: string, i: number) => (
-                              <button key={i} onClick={() => setCardPhoto(i)}
-                                className={`w-1.5 h-1.5 rounded-full ${i === Math.min(cardPhoto, placeCard.photos.length - 1) ? 'bg-white' : 'bg-white/50'}`} />
-                            ))}
-                          </div>
-                        )}
+                        {/* Same kropki po 6 px były jedynym sposobem na zmianę zdjęcia:
+                            nie wyglądały na klikalne i trudno było w nie trafić. Strzałki
+                            mówią wprost, że zdjęć jest więcej, licznik ile ich zostało,
+                            a kropki zostają jako wskaźnik miejsca w zestawie — z polem
+                            kliknięcia większym niż sama kropka. */}
+                        {placeCard.photos.length > 1 && (() => {
+                          const ile = placeCard.photos.length;
+                          const teraz = Math.min(cardPhoto, ile - 1);
+                          const przesun = (o: number) => setCardPhoto((teraz + o + ile) % ile);
+                          const strzalka = `absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full
+                            bg-background/85 text-foreground shadow-token-sm backdrop-blur-[2px]
+                            flex items-center justify-center hover:bg-background transition-colors`;
+                          return (
+                            <>
+                              <button type="button" aria-label="Poprzednie zdjęcie"
+                                onClick={() => przesun(-1)} className={`${strzalka} left-2`}>
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <button type="button" aria-label="Następne zdjęcie"
+                                onClick={() => przesun(1)} className={`${strzalka} right-2`}>
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                              <span className="absolute top-2 right-2 rounded-full bg-ink/55 text-background
+                                               font-mono tabular-nums text-[11px] px-2 py-0.5">
+                                {teraz + 1}/{ile}
+                              </span>
+                              <div className="absolute bottom-0 left-0 right-0 flex justify-center">
+                                {placeCard.photos.map((_: string, i: number) => (
+                                  <button key={i} type="button" onClick={() => setCardPhoto(i)}
+                                    aria-label={`Zdjęcie ${i + 1} z ${ile}`}
+                                    aria-current={i === teraz}
+                                    className="px-1 py-2.5">
+                                    <span className={`block w-1.5 h-1.5 rounded-full transition-colors ${
+                                      i === teraz ? 'bg-white' : 'bg-white/50'}`} />
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
 
+                    {/* Przypinanie było wyłącznie ikonką na liście. Kto otworzył kartę,
+                        żeby zdecydować, musiał ją zamknąć i trafić w pinezkę 14 px
+                        obok — decyzja zapadała tu, a przycisk był gdzie indziej. */}
                     {placeCard.source === 'suggested' && (
-                      <span className="inline-block text-[10px] text-primary bg-primary/10 rounded-full px-2 py-0.5">
-                        propozycja agenta — nie ma jej jeszcze na Twojej tablicy
-                      </span>
+                      places.some((p) => p.name === placeCard.name) ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <Pin className="w-3 h-3" /> jest już na Twojej tablicy
+                        </span>
+                      ) : (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                          <span className="text-[11px] text-muted-foreground">
+                            propozycja agenta — nie ma jej jeszcze na Twojej tablicy
+                          </span>
+                          <Button size="sm" variant="outline" className="shrink-0"
+                            onClick={() => pinSuggestion({ name: placeCard.name, minutes: placeCard.minutesRaw, note: placeCard.note })}>
+                            <Pin className="w-3.5 h-3.5 mr-1.5" /> Dodaj do tablicy
+                          </Button>
+                        </div>
+                      )
                     )}
 
                     {cardLoading && !placeCard.description && (
@@ -1988,51 +2217,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Wydarzenia: pokazujemy je przy tablicy, bo tam zapada decyzja
                 "dokładam dzień czy nie" — nie w osobnej zakładce. Rozwijane, bo
                 sprawdza się je raz na wyjazd, a nie przy każdym wejściu. */}
-            {rozwiniete === 'wydarzenia' && (
-            <div className="rounded-md border bg-card">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-primary" />
-                  Co się dzieje w: {active.destination}
-                </h3>
-                <button onClick={refreshEvents} disabled={eventsBusy}
-                  className="text-xs text-primary hover:underline disabled:opacity-60 flex items-center gap-1">
-                  {eventsBusy
-                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Szukam…</>
-                    : <>{events.length > 0 ? 'Odśwież' : 'Sprawdź wydarzenia'}</>}
-                </button>
-              </div>
-              {events.length === 0 ? (
-                <p className="px-4 py-3 text-xs text-muted-foreground">
-                  Wystawy, festiwale i jarmarki z konkretnymi terminami — sprawdzamy je na żądanie,
-                  bo szybko się dezaktualizują.
-                </p>
-              ) : (
-                <div className="divide-y max-h-64 overflow-y-auto">
-                  {events.map((ev) => (
-                    <div key={ev.id} className="px-4 py-2.5 flex items-start gap-3 text-sm">
-                      <span className="font-mono text-[11px] text-muted-foreground shrink-0 pt-0.5 w-[92px]">
-                        {ev.starts_on?.slice(5)}{ev.ends_on && ev.ends_on !== ev.starts_on ? `–${ev.ends_on.slice(5)}` : ''}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium leading-snug">{ev.name}</div>
-                        {ev.description && (
-                          <div className="text-xs text-muted-foreground leading-snug">{ev.description}</div>
-                        )}
-                      </div>
-                      {ev.url && (
-                        <a href={ev.url} target="_blank" rel="noreferrer"
-                          className="text-muted-foreground hover:text-primary shrink-0 mt-0.5" title="Strona wydarzenia">
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            )}
 
             {(outliers.length > 0 || duplicates.length > 0) && (
               <div className="rounded-md border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">
@@ -2050,62 +2234,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </div>
             )}
 
-
-            {/* Publikacja tablicy. Osobno od udostępniania imiennego, bo to inna
-                decyzja: tam wpuszczasz konkretną osobę, tutaj każdego zalogowanego. */}
-            <div className="border-t pt-4">
-              <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-4">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold">Tablica publiczna</h3>
-                  <p className="text-[13px] text-muted-foreground mt-1 text-pretty">
-                    {active?.is_public
-                      ? `Każdy zalogowany widzi tę tablicę i może ją skopiować do siebie.${
-                          active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
-                      : 'Widzisz ją tylko Ty i osoby, którym ją udostępniłeś. Po opublikowaniu każdy zalogowany będzie mógł ją skopiować do swoich wyjazdów.'}
-                  </p>
-                </div>
-                <Button size="sm" variant={active?.is_public ? 'outline' : 'default'}
-                  disabled={publishing} onClick={togglePublic}
-                  className={active?.is_public ? 'shrink-0' : 'shrink-0 bg-primary hover:bg-primary/90'}>
-                  {publishing
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : active?.is_public ? 'Cofnij publikację' : 'Opublikuj'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="border-t pt-4 space-y-2">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-primary" /> Udostępnij imiennie
-              </h3>
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  value={shareEmail}
-                  onChange={(e) => setShareEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && shareProject()}
-                  placeholder="adres e-mail osoby, która ma współtworzyć"
-                  className="flex-1"
-                />
-                <Button onClick={shareProject} disabled={sharing || !shareEmail.trim()} variant="outline">
-                  {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Udostępnij'}
-                </Button>
-              </div>
-              {shares.length > 0 && (
-                <div className="space-y-1">
-                  {shares.map((sh) => (
-                    <div key={sh.id} className="flex items-center gap-2 text-xs p-2 rounded-md bg-muted/50">
-                      <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="flex-1 truncate">{sh.shared_with_email}</span>
-                      <span className="text-muted-foreground">{sh.role === 'editor' ? 'może edytować' : 'podgląd'}</span>
-                      <button onClick={() => revokeShare(sh.id)} className="text-muted-foreground hover:text-red-500">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             </>)}
 
@@ -2248,6 +2376,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       {(day.items || []).map((it: any, i: number) => {
                         const suggested = it.source === 'suggested';
                         const alreadyPinned = places.some((p) => p.name === it.name);
+                        const naMapie = it.lat != null && it.lng != null;
+                        const nrNaMapie = naMapie
+                          ? (day.items || []).slice(0, i + 1)
+                              .filter((x: any) => x.lat != null && x.lng != null).length
+                          : null;
   return (
                           <div key={i} className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
                             <span className="w-14 shrink-0 pt-0.5">
@@ -2258,19 +2391,27 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 </span>
                               )}
                             </span>
-                            {/* Numer na osi odpowiada numerowi pinezki na mapie obok. */}
-                            <span className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
-                                              text-[12px] font-medium ${
-                              suggested
-                                ? 'bg-dusty-blue text-dusty-blue-foreground'
-                                : 'bg-primary text-primary-foreground'
-                            }`}>
-                              {i + 1}
-                            </span>
+                            {/* Numer na osi odpowiada numerowi pinezki na mapie obok — dlatego
+                                liczy tylko punkty, które na tę mapę trafiają. Pozycja bez
+                                współrzędnych dostaje pustą obwódkę zamiast numeru, żeby nie
+                                przesuwać numeracji reszty dnia. */}
+                            {naMapie ? (
+                              <span className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
+                                                text-[12px] font-medium ${
+                                suggested
+                                  ? 'bg-dusty-blue text-dusty-blue-foreground'
+                                  : 'bg-primary text-primary-foreground'
+                              }`}>
+                                {nrNaMapie}
+                              </span>
+                            ) : (
+                              <span title="Bez pinezki na mapie"
+                                className="w-6 h-6 rounded-full shrink-0 mt-0.5 border border-dashed border-border" />
+                            )}
                             <div className="min-w-0 flex-1">
                               <div className="font-display text-[15px] flex items-center gap-2 flex-wrap">
                                 <button
-                                  onClick={() => openPlaceCard(it)}
+                                  onClick={() => openPlaceCard({ ...it, nr: nrNaMapie })}
                                   className="text-left hover:text-primary hover:underline decoration-dotted underline-offset-2"
                                 >
                                   {it.name}
@@ -2329,7 +2470,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   <aside className="space-y-4 lg:sticky lg:top-[88px]">
                     {(() => {
                       const d = (plan.days || [])[Math.min(planDay, (plan.days || []).length - 1)];
-                      const pts = (d?.items || [])
+                      const wszystkie = d?.items || [];
+                      const pts = wszystkie
                         .filter((it: any) => it.lat != null && it.lng != null)
                         .map((it: any) => ({ name: it.name, lat: it.lat, lng: it.lng }));
                       if (pts.length === 0) return null;
@@ -2338,7 +2480,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       const withoutCoords = (d?.items || []).length - pts.length;
                       return (
                         <div className="rounded-md border border-border overflow-hidden bg-card">
-                          <PlanDayMap points={pts} track={dayTrack} className="h-[380px] w-full" />
+                          <PlanDayMap points={pts} track={dayTrack} className="h-[380px] w-full"
+                            onPunkt={(i) => {
+                              // Numer pinezki to jej pozycja na mapie, więc karta otwarta
+                              // z mapy pokazuje dokładnie ten numer, w który kliknięto.
+                              const it = pts[i] && wszystkie.find((x: any) => x.name === pts[i].name);
+                              if (it) openPlaceCard({ ...it, nr: i + 1 });
+                            }} />
                           <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
                             <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                               Trasa dnia
@@ -2427,7 +2575,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 {savedPlans.map((sp) => (
                   <div key={sp.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
                     <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <button onClick={() => setPlan(sp.plan)} className="flex-1 text-left hover:underline truncate">
+                    <button onClick={() => otworzPlan(sp)} className="flex-1 text-left hover:underline truncate">
                       {sp.name}
                       <span className="text-xs text-muted-foreground ml-2">
                         {new Date(sp.created_at).toLocaleDateString('pl-PL')}
