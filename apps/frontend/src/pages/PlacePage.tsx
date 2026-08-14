@@ -70,7 +70,7 @@ export default function PlacePage() {
       (supabase as any).from('place_favorites').select('place_id')
         .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
       (supabase as any).from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
-      (supabase as any).from('place_catalog').select('*').neq('id', data.id).limit(200),
+      (supabase as any).from('place_catalog').select('*').neq('id', data.id).limit(2000),
     ]);
     setFavorite(!!fav);
     setBoards(projs ?? []);
@@ -93,13 +93,19 @@ export default function PlacePage() {
         .slice(0, 3)
         .map((r) => r.x)
     );
+    // Podobne dobierane były wyłącznie po tagach klimatu, bez żadnego warunku
+    // geograficznego. Przy atrakcji w Lipsku wychodziły więc miejsca z Rygi,
+    // Tallina i Wrocławia — trafne co do klimatu, bezużyteczne przy planowaniu.
+    // Teraz to samo miasto idzie pierwsze, a resztę dobieramy tylko wtedy, gdy
+    // w mieście brakuje propozycji.
     const myTags = new Set<string>(data.vibe_tags ?? []);
-    setSimilar(
-      pool.map((x) => ({ x, shared: (x.vibe_tags ?? []).filter((t) => myTags.has(t)).length }))
-        .filter((r) => r.shared > 0)
-        .sort((a, b) => b.shared - a.shared || b.x.pin_count - a.x.pin_count)
-        .slice(0, 8).map((r) => r.x)
-    );
+    const wgKlimatu = pool
+      .map((x) => ({ x, shared: (x.vibe_tags ?? []).filter((t) => myTags.has(t)).length }))
+      .filter((r) => r.shared > 0)
+      .sort((a, b) => b.shared - a.shared || b.x.pin_count - a.x.pin_count);
+    const wMiescie = wgKlimatu.filter((r) => r.x.city && r.x.city === data.city);
+    const gdzieIndziej = wgKlimatu.filter((r) => !r.x.city || r.x.city !== data.city);
+    setSimilar([...wMiescie, ...gdzieIndziej].slice(0, 8).map((r) => r.x));
   }, [slug]);
 
   useEffect(() => { load(); }, [load]);
@@ -264,7 +270,16 @@ export default function PlacePage() {
 
             {similar.length > 0 && (
               <section className="mt-12">
-                <h2 className="font-display text-[22px]">Podobne w klimacie</h2>
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <h2 className="font-display text-[22px]">Podobne w klimacie</h2>
+                  {place.city && (
+                    <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                      {similar.some((sp) => sp.city !== place.city)
+                        ? `najpierw ${place.city}, dalej inne miasta`
+                        : place.city}
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                   {similar.map((sp) => (
                     <button key={sp.id} onClick={() => navigate(`/miejsce/${sp.slug}`)}
@@ -274,6 +289,16 @@ export default function PlacePage() {
                       </div>
                       <div className="p-2.5">
                         <div className="text-[13px] font-medium leading-snug line-clamp-2">{sp.name}</div>
+                        {/* Bez tego karta mówiła samą nazwą. „Hala Targowa" przy atrakcji
+                            w Lipsku nie zdradzała, że stoi we Wrocławiu — a to jedyna
+                            informacja, która decyduje, czy propozycja ma sens. */}
+                        {(sp.city || sp.country) && (
+                          <div className={`font-mono text-[11px] mt-0.5 truncate ${
+                            sp.city && sp.city === place.city ? 'text-muted-foreground' : 'text-clay'
+                          }`}>
+                            {[sp.city, sp.country].filter(Boolean).join(' / ')}
+                          </div>
+                        )}
                       </div>
                     </button>
                   ))}
