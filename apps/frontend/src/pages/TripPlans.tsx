@@ -11,8 +11,24 @@ import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 
 interface Wyjazd {
   id: string; name: string; destination: string | null; days: number | null;
-  trip_type: string | null; updated_at: string;
+  trip_type: string | null; updated_at: string; created_at: string;
 }
+
+/**
+ * Porządek listy. Domyślnie „ostatnio używane", bo do wyjazdu wraca się częściej
+ * niż zakłada nowy — a przy piętnastu tablicach o tych samych nazwach („Paryż
+ * z dziećmi" dwa razy) data założenia nie mówi nic o tym, przy której się pracuje.
+ *
+ * Terminu wyjazdu tu nie ma celowo: datę nosi plan, nie tablica, a plan z datą ma
+ * na razie 3 z 15 tablic — sortowanie zostawiałoby resztę bez klucza.
+ */
+const PORZADKI = [
+  { id: 'ostatnie', label: 'Ostatnio używane' },
+  { id: 'nowe', label: 'Najnowsze' },
+  { id: 'nazwa', label: 'Nazwa A–Z' },
+  { id: 'miejsca', label: 'Najwięcej miejsc' },
+] as const;
+type Porzadek = typeof PORZADKI[number]['id'];
 
 const odmiana = (n: number, jeden: string, kilka: string, wiele: string) => {
   if (n === 1) return jeden;
@@ -37,6 +53,15 @@ export default function TripPlans() {
   const [wyjazdy, setWyjazdy] = useState<Wyjazd[]>([]);
   const [podglad, setPodglad] = useState<Record<string, { zdjecia: string[]; ile: number }>>({});
   const [ladowanie, setLadowanie] = useState(true);
+  const [porzadek, setPorzadek] = useState<Porzadek>(() => {
+    try { return (localStorage.getItem('rm_porzadek_tablic') as Porzadek) || 'ostatnie'; }
+    catch { return 'ostatnie'; }
+  });
+
+  const ustawPorzadek = (p: Porzadek) => {
+    setPorzadek(p);
+    try { localStorage.setItem('rm_porzadek_tablic', p); } catch { /* tryb prywatny */ }
+  };
 
   useEffect(() => { (async () => setInitials(await inicjalyUzytkownika()))(); }, []);
 
@@ -47,7 +72,7 @@ export default function TripPlans() {
     setLadowanie(true);
     const { data } = await (supabase as any)
       .from('trip_projects')
-      .select('id, name, destination, days, trip_type, updated_at')
+      .select('id, name, destination, days, trip_type, updated_at, created_at')
       .order('updated_at', { ascending: false });
     setWyjazdy(data ?? []);
 
@@ -98,9 +123,26 @@ export default function TripPlans() {
               Otwórz wyjazd, żeby zobaczyć jego tablicę i plan.
             </p>
           </div>
-          <Button onClick={() => navigate('/start')} className="bg-primary hover:bg-primary/90">
-            <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Pigułki zamiast listy rozwijanej: cztery pozycje mieszczą się w rzędzie,
+                a wybrany porządek widać bez otwierania czegokolwiek. */}
+            <div className="flex flex-wrap gap-1.5">
+              {PORZADKI.map((p) => (
+                <button key={p.id} onClick={() => ustawPorzadek(p.id)}
+                  aria-pressed={porzadek === p.id}
+                  className={`rounded-full px-3 py-1 text-xs border transition-colors ${
+                    porzadek === p.id
+                      ? 'bg-foreground border-foreground text-background'
+                      : 'bg-background border-border hover:bg-muted text-muted-foreground'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <Button onClick={() => navigate('/start')} className="bg-primary hover:bg-primary/90">
+              <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
+            </Button>
+          </div>
         </div>
 
         {ladowanie ? (
@@ -119,7 +161,12 @@ export default function TripPlans() {
           </div>
         ) : (
           <div className="mt-8 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,248px),1fr))]">
-            {wyjazdy.map((w) => {
+            {[...wyjazdy].sort((a, b) => {
+              if (porzadek === 'nazwa') return a.name.localeCompare(b.name, 'pl');
+              if (porzadek === 'nowe') return b.created_at.localeCompare(a.created_at);
+              if (porzadek === 'miejsca') return (podglad[b.id]?.ile ?? 0) - (podglad[a.id]?.ile ?? 0);
+              return b.updated_at.localeCompare(a.updated_at);
+            }).map((w) => {
               const p = podglad[w.id];
               const ile = p?.ile ?? 0;
               return (
