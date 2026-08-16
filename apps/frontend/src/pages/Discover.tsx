@@ -162,7 +162,11 @@ export default function Discover() {
     // znów wpadał w widok i cykl zaczynał się od nowa — strona migała bez końca.
     // Teraz jedno zapytanie na miasto, a przewijanie wyłącznie odsłania to,
     // co już jest w pamięci.
-    let q = supabase.from('place_catalog').select('*').limit(200);
+    // Jawna lista kolumn: karta feedu nie potrzebuje wiki_extract (bywa dłuższy
+    // niż cała reszta wiersza razem wzięta) ani pól redakcyjnych.
+    let q = supabase.from('place_catalog')
+      .select('id, slug, name, city, country, lat, lng, category, kind, description, photos, opening_hours, visit_minutes, vibe_tags, pin_count, created_at')
+      .limit(200);
     if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
     // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
@@ -190,11 +194,13 @@ export default function Discover() {
       const [{ data: favs }, { data: projs }, { data: allCities }] = await Promise.all([
         supabase.from('place_favorites').select('place_id').eq('user_id', userData.user.id),
         supabase.from('trip_projects').select('id, name, destination, days, start_name, start_lat, start_lng').order('updated_at', { ascending: false }),
-        supabase.from('place_catalog').select('city').not('city', 'is', null).limit(500),
+        // DISTINCT robi baza — wcześniej szło tu 500 surowych wierszy
+        // i deduplikacja w przeglądarce, a miast powyżej limitu nie było wcale.
+        supabase.rpc('catalog_cities'),
       ]);
       setFavorites(new Set((favs ?? []).map((f: any) => f.place_id)));
       setBoards(projs ?? []);
-      setCities([...new Set((allCities ?? []).map((r: any) => r.city))].sort() as string[]);
+      setCities(((allCities ?? []) as { city: string }[]).map((r) => r.city));
       if ((projs ?? []).length > 0) {
         const wybrany = (wskazanyWyjazd && projs.find((p: any) => p.id === wskazanyWyjazd)) || projs[0];
         setActiveBoard(wybrany.id);

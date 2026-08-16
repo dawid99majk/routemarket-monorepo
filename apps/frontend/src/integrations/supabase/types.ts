@@ -989,6 +989,12 @@ export type Database = {
       }
     }
     Functions: {
+      catalog_cities: {
+        Args: never
+        Returns: {
+          city: string
+        }[]
+      }
       claim_pending_trip_shares: { Args: never; Returns: number }
       copy_public_board: { Args: { p_source: string }; Returns: string }
       delete_email: {
@@ -1038,6 +1044,8 @@ export type Database = {
           read_ct: number
         }[]
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user" | "creator"

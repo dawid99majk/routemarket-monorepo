@@ -69,12 +69,37 @@ export default function PlacePage() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
 
-    const [{ data: fav }, { data: projs }, { data: all }] = await Promise.all([
+    // Pula do „w okolicy" i „podobnych" schodziła z bazy jako 2000 pełnych
+    // wierszy z wiki_extract — megabajty na wejście na każdą stronę miejsca.
+    // Warunki geograficzne i tagowe umie policzyć baza: to samo miasto, ramka
+    // ~2 km wokół punktu i przecięcie vibe_tags. Trzy wąskie zapytania zamiast
+    // jednej hurtowni, a logika niżej pracuje na tej samej strukturze co dotąd.
+    const POOL_COLS = 'id, slug, name, city, country, lat, lng, category, kind, description, photos, visit_minutes, vibe_tags, pin_count';
+    const poolQueries = [
+      data.city
+        ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id).eq('city', data.city).limit(300)
+        : null,
+      data.lat != null
+        ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id)
+            .gte('lat', data.lat - 0.02).lte('lat', data.lat + 0.02)
+            .gte('lng', data.lng - 0.03).lte('lng', data.lng + 0.03).limit(200)
+        : null,
+      (data.vibe_tags ?? []).length > 0
+        ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id)
+            .overlaps('vibe_tags', data.vibe_tags as string[])
+            .order('pin_count', { ascending: false }).limit(200)
+        : null,
+    ];
+    const [{ data: fav }, { data: projs }, ...poolParts] = await Promise.all([
       supabase.from('place_favorites').select('place_id')
         .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
       supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
-      supabase.from('place_catalog').select('*').neq('id', data.id).limit(2000),
+      ...poolQueries.filter((q): q is NonNullable<typeof q> => q !== null),
     ]);
+    const seen = new Set<string>();
+    const all = poolParts
+      .flatMap((part) => (part.data ?? []) as unknown as CatalogPlace[])
+      .filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
     setFavorite(!!fav);
     setBoards(projs ?? []);
     const boardId = (projs ?? [])[0]?.id ?? null;
@@ -87,7 +112,7 @@ export default function PlacePage() {
     }
 
     // „W okolicy" liczone z prawdziwych współrzędnych, nie zgadywane
-    const pool = (all ?? []) as CatalogPlace[];
+    const pool = all;
     setNearby(
       pool.filter((x) => x.lat != null)
         .map((x) => ({ x, km: kmBetween(data, x) }))
