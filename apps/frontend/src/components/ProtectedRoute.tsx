@@ -22,9 +22,10 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
   if (!user) return <Navigate to="/auth" replace />;
   if (allowedRoles && allowedRoles.length > 0 && !hasRole(user, allowedRoles)) {
-    // If it was a creator-only route, send them to become-creator instead of home
+    // Trasy dla twórców zniknęły razem z modułem sprzedaży, a /become-creator
+    // nie istnieje w routingu — odsyłanie tam kończyło się pustą stroną.
     if (allowedRoles.includes('creator')) {
-      return <Navigate to="/become-creator" replace />;
+      return <Navigate to="/start" replace />;
     }
     return <Navigate to="/" replace />;
   }

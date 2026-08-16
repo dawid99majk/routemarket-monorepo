@@ -82,9 +82,14 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
               {context}
             </span>
           )}
-          <button onClick={() => navigate('/ulubione')} title="Ulubione" aria-label="Ulubione"
-            className="w-8 h-8 rounded-full bg-muted flex items-center justify-center hover:bg-border transition-colors">
+          {/* Jedno wejście: kolekcje są podzbiorami zapisanych, a nie osobnym
+              zbiorem, więc dwa przyciski obok siebie pytały użytkownika o różnicę,
+              której nie ma. */}
+          <button onClick={() => navigate('/zapisane')} title="Zapisane miejsca" aria-label="Zapisane"
+            className="h-8 inline-flex items-center gap-1.5 rounded-full bg-muted px-3
+                       hover:bg-border transition-colors">
             <Heart className="w-4 h-4 text-muted-foreground" />
+            <span className="text-[13px] text-muted-foreground hidden sm:inline">Zapisane</span>
           </button>
           {initials && (
             <button onClick={() => navigate('/profile')}

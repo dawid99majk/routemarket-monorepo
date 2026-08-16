@@ -46,7 +46,7 @@ export default function Contact() {
     try {
       // Skrzynka kontaktowa żyła w tabelach marketplace'u. Formularz trafia teraz
       // wprost do kolejki mailowej — bez osobnego modułu wiadomości w aplikacji.
-      const { error } = await (supabase as any).rpc('enqueue_email', {
+      const { error } = await supabase.rpc('enqueue_email', {
         queue_name: 'transactional_emails',
         payload: {
           message_id: `contact-${crypto.randomUUID()}`,

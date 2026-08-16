@@ -109,12 +109,12 @@ export default function Start() {
     setInitials(await inicjalyUzytkownika());
 
     const [{ data: pr }, { data: pl }, { data: sp }] = await Promise.all([
-      (supabase as any).from('trip_projects')
+      supabase.from('trip_projects')
         .select('id, name, destination, days, hours_per_day, trip_type, updated_at')
         .order('updated_at', { ascending: false }),
-      (supabase as any).from('trip_project_places')
+      supabase.from('trip_project_places')
         .select('id, project_id, name, priority, image_url, visit_minutes, opening_hours, catalog_id'),
-      (supabase as any).from('trip_plans')
+      supabase.from('trip_plans')
         .select('project_id, start_date, plan, created_at')
         .order('created_at', { ascending: false }),
     ]);
@@ -127,7 +127,7 @@ export default function Start() {
     // z innego kraju nie jest inspiracją, tylko szumem. Bez aktywnego wyjazdu
     // pokazujemy najczęściej kopiowane.
     const cel = (pr ?? [])[0]?.destination as string | undefined;
-    let q = (supabase as any).from('trip_projects')
+    let q = supabase.from('trip_projects')
       .select('id, name, destination, days, author_display, copy_count')
       .eq('is_public', true).neq('user_id', u.id)
       .order('copy_count', { ascending: false }).limit(3);
@@ -137,7 +137,7 @@ export default function Start() {
     if (pubs?.length) {
       // Zdjęcia razem z liczeniem: kafelek bez ani jednego zdjęcia to trzy kolorowe
       // prostokąty, które wyglądają jak pusta tablica.
-      const { data: cnt } = await (supabase as any)
+      const { data: cnt } = await supabase
         .from('trip_project_places').select('project_id, image_url')
         .in('project_id', pubs.map((b: any) => b.id));
       setBoards(pubs.map((b: any) => {
@@ -231,7 +231,7 @@ export default function Start() {
 
   const decide = async (p: Place, priority: Priority) => {
     setPlaces((prev) => prev.map((x) => (x.id === p.id ? { ...x, priority } : x)));
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('trip_project_places').update({ priority }).eq('id', p.id);
     if (error) {
       setPlaces((prev) => prev.map((x) => (x.id === p.id ? { ...x, priority: 'nice' } : x)));
@@ -248,7 +248,7 @@ export default function Start() {
     const c = city.trim();
     if (c.length < 3) { setPodglad([]); setSprawdzone(null); return; }
     const t = setTimeout(async () => {
-      const { data } = await (supabase as any).from('place_catalog')
+      const { data } = await supabase.from('place_catalog')
         .select('id, slug, name, city, kind, category, photos, visit_minutes')
         .ilike('city', `%${c}%`).order('pin_count', { ascending: false }).limit(8);
       setPodglad(data ?? []);
@@ -262,7 +262,7 @@ export default function Start() {
     setZbieram(true);
     try {
       const d = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 12 }, { timeoutMs: 180_000 });
-      const { data } = await (supabase as any).from('place_catalog')
+      const { data } = await supabase.from('place_catalog')
         .select('id, slug, name, city, kind, category, photos, visit_minutes')
         .ilike('city', `%${d.city || city.trim()}%`).order('pin_count', { ascending: false }).limit(8);
       setPodglad(data ?? []);
@@ -282,7 +282,7 @@ export default function Start() {
     if (!userData.user) { setCreating(false); return navigate('/auth'); }
 
     const label = climateLabel(climate).toLowerCase();
-    const { data, error } = await (supabase as any).from('trip_projects').insert({
+    const { data, error } = await supabase.from('trip_projects').insert({
       user_id: userData.user.id,
       name: `${city.trim()} ${label}`,
       destination: city.trim(),
@@ -301,7 +301,7 @@ export default function Start() {
 
   const copyBoard = async (b: PublicBoard) => {
     setCopying(b.id);
-    const { data, error } = await (supabase as any).rpc('copy_public_board', { p_source: b.id });
+    const { data, error } = await supabase.rpc('copy_public_board', { p_source: b.id });
     setCopying(null);
     if (error) return toast.error(error.message);
     toast.success(`„${b.name}” trafiła do Twoich wyjazdów`);

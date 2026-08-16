@@ -13,113 +13,27 @@ import { LANGUAGES } from '@/lib/languages';
 import RoutePreferences from '@/components/RoutePreferences';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, User, Mail, Shield, Loader2, Package, CreditCard, DollarSign, Sparkles, Pencil, Check, X, LogOut, Globe, Link2, ExternalLink, CheckCircle2, AlertCircle,
+  ArrowLeft, User, Mail, Shield, Loader2, Package, MapPin, CalendarDays, Pencil, Check, X, LogOut, Globe, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 
-function StripeConnectStatus({ userId }: { userId: string }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { data: creatorProfile, isLoading: loadingProfile, refetch: refetchProfile } = useQuery({
-    queryKey: ['creator-profile-stripe', userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      return data;
-    },
-  });
-
-  const { data: stripeStatus, refetch: refetchStatus } = useQuery({
-    queryKey: ['stripe-connect-status', userId],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke('create-connect-account', {
-        body: { action: 'check-status', origin: window.location.origin },
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
-      if (res.error) throw res.error;
-      return res.data as { connected: boolean; charges_enabled?: boolean; payouts_enabled?: boolean; onboarding_complete?: boolean } | null;
-    },
-    staleTime: 60_000,
-  });
-
-  const startOnboarding = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await supabase.functions.invoke('create-connect-account', {
-        body: { origin: window.location.origin },
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
-      if (res.error) throw res.error;
-      if (res.data?.url) {
-        window.location.href = res.data.url;
-      } else {
-        toast.error(res.data?.error || t('stripe.onboarding_error'));
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('stripe.connection_error'));
-    }
-  };
-
-  if (loadingProfile) return null;
-
-  const hasAccount = !!creatorProfile?.stripe_connect_account_id || !!stripeStatus?.connected;
-  const isComplete = !!creatorProfile?.stripe_onboarding_complete || !!stripeStatus?.onboarding_complete;
-
-  return (
-    <div className="bg-card rounded-md p-6 shadow-token-sm">
-      <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <Link2 className="w-5 h-5 text-primary" /> {t('stripe.title')}
-      </h2>
-      <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
-        {isComplete ? (
-          <>
-            <CheckCircle2 className="w-6 h-6 text-accent shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">{t('stripe.account_active')}</p>
-              <p className="text-xs text-muted-foreground">{t('stripe.active_desc')}</p>
-              <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                <span>{t('stripe.sales_count')}: <strong className="text-foreground">{creatorProfile?.total_sales ?? 0}</strong></span>
-                <span>{t('stripe.earnings_label')}: <strong className="text-foreground">{Number(creatorProfile?.total_earnings ?? 0).toFixed(2)} zł</strong></span>
-              </div>
-            </div>
-          </>
-        ) : hasAccount ? (
-          <>
-            <AlertCircle className="w-6 h-6 text-primary shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">{t('stripe.onboarding_incomplete')}</p>
-              <p className="text-xs text-muted-foreground">{t('stripe.finish_desc')}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button size="sm" onClick={startOnboarding} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <ExternalLink className="w-3.5 h-3.5 mr-1" /> {t('stripe.finish_onboarding')}
-                </Button>
-                <Button size="sm" variant="outline" onClick={async () => { await refetchProfile(); await refetchStatus(); }}>
-                  {t('common.refresh_status')}
-                </Button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <AlertCircle className="w-6 h-6 text-muted-foreground shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">{t('stripe.no_account')}</p>
-              <p className="text-xs text-muted-foreground">{t('stripe.no_account_desc')}</p>
-              <Button size="sm" onClick={startOnboarding} className="mt-2 bg-accent hover:bg-accent/90 text-accent-foreground">
-                <ExternalLink className="w-3.5 h-3.5 mr-1" /> {t('stripe.connect_stripe')}
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function UserProfile() {
+  /** Liczby z planera zamiast statystyk sprzedaży. Trzy szybkie zliczenia,
+   *  bez pobierania wierszy — profil nie potrzebuje ich treści. */
+  const { data: liczby } = useQuery({
+    queryKey: ['statystyki-planera'],
+    queryFn: async () => {
+      const licz = async (tabela: string) => {
+        const { count } = await supabase
+          .from(tabela).select('id', { count: 'exact', head: true });
+        return count ?? 0;
+      };
+      const [tablice, miejsca, plany] = await Promise.all([
+        licz('trip_projects'), licz('trip_project_places'), licz('trip_plans'),
+      ]);
+      return { tablice, miejsca, plany };
+    },
+  });
+
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, logout, loading: authLoading, refetch } = useAuth();
@@ -302,31 +216,14 @@ export default function UserProfile() {
           </div>
         </div>
 
-        {/* Stripe Connect status for creators */}
-        {(user.roles?.includes('creator') || user.roles?.includes('admin')) && (
-          <StripeConnectStatus userId={user.id} />
-        )}
-
-        {!user.roles?.includes('creator') && !user.roles?.includes('admin') && (
-          <div className="bg-muted/50 rounded-md p-6 shadow-token-sm border border-accent/20">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-accent/10 rounded-md flex items-center justify-center shrink-0"><Sparkles className="w-6 h-6 text-accent" /></div>
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold">{t('creator.become_cta')}</h2>
-                <p className="text-sm text-muted-foreground mt-1">{t('creator.earn_share')}</p>
-                <Button onClick={() => navigate('/become-creator')} className="mt-3 bg-accent hover:bg-accent/90 text-accent-foreground"><Sparkles className="w-4 h-4 mr-2" /> {t('creator.become_cta')}</Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         <RoutePreferences />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { icon: Package, label: t('profile.published_routes'), value: '0', color: 'bg-primary/10 text-primary' },
-            { icon: CreditCard, label: t('profile.purchased_routes'), value: '0', color: 'bg-blue-50 text-blue-500' },
-            { icon: DollarSign, label: t('profile.total_earnings'), value: '0 zł', color: 'bg-accent/10 text-accent' },
+            { icon: Package, label: 'Wyjazdy', value: String(liczby?.tablice ?? '—'), color: 'bg-primary/10 text-primary' },
+            { icon: MapPin, label: 'Zebrane miejsca', value: String(liczby?.miejsca ?? '—'), color: 'bg-dusty-blue/10 text-dusty-blue' },
+            { icon: CalendarDays, label: 'Ułożone plany', value: String(liczby?.plany ?? '—'), color: 'bg-accent/10 text-accent' },
           ].map(({ icon: I, label, value, color }) => (
             <div key={label} className="bg-card rounded-md p-5 shadow-token-sm">
               <div className="flex items-center gap-3">

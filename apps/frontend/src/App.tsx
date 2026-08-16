@@ -18,41 +18,66 @@ const GaTracker = () => {
 };
 
 // Lazy-loaded pages
-const GlobeLab = lazy(() => import("./pages/GlobeLab"));
-const MyRoutes = lazy(() => import("./pages/MyRoutes"));
-const PlacePage = lazy(() => import("./pages/PlacePage"));
-const Start = lazy(() => import('./pages/Start'));
-const Discover = lazy(() => import("./pages/Discover"));
-const Favorites = lazy(() => import("./pages/Favorites"));
-const Collections = lazy(() => import("./pages/Collections"));
-const TripPlans = lazy(() => import("./pages/TripPlans"));
-const RouteBuilderV2 = lazy(() => import("./pages/v2/RouteBuilderV2"));
+/**
+ * Wdrożenie zmienia skróty w nazwach plików, a otwarta karta pamięta stare.
+ * Wejście na trasę, która nie zdążyła się wczytać przed wdrożeniem, kończyło się
+ * białą stroną: Suspense obsługuje oczekiwanie, nie błąd. Jedno przeładowanie
+ * pobiera świeży manifest i naprawia sytuację — a znacznik w sessionStorage
+ * pilnuje, żeby przy padniętej sieci nie zapętlić przeładowań.
+ */
+function leniwie<T extends { default: React.ComponentType<any> }>(zaladuj: () => Promise<T>) {
+  return lazy(() =>
+    zaladuj().catch((blad) => {
+      const KLUCZ = 'rm_chunk_przeladowany';
+      if (sessionStorage.getItem(KLUCZ)) {
+        sessionStorage.removeItem(KLUCZ);
+        throw blad;
+      }
+      sessionStorage.setItem(KLUCZ, '1');
+      window.location.reload();
+      // Przeładowanie jest asynchroniczne; obietnica, która nigdy się nie
+      // rozstrzyga, trzyma Suspense do momentu wymiany dokumentu.
+      return new Promise<T>(() => {});
+    })
+  );
+}
+
+const GlobeLab = leniwie(() => import("./pages/GlobeLab"));
+const MyRoutes = leniwie(() => import("./pages/MyRoutes"));
+const PlacePage = leniwie(() => import("./pages/PlacePage"));
+const Start = leniwie(() => import('./pages/Start'));
+const Discover = leniwie(() => import("./pages/Discover"));
+const Favorites = leniwie(() => import("./pages/Favorites"));
+const Collections = leniwie(() => import("./pages/Collections"));
+const Zapisane = leniwie(() => import("./pages/Zapisane"));
+const TripPlans = leniwie(() => import("./pages/TripPlans"));
+const RouteBuilderV2 = leniwie(() => import("./pages/v2/RouteBuilderV2"));
 
 function LegacyCreateRedirect() {
   const location = useLocation();
   return <Navigate to={`/route-builder-v2${location.search}`} replace />;
 }
-const UserProfile = lazy(() => import("./pages/UserProfile"));
-const AuthCallback = lazy(() => import("./pages/AuthCallback"));
-const AuthError = lazy(() => import("./pages/AuthError"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const Auth = lazy(() => import("./pages/Auth"));
-const Contact = lazy(() => import("./pages/Contact"));
-const Brand = lazy(() => import("./pages/Brand"));
-const AdminLayout = lazy(() => import("./components/AdminLayout"));
-const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
-const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
-const AdminAtlas = lazy(() => import("./pages/admin/AdminAtlas"));
-const GuideHub = lazy(() => import("./components/GuideHub"));
-const NavigationLauncher = lazy(() => import("./components/NavigationLauncher"));
-const Terms = lazy(() => import("./pages/legal/Terms"));
-const Privacy = lazy(() => import("./pages/legal/Privacy"));
-const Cookies = lazy(() => import("./pages/legal/Cookies"));
-const Refunds = lazy(() => import("./pages/legal/Refunds"));
-const Documents = lazy(() => import("./pages/legal/Documents"));
-const AcceptableUse = lazy(() => import("./pages/legal/AcceptableUse"));
-const Copyright = lazy(() => import("./pages/legal/Copyright"));
-const DSACompliance = lazy(() => import("./pages/legal/DSACompliance"));
+const UserProfile = leniwie(() => import("./pages/UserProfile"));
+const AuthCallback = leniwie(() => import("./pages/AuthCallback"));
+const AuthError = leniwie(() => import("./pages/AuthError"));
+const NotFound = leniwie(() => import("./pages/NotFound"));
+const Auth = leniwie(() => import("./pages/Auth"));
+const Contact = leniwie(() => import("./pages/Contact"));
+const Brand = leniwie(() => import("./pages/Brand"));
+const AdminLayout = leniwie(() => import("./components/AdminLayout"));
+const AdminDashboard = leniwie(() => import("./pages/admin/AdminDashboard"));
+const AdminUsers = leniwie(() => import("./pages/admin/AdminUsers"));
+const AdminAtlas = leniwie(() => import("./pages/admin/AdminAtlas"));
+const GuideHub = leniwie(() => import("./components/GuideHub"));
+const NavigationLauncher = leniwie(() => import("./components/NavigationLauncher"));
+const Terms = leniwie(() => import("./pages/legal/Terms"));
+const Privacy = leniwie(() => import("./pages/legal/Privacy"));
+const Cookies = leniwie(() => import("./pages/legal/Cookies"));
+const Refunds = leniwie(() => import("./pages/legal/Refunds"));
+const Documents = leniwie(() => import("./pages/legal/Documents"));
+const AcceptableUse = leniwie(() => import("./pages/legal/AcceptableUse"));
+const Copyright = leniwie(() => import("./pages/legal/Copyright"));
+const DSACompliance = leniwie(() => import("./pages/legal/DSACompliance"));
 
 const queryClient = new QueryClient();
 
@@ -95,7 +120,13 @@ const App = () => (
                   <Route path="/brand" element={<Brand />} />
 
                   {/* Authenticated routes */}
-                  <Route path="/kolekcje" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
+                  <Route path="/zapisane" element={<ProtectedRoute><Zapisane /></ProtectedRoute>} />
+                  {/* Ulubione i kolekcje były osobnymi ekranami dla tej samej intencji.
+                      Stare adresy zostają jako przekierowania — mogą wisieć w zakładkach
+                      przeglądarki albo w wysłanych odnośnikach. */}
+                  <Route path="/ulubione" element={<Navigate to="/zapisane" replace />} />
+                  <Route path="/kolekcje" element={<Navigate to="/zapisane" replace />} />
+                  <Route path="/kolekcje/:slug" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
                   <Route path="/kolekcja/:slug" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
                   <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />

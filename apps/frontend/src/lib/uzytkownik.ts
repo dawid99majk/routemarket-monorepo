@@ -13,7 +13,7 @@ export async function nazwaUzytkownika(): Promise<string | null> {
   const u = data.user;
   if (!u) return null;
 
-  const { data: profil } = await (supabase as any)
+  const { data: profil } = await supabase
     .from('profiles').select('display_name').eq('user_id', u.id).maybeSingle();
 
   const kandydat = String(profil?.display_name ?? '').trim();

@@ -22,11 +22,11 @@ export default function Favorites() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) { navigate('/auth'); return; }
     const [{ data }, { data: projs }] = await Promise.all([
-      (supabase as any).from('place_favorites')
+      supabase.from('place_favorites')
         .select('created_at, place_catalog(*)')
         .eq('user_id', userData.user.id)
         .order('created_at', { ascending: false }),
-      (supabase as any).from('trip_projects').select('id, name').order('updated_at', { ascending: false })
+      supabase.from('trip_projects').select('id, name').order('updated_at', { ascending: false })
     ]);
     setPlaces((data ?? []).map((r: any) => r.place_catalog).filter(Boolean));
     setBoards(projs ?? []);
@@ -38,13 +38,13 @@ export default function Favorites() {
   const remove = async (placeId: string) => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    await (supabase as any).from('place_favorites').delete()
+    await supabase.from('place_favorites').delete()
       .eq('user_id', userData.user.id).eq('place_id', placeId);
     setPlaces((prev) => prev.filter((p) => p.id !== placeId));
   };
 
   const addToBoard = async (place: any, projectId: string) => {
-    const { error } = await (supabase as any).from('trip_project_places').insert({
+    const { error } = await supabase.from('trip_project_places').insert({
       project_id: projectId,
       catalog_id: place.id,
       name: place.name,

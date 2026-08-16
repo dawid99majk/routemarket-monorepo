@@ -101,11 +101,11 @@ export default function Index() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await (supabase as any).from('trip_projects')
+      const { data } = await supabase.from('trip_projects')
         .select('id, name, author_display, copy_count')
         .eq('is_public', true).order('copy_count', { ascending: false }).limit(3);
       if (!data?.length) return setTablice([]);
-      const { data: miejsca } = await (supabase as any).from('trip_project_places')
+      const { data: miejsca } = await supabase.from('trip_project_places')
         .select('project_id, image_url').in('project_id', data.map((b: any) => b.id));
       setTablice(data.map((b: any) => {
         const swoje = (miejsca ?? []).filter((m: any) => m.project_id === b.id);
@@ -132,7 +132,9 @@ export default function Index() {
     if (!cel.trim() || zakladam) return;
     if (!user) {
       sessionStorage.setItem('rm_zamiar', JSON.stringify({ cel: cel.trim(), klimat }));
-      return navigate('/auth');
+      // Bez wskazania celu logowanie odsyła na stronę główną, a ta zamiaru nie
+      // czyta — odczytuje go Start. Miasto wpisane przed rejestracją ginęło.
+      return navigate('/auth?redirect=/start');
     }
     setZakladam(true);
     try {
@@ -418,8 +420,8 @@ export default function Index() {
           Dokąd jedziesz w tym roku?
         </h2>
         <p className="text-[16px] leading-relaxed text-foreground/80 mt-5 max-w-[52ch] mx-auto text-pretty">
-          Wpisz miasto i zobacz pierwsze propozycje. Konto założysz dopiero, kiedy będziesz chciał
-          zapisać tablicę.
+          Wpisz miasto, a agent zbierze pierwsze propozycje na Twoją tablicę.
+          Zajmie to jedną chwilę i konto.
         </p>
         <div className="mt-8 flex justify-center">
           <div className="w-full max-w-[520px]">{poleDestynacji}</div>

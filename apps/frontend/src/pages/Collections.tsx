@@ -4,6 +4,8 @@ import { ArrowLeft, Check, Copy, Globe, Loader2, Lock, MapPin, Plus, Trash2 } fr
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import PlannerHeader from '@/components/PlannerHeader';
+import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { Input } from '@/components/ui/input';
 
 interface Collection {
@@ -26,6 +28,8 @@ const slugify = (name: string) =>
  * wejściem do serwisu, jakie istnieje: cudzy gust działa lepiej niż wyszukiwarka.
  */
 export default function Collections() {
+  const [inicjaly, setInicjaly] = useState<string | null>(null);
+  useEffect(() => { (async () => setInicjaly(await inicjalyUzytkownika()))(); }, []);
   const { slug } = useParams<{ slug?: string }>();
   const navigate = useNavigate();
 
@@ -48,18 +52,18 @@ export default function Collections() {
       setUserId(userData.user.id);
 
       if (slug) {
-        const { data: col } = await (supabase as any)
+        const { data: col } = await supabase
           .from('collections').select('*').eq('slug', slug).maybeSingle();
         if (cancelled) return;
         setCurrent(col ?? null);
         if (col) {
-          const { data: cp } = await (supabase as any)
+          const { data: cp } = await supabase
             .from('collection_places').select('sort_order, place_catalog(*)')
             .eq('collection_id', col.id).order('sort_order', { ascending: true });
           if (!cancelled) setPlaces((cp ?? []).map((r: any) => r.place_catalog).filter(Boolean));
         }
       } else {
-        const { data } = await (supabase as any)
+        const { data } = await supabase
           .from('collections').select('*').order('created_at', { ascending: false });
         if (!cancelled) setCollections(data ?? []);
       }
@@ -70,7 +74,7 @@ export default function Collections() {
 
   const create = async () => {
     if (!newName.trim() || !userId) return;
-    const { data, error } = await (supabase as any).from('collections')
+    const { data, error } = await supabase.from('collections')
       .insert({ user_id: userId, name: newName.trim(), slug: slugify(newName) })
       .select('*').single();
     if (error) return toast.error(error.message);
@@ -83,7 +87,7 @@ export default function Collections() {
   const togglePublic = async () => {
     if (!current) return;
     const next = !current.is_public;
-    const { error } = await (supabase as any).from('collections')
+    const { error } = await supabase.from('collections')
       .update({ is_public: next }).eq('id', current.id);
     if (error) return toast.error(error.message);
     setCurrent({ ...current, is_public: next });
@@ -92,7 +96,7 @@ export default function Collections() {
 
   const removePlace = async (placeId: string) => {
     if (!current) return;
-    await (supabase as any).from('collection_places').delete()
+    await supabase.from('collection_places').delete()
       .eq('collection_id', current.id).eq('place_id', placeId);
     setPlaces((prev) => prev.filter((p) => p.id !== placeId));
   };
@@ -194,19 +198,22 @@ export default function Collections() {
   // --- lista kolekcji ---
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/start')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <span className="font-semibold">Moje kolekcje</span>
-          <Button size="sm" className="ml-auto bg-primary hover:bg-primary/90" onClick={() => setCreating(true)}>
-            <Plus className="w-4 h-4 mr-1.5" /> Nowa
+      <PlannerHeader initials={inicjaly} />
+
+      <main className="max-w-[1400px] mx-auto px-6 py-8 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-2">
+          <div>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
+              Zebrane pomysły
+            </p>
+            <h1 className="font-display font-light text-[40px] leading-[1.05] tracking-[-0.02em] mt-2">
+              Moje kolekcje
+            </h1>
+          </div>
+          <Button className="bg-primary hover:bg-primary/90" onClick={() => setCreating(true)}>
+            <Plus className="w-4 h-4 mr-1.5" /> Nowa kolekcja
           </Button>
         </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-4">
         {creating && (
           <div className="flex gap-2 rounded-md border p-3">
             <Input

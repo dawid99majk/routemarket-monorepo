@@ -50,13 +50,16 @@ export default function PlacePage() {
   const [mark, setMark] = useState<Bucket | null>(null);
   const [nearby, setNearby] = useState<CatalogPlace[]>([]);
   const [similar, setSimilar] = useState<CatalogPlace[]>([]);
+  const [kolekcje, setKolekcje] = useState<{ id: string; name: string }[]>([]);
+  /** Widoczny tylko przez chwilę po zapisaniu — propozycja, nie warunek. */
+  const [poZapisie, setPoZapisie] = useState(false);
   const [agentTip, setAgentTip] = useState<string | null>(null);
   const [tipLoading, setTipLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!slug) return;
     setLoading(true);
-    const { data } = await (supabase as any).from('place_catalog').select('*').eq('slug', slug).maybeSingle();
+    const { data } = await supabase.from('place_catalog').select('*').eq('slug', slug).maybeSingle();
     setPlace(data ?? null);
     setLoading(false);
     setPhotoIdx(0);
@@ -67,10 +70,10 @@ export default function PlacePage() {
     if (!userData.user) return;
 
     const [{ data: fav }, { data: projs }, { data: all }] = await Promise.all([
-      (supabase as any).from('place_favorites').select('place_id')
+      supabase.from('place_favorites').select('place_id')
         .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
-      (supabase as any).from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
-      (supabase as any).from('place_catalog').select('*').neq('id', data.id).limit(2000),
+      supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
+      supabase.from('place_catalog').select('*').neq('id', data.id).limit(2000),
     ]);
     setFavorite(!!fav);
     setBoards(projs ?? []);
@@ -78,7 +81,7 @@ export default function PlacePage() {
     setActiveBoard(boardId);
 
     if (boardId) {
-      const { data: pinned } = await (supabase as any).from('trip_project_places')
+      const { data: pinned } = await supabase.from('trip_project_places')
         .select('priority').eq('project_id', boardId).eq('catalog_id', data.id).maybeSingle();
       setMark((pinned?.priority as Bucket) ?? null);
     }
@@ -133,18 +136,18 @@ export default function PlacePage() {
     if (!activeBoard) return toast.error('Najpierw załóż wyjazd, do którego zapisujemy');
     if (mark === bucket) {
       setMark(null);
-      await (supabase as any).from('trip_project_places')
+      await supabase.from('trip_project_places')
         .delete().eq('project_id', activeBoard).eq('catalog_id', place.id);
       return;
     }
     const had = mark;
     setMark(bucket);
     if (had) {
-      await (supabase as any).from('trip_project_places')
+      await supabase.from('trip_project_places')
         .update({ priority: bucket }).eq('project_id', activeBoard).eq('catalog_id', place.id);
       return;
     }
-    const { error } = await (supabase as any).from('trip_project_places').insert({
+    const { error } = await supabase.from('trip_project_places').insert({
       project_id: activeBoard, catalog_id: place.id, name: place.name, category: place.category,
       priority: bucket, lat: place.lat, lng: place.lng, description: place.description,
       opening_hours: place.opening_hours, visit_minutes: place.visit_minutes,
@@ -158,13 +161,17 @@ export default function PlacePage() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return navigate('/auth');
     if (favorite) {
-      await (supabase as any).from('place_favorites').delete()
+      await supabase.from('place_favorites').delete()
         .eq('user_id', userData.user.id).eq('place_id', place.id);
       setFavorite(false);
     } else {
-      await (supabase as any).from('place_favorites').insert({ user_id: userData.user.id, place_id: place.id });
+      await supabase.from('place_favorites').insert({ user_id: userData.user.id, place_id: place.id });
       setFavorite(true);
-      toast.success('Dodano do ulubionych');
+      const { data: kol } = await supabase.from('collections')
+        .select('id, name').eq('user_id', userData.user.id).order('created_at', { ascending: false });
+      setKolekcje(kol ?? []);
+      setPoZapisie(true);
+      window.setTimeout(() => setPoZapisie(false), 8000);
     }
   };
 
@@ -326,8 +333,36 @@ export default function PlacePage() {
               <button onClick={toggleFavorite}
                 className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <Heart className={`w-3.5 h-3.5 ${favorite ? 'fill-accent text-accent' : ''}`} />
-                {favorite ? 'W ulubionych' : 'Odłóż do ulubionych'}
+                {favorite ? 'Zapisane' : 'Zapisz na później'}
               </button>
+
+              {poZapisie && (
+                <div className="mt-2 rounded-md border border-border bg-muted/50 px-3 py-2
+                                animate-in fade-in slide-in-from-top-1 duration-200">
+                  {kolekcje.length > 0 ? (
+                    <select value=""
+                      onChange={async (e) => {
+                        if (!e.target.value || !place) return;
+                        const { error } = await supabase.from('collection_places')
+                          .insert({ collection_id: e.target.value, place_id: place.id });
+                        e.target.value = '';
+                        if (error) return toast.error(error.message);
+                        toast.success('Odłożone do kolekcji');
+                        setPoZapisie(false);
+                      }}
+                      aria-label="Odłóż do kolekcji"
+                      className="w-full text-[12px] bg-transparent outline-none cursor-pointer">
+                      <option value="">Zapisane · odłóż do kolekcji ▾</option>
+                      {kolekcje.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                    </select>
+                  ) : (
+                    <button onClick={() => navigate('/zapisane')}
+                      className="text-[12px] text-muted-foreground hover:text-primary transition-colors">
+                      Zapisane · załóż pierwszą kolekcję ↗
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="rounded-md bg-muted border border-border p-4">

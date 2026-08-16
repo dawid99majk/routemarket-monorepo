@@ -162,7 +162,7 @@ export default function Discover() {
     // znów wpadał w widok i cykl zaczynał się od nowa — strona migała bez końca.
     // Teraz jedno zapytanie na miasto, a przewijanie wyłącznie odsłania to,
     // co już jest w pamięci.
-    let q = (supabase as any).from('place_catalog').select('*').limit(200);
+    let q = supabase.from('place_catalog').select('*').limit(200);
     if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
     // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
@@ -188,9 +188,9 @@ export default function Discover() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
       const [{ data: favs }, { data: projs }, { data: allCities }] = await Promise.all([
-        (supabase as any).from('place_favorites').select('place_id').eq('user_id', userData.user.id),
-        (supabase as any).from('trip_projects').select('id, name, destination, days, start_name, start_lat, start_lng').order('updated_at', { ascending: false }),
-        (supabase as any).from('place_catalog').select('city').not('city', 'is', null).limit(500),
+        supabase.from('place_favorites').select('place_id').eq('user_id', userData.user.id),
+        supabase.from('trip_projects').select('id, name, destination, days, start_name, start_lat, start_lng').order('updated_at', { ascending: false }),
+        supabase.from('place_catalog').select('city').not('city', 'is', null).limit(500),
       ]);
       setFavorites(new Set((favs ?? []).map((f: any) => f.place_id)));
       setBoards(projs ?? []);
@@ -208,7 +208,7 @@ export default function Discover() {
   useEffect(() => {
     if (!activeBoard) { setMarks({}); return; }
     (async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('trip_project_places').select('catalog_id, priority').eq('project_id', activeBoard);
       const next: Record<string, Bucket> = {};
       for (const row of data ?? []) if (row.catalog_id) next[row.catalog_id] = row.priority as Bucket;
@@ -262,18 +262,18 @@ export default function Discover() {
 
     if (current === bucket) {
       setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
-      await (supabase as any).from('trip_project_places')
+      await supabase.from('trip_project_places')
         .delete().eq('project_id', activeBoard).eq('catalog_id', place.id);
       return;
     }
 
     setMarks((prev) => ({ ...prev, [place.id]: bucket }));
     if (current) {
-      await (supabase as any).from('trip_project_places')
+      await supabase.from('trip_project_places')
         .update({ priority: bucket }).eq('project_id', activeBoard).eq('catalog_id', place.id);
       return;
     }
-    const { error } = await (supabase as any).from('trip_project_places').insert({
+    const { error } = await supabase.from('trip_project_places').insert({
       project_id: activeBoard,
       catalog_id: place.id,
       name: place.name,
@@ -297,11 +297,11 @@ export default function Discover() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return navigate('/auth');
     if (favorites.has(place.id)) {
-      await (supabase as any).from('place_favorites').delete()
+      await supabase.from('place_favorites').delete()
         .eq('user_id', userData.user.id).eq('place_id', place.id);
       setFavorites((prev) => { const n = new Set(prev); n.delete(place.id); return n; });
     } else {
-      await (supabase as any).from('place_favorites').insert({ user_id: userData.user.id, place_id: place.id });
+      await supabase.from('place_favorites').insert({ user_id: userData.user.id, place_id: place.id });
       setFavorites((prev) => new Set(prev).add(place.id));
     }
   };
@@ -365,7 +365,7 @@ export default function Discover() {
 
   const zapiszStart = async (nazwa: string, lat: number | null, lng: number | null) => {
     if (!board) return;
-    const { error } = await (supabase as any).from('trip_projects')
+    const { error } = await supabase.from('trip_projects')
       .update({ start_name: nazwa, start_lat: lat, start_lng: lng }).eq('id', board.id);
     if (error) return toast.error(error.message);
     setBoards((prev) => prev.map((b) => (b.id === board.id ? { ...b, start_name: nazwa, start_lat: lat, start_lng: lng } as any : b)));

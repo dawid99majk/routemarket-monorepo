@@ -7,411 +7,165 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.4"
-  }
   public: {
     Tables: {
-      analytics_events: {
+      ai_usage_log: {
         Row: {
+          charged_tokens: number | null
+          completion_tokens: number | null
+          cost_micro_usd: number | null
           created_at: string
-          event_name: string
-          id: string
-          metadata: Json | null
-          route_id: number | null
+          duration_ms: number | null
+          error_message: string | null
+          id: number
+          model: string | null
+          operation: string
+          project_id: string | null
+          prompt_tokens: number | null
+          success: boolean
+          total_tokens: number | null
           user_id: string | null
         }
         Insert: {
+          charged_tokens?: number | null
+          completion_tokens?: number | null
+          cost_micro_usd?: number | null
           created_at?: string
-          event_name: string
-          id?: string
-          metadata?: Json | null
-          route_id?: number | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: number
+          model?: string | null
+          operation: string
+          project_id?: string | null
+          prompt_tokens?: number | null
+          success?: boolean
+          total_tokens?: number | null
           user_id?: string | null
         }
         Update: {
+          charged_tokens?: number | null
+          completion_tokens?: number | null
+          cost_micro_usd?: number | null
           created_at?: string
-          event_name?: string
-          id?: string
-          metadata?: Json | null
-          route_id?: number | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: number
+          model?: string | null
+          operation?: string
+          project_id?: string | null
+          prompt_tokens?: number | null
+          success?: boolean
+          total_tokens?: number | null
           user_id?: string | null
         }
         Relationships: []
       }
-      buyer_risk_acknowledgements: {
+      atlas_artifacts: {
         Row: {
-          acknowledged_at: string
-          acknowledgement_version: string
-          declarations: Json
-          id: string
-          ip_hash: string | null
-          risk_level: string | null
-          route_id: number
-          user_agent: string | null
-          user_id: string
+          data: Json
+          project_slug: string
+          type: string
+          updated_at: string | null
         }
         Insert: {
-          acknowledged_at?: string
-          acknowledgement_version?: string
-          declarations: Json
-          id?: string
-          ip_hash?: string | null
-          risk_level?: string | null
-          route_id: number
-          user_agent?: string | null
-          user_id: string
+          data: Json
+          project_slug: string
+          type: string
+          updated_at?: string | null
         }
         Update: {
-          acknowledged_at?: string
-          acknowledgement_version?: string
-          declarations?: Json
-          id?: string
-          ip_hash?: string | null
-          risk_level?: string | null
-          route_id?: number
-          user_agent?: string | null
-          user_id?: string
+          data?: Json
+          project_slug?: string
+          type?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "buyer_risk_acknowledgements_route_id_fkey"
-            columns: ["route_id"]
+            foreignKeyName: "atlas_artifacts_project_slug_fkey"
+            columns: ["project_slug"]
             isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
+            referencedRelation: "atlas_projects"
+            referencedColumns: ["slug"]
           },
         ]
       }
-      campaign_creatives: {
+      atlas_projects: {
         Row: {
-          bg_color: string | null
-          campaign_id: string
-          created_at: string
-          cta_text: string | null
-          headline: string
-          id: string
-          image_key: string | null
-          language_code: string
-          subheadline: string | null
-          text_color: string | null
+          data: Json
+          slug: string
+          updated_at: string | null
         }
         Insert: {
-          bg_color?: string | null
-          campaign_id: string
-          created_at?: string
-          cta_text?: string | null
-          headline: string
-          id?: string
-          image_key?: string | null
-          language_code?: string
-          subheadline?: string | null
-          text_color?: string | null
+          data: Json
+          slug: string
+          updated_at?: string | null
         }
         Update: {
-          bg_color?: string | null
-          campaign_id?: string
-          created_at?: string
-          cta_text?: string | null
-          headline?: string
-          id?: string
-          image_key?: string | null
-          language_code?: string
-          subheadline?: string | null
-          text_color?: string | null
+          data?: Json
+          slug?: string
+          updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_creatives_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaign_creatives_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "public_campaigns"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
-      campaign_events: {
+      collection_places: {
         Row: {
-          campaign_id: string
+          collection_id: string
           created_at: string
-          event_type: string
-          id: string
-          metadata: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          campaign_id: string
-          created_at?: string
-          event_type: string
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          campaign_id?: string
-          created_at?: string
-          event_type?: string
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaign_events_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaign_events_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "public_campaigns"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      campaigns: {
-        Row: {
-          budget_cents: number | null
-          created_at: string
-          created_by: string
-          description: string | null
-          end_date: string | null
-          id: string
-          is_internal: boolean
-          name: string
-          placement: Database["public"]["Enums"]["campaign_placement"]
-          priority: number
-          start_date: string | null
-          status: Database["public"]["Enums"]["campaign_status"]
-          target_category_id: number | null
-          target_route_id: number | null
-          target_url: string | null
-          updated_at: string
-        }
-        Insert: {
-          budget_cents?: number | null
-          created_at?: string
-          created_by: string
-          description?: string | null
-          end_date?: string | null
-          id?: string
-          is_internal?: boolean
-          name: string
-          placement?: Database["public"]["Enums"]["campaign_placement"]
-          priority?: number
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["campaign_status"]
-          target_category_id?: number | null
-          target_route_id?: number | null
-          target_url?: string | null
-          updated_at?: string
-        }
-        Update: {
-          budget_cents?: number | null
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          end_date?: string | null
-          id?: string
-          is_internal?: boolean
-          name?: string
-          placement?: Database["public"]["Enums"]["campaign_placement"]
-          priority?: number
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["campaign_status"]
-          target_category_id?: number | null
-          target_route_id?: number | null
-          target_url?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaigns_target_category_id_fkey"
-            columns: ["target_category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaigns_target_route_id_fkey"
-            columns: ["target_route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      categories: {
-        Row: {
-          created_at: string
-          icon: string
-          id: number
-          name: string
+          place_id: string
           sort_order: number
         }
         Insert: {
+          collection_id: string
           created_at?: string
-          icon?: string
-          id?: number
+          place_id: string
+          sort_order?: number
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          place_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_places_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          created_at: string
+          id: string
+          is_public: boolean
           name: string
-          sort_order?: number
+          slug: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          name: string
+          slug: string
+          user_id: string
         }
         Update: {
           created_at?: string
-          icon?: string
-          id?: number
+          id?: string
+          is_public?: boolean
           name?: string
-          sort_order?: number
-        }
-        Relationships: []
-      }
-      comments: {
-        Row: {
-          content: string
-          created_at: string
-          id: number
-          route_id: number
-          user_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string
-          id?: number
-          route_id: number
-          user_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string
-          id?: number
-          route_id?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comments_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      conversations: {
-        Row: {
-          created_at: string
-          guest_email: string | null
-          guest_name: string | null
-          id: string
-          status: string
-          subject: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          guest_email?: string | null
-          guest_name?: string | null
-          id?: string
-          status?: string
-          subject?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          guest_email?: string | null
-          guest_name?: string | null
-          id?: string
-          status?: string
-          subject?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      creator_declarations: {
-        Row: {
-          accepted_at: string
-          declarations: Json
-          id: string
-          route_id: number
-          terms_version: string
-          user_id: string
-        }
-        Insert: {
-          accepted_at?: string
-          declarations: Json
-          id?: string
-          route_id: number
-          terms_version?: string
-          user_id: string
-        }
-        Update: {
-          accepted_at?: string
-          declarations?: Json
-          id?: string
-          route_id?: number
-          terms_version?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "creator_declarations_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      creator_profiles: {
-        Row: {
-          bio: string | null
-          created_at: string
-          display_name: string
-          id: number
-          stripe_connect_account_id: string | null
-          stripe_onboarding_complete: boolean | null
-          total_earnings: number | null
-          total_sales: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          bio?: string | null
-          created_at?: string
-          display_name: string
-          id?: number
-          stripe_connect_account_id?: string | null
-          stripe_onboarding_complete?: boolean | null
-          total_earnings?: number | null
-          total_sales?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          bio?: string | null
-          created_at?: string
-          display_name?: string
-          id?: number
-          stripe_connect_account_id?: string | null
-          stripe_onboarding_complete?: boolean | null
-          total_earnings?: number | null
-          total_sales?: number | null
-          updated_at?: string
+          slug?: string
           user_id?: string
         }
         Relationships: []
@@ -503,88 +257,6 @@ export type Database = {
         }
         Relationships: []
       }
-      favorites: {
-        Row: {
-          created_at: string
-          id: number
-          route_id: number
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: never
-          route_id: number
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: never
-          route_id?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "favorites_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      generated_content: {
-        Row: {
-          category: string
-          content_type: string
-          created_at: string
-          created_by: string
-          file_key: string | null
-          id: string
-          language_code: string | null
-          metadata: Json | null
-          prompt: string
-          result_text: string | null
-          route_id: number | null
-          updated_at: string
-        }
-        Insert: {
-          category: string
-          content_type: string
-          created_at?: string
-          created_by: string
-          file_key?: string | null
-          id?: string
-          language_code?: string | null
-          metadata?: Json | null
-          prompt: string
-          result_text?: string | null
-          route_id?: number | null
-          updated_at?: string
-        }
-        Update: {
-          category?: string
-          content_type?: string
-          created_at?: string
-          created_by?: string
-          file_key?: string | null
-          id?: string
-          language_code?: string | null
-          metadata?: Json | null
-          prompt?: string
-          result_text?: string | null
-          route_id?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "generated_content_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       legal_documents: {
         Row: {
           content_hash: string
@@ -615,40 +287,185 @@ export type Database = {
         }
         Relationships: []
       }
-      messages: {
+      place_catalog: {
         Row: {
-          content: string
-          conversation_id: string
+          category: string
+          city: string | null
+          country: string | null
           created_at: string
+          created_by: string | null
+          description: string
           id: string
-          is_read: boolean
-          sender_id: string | null
-          sender_type: string
+          kind: string | null
+          lat: number
+          lng: number
+          name: string
+          opening_hours: string | null
+          osm_id: string | null
+          photos: Json
+          pin_count: number
+          report_count: number
+          slug: string
+          source: string
+          status: string
+          updated_at: string
+          vibe_tags: string[]
+          visit_minutes: number | null
+          website: string | null
+          wiki_extract: string | null
         }
         Insert: {
-          content: string
-          conversation_id: string
+          category?: string
+          city?: string | null
+          country?: string | null
           created_at?: string
+          created_by?: string | null
+          description?: string
           id?: string
-          is_read?: boolean
-          sender_id?: string | null
-          sender_type?: string
+          kind?: string | null
+          lat: number
+          lng: number
+          name: string
+          opening_hours?: string | null
+          osm_id?: string | null
+          photos?: Json
+          pin_count?: number
+          report_count?: number
+          slug: string
+          source?: string
+          status?: string
+          updated_at?: string
+          vibe_tags?: string[]
+          visit_minutes?: number | null
+          website?: string | null
+          wiki_extract?: string | null
         }
         Update: {
-          content?: string
-          conversation_id?: string
+          category?: string
+          city?: string | null
+          country?: string | null
           created_at?: string
+          created_by?: string | null
+          description?: string
           id?: string
-          is_read?: boolean
-          sender_id?: string | null
-          sender_type?: string
+          kind?: string | null
+          lat?: number
+          lng?: number
+          name?: string
+          opening_hours?: string | null
+          osm_id?: string | null
+          photos?: Json
+          pin_count?: number
+          report_count?: number
+          slug?: string
+          source?: string
+          status?: string
+          updated_at?: string
+          vibe_tags?: string[]
+          visit_minutes?: number | null
+          website?: string | null
+          wiki_extract?: string | null
+        }
+        Relationships: []
+      }
+      place_events: {
+        Row: {
+          city: string
+          created_at: string
+          description: string
+          ends_on: string | null
+          id: string
+          name: string
+          place_id: string | null
+          source: string
+          starts_on: string
+          url: string | null
+        }
+        Insert: {
+          city: string
+          created_at?: string
+          description?: string
+          ends_on?: string | null
+          id?: string
+          name: string
+          place_id?: string | null
+          source?: string
+          starts_on: string
+          url?: string | null
+        }
+        Update: {
+          city?: string
+          created_at?: string
+          description?: string
+          ends_on?: string | null
+          id?: string
+          name?: string
+          place_id?: string | null
+          source?: string
+          starts_on?: string
+          url?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "messages_conversation_id_fkey"
-            columns: ["conversation_id"]
+            foreignKeyName: "place_events_place_id_fkey"
+            columns: ["place_id"]
             isOneToOne: false
-            referencedRelation: "conversations"
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_favorites: {
+        Row: {
+          created_at: string
+          place_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          place_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          place_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_favorites_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_reports: {
+        Row: {
+          created_at: string
+          place_id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          place_id: string
+          reason?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          place_id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_reports_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
             referencedColumns: ["id"]
           },
         ]
@@ -686,514 +503,159 @@ export type Database = {
         }
         Relationships: []
       }
-      purchase_consents: {
+      route_builder_artifacts: {
         Row: {
-          accepted_at: string
-          consent_version: string
-          declarations: Json
+          artifact_type: string
+          content: Json | null
+          created_at: string
+          file_path: string | null
           id: string
-          ip_hash: string | null
-          route_id: number
-          user_agent: string | null
-          user_id: string
+          project_id: string
+          raw_data: string | null
         }
         Insert: {
-          accepted_at?: string
-          consent_version?: string
-          declarations: Json
+          artifact_type: string
+          content?: Json | null
+          created_at?: string
+          file_path?: string | null
           id?: string
-          ip_hash?: string | null
-          route_id: number
-          user_agent?: string | null
-          user_id: string
+          project_id: string
+          raw_data?: string | null
         }
         Update: {
-          accepted_at?: string
-          consent_version?: string
-          declarations?: Json
+          artifact_type?: string
+          content?: Json | null
+          created_at?: string
+          file_path?: string | null
           id?: string
-          ip_hash?: string | null
-          route_id?: number
-          user_agent?: string | null
-          user_id?: string
+          project_id?: string
+          raw_data?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "purchase_consents_route_id_fkey"
-            columns: ["route_id"]
+            foreignKeyName: "route_builder_artifacts_project_id_fkey"
+            columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "routes"
+            referencedRelation: "route_builder_projects"
             referencedColumns: ["id"]
           },
         ]
       }
-      purchases: {
+      route_builder_jobs: {
         Row: {
-          amount_paid: number
-          id: number
-          purchased_at: string
-          route_id: number
-          stripe_payment_intent_id: string | null
-          user_id: string
-        }
-        Insert: {
-          amount_paid: number
-          id?: number
-          purchased_at?: string
-          route_id: number
-          stripe_payment_intent_id?: string | null
-          user_id: string
-        }
-        Update: {
-          amount_paid?: number
-          id?: number
-          purchased_at?: string
-          route_id?: number
-          stripe_payment_intent_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "purchases_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ratings: {
-        Row: {
+          attempt_count: number
           created_at: string
-          id: number
-          route_id: number
-          score: number
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          route_id: number
-          score: number
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          route_id?: number
-          score?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ratings_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      route_images: {
-        Row: {
-          created_at: string
-          id: number
-          image_key: string
-          route_id: number
-          sort_order: number
-        }
-        Insert: {
-          created_at?: string
-          id?: never
-          image_key: string
-          route_id: number
-          sort_order?: number
-        }
-        Update: {
-          created_at?: string
-          id?: never
-          image_key?: string
-          route_id?: number
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "route_images_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      route_pdfs: {
-        Row: {
-          created_at: string
-          file_key: string
-          id: number
-          language_code: string
-          route_id: number
-        }
-        Insert: {
-          created_at?: string
-          file_key: string
-          id?: never
-          language_code: string
-          route_id: number
-        }
-        Update: {
-          created_at?: string
-          file_key?: string
-          id?: never
-          language_code?: string
-          route_id?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "route_pdfs_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      route_pois: {
-        Row: {
-          created_at: string
-          description: string
-          fun_fact: string | null
+          current_step: string
+          error_code: string | null
+          error_message: string | null
+          human_message: string | null
           id: string
-          lat: number
-          lng: number
-          name: string
-          photo_keys: Json | null
-          route_id: number
-          sort_order: number
-          type: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string
-          fun_fact?: string | null
-          id?: string
-          lat: number
-          lng: number
-          name: string
-          photo_keys?: Json | null
-          route_id: number
-          sort_order?: number
-          type?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string
-          fun_fact?: string | null
-          id?: string
-          lat?: number
-          lng?: number
-          name?: string
-          photo_keys?: Json | null
-          route_id?: number
-          sort_order?: number
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "route_pois_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      route_private_details: {
-        Row: {
-          created_at: string
-          full_description: string
-          route_id: number
+          locked_at: string | null
+          locked_by: string | null
+          missing_inputs: Json | null
+          progress: number
+          project_id: string
+          status: string
           updated_at: string
         }
         Insert: {
+          attempt_count?: number
           created_at?: string
-          full_description?: string
-          route_id: number
+          current_step: string
+          error_code?: string | null
+          error_message?: string | null
+          human_message?: string | null
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          missing_inputs?: Json | null
+          progress?: number
+          project_id: string
+          status?: string
           updated_at?: string
         }
         Update: {
+          attempt_count?: number
           created_at?: string
-          full_description?: string
-          route_id?: number
+          current_step?: string
+          error_code?: string | null
+          error_message?: string | null
+          human_message?: string | null
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          missing_inputs?: Json | null
+          progress?: number
+          project_id?: string
+          status?: string
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_builder_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "route_builder_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_builder_projects: {
+        Row: {
+          created_at: string
+          id: string
+          requirements: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          requirements: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          requirements?: Json
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
-      route_recommendations: {
+      route_preferences: {
         Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          photo_key: string | null
-          price_range: string | null
-          route_id: number
-          sort_order: number
-          what_to_order: string | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          photo_key?: string | null
-          price_range?: string | null
-          route_id: number
-          sort_order?: number
-          what_to_order?: string | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          photo_key?: string | null
-          price_range?: string | null
-          route_id?: number
-          sort_order?: number
-          what_to_order?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "route_recommendations_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      route_tips: {
-        Row: {
-          category: string
-          content: string
-          created_at: string
-          id: string
-          route_id: number
-          sort_order: number
-        }
-        Insert: {
-          category: string
-          content?: string
-          created_at?: string
-          id?: string
-          route_id: number
-          sort_order?: number
-        }
-        Update: {
-          category?: string
-          content?: string
-          created_at?: string
-          id?: string
-          route_id?: number
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "route_tips_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      route_translations: {
-        Row: {
-          created_at: string
-          description: string
-          id: number
-          is_auto_translated: boolean
-          language_code: string
-          route_id: number
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string
-          id?: never
-          is_auto_translated?: boolean
-          language_code: string
-          route_id: number
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string
-          id?: never
-          is_auto_translated?: boolean
-          language_code?: string
-          route_id?: number
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "route_translations_route_id_fkey"
-            columns: ["route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      routes: {
-        Row: {
-          ai_assisted: boolean
-          ai_assisted_note: string | null
-          ai_assisted_scope: string | null
-          audience: Json | null
-          budget: string | null
-          category_id: number | null
-          cover_image_key: string | null
-          created_at: string
-          currency: string
-          data_confidence: string | null
-          description: string
-          difficulty: string | null
-          distance_km: number | null
-          duration: string | null
-          elevation_gain_m: number | null
-          end_point: string | null
-          estimated_time_h: number | null
-          gpx_file_key: string | null
-          id: number
-          instagram_url: string | null
-          known_hazards: Json | null
-          last_verified_at: string | null
-          latitude: number
-          location_string: string
-          longitude: number
-          loop_type: string | null
-          pdf_file_key: string | null
-          pets_friendly: boolean
-          preview_track: Json | null
-          price: number
-          required_equipment: Json | null
-          risk_level: string | null
-          route_type: string | null
-          season: string | null
-          start_point: string | null
-          status: string
-          subcategory: string | null
-          surface_type: string | null
-          tags: Json | null
-          title: string
+          crowds: number
+          dining: number
+          effort: number
+          pace: number
+          popularity: number
           updated_at: string
           user_id: string
-          youtube_url: string | null
+          wandering: number
         }
         Insert: {
-          ai_assisted?: boolean
-          ai_assisted_note?: string | null
-          ai_assisted_scope?: string | null
-          audience?: Json | null
-          budget?: string | null
-          category_id?: number | null
-          cover_image_key?: string | null
-          created_at?: string
-          currency?: string
-          data_confidence?: string | null
-          description?: string
-          difficulty?: string | null
-          distance_km?: number | null
-          duration?: string | null
-          elevation_gain_m?: number | null
-          end_point?: string | null
-          estimated_time_h?: number | null
-          gpx_file_key?: string | null
-          id?: number
-          instagram_url?: string | null
-          known_hazards?: Json | null
-          last_verified_at?: string | null
-          latitude?: number
-          location_string?: string
-          longitude?: number
-          loop_type?: string | null
-          pdf_file_key?: string | null
-          pets_friendly?: boolean
-          preview_track?: Json | null
-          price?: number
-          required_equipment?: Json | null
-          risk_level?: string | null
-          route_type?: string | null
-          season?: string | null
-          start_point?: string | null
-          status?: string
-          subcategory?: string | null
-          surface_type?: string | null
-          tags?: Json | null
-          title: string
+          crowds?: number
+          dining?: number
+          effort?: number
+          pace?: number
+          popularity?: number
           updated_at?: string
           user_id: string
-          youtube_url?: string | null
+          wandering?: number
         }
         Update: {
-          ai_assisted?: boolean
-          ai_assisted_note?: string | null
-          ai_assisted_scope?: string | null
-          audience?: Json | null
-          budget?: string | null
-          category_id?: number | null
-          cover_image_key?: string | null
-          created_at?: string
-          currency?: string
-          data_confidence?: string | null
-          description?: string
-          difficulty?: string | null
-          distance_km?: number | null
-          duration?: string | null
-          elevation_gain_m?: number | null
-          end_point?: string | null
-          estimated_time_h?: number | null
-          gpx_file_key?: string | null
-          id?: number
-          instagram_url?: string | null
-          known_hazards?: Json | null
-          last_verified_at?: string | null
-          latitude?: number
-          location_string?: string
-          longitude?: number
-          loop_type?: string | null
-          pdf_file_key?: string | null
-          pets_friendly?: boolean
-          preview_track?: Json | null
-          price?: number
-          required_equipment?: Json | null
-          risk_level?: string | null
-          route_type?: string | null
-          season?: string | null
-          start_point?: string | null
-          status?: string
-          subcategory?: string | null
-          surface_type?: string | null
-          tags?: Json | null
-          title?: string
+          crowds?: number
+          dining?: number
+          effort?: number
+          pace?: number
+          popularity?: number
           updated_at?: string
           user_id?: string
-          youtube_url?: string | null
+          wandering?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "routes_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       suppressed_emails: {
         Row: {
@@ -1216,6 +678,277 @@ export type Database = {
           id?: string
           metadata?: Json | null
           reason?: string
+        }
+        Relationships: []
+      }
+      token_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          reason: string
+          ref: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          reason: string
+          ref?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          reason?: string
+          ref?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      trip_plans: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          plan: Json
+          project_id: string
+          start_date: string | null
+          window_end: string | null
+          window_start: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          plan: Json
+          project_id: string
+          start_date?: string | null
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          plan?: Json
+          project_id?: string
+          start_date?: string | null
+          window_end?: string | null
+          window_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_plans_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "trip_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_project_places: {
+        Row: {
+          board_x: number | null
+          board_y: number | null
+          catalog_id: string | null
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          lat: number | null
+          lng: number | null
+          name: string
+          opening_hours: string | null
+          priority: string
+          project_id: string
+          sort_order: number
+          source: string | null
+          visit_minutes: number | null
+          website: string | null
+          wiki_extract: string | null
+        }
+        Insert: {
+          board_x?: number | null
+          board_y?: number | null
+          catalog_id?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          lat?: number | null
+          lng?: number | null
+          name: string
+          opening_hours?: string | null
+          priority?: string
+          project_id: string
+          sort_order?: number
+          source?: string | null
+          visit_minutes?: number | null
+          website?: string | null
+          wiki_extract?: string | null
+        }
+        Update: {
+          board_x?: number | null
+          board_y?: number | null
+          catalog_id?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          opening_hours?: string | null
+          priority?: string
+          project_id?: string
+          sort_order?: number
+          source?: string | null
+          visit_minutes?: number | null
+          website?: string | null
+          wiki_extract?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_project_places_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_project_places_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "trip_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_project_shares: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          role: string
+          shared_with_email: string
+          shared_with_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          role?: string
+          shared_with_email: string
+          shared_with_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          role?: string
+          shared_with_email?: string
+          shared_with_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_project_shares_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "trip_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_projects: {
+        Row: {
+          author_display: string | null
+          copy_count: number
+          created_at: string
+          crowds: number | null
+          days: number | null
+          destination: string
+          destination_lat: number | null
+          destination_lng: number | null
+          dining: number | null
+          effort: number | null
+          fill_percent: number
+          hours_per_day: number | null
+          id: string
+          is_public: boolean
+          name: string
+          notes: string
+          pace: number | null
+          popularity: number | null
+          published_at: string | null
+          start_lat: number | null
+          start_lng: number | null
+          start_name: string | null
+          trip_type: string | null
+          updated_at: string
+          user_id: string
+          wandering: number | null
+        }
+        Insert: {
+          author_display?: string | null
+          copy_count?: number
+          created_at?: string
+          crowds?: number | null
+          days?: number | null
+          destination: string
+          destination_lat?: number | null
+          destination_lng?: number | null
+          dining?: number | null
+          effort?: number | null
+          fill_percent?: number
+          hours_per_day?: number | null
+          id?: string
+          is_public?: boolean
+          name: string
+          notes?: string
+          pace?: number | null
+          popularity?: number | null
+          published_at?: string | null
+          start_lat?: number | null
+          start_lng?: number | null
+          start_name?: string | null
+          trip_type?: string | null
+          updated_at?: string
+          user_id: string
+          wandering?: number | null
+        }
+        Update: {
+          author_display?: string | null
+          copy_count?: number
+          created_at?: string
+          crowds?: number | null
+          days?: number | null
+          destination?: string
+          destination_lat?: number | null
+          destination_lng?: number | null
+          dining?: number | null
+          effort?: number | null
+          fill_percent?: number
+          hours_per_day?: number | null
+          id?: string
+          is_public?: boolean
+          name?: string
+          notes?: string
+          pace?: number | null
+          popularity?: number | null
+          published_at?: string | null
+          start_lat?: number | null
+          start_lng?: number | null
+          start_name?: string | null
+          trip_type?: string | null
+          updated_at?: string
+          user_id?: string
+          wandering?: number | null
         }
         Relationships: []
       }
@@ -1242,89 +975,22 @@ export type Database = {
       }
     }
     Views: {
-      public_campaigns: {
+      ai_usage_summary: {
         Row: {
-          end_date: string | null
-          id: string | null
-          name: string | null
-          placement: Database["public"]["Enums"]["campaign_placement"] | null
-          priority: number | null
-          start_date: string | null
-          status: Database["public"]["Enums"]["campaign_status"] | null
-          target_category_id: number | null
-          target_route_id: number | null
-          target_url: string | null
-        }
-        Insert: {
-          end_date?: string | null
-          id?: string | null
-          name?: string | null
-          placement?: Database["public"]["Enums"]["campaign_placement"] | null
-          priority?: number | null
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["campaign_status"] | null
-          target_category_id?: number | null
-          target_route_id?: number | null
-          target_url?: string | null
-        }
-        Update: {
-          end_date?: string | null
-          id?: string | null
-          name?: string | null
-          placement?: Database["public"]["Enums"]["campaign_placement"] | null
-          priority?: number | null
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["campaign_status"] | null
-          target_category_id?: number | null
-          target_route_id?: number | null
-          target_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "campaigns_target_category_id_fkey"
-            columns: ["target_category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "campaigns_target_route_id_fkey"
-            columns: ["target_route_id"]
-            isOneToOne: false
-            referencedRelation: "routes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      public_creator_profiles: {
-        Row: {
-          bio: string | null
-          created_at: string | null
-          display_name: string | null
-          id: number | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          bio?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          id?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          bio?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          id?: number | null
-          updated_at?: string | null
-          user_id?: string | null
+          avg_cost_micro_usd: number | null
+          avg_ms: number | null
+          avg_tokens: number | null
+          calls: number | null
+          failures: number | null
+          operation: string | null
+          total_cost_usd: number | null
         }
         Relationships: []
       }
     }
     Functions: {
+      claim_pending_trip_shares: { Args: never; Returns: number }
+      copy_public_board: { Args: { p_source: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1347,6 +1013,7 @@ export type Database = {
           route_id: number
         }[]
       }
+      has_project_access: { Args: { pid: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

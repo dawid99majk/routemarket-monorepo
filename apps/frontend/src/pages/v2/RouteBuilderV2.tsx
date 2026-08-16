@@ -363,7 +363,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       const destination = (waypoints[0]?.name || context.title || 'Wyjazd').split(',')[0].trim();
       const preset = TRIP_PRESETS.find((t) => t.label === context.tripProfile?.charakter);
 
-      const { data: project, error } = await (supabase as any)
+      const { data: project, error } = await supabase
         .from('trip_projects')
         .insert({
           user_id: userData.user.id,
@@ -390,7 +390,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         description: poiDetails[wp.name || `Punkt ${i + 1}`]?.description || '',
         source: 'route'
       }));
-      const { error: placesError } = await (supabase as any).from('trip_project_places').insert(rows);
+      const { error: placesError } = await supabase.from('trip_project_places').insert(rows);
       if (placesError) throw placesError;
 
       toast.success(`Utworzono projekt z ${rows.length} miejscami`);
@@ -474,7 +474,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
       if (alreadyHasRoute) return;
 
-      (supabase as any).from('route_builder_projects').select('*').eq('id', projectId).single()
+      supabase.from('route_builder_projects').select('*').eq('id', projectId).single()
         .then(({ data }) => {
            if (data && data.requirements) {
               const reqs = data.requirements;
@@ -533,7 +533,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('route_builder_projects')
         .select('*')
         .eq('user_id', userData.user.id)
@@ -580,7 +580,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     if (!confirm("Czy na pewno chcesz usunąć tę trasę?")) return;
     
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('route_builder_projects')
         .delete()
         .eq('id', id);

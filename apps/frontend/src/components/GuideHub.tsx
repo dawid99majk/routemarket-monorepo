@@ -67,9 +67,9 @@ function EmptyState({ query }: { query: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center px-4">
       <Search className="w-10 h-10 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-medium text-foreground mb-1">Nic nie znaleziono</p>
+      <p className="text-sm font-medium text-foreground mb-1">Pusto</p>
       <p className="text-xs text-muted-foreground">
-        No results for "<span className="font-medium">{query}</span>". Try a different keyword.
+        Nic nie pasuje do „<span className="font-medium">{query}</span>". Spróbuj innego słowa.
       </p>
     </div>
   );
@@ -144,12 +144,12 @@ export default function GuideHub() {
       {/* Expandable FAB — icon-only, expands on hover/focus */}
       <button
         onClick={() => setOpen(true)}
-        className="group fixed right-4 bottom-4 z-[1300] flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="group fixed right-4 bottom-[5.5rem] md:bottom-4 z-[1300] flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label="Otwórz pomoc"
       >
         <HelpCircle className="w-5 h-5 shrink-0" />
         <span className="overflow-hidden max-w-0 group-hover:max-w-[160px] group-focus-visible:max-w-[160px] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-hover:ml-2 group-focus-visible:ml-2 text-sm font-semibold whitespace-nowrap transition-all duration-300 ease-out">
-          How it works
+          Jak to działa
         </span>
       </button>
 
@@ -200,7 +200,7 @@ export default function GuideHub() {
                       <button
                         onClick={() => { setSearchQuery(''); searchRef.current?.focus(); }}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label="Clear search"
+                        aria-label="Wyczyść wyszukiwanie"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -212,7 +212,9 @@ export default function GuideHub() {
                   /* ── Search results (cross-tab) ── */
                   <div className="flex-1 overflow-y-auto px-6 py-4">
                     <p className="text-xs text-muted-foreground mb-3">
-                      {filteredArticles.length} result{filteredArticles.length !== 1 ? 's' : ''}
+                      {filteredArticles.length} {filteredArticles.length === 1 ? 'wynik'
+                        : [2, 3, 4].includes(filteredArticles.length % 10)
+                          && ![12, 13, 14].includes(filteredArticles.length % 100) ? 'wyniki' : 'wyników'}
                     </p>
                     {renderCards(filteredArticles)}
                   </div>

@@ -70,14 +70,14 @@ export default function TripPlans() {
 
   const wczytajListe = useCallback(async () => {
     setLadowanie(true);
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('trip_projects')
       .select('id, name, destination, days, trip_type, updated_at, created_at')
       .order('updated_at', { ascending: false });
     setWyjazdy(data ?? []);
 
     if (data?.length) {
-      const { data: miejsca } = await (supabase as any)
+      const { data: miejsca } = await supabase
         .from('trip_project_places')
         .select('project_id, image_url')
         .in('project_id', data.map((p: any) => p.id));

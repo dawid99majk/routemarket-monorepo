@@ -39,7 +39,7 @@ export default function MyRoutes() {
         navigate('/auth');
         return;
       }
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('route_builder_projects')
         .select('id, created_at, updated_at, requirements')
         .order('updated_at', { ascending: false, nullsFirst: false });
@@ -49,7 +49,7 @@ export default function MyRoutes() {
   }, [navigate]);
 
   const remove = async (id: string) => {
-    await (supabase as any).from('route_builder_projects').delete().eq('id', id);
+    await supabase.from('route_builder_projects').delete().eq('id', id);
     setProjects((prev) => prev.filter((p) => p.id !== id));
     toast.success('Trasa usunięta');
   };

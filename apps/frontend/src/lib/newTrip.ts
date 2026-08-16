@@ -54,7 +54,7 @@ export async function utworzWyjazd({ cel, klimat, termin }: ZamiarWyjazdu): Prom
   if (!userData.user) return null;
 
   const parsed = parseTermin(termin);
-  const { data, error } = await (supabase as any).from('trip_projects').insert({
+  const { data, error } = await supabase.from('trip_projects').insert({
     user_id: userData.user.id,
     name: `${cel.trim()} ${etykietaKlimatu(klimat).toLowerCase()}`,
     destination: cel.trim(),

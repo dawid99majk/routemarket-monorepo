@@ -88,7 +88,7 @@ export default function RoutePreferences() {
         setLoading(false);
         return;
       }
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('route_preferences')
         .select('pace, popularity, wandering, dining, effort, crowds')
         .eq('user_id', userData.user.id)
@@ -103,7 +103,7 @@ export default function RoutePreferences() {
     try {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Brak zalogowanego użytkownika');
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('route_preferences')
         .upsert({ user_id: userData.user.id, ...values, updated_at: new Date().toISOString() });
       if (error) throw error;

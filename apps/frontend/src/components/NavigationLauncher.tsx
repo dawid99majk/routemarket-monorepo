@@ -46,7 +46,7 @@ export default function NavigationLauncher() {
     setPicking(true);
     setLoading(true);
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('route_builder_projects')
         .select('id, requirements')
         .order('updated_at', { ascending: false, nullsFirst: false })

@@ -45,7 +45,7 @@ function useRoutePreferences() {
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('route_preferences')
         .select('pace, popularity, wandering, dining, effort, crowds')
         .eq('user_id', userData.user.id)
@@ -184,7 +184,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
         };
 
         if (!projectId) {
-            const { data: project, error } = await (supabase as any).from('route_builder_projects')
+            const { data: project, error } = await supabase.from('route_builder_projects')
             .insert({
                 user_id: userData.user.id,
                 requirements: reqs
@@ -194,7 +194,7 @@ export function useWizardMachine(initialProjectId: string | null = null) {
             if (error) throw error;
             projectId = project.id;
         } else {
-            const { error } = await (supabase as any).from('route_builder_projects')
+            const { error } = await supabase.from('route_builder_projects')
             .update({
                 requirements: reqs,
                 updated_at: new Date().toISOString()

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, Bed, CalendarDays, ChevronLeft, ChevronRight, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
+  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -204,14 +204,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const view = searchParams.get('widok') === 'plan' ? 'plan' : 'tablica';
   const [plan, setPlan] = useState<any | null>(null);
   const [odrzuconeOtwarte, setOdrzuconeOtwarte] = useState(false);
-  /** Miejsca dla mapy tablicy: tylko te ze współrzędnymi, odrzucone pomijamy —
-   *  skoro zeszły z kolumn, to i z mapy, żeby nie zaśmiecały obrazu rozrzutu. */
-  const naMapie = useMemo(
-    () => places
-      .filter((x) => x.lat != null && x.lng != null && x.priority !== 'rejected')
-      .map((x) => ({ id: x.id, name: x.name, lat: x.lat, lng: x.lng,
-                     visit_minutes: x.visit_minutes, kubelek: x.priority as any })),
-    [places]);
   /** Wiersz zapisanego planu, do którego dopisujemy przeliczone przebiegi dni. */
   const [planId, setPlanId] = useState<string | null>(null);
   // Okno domyślne to pełny dzień zwiedzania. Wcześniejsze 17:00-21:00 pochodziło
@@ -235,6 +227,28 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
   const active = projects.find((p) => p.id === activeId) || null;
 
+  /** Miejsca dla mapy tablicy: tylko te ze współrzędnymi, odrzucone pomijamy —
+   *  skoro zeszły z kolumn, to i z mapy, żeby nie zaśmiecały obrazu rozrzutu. */
+  /** Punkt startowy w postaci, jakiej oczekuje mapa. Bez współrzędnych nie ma co
+   *  rysować — sama nazwa własna wystarcza planerowi, ale nie pinezce. */
+  const startNaMapie = useMemo(() => {
+    const a = active as any;
+    return a?.start_name && a.start_lat != null && a.start_lng != null
+      ? { name: a.start_name, lat: a.start_lat, lng: a.start_lng }
+      : null;
+  }, [active]);
+
+  const naMapie = useMemo(
+    () => places
+      .filter((x) => x.lat != null && x.lng != null && x.priority !== 'rejected')
+      .map((x) => ({ id: x.id, name: x.name, lat: x.lat, lng: x.lng,
+                     visit_minutes: x.visit_minutes, kubelek: x.priority as any })),
+    [places]);
+
+  const kadrZeStartem = useMemo(
+    () => (startNaMapie ? [...naMapie, startNaMapie] : naMapie),
+    [naMapie, startNaMapie]);
+
   useEffect(() => {
     if (!onContextChange) return;
     onContextChange(active
@@ -249,15 +263,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       if (!userData.user) return setLoading(false);
       // Zaproszenia wysłane na adres e-mail czekają, aż ktoś założy konto —
       // po zalogowaniu podpinamy je pod użytkownika, żeby tablice się pojawiły.
-      await (supabase as any).rpc('claim_pending_trip_shares');
-      const { data } = await (supabase as any)
+      await supabase.rpc('claim_pending_trip_shares');
+      const { data } = await supabase
         .from('trip_projects')
         .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count, start_name, start_lat, start_lng')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
 
       if (data?.length) {
-        const { data: miejsca } = await (supabase as any)
+        const { data: miejsca } = await supabase
           .from('trip_project_places')
           .select('project_id, image_url')
           .in('project_id', data.map((p: any) => p.id));
@@ -276,7 +290,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         || new URLSearchParams(window.location.search).get('project');
       const target = requested && data?.some((p: any) => p.id === requested) ? requested : data?.[0]?.id;
       if (target) setActiveId(target);
-      const { data: prefs } = await (supabase as any)
+      const { data: prefs } = await supabase
         .from('route_preferences')
         .select('pace, popularity, wandering, dining, effort, crowds')
         .eq('user_id', userData.user.id)
@@ -302,7 +316,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setEditingType(false);
     setShareEmail('');
     (async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('trip_project_places')
         .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
         .eq('project_id', activeId)
@@ -312,13 +326,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       // Na pustej tablicy panel wyszukiwania jest jedyną treścią — nie ma czego
       // zwijać, a użytkownik i tak zaczyna od dodania pierwszego miejsca.
       if (!(data || []).length) setNarzedzie('szukaj');
-      const { data: plans } = await (supabase as any)
+      const { data: plans } = await supabase
         .from('trip_plans')
         .select('id, name, window_start, window_end, start_date, plan, created_at')
         .eq('project_id', activeId)
         .order('created_at', { ascending: false });
       setSavedPlans(plans || []);
-      const { data: sh } = await (supabase as any)
+      const { data: sh } = await supabase
         .from('trip_project_shares')
         .select('id, shared_with_email, role')
         .eq('project_id', activeId);
@@ -337,7 +351,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setPublishing(true);
     const nowe = !(active as any).is_public;
     const autor = nowe ? await podpisPubliczny() : null;
-    const { error } = await (supabase as any).from('trip_projects').update({
+    const { error } = await supabase.from('trip_projects').update({
       is_public: nowe,
       published_at: nowe ? new Date().toISOString() : null,
       ...(nowe ? { author_display: autor } : {}),
@@ -358,7 +372,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const ustawOs = async (klucz: keyof RoutePreferenceValues, wartosc: number | null) => {
     if (!active) return;
     setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, [klucz]: wartosc } as any : p)));
-    const { error } = await (supabase as any).from('trip_projects')
+    const { error } = await supabase.from('trip_projects')
       .update({ [klucz]: wartosc }).eq('id', active.id);
     if (error) toast.error(error.message);
   };
@@ -369,7 +383,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!form.destination.trim()) return toast.error('Podaj miasto, w którym planujesz wyjazd');
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return toast.error('Zaloguj się, aby tworzyć projekty');
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trip_projects')
       .insert({
         user_id: userData.user.id,
@@ -446,12 +460,37 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    * do zwiedzania, tylko adres, z którego wychodzicie — planer dostaje go jako bazę
    * i zaczyna oraz kończy tam każdy dzień.
    */
+  const [lokalizowanie, setLokalizowanie] = useState(false);
+
+  /**
+   * Położenie z urządzenia — to samo, co przycisk „Moje położenie" w Odkrywaj.
+   * Przeglądarka pyta o zgodę sama i bez niej nic nie dostajemy, dlatego to
+   * osobne kliknięcie, a nie coś, co dzieje się przy wejściu na tablicę.
+   */
+  const startZUrzadzenia = () => {
+    if (!navigator.geolocation) return toast.error('Ta przeglądarka nie udostępnia położenia');
+    setLokalizowanie(true);
+    navigator.geolocation.getCurrentPosition(
+      (poz) => {
+        setLokalizowanie(false);
+        ustawStart({ name: 'Moje położenie', lat: poz.coords.latitude, lng: poz.coords.longitude });
+      },
+      (err) => {
+        setLokalizowanie(false);
+        toast.error(err.code === err.PERMISSION_DENIED
+          ? 'Bez zgody na położenie nie odczytam lokalizacji'
+          : 'Nie udało się odczytać położenia');
+      },
+      { timeout: 10_000 }
+    );
+  };
+
   const ustawStart = async (sug: any | null) => {
     if (!active) return;
     const patch = sug
       ? { start_name: sug.name, start_lat: sug.lat ?? null, start_lng: sug.lng ?? null }
       : { start_name: null, start_lat: null, start_lng: null };
-    const { error } = await (supabase as any).from('trip_projects').update(patch).eq('id', active.id);
+    const { error } = await supabase.from('trip_projects').update(patch).eq('id', active.id);
     if (error) return toast.error(error.message);
     setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, ...patch } as any : p)));
     setStartQuery('');
@@ -584,7 +623,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
     setResults((prev) => prev.filter((r) => r.name !== place.name));
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trip_project_places')
       .insert({
         project_id: active.id,
@@ -614,7 +653,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     wpiszDoKatalogu()
       .then(async (cat: any) => {
         if (!cat?.id) return;
-        await (supabase as any).from('trip_project_places')
+        await supabase.from('trip_project_places')
           .update({ catalog_id: cat.id }).eq('id', data.id);
         setPlaces((prev) => prev.map((x) => (x.id === data.id ? { ...x, catalog_id: cat.id } : x)));
       })
@@ -622,7 +661,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   const unpin = async (id: string) => {
-    await (supabase as any).from('trip_project_places').delete().eq('id', id);
+    await supabase.from('trip_project_places').delete().eq('id', id);
     setPlaces((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -643,7 +682,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       return !before || before.sort_order !== p.sort_order || before.priority !== p.priority;
     });
     for (const p of changed) {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('trip_project_places')
         .update({ priority: p.priority, sort_order: p.sort_order })
         .eq('id', p.id);
@@ -669,7 +708,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const saveFillPercent = async (value: number) => {
     if (!active) return;
     setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, fill_percent: value } : p)));
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('trip_projects').update({ fill_percent: value }).eq('id', active.id);
     if (error) toast.error(error.message);
   };
@@ -755,7 +794,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         setPlan(zPrzebiegiem);
         setSavedPlans((prev) => prev.map((sp) =>
           sp.id === planId ? { ...sp, plan: zPrzebiegiem } : sp));
-        await (supabase as any).from('trip_plans').update({ plan: zPrzebiegiem }).eq('id', planId);
+        await supabase.from('trip_plans').update({ plan: zPrzebiegiem }).eq('id', planId);
       }
     } catch (err: any) {
       setDayRoutes((prev) => { const next = { ...prev }; delete next[day.day]; return next; });
@@ -791,7 +830,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
   const loadEvents = async (city: string) => {
     const today = new Date().toISOString().slice(0, 10);
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from('place_events').select('*')
       .ilike('city', city)
       .gte('ends_on', today)
@@ -867,7 +906,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const patch = presetId
       ? { trip_type: presetId, ...(preset?.axes ?? EMPTY_AXES) }
       : { trip_type: null, ...EMPTY_AXES };
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('trip_projects')
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', active.id);
@@ -881,7 +920,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!active) return;
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    const { data: copy, error } = await (supabase as any)
+    const { data: copy, error } = await supabase
       .from('trip_projects')
       .insert({
         user_id: userData.user.id,
@@ -898,12 +937,12 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       .single();
     if (error) return toast.error(error.message);
     if (places.length > 0) {
-      const { data: full } = await (supabase as any)
+      const { data: full } = await supabase
         .from('trip_project_places')
         .select('name, category, priority, lat, lng, description, opening_hours, visit_minutes, source')
         .eq('project_id', active.id);
       if (full?.length) {
-        await (supabase as any).from('trip_project_places')
+        await supabase.from('trip_project_places')
           .insert(full.map((f: any) => ({ ...f, project_id: copy.id })));
       }
     }
@@ -916,7 +955,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!active || !shareEmail.trim()) return;
     setSharing(true);
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('trip_project_shares')
         .insert({ project_id: active.id, shared_with_email: shareEmail.trim().toLowerCase() })
         .select('id, shared_with_email, role')
@@ -933,7 +972,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   const revokeShare = async (id: string) => {
-    await (supabase as any).from('trip_project_shares').delete().eq('id', id);
+    await supabase.from('trip_project_shares').delete().eq('id', id);
     setShares((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -1032,7 +1071,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
     const brief = `${active.destination}: ${label}. Miejsca: ${waypoints.map((w) => w.name).join(', ')}.`;
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('route_builder_projects')
       .insert({
         user_id: userData.user.id,
@@ -1063,7 +1102,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   /** Propozycja agenta, która się spodobała, trafia na tablicę jak każde inne miejsce. */
   const pinSuggestion = async (item: any) => {
     if (!active) return;
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trip_project_places')
       .insert({
         project_id: active.id,
@@ -1082,7 +1121,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   const deletePlan = async (id: string) => {
-    await (supabase as any).from('trip_plans').delete().eq('id', id);
+    await supabase.from('trip_plans').delete().eq('id', id);
     setSavedPlans((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -1127,7 +1166,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       // przycisk "ułóż plan" wyglądałby, jakby nic nie zrobił.
       navigate(`/plany/${active.id}?widok=plan`);
       // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
-      const { data: saved } = await (supabase as any)
+      const { data: saved } = await supabase
         .from('trip_plans')
         .insert({
           project_id: active.id,
@@ -1255,16 +1294,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </span>
             </div>
           )}
-          <Button size="sm" variant="outline" onClick={() => setCreating((v) => !v)}>
+          <Button variant="outline" onClick={() => setCreating((v) => !v)}>
             <Plus className="w-4 h-4 mr-1" /> Nowy plan
           </Button>
           {active && view === 'plan' && plan && savedPlans.length > 0 && (
-            <Button size="sm" variant="outline" onClick={pokazWszystkiePlany}>
+            <Button variant="outline" onClick={pokazWszystkiePlany}>
               <CalendarDays className="w-4 h-4 mr-1.5" /> Wszystkie plany ({savedPlans.length})
             </Button>
           )}
           {active && view === 'plan' && plan && (
-            <Button size="sm" variant="outline" onClick={buildPlan} disabled={planning}>
+            <Button variant="outline" onClick={buildPlan} disabled={planning}>
               {planning
                 ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Liczę…</>
                 : <><RefreshCw className="w-4 h-4 mr-1.5" /> Przelicz plan</>}
@@ -1343,9 +1382,22 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         {/* Powrót zamiast przełącznika. Lista wyjazdów mieszka teraz pod /plany,
             a ta strona pokazuje wyłącznie jedną tablicę — dzięki temu widać,
             którą się otworzyło, bez czytania podświetleń w rzędzie kafelków. */}
+        {/* Wejście w tablicę otwiera ostatnio używaną, więc powrót do listy jest
+            częstym ruchem, nie wyjątkiem. Jako trzynastopikselowy szary napis
+            z ujemnym marginesem ginął pod tytułem — trzeba go było szukać.
+            Teraz jest przyciskiem z obwódką i liczbą pozostałych wyjazdów, czyli
+            widać zarówno, że da się przełączyć, jak i na ile jest w co. */}
         <button onClick={() => navigate('/plany')}
-          className="text-[13px] text-muted-foreground hover:text-foreground transition-colors -mt-2">
-          ← Wszystkie wyjazdy
+          className="inline-flex items-center gap-2 self-start h-10 rounded-full
+                     bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm
+                     transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Wszystkie tablice
+          {projects.length > 1 && (
+            <span className="font-mono tabular-nums text-[11px] text-primary-foreground/70">
+              {projects.length}
+            </span>
+          )}
         </button>
 
         {active && (
@@ -1385,9 +1437,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       Hotel, parking, dworzec — planer zacznie i skończy tam każdy dzień.
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
-                    Ustaw punkt startowy
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
+                      {lokalizowanie
+                        ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
+                        : <><Crosshair className="w-4 h-4 mr-1.5" /> Moje położenie</>}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
+                      Ustaw punkt startowy
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -2081,7 +2140,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     </div>
                     {naMapie.length > 0 ? (
                       <>
-                        <DiscoverMap places={naMapie} doKadru={naMapie} className="h-[480px]" />
+                        <DiscoverMap places={naMapie} doKadru={kadrZeStartem}
+                          start={startNaMapie} className="h-[480px]" />
                         <div className="flex items-center gap-4 px-3 py-2 border-t border-border">
                           {[['must', 'na pewno'], ['nice', 'być może']].map(([id, etykieta]) => (
                             <span key={id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
