@@ -4,7 +4,32 @@ Niniejszy plik stanowi oficjalną, szczegółową historię zmian wdrożonych na
 
 ---
 
-## 📅 Ostatnia aktualizacja: 26 Lipca 2026 (sesja 2)
+## 📅 Ostatnia aktualizacja: 16 Sierpnia 2026
+
+### 🛡️ Twardnienie infrastruktury i wydajność zapytań (16 Sierpnia 2026)
+
+**Infrastruktura (skrypty na VPS, poza repo):**
+- **Backup**: `/root/routemarket_backup.sh` (cron 2:30) — pg_dump bazy Supabase + `routes/` atlas-engine + Storage, rotacja 14 dni lokalnie, sync na `gdrive:RouteMarket-backups`. Restore przetestowany na czystym kontenerze. **Pułapka**: pg_dump wewnątrz kontenera supabase-db segfaultuje — dump robi kontener `postgres:15-alpine` w sieci `supabase_default` (host `supabase-db`, port **5434**).
+- **Watchdog**: `/root/routemarket_watchdog.sh` (cron co 5 min) — strona, route-builder-api, atlas-api, auth Supabase (z nagłówkiem apikey); przy padzie restart kontenera + wpis w `/root/monitoring/watchdog.log`. Brak kanału alertów — SMTP Supabase to atrapa (`fake_mail_user`); do podpięcia Telegram albo prawdziwy SMTP.
+- **Koszty AI**: `/root/routemarket_koszty_ai.sh` (cron 23:55) agreguje `[usage]` do `/root/monitoring/koszty-ai.log`. Logi kontenerów >200 MB przycinane w niedziele.
+
+**Bezpieczeństwo (`migracja-rls-route-builder.sql`):**
+- Pięć tabel (`route_builder_projects/jobs/artifacts`, `atlas_projects/artifacts`) miało **wyłączone RLS** przy pełnych grantach dla `anon` — każdy z publicznym kluczem z bundla mógł je czytać, nadpisywać i czyścić. Włączone RLS: projekty po `user_id` (+ admin odczyt), joby/artefakty przez własność projektu, atlas_* tylko service_role.
+- `TRUNCATE` odebrany `anon`/`authenticated` na **wszystkich** tabelach public — TRUNCATE nie podlega RLS. Testy: `test-publiczne.sql` sekcja 7.
+
+**Wydajność:**
+- `PlacePage`: pula „w okolicy"/„podobnych" to było `select('*')` × 2000 wierszy z `wiki_extract` — teraz trzy wąskie zapytania (miasto / bbox ~2 km / overlap `vibe_tags`).
+- `Discover`: feed po jawnych kolumnach; miasta przez RPC `catalog_cities()` zamiast 500 wierszy do JS. Indeksy: `(city, pin_count DESC)`, trigram na `city`, `(lat,lng)`, GIN na `vibe_tags` (`migracja-rpc-miasta-indeksy.sql`).
+- **Trwały cache POI** (`poi_cache`, `migracja-poi-cache.sql`): wyniki Overpassa w Postgresie na 30 dni; restart kontenera nie zeruje cache'u, przy awarii mirrorów służy rekord dowolnego wieku. Zmierzono: Kraków 11–25 s z Overpassa → **51 ms** z bazy.
+
+**Jakość planów (`plan-trip`):**
+- Druga runda dopasowań współrzędnych: pozycje przejściowe („Przejście do Ogrodu Botanicznego", „Obiad w Hali Targowej") dopasowywane po **rdzeniach słów** (pierwsze 5 znaków — radzi sobie z odmianą), a ostatnia deska ratunku to interpolacja między sąsiadami dnia z flagą `approx`. Koniec z dziurami w mapie dnia i GPX.
+
+**Deweloperka:**
+- Typy Supabase przegenerowane z żywej bazy: `gen-types.sh` (postgres-meta) — zniknęły 103 rzutowania `(supabase as any)` z 19 plików. **Odpalać po każdej migracji.**
+- `deploy-frontend.sh`: build + stempel `deploy-stamp.txt` + weryfikacja w kontenerze — pułapka „stary dist w obrazie" zamknięta mechanicznie. `deploy-api.sh`: build w tle (nohup), koniec = `DEPLOY-OK` w `/tmp/rb-build.log`.
+
+---
 
 ### 🚀 Przebudowa jakości generowania tras (25 Lipca 2026)
 

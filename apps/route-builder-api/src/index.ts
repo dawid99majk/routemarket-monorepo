@@ -911,9 +911,60 @@ Odpowiedz WYŁĄCZNIE obiektem JSON.`;
           delete item.lat;
           delete item.lng;
           unlocated++;
-          missing.push(raw);
         }
       }
+    }
+
+    // Druga runda dla pozycji, które zostały bez punktu. To niemal zawsze pozycje
+    // przejściowe — "Przejście do Ogrodu Botanicznego", "Powrót pod hotel",
+    // "Obiad w Hali Targowej" — gdzie cel siedzi w końcówce nazwy, tyle że
+    // w odmienionej formie ("Ogrodu Botanicznego" vs "Ogród Botaniczny" w puli).
+    // Dlatego porównujemy rdzenie słów (pierwsze 5 znaków), a gdy i to zawiedzie,
+    // pozycja dostaje punkt między najbliższymi sąsiadami dnia: pinezka "po
+    // drodze" jest bliżej prawdy niż dziura w mapie dnia i w pliku GPX.
+    const TRANSITION = /^(przejscie|przejazd|spacer|powrot|wyjazd|zejscie|wejscie|dojazd|dojscie|obiad|lunch|kolacja|sniadanie|przerwa)[a-z ]*?\b(do|pod|na|w|we|z|ze|przez|przy|obok)\b/;
+    for (const day of plan.days || []) {
+      const items: any[] = day.items || [];
+      items.forEach((item: any, i: number) => {
+        if (typeof item.lat === 'number' && typeof item.lng === 'number') return;
+        const raw = String(item.name || '');
+        const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const m = norm.match(TRANSITION);
+        const target = m ? norm.slice((m.index ?? 0) + m[0].length) : norm;
+        const tStems = nameTokens(target).map((t) => t.slice(0, 5));
+        if (tStems.length > 0) {
+          const scored = pool
+            .map((x) => {
+              const xs = new Set(x.tokens.map((t) => t.slice(0, 5)));
+              const shared = tStems.filter((t) => xs.has(t)).length;
+              return { x, score: shared / tStems.length };
+            })
+            .filter((r) => r.score >= 0.6)
+            .sort((a, b) => b.score - a.score);
+          if (scored[0]) {
+            item.lat = scored[0].x.lat;
+            item.lng = scored[0].x.lng;
+            located++;
+            unlocated--;
+            return;
+          }
+        }
+        const prev = items.slice(0, i).reverse().find((x) => typeof x.lat === 'number');
+        const next = items.slice(i + 1).find((x) => typeof x.lat === 'number');
+        const anchor = prev && next
+          ? { lat: (prev.lat + next.lat) / 2, lng: (prev.lng + next.lng) / 2 }
+          : (prev || next);
+        if (anchor) {
+          item.lat = anchor.lat;
+          item.lng = anchor.lng;
+          // Punkt przybliżony — frontend może go rysować delikatniej.
+          item.approx = true;
+          located++;
+          unlocated--;
+        } else {
+          missing.push(raw);
+        }
+      });
     }
     console.log(`[plan-trip] Współrzędne: ${located} pozycji ma, ${unlocated} bez${
       missing.length ? ` (${missing.slice(0, 5).join(', ')})` : ''}`);

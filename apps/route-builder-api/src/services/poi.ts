@@ -176,6 +176,45 @@ const DEFAULT_RADIUS_KM: Record<string, number> = {
 const cache = new Map<string, { at: number; data: PoiCandidate[] }>();
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
+// Warstwa trwała cache'u w Postgresie. Cache tylko w pamięci znikał przy każdym
+// restarcie kontenera, a publiczne mirrory Overpass regularnie padają (429/504)
+// — po deployu pierwszy użytkownik każdego obszaru płacił pełny koszt albo
+// dostawał pustą listę. POI miast nie zmieniają się z tygodnia na tydzień,
+// więc rekord w bazie jest świeży miesiąc, a jako fallback przy awarii
+// Overpassa dobry bez limitu wieku.
+import { createClient } from '@supabase/supabase-js';
+const POI_DB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const poiDb = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL || 'http://localhost:54321', process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
+  : null;
+
+async function poiCacheRead(key: string): Promise<{ data: PoiCandidate[]; ageMs: number } | null> {
+  if (!poiDb) return null;
+  try {
+    const { data } = await poiDb.from('poi_cache').select('data, updated_at').eq('key', key).maybeSingle();
+    if (!data) return null;
+    return {
+      data: data.data as PoiCandidate[],
+      ageMs: Date.now() - new Date(data.updated_at as string).getTime()
+    };
+  } catch (err: any) {
+    console.warn(`[POI] poi_cache read failed: ${err.message}`);
+    return null;
+  }
+}
+
+function poiCacheWrite(key: string, data: PoiCandidate[]): void {
+  if (!poiDb) return;
+  poiDb
+    .from('poi_cache')
+    .upsert({ key, data, updated_at: new Date().toISOString() })
+    .then(({ error }) => {
+      if (error) console.warn(`[POI] poi_cache write failed: ${error.message}`);
+    });
+}
+
 function scoreElement(tags: Record<string, string>): number {
   let score = 0;
   if (tags.wikipedia || tags['wikipedia:pl']) score += 3;
@@ -265,6 +304,14 @@ export class PoiService {
       return cached.data.slice(0, limit);
     }
 
+    // Trwały cache: obszar zasiany kiedykolwiek w ciągu miesiąca nie dotyka
+    // Overpassa w ogóle. Przeterminowany rekord trzymamy pod ręką jako fallback.
+    const dbCached = await poiCacheRead(cacheKey);
+    if (dbCached && dbCached.ageMs < POI_DB_TTL_MS) {
+      cache.set(cacheKey, { at: Date.now(), data: dbCached.data });
+      return dbCached.data.slice(0, limit);
+    }
+
     // bbox wokół centrum: 1 stopień szerokości ≈ 111 km
     const dLat = radiusKm / 111;
     const dLng = radiusKm / (111 * Math.cos((center.lat * Math.PI) / 180));
@@ -310,6 +357,10 @@ export class PoiService {
       if (stale) {
         console.warn('[POI] Overpass unavailable — serving stale cached candidates.');
         return stale.data.slice(0, limit);
+      }
+      if (dbCached) {
+        console.warn('[POI] Overpass unavailable — serving stale poi_cache from DB.');
+        return dbCached.data.slice(0, limit);
       }
       console.error('[POI] Overpass unavailable and no cached candidates.');
       return [];
@@ -365,6 +416,7 @@ export class PoiService {
       console.warn(`[POI] Incomplete result (${candidates.length} POI) — not caching.`);
     } else {
       cache.set(cacheKey, { at: Date.now(), data: candidates });
+      poiCacheWrite(cacheKey, candidates);
     }
     return candidates.slice(0, limit);
   }
