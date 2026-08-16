@@ -53,3 +53,18 @@ select
 rollback to savepoint s4;
 
 rollback;
+
+\echo ''
+\echo '=== 7. RLS route_builder/atlas (audyt 16.08): obcy i anon widzą 0 ==='
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'obcy')::text, true) \gset ignore7_
+select count(*) as "cudze route_builder_projects (ma być 0)" from route_builder_projects where user_id <> :'obcy'::uuid;
+select count(*) as "route_builder_jobs (ma być 0)" from route_builder_jobs;
+select count(*) as "atlas_projects (ma być 0)" from atlas_projects;
+rollback;
+begin;
+set local role anon;
+select count(*) as "anon route_builder_projects (ma być 0)" from route_builder_projects;
+select count(*) as "anon atlas_artifacts (ma być 0)" from atlas_artifacts;
+rollback;
