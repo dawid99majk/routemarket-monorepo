@@ -2236,6 +2236,37 @@ app.post('/catalog/refresh-photos', async (c) => {
  * jednocześnie to najmocniejszy powód, żeby wrócić na stronę przed wyjazdem.
  * Szukamy z wyszukiwarką, bo bez niej model podałby wydarzenia sprzed dwóch lat.
  */
+/**
+ * Sprawdza, czy adres wydarzenia w ogóle istnieje.
+ *
+ * Model dostaje narzędzie wyszukiwania, a mimo to zwracał adresy wyglądające
+ * wiarygodnie i prowadzące donikąd: z sześciu sprawdzonych ręcznie działały dwa,
+ * reszta to 404 albo domena bez odpowiedzi. Link, który wygląda na zweryfikowany
+ * i prowadzi w pustkę, jest gorszy niż brak linku — dlatego zapisujemy wyłącznie
+ * te, które odpowiedziały.
+ *
+ * Najpierw HEAD, bo tani; część serwerów go nie obsługuje i odpowiada 405, więc
+ * wtedy próbujemy GET. Krótki limit czasu, bo to blokuje odświeżanie wydarzeń.
+ */
+async function adresIstnieje(url: string): Promise<boolean> {
+  if (!/^https?:\/\//i.test(url)) return false;
+  for (const metoda of ['HEAD', 'GET'] as const) {
+    try {
+      const odp = await fetch(url, {
+        method: metoda,
+        redirect: 'follow',
+        headers: { 'User-Agent': 'RouteMarketBot/1.0 (+https://routemarket.io)' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (odp.ok) return true;
+      if (odp.status !== 405 && odp.status !== 501) return false;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 app.post('/events/refresh', async (c) => {
   try {
     const { city, from, to } = await c.req.json() as { city: string; from?: string; to?: string };
@@ -2260,7 +2291,9 @@ Dla każdego zwróć:
 - "description": jedno zdanie, czego dotyczy
 - "starts_on": data w formacie RRRR-MM-DD
 - "ends_on": data zakończenia w formacie RRRR-MM-DD (jeśli jednodniowe, ta sama co starts_on)
-- "url": adres strony wydarzenia, jeśli znasz
+- "url": adres strony wydarzenia WYŁĄCZNIE z wyników wyszukiwania, dokładnie taki,
+  jaki tam widzisz. Nie układaj adresu samodzielnie ze wzoru ani nie zgaduj.
+  Jeśli w wynikach nie ma adresu tego wydarzenia, wpisz null.
 
 Zwróć od 3 do 12 wydarzeń. Odpowiedz WYŁĄCZNIE obiektem JSON: {"events": [...]}`;
 
@@ -2285,6 +2318,15 @@ Zwróć od 3 do 12 wydarzeń. Odpowiedz WYŁĄCZNIE obiektem JSON: {"events": [.
     const catalog = await repo.listCatalogByCity(city, 200);
     const saved: any[] = [];
 
+    let odrzuconeAdresy = 0;
+    const sprawdzonyAdres = async (url: unknown): Promise<string | null> => {
+      if (typeof url !== 'string' || !url.trim()) return null;
+      const czysty = url.trim().slice(0, 500);
+      if (await adresIstnieje(czysty)) return czysty;
+      odrzuconeAdresy++;
+      return null;
+    };
+
     for (const ev of events) {
       // Data bez formatu to data zmyślona — takie wpisy odrzucamy, bo wydarzenie
       // bez terminu nie ma żadnej wartości w planowaniu wyjazdu.
@@ -2306,7 +2348,7 @@ Zwróć od 3 do 12 wydarzeń. Odpowiedz WYŁĄCZNIE obiektem JSON: {"events": [.
           description: String(ev.description || '').slice(0, 500),
           starts_on: ev.starts_on,
           ends_on: ev.ends_on || ev.starts_on,
-          url: typeof ev.url === 'string' ? ev.url.slice(0, 500) : null
+          url: await sprawdzonyAdres(ev.url)
         });
         if (row) saved.push(row);
       } catch (err: any) {
@@ -2314,7 +2356,8 @@ Zwróć od 3 do 12 wydarzeń. Odpowiedz WYŁĄCZNIE obiektem JSON: {"events": [.
       }
     }
 
-    console.log(`[events] ${city}: zapisano ${saved.length} z ${events.length} znalezionych`);
+    console.log(`[events] ${city}: zapisano ${saved.length} z ${events.length} znalezionych`
+      + (odrzuconeAdresy ? `, odrzucono ${odrzuconeAdresy} nieistniejących adresów` : ''));
     return c.json({ city, saved: saved.length, events: saved });
   } catch (err: any) {
     console.error('[events/refresh] Error:', err);

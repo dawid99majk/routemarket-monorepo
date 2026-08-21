@@ -19,6 +19,7 @@ import { AXES, type RoutePreferenceValues } from '@/components/RoutePreferences'
 import OsPreferencji from '@/components/OsPreferencji';
 import PasekNarzedziTablicy, { type NarzedzieId } from '@/components/PasekNarzedziTablicy';
 import { apiPost } from '@/lib/api';
+import { zakresDat, wTerminie } from '@/lib/daty';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -461,6 +462,34 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    * i zaczyna oraz kończy tam każdy dzień.
    */
   const [lokalizowanie, setLokalizowanie] = useState(false);
+  const [pokazTermin, setPokazTermin] = useState(false);
+  const [terminOd, setTerminOd] = useState('');
+  const [terminDo, setTerminDo] = useState('');
+
+  /**
+   * Termin wyjazdu jest opcjonalny i taki zostaje — wyjazd bez dat działa
+   * normalnie, jako szkic. Dopiero gdy jest, zaczyna sterować resztą: godziny
+   * otwarcia liczą się dla właściwej pory roku, a wydarzenia w terminie idą
+   * na górę listy.
+   */
+  const zapiszTermin = async (od: string | null, doDnia: string | null) => {
+    if (!active) return;
+    const dni = od && doDnia
+      ? Math.round((new Date(doDnia).getTime() - new Date(od).getTime()) / 86_400_000) + 1
+      : null;
+    if (dni !== null && dni < 1) return toast.error('Koniec nie może być przed początkiem');
+
+    const patch: any = { start_date: od, end_date: doDnia };
+    // Liczba dni wynika z terminu — trzymanie dwóch niezależnych prawd o długości
+    // wyjazdu skończyłoby się planem na trzy dni w dwudniowym terminie.
+    if (dni !== null) patch.days = dni;
+
+    const { error } = await (supabase as any).from('trip_projects').update(patch).eq('id', active.id);
+    if (error) return toast.error(error.message);
+    setProjects((prev) => prev.map((x) => (x.id === active.id ? { ...x, ...patch } as any : x)));
+    setPokazTermin(false);
+    toast.success(od ? `Termin: ${zakresDat(od, doDnia)}` : 'Termin usunięty');
+  };
 
   /**
    * Położenie z urządzenia — to samo, co przycisk „Moje położenie" w Odkrywaj.
@@ -827,6 +856,61 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     } catch { /* licznik jest informacją, nie warunkiem pracy */ }
   };
   useEffect(() => { refreshTokens(); }, []);
+
+  /**
+   * Wydarzenie na tablicę. Dotąd panel wydarzeń tylko informował, że coś się dzieje,
+   * i nie dawało się z tym zrobić nic — a przecież festiwal w terminie wyjazdu jest
+   * dokładnie tym, wokół czego układa się dzień.
+   *
+   * Gdy wydarzenie ma dopasowane miejsce w katalogu, bierzemy stamtąd współrzędne
+   * i zdjęcie. Bez dopasowania wpis trafia bez punktu — świadomie, bo zmyślona
+   * pinezka jest gorsza niż jej brak; użytkownik może ją potem ustawić sam.
+   */
+  const wydarzenieNaTablice = async (ev: any) => {
+    if (!active) return;
+    if (places.some((p) => p.name === ev.name)) {
+      return toast.info('To wydarzenie jest już na tablicy');
+    }
+    const zKatalogu = ev.place_id
+      ? (await (supabase as any).from('place_catalog').select('*').eq('id', ev.place_id).maybeSingle()).data
+      : null;
+
+    const termin = zakresDat(ev.starts_on, ev.ends_on);
+    const { data, error } = await (supabase as any).from('trip_project_places').insert({
+      project_id: active.id,
+      catalog_id: ev.place_id ?? null,
+      name: ev.name,
+      category: 'event',
+      priority: 'nice',
+      lat: zKatalogu?.lat ?? null,
+      lng: zKatalogu?.lng ?? null,
+      description: [termin, ev.description].filter(Boolean).join(' · '),
+      image_url: zKatalogu?.photos?.[0] ?? null,
+      source: 'event',
+    }).select('*').single();
+
+    if (error) return toast.error(error.message);
+    setPlaces((prev) => [...prev, data]);
+    toast.success(zKatalogu
+      ? `Dodane do tablicy: ${ev.name}`
+      : `Dodane do tablicy: ${ev.name} — bez punktu na mapie, ustaw go na kartce`);
+  };
+
+  /**
+   * Wydarzenia z terminu wyjazdu na górze, reszta pod nimi.
+   *
+   * Reszty nie ukrywamy celowo: ktoś, kto zobaczy ciekawy festiwal dwa tygodnie
+   * po swoim terminie, może ten termin przesunąć — a nie zrobi tego, jeśli nigdy
+   * o nim nie usłyszy. Bez ustawionego terminu kolejność zostaje chronologiczna.
+   */
+  const wydarzeniaPodzielone = useMemo(() => {
+    const od = (active as any)?.start_date ?? null;
+    const doDnia = (active as any)?.end_date ?? null;
+    if (!od) return { wTerminieLista: [] as any[], pozostale: events };
+    const wTerminieLista = events.filter((e) => wTerminie(e.starts_on, e.ends_on, od, doDnia));
+    const pozostale = events.filter((e) => !wTerminie(e.starts_on, e.ends_on, od, doDnia));
+    return { wTerminieLista, pozostale };
+  }, [events, active]);
 
   const loadEvents = async (city: string) => {
     const today = new Date().toISOString().slice(0, 10);
@@ -1502,6 +1586,75 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               )}
             </div>
 
+            {/* Termin obok punktu startowego, bo to dwie odpowiedzi na to samo
+                pytanie: kiedy i skąd. Wcześniej termin dawało się wpisać tylko przy
+                zakładaniu wyjazdu i nigdzie potem nie było go widać ani jak dodać. */}
+            <div className="rounded-md border border-border bg-card px-4 py-3.5">
+              {(active as any).start_date ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <CalendarDays className="w-4 h-4 text-primary shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                      Termin
+                    </div>
+                    <div className="text-sm truncate">
+                      {zakresDat((active as any).start_date, (active as any).end_date)}
+                      {active.days ? ` · ${active.days} ${active.days === 1 ? 'dzień' : 'dni'}` : ''}
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                      setTerminOd((active as any).start_date ?? '');
+                      setTerminDo((active as any).end_date ?? '');
+                      setPokazTermin(true);
+                    }}
+                    className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+                    Zmień
+                  </button>
+                  <button onClick={() => zapiszTermin(null, null)}
+                    className="text-[13px] text-muted-foreground hover:text-destructive transition-colors">
+                    Usuń
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm">Kiedy jedziecie?</div>
+                    <div className="text-[13px] text-muted-foreground">
+                      Bez terminu wszystko działa — z terminem godziny otwarcia liczą się dla
+                      właściwej pory roku, a wydarzenia z Twoich dni idą na górę.
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setPokazTermin(true)}>
+                    Ustaw termin
+                  </Button>
+                </div>
+              )}
+
+              {pokazTermin && (
+                <div className="flex flex-wrap items-end gap-3 mt-3">
+                  <label className="text-[13px] text-muted-foreground">
+                    Od
+                    <Input type="date" value={terminOd} autoFocus
+                      onChange={(e) => setTerminOd(e.target.value)} className="mt-1" />
+                  </label>
+                  <label className="text-[13px] text-muted-foreground">
+                    Do
+                    <Input type="date" value={terminDo} min={terminOd || undefined}
+                      onChange={(e) => setTerminDo(e.target.value)} className="mt-1" />
+                  </label>
+                  <Button size="sm" disabled={!terminOd}
+                    onClick={() => zapiszTermin(terminOd, terminDo || terminOd)}
+                    className="bg-primary hover:bg-primary/90">
+                    Zapisz
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPokazTermin(false)}>
+                    Anuluj
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Pasek narzędzi w miejsce trzech luźnych kart i osobnego okna
                 preferencji. Kafel jest teraz zakładką: aktywny ma wypełnienie
                 i dziobek wskazujący panel, otwarte jest zawsze jedno narzędzie.
@@ -1834,7 +1987,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 {
                   id: 'wydarzenia' as const,
                   etykieta: 'Wydarzenia',
-                  meta: events.length ? `${events.length} w terminie` : 'Sprawdź termin',
+                  meta: (active as any).start_date && wydarzeniaPodzielone.wTerminieLista.length
+                    ? `${wydarzeniaPodzielone.wTerminieLista.length} w Twoim terminie`
+                    : events.length ? `${events.length} znalezionych` : 'Sprawdź wydarzenia',
                   tytul: events.length
                     ? `${events.length} wydarzeń w Twoim terminie`
                     : 'Brak wydarzeń w terminie',
@@ -1859,26 +2014,78 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       bo szybko się dezaktualizują.
                     </p>
                   ) : (
-                    <div className="divide-y max-h-64 overflow-y-auto">
-                      {events.map((ev) => (
-                        <div key={ev.id} className="px-4 py-2.5 flex items-start gap-3 text-sm">
-                          <span className="font-mono text-[11px] text-muted-foreground shrink-0 pt-0.5 w-[92px]">
-                            {ev.starts_on?.slice(5)}{ev.ends_on && ev.ends_on !== ev.starts_on ? `–${ev.ends_on.slice(5)}` : ''}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium leading-snug">{ev.name}</div>
-                            {ev.description && (
-                              <div className="text-xs text-muted-foreground leading-snug">{ev.description}</div>
-                            )}
-                          </div>
-                          {ev.url && (
-                            <a href={ev.url} target="_blank" rel="noreferrer"
-                              className="text-muted-foreground hover:text-primary shrink-0 mt-0.5" title="Strona wydarzenia">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
+                    <div className="divide-y max-h-[420px] overflow-y-auto">
+                      {wydarzeniaPodzielone.wTerminieLista.length > 0 && (
+                        <div className="px-4 py-1.5 bg-primary/5 font-narrow uppercase
+                                        tracking-[0.18em] text-[10px] text-primary">
+                          W Twoim terminie · {wydarzeniaPodzielone.wTerminieLista.length}
                         </div>
-                      ))}
+                      )}
+                      {[...wydarzeniaPodzielone.wTerminieLista,
+                        ...(wydarzeniaPodzielone.wTerminieLista.length > 0
+                          ? [{ __przerwa: true } as any] : []),
+                        ...wydarzeniaPodzielone.pozostale].map((ev) => {
+                        if (ev.__przerwa) {
+                          return (
+                            <div key="__przerwa"
+                              className="px-4 py-1.5 bg-muted/40 font-narrow uppercase
+                                         tracking-[0.18em] text-[10px] text-muted-foreground">
+                              Poza terminem — jeśli któreś Cię kusi, termin da się przesunąć
+                            </div>
+                          );
+                        }
+                        const juzNaTablicy = places.some((p) => p.name === ev.name);
+                        return (
+                          <div key={ev.id} className="px-4 py-3 text-sm">
+                            {/* Data nazwą miesiąca, nie wycinkiem zapisu ISO. „08-23–09-19"
+                                nie mówiło ani o roku, ani o tym, że to sierpień i wrzesień. */}
+                            <div className="font-mono text-[11px] tabular-nums flex items-center gap-1.5">
+                              {wTerminie(ev.starts_on, ev.ends_on,
+                                         (active as any)?.start_date ?? null,
+                                         (active as any)?.end_date ?? null) && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                              )}
+                              <span className="text-muted-foreground">
+                                {zakresDat(ev.starts_on, ev.ends_on)}
+                              </span>
+                            </div>
+                            <div className="font-medium leading-snug mt-0.5">{ev.name}</div>
+                            {ev.description && (
+                              <div className="text-xs text-muted-foreground leading-snug mt-0.5">
+                                {ev.description}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-3 mt-2">
+                              {/* Adres zapisujemy tylko po sprawdzeniu, że odpowiada, więc
+                                  jego brak znaczy „nie znaleźliśmy działającego" — wtedy
+                                  uczciwiej wysłać do wyszukiwarki niż pokazać martwy link. */}
+                              {ev.url ? (
+                                <a href={ev.url} target="_blank" rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-[12px] text-primary hover:underline">
+                                  <ExternalLink className="w-3.5 h-3.5" /> Strona wydarzenia
+                                </a>
+                              ) : (
+                                <a
+                                  href={`https://www.google.com/search?q=${encodeURIComponent(
+                                    `${ev.name} ${active.destination}`)}`}
+                                  target="_blank" rel="noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground">
+                                  <Search className="w-3.5 h-3.5" /> Poszukaj w sieci
+                                </a>
+                              )}
+                              <button
+                                onClick={() => wydarzenieNaTablice(ev)}
+                                disabled={juzNaTablicy}
+                                className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground
+                                           hover:text-primary transition-colors disabled:opacity-60
+                                           disabled:hover:text-muted-foreground">
+                                <Plus className="w-3.5 h-3.5" />
+                                {juzNaTablicy ? 'Jest na tablicy' : 'Dodaj do tablicy'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

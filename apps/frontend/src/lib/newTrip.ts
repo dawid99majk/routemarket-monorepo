@@ -54,11 +54,22 @@ export async function utworzWyjazd({ cel, klimat, termin }: ZamiarWyjazdu): Prom
   if (!userData.user) return null;
 
   const parsed = parseTermin(termin);
+  // parseTermin od początku zwracał datę startu, a tu brana była wyłącznie liczba
+  // dni — termin wpisany na pierwszym ekranie ginął bezpowrotnie i na tablicy nie
+  // było już czego pokazać ani czym sterować godzinami otwarcia.
+  const isoDnia = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const koniec = parsed
+    ? new Date(parsed.start.getTime() + (parsed.days - 1) * 86_400_000)
+    : null;
+
   const { data, error } = await supabase.from('trip_projects').insert({
     user_id: userData.user.id,
     name: `${cel.trim()} ${etykietaKlimatu(klimat).toLowerCase()}`,
     destination: cel.trim(),
     days: parsed?.days ?? null,
+    start_date: parsed ? isoDnia(parsed.start) : null,
+    end_date: koniec ? isoDnia(koniec) : null,
     trip_type: klimat,
     ...(TRIP_PRESETS.find((t) => t.id === klimat)?.axes ?? EMPTY_AXES),
   }).select('id').single();
