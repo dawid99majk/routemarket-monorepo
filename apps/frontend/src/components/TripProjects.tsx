@@ -1259,7 +1259,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     <div>
       {/* Nagłówek wyjazdu w układzie z projektu: nadtytuł, nazwa krojem
           nagłówkowym i wezwanie do ułożenia planu po prawej. */}
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
           <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
             {!active ? 'Plany wyjazdów' : view === 'plan' ? 'Plan wyjazdu' : 'Tablica wyjazdu'}
@@ -1271,58 +1271,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             <p className="text-sm text-muted-foreground mt-2">
               Zbieraj miejsca, kiedy tylko chcesz. Trasy ułożymy z nich później.
             </p>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Współdzielenie w nagłówku, bo to informacja o wyjeździe, a nie czynność.
-              Zarządzanie osobami zostaje niżej, przy polu z adresem. */}
-          {active && shares.length > 0 && (
-            <div className="hidden sm:flex items-center gap-2.5">
-              <div className="flex -space-x-2">
-                {shares.slice(0, 3).map((sh) => (
-                  <span key={sh.id} title={sh.shared_with_email}
-                    className="w-8 h-8 rounded-full bg-primary-light border-2 border-background
-                               flex items-center justify-center text-[11px] font-medium text-foreground">
-                    {sh.shared_with_email.slice(0, 2).toUpperCase()}
-                  </span>
-                ))}
-              </div>
-              <span className="text-[13px] text-muted-foreground">
-                {shares.length === 1
-                  ? `Współdzielona z ${shares[0].shared_with_email.split('@')[0]}`
-                  : `Współdzielona z ${shares.length} osobami`}
-              </span>
-            </div>
-          )}
-          <Button variant="outline" onClick={() => setCreating((v) => !v)}>
-            <Plus className="w-4 h-4 mr-1" /> Nowy plan
-          </Button>
-          {active && view === 'plan' && plan && savedPlans.length > 0 && (
-            <Button variant="outline" onClick={pokazWszystkiePlany}>
-              <CalendarDays className="w-4 h-4 mr-1.5" /> Wszystkie plany ({savedPlans.length})
-            </Button>
-          )}
-          {active && view === 'plan' && plan && (
-            <Button variant="outline" onClick={buildPlan} disabled={planning}>
-              {planning
-                ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Liczę…</>
-                : <><RefreshCw className="w-4 h-4 mr-1.5" /> Przelicz plan</>}
-            </Button>
-          )}
-          {/* Dodawanie miejsc jako stała akcja nagłówka. Wcześniej jedynym widocznym
-              wejściem był przycisk w pustym kubełku — znikał po dodaniu pierwszego
-              miejsca, więc dołożenie drugiego wymagało domyślenia się, że służy do
-              tego mała karta „Szukaj miejsc" pod kolumnami. */}
-          {active && view === 'tablica' && (
-            <Button variant="outline" onClick={() => navigate(`/odkrywaj?wyjazd=${active.id}`)}>
-              <Plus className="w-4 h-4 mr-1.5" /> Dodaj miejsca
-            </Button>
-          )}
-          {active && mustCount > 0 && view === 'tablica' && (
-            <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
-              className="bg-primary hover:bg-primary/90">
-              Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
-            </Button>
           )}
         </div>
       </div>
@@ -1387,18 +1335,75 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             z ujemnym marginesem ginął pod tytułem — trzeba go było szukać.
             Teraz jest przyciskiem z obwódką i liczbą pozostałych wyjazdów, czyli
             widać zarówno, że da się przełączyć, jak i na ile jest w co. */}
-        <button onClick={() => navigate('/plany')}
-          className="inline-flex items-center gap-2 self-start h-10 rounded-full
-                     bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm
-                     transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Wszystkie tablice
-          {projects.length > 1 && (
-            <span className="font-mono tabular-nums text-[11px] text-primary-foreground/70">
-              {projects.length}
-            </span>
-          )}
-        </button>
+        {/* Powrót i akcje w jednym rzędzie. Wcześniej akcje stały przy tytule,
+            piętro wyżej niż powrót — dwie linie przycisków jedna nad drugą
+            zamiast jednej, na której wszystko się równa. */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <button onClick={() => navigate('/plany')}
+            className="inline-flex items-center gap-2 h-10 rounded-full
+                       bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm
+                       transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Wszystkie tablice
+            {projects.length > 1 && (
+              <span className="font-mono tabular-nums text-[11px] text-primary-foreground/70">
+                {projects.length}
+              </span>
+            )}
+          </button>
+          <div className="flex items-center gap-4">
+            {/* Współdzielenie w nagłówku, bo to informacja o wyjeździe, a nie czynność.
+                Zarządzanie osobami zostaje niżej, przy polu z adresem. */}
+            {active && shares.length > 0 && (
+              <div className="hidden sm:flex items-center gap-2.5">
+                <div className="flex -space-x-2">
+                  {shares.slice(0, 3).map((sh) => (
+                    <span key={sh.id} title={sh.shared_with_email}
+                      className="w-8 h-8 rounded-full bg-primary-light border-2 border-background
+                                 flex items-center justify-center text-[11px] font-medium text-foreground">
+                      {sh.shared_with_email.slice(0, 2).toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-[13px] text-muted-foreground">
+                  {shares.length === 1
+                    ? `Współdzielona z ${shares[0].shared_with_email.split('@')[0]}`
+                    : `Współdzielona z ${shares.length} osobami`}
+                </span>
+              </div>
+            )}
+            <Button variant="outline" onClick={() => setCreating((v) => !v)}>
+              <Plus className="w-4 h-4 mr-1" /> Nowy plan
+            </Button>
+            {active && view === 'plan' && plan && savedPlans.length > 0 && (
+              <Button variant="outline" onClick={pokazWszystkiePlany}>
+                <CalendarDays className="w-4 h-4 mr-1.5" /> Wszystkie plany ({savedPlans.length})
+              </Button>
+            )}
+            {active && view === 'plan' && plan && (
+              <Button variant="outline" onClick={buildPlan} disabled={planning}>
+                {planning
+                  ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Liczę…</>
+                  : <><RefreshCw className="w-4 h-4 mr-1.5" /> Przelicz plan</>}
+              </Button>
+            )}
+            {/* Dodawanie miejsc jako stała akcja nagłówka. Wcześniej jedynym widocznym
+                wejściem był przycisk w pustym kubełku — znikał po dodaniu pierwszego
+                miejsca, więc dołożenie drugiego wymagało domyślenia się, że służy do
+                tego mała karta „Szukaj miejsc" pod kolumnami. */}
+            {active && view === 'tablica' && (
+              <Button variant="outline" onClick={() => navigate(`/odkrywaj?wyjazd=${active.id}`)}>
+                <Plus className="w-4 h-4 mr-1.5" /> Dodaj miejsca
+              </Button>
+            )}
+            {active && mustCount > 0 && view === 'tablica' && (
+              <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
+                className="bg-primary hover:bg-primary/90">
+                Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
+              </Button>
+            )}
+          </div>
+        </div>
 
         {active && (
           <>
@@ -1419,6 +1424,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     </div>
                     <div className="text-sm truncate">{(active as any).start_name}</div>
                   </div>
+                  {/* Przycisk położenia był tylko w gałęzi bez ustawionego startu,
+                      więc kto raz wpisał hotel, nie mógł go już podmienić na swoje
+                      położenie bez wcześniejszego kasowania punktu. */}
+                  <button onClick={startZUrzadzenia} disabled={lokalizowanie}
+                    className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground
+                               hover:text-primary transition-colors disabled:opacity-60">
+                    {lokalizowanie
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Szukam…</>
+                      : <><Crosshair className="w-3.5 h-3.5" /> Moje położenie</>}
+                  </button>
                   <button onClick={() => { setPokazStart(true); setStartQuery(''); }}
                     className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
                     Zmień
