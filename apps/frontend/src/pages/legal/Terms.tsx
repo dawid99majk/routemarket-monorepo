@@ -1,111 +1,171 @@
 import LegalLayout from '@/components/LegalLayout';
 
+/**
+ * Napisane pod planer, nie pod marketplace. Poprzednia wersja opisywała sprzedaż
+ * „Route Packages", prowizję 35%, wypłaty przez Stripe Connect i weryfikację
+ * tożsamości twórców — nic z tego nigdy nie istniało w tym produkcie i nie
+ * istnieje w bazie. Obowiązki, których nie da się wykonać, są gorsze niż ich brak.
+ */
 export default function Terms() {
   return (
     <LegalLayout docKey="terms">
       <h1>Terms of Service</h1>
-      <p className="text-sm text-muted-foreground">RouteMarket.io — Last updated: April 03, 2026</p>
+      <p className="text-sm text-muted-foreground">RouteMarket — last updated 18 August 2026</p>
 
-      <h2>1. Introduction and Acceptance</h2>
-      <p>Welcome to RouteMarket.io ("Platform", "we", "us", or "our"). These Terms of Service ("Terms") govern your access to and use of the RouteMarket.io website, services, and applications (collectively, the "Service").</p>
-      <p>RouteMarket.io is operated by Dawid Majka, with registered address at ul. Czeresniowa 67/2, Medlow, 55-020, Poland, contact email: contact@routemarket.io ("Operator").</p>
-      <p>By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, you must not access or use the Service.</p>
-      <p>We reserve the right to modify these Terms at any time. For material changes affecting your rights, we will provide at least 30 days' notice.</p>
+      <h2>1. Who we are</h2>
+      <p>
+        RouteMarket (the "Service") is operated by Dawid Majka, ul. Czereśniowa 67/2,
+        55-020 Medłów, Poland — referred to below as "we", "us" or "the Operator".
+        You can reach us at <a href="mailto:contact@routemarket.io">contact@routemarket.io</a>.
+      </p>
+      <p>
+        By creating an account or using the Service you accept these Terms. If you do not
+        accept them, please do not use the Service.
+      </p>
 
-      <h2>2. Definitions</h2>
-      <p><strong>"Creator"</strong> — a registered user who uploads, publishes, and sells Route Packages on the Platform.</p>
-      <p><strong>"Explorer"</strong> — a registered user who browses, purchases, and downloads Route Packages.</p>
-      <p><strong>"User"</strong> — any person who accesses or uses the Service.</p>
-      <p><strong>"Route Package"</strong> — a digital product listed on the Platform (GPX file and/or PDF guide).</p>
-      <p><strong>"Content"</strong> — any text, images, files, data, route information, reviews, or other materials uploaded through the Service.</p>
-      <p><strong>"Platform Fee"</strong> — the commission retained by RouteMarket.io, currently 35% of the sale price.</p>
-      <p><strong>"Digital Content"</strong> — data produced and supplied in digital form, as defined in Directive (EU) 2019/770.</p>
+      <h2>2. What the Service does</h2>
+      <p>
+        RouteMarket is a trip planning tool. You collect places you might want to visit onto
+        a board, sort them into "definitely", "maybe" and "no", and an automated assistant
+        arranges the ones you kept into a realistic day-by-day plan. Plans can be exported
+        as GPX files for use in other applications.
+      </p>
+      <p>
+        The Service is provided free of charge. Nothing is sold through it, no goods or
+        digital products are offered for sale, and no payment details are collected.
+      </p>
+      <p>
+        We may change, suspend or discontinue any part of the Service. Where a change
+        materially affects how you use it, we will give reasonable notice.
+      </p>
 
-      <h2>3. Eligibility and Account Registration</h2>
-      <h3>3.1 Eligibility</h3>
-      <p>You must be at least 18 years old to use the Service.</p>
-      <h3>3.2 Account Registration</h3>
-      <p>You agree to provide accurate, current, and complete information during registration and to keep your account information updated.</p>
-      <h3>3.3 Creator Verification (KYBC)</h3>
-      <p>In accordance with the Digital Services Act (EU) 2022/2065, Article 30, Creators must complete identity verification through Stripe Connect.</p>
+      <h2>3. Your account</h2>
+      <p>
+        You need an account to save boards and generate plans. Keep your password to
+        yourself — you are responsible for what happens through your account.
+      </p>
+      <p>
+        Provide accurate details when registering, and keep them current. You may close your
+        account at any time by writing to us; we will delete your content as described in
+        the <a href="/legal/privacy">Privacy Policy</a>.
+      </p>
+      <p>
+        The Service is not intended for children under 16. If you are under 16, please do
+        not create an account.
+      </p>
 
-      <h2>4. Description of the Service</h2>
-      <p>RouteMarket.io is a peer-to-peer marketplace connecting Creators of route-based digital content with Explorers. RouteMarket.io acts solely as an intermediary platform and is not a party to transactions between Creators and Explorers.</p>
+      <h2>4. Your content</h2>
+      <p>
+        Everything you add — board names, places, notes, plans — remains yours. We do not
+        claim ownership of it.
+      </p>
+      <p>
+        To run the Service we need permission to store your content, show it back to you,
+        and process it in order to build plans. By using the Service you grant us that
+        permission, limited to operating the Service and for as long as you keep the content
+        with us.
+      </p>
+      <p>
+        If you publish a board or a collection, you additionally allow other users to view it
+        and copy it into their own accounts. Publishing is always your explicit choice and
+        can be reversed at any time — although copies already made by others will remain in
+        their accounts, because they are their content from that moment on.
+      </p>
+      <p>
+        What you may and may not publish is set out in the{' '}
+        <a href="/legal/acceptable-use">Acceptable Use Policy</a>. Rules on material belonging
+        to someone else are in the <a href="/legal/copyright">Copyright Policy</a>.
+      </p>
 
-      <h2>5. Purchases, Payments, and Fees</h2>
-      <h3>5.1 Pricing and Currency</h3>
-      <p>Creators set prices. All prices are displayed in the Explorer's selected currency using real-time exchange rates.</p>
-      <h3>5.2 Payment Processing</h3>
-      <p>All payments are processed by Stripe, Inc. RouteMarket.io does not store full payment card details.</p>
-      <h3>5.3 Platform Fee and Creator Payouts</h3>
-      <p>RouteMarket.io retains 35%. The Creator receives 65%, paid out via Stripe Connect.</p>
-      <h3>5.4 VAT and Sales Tax</h3>
-      <p>RouteMarket.io handles VAT collection and remittance where required through the One-Stop Shop (OSS) mechanism.</p>
+      <h2>5. Tokens</h2>
+      <p>
+        Some operations that cost us real computing resources — generating a day plan,
+        calculating a walking route — consume tokens from your account balance.
+      </p>
+      <p>
+        Tokens are an internal usage allowance. They are granted by us, cannot be bought,
+        sold, transferred or exchanged for money, and have no monetary value. If your balance
+        runs out, the affected operations become unavailable until we grant more; the rest of
+        the Service keeps working.
+      </p>
 
-      <h2>6. Digital Content and Right of Withdrawal</h2>
-      <h3>6.1 Nature of Products</h3>
-      <p>Route Packages are Digital Content within Directive (EU) 2019/770.</p>
-      <h3>6.2 Waiver of Right of Withdrawal (EU Consumers)</h3>
-      <p>Under Article 16(m) of Directive 2011/83/EU, the right of withdrawal does not apply once download begins with your prior express consent.</p>
-      <h3>6.3 Conformity of Digital Content</h3>
-      <p>If a Route Package is defective or does not match its description, you are entitled to a remedy. See our <a href="/legal/refunds">Refund Policy</a>.</p>
+      <h2>6. What the Service is not</h2>
+      <p>
+        Plans are generated automatically from public data sources and from an AI language
+        model. They are suggestions, not verified travel advice.
+      </p>
+      <p>
+        Opening hours, admission rules, accessibility, safety conditions and the very
+        existence of a place can change or simply be wrong in our sources. Always verify
+        anything that matters — especially opening hours, bookings and local conditions —
+        before you rely on it.
+      </p>
+      <p>
+        Walking times and routes are estimates produced by routing software. They do not
+        account for closures, terrain difficulty, weather or your own pace and condition.
+        You are responsible for your own safety and for judging whether a route suits you.
+      </p>
 
-      <h2>7. Refunds and Complaints</h2>
-      <p>Our full <a href="/legal/refunds">Refund &amp; Returns Policy</a> forms an integral part of these Terms.</p>
+      <h2>7. Acceptable use</h2>
+      <p>You agree not to:</p>
       <ul>
-        <li>Refunds available for defective, non-conforming products or technical errors.</li>
-        <li>Duplicate charges are always refunded.</li>
-        <li>Complaints must be submitted within 14 calendar days of purchase.</li>
+        <li>use the Service in a way that breaks the law or infringes anyone's rights;</li>
+        <li>attempt to gain access to accounts, data or systems that are not yours;</li>
+        <li>disrupt the Service or place a disproportionate load on it, including by
+            automated scraping or mass requests;</li>
+        <li>publish content prohibited by the <a href="/legal/acceptable-use">Acceptable Use Policy</a>.</li>
       </ul>
-      <h3>7.1 Online Dispute Resolution (EU)</h3>
-      <p>EU consumers may use the ODR platform: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener noreferrer">https://ec.europa.eu/consumers/odr/</a></p>
+      <p>
+        If you break these rules we may limit or close your account. Where it is reasonable
+        to do so, we will tell you why first and give you a chance to respond.
+      </p>
 
-      <h2>8. Intellectual Property</h2>
-      <h3>8.1 Platform IP</h3>
-      <p>The Service is owned by or licensed to RouteMarket.io.</p>
-      <h3>8.2 Creator Content</h3>
-      <p>Creators retain full ownership. By uploading, Creators grant RouteMarket.io a non-exclusive license to display and promote Content for operating the Platform.</p>
-      <h3>8.3 Explorer License</h3>
-      <p>Explorers receive a non-exclusive, non-transferable, personal license for private, non-commercial use.</p>
-      <h3>8.4 Copyright Infringement (DMCA / DSA)</h3>
-      <p>We process notices in accordance with DSA Article 16 and the US DMCA (17 U.S.C. § 512).</p>
+      <h2>8. Availability and liability</h2>
+      <p>
+        The Service is provided as it is. We work to keep it running and accurate, but we do
+        not promise it will be uninterrupted, error-free, or that its suggestions will suit
+        your circumstances.
+      </p>
+      <p>
+        We are liable for damage caused intentionally or by gross negligence, and for harm to
+        life, body or health, in each case as required by applicable law. Beyond that, and to
+        the extent the law allows, our liability is excluded — in particular for indirect
+        damage, lost profits, and consequences of relying on automatically generated plans
+        without verifying them.
+      </p>
+      <p>
+        Nothing in these Terms limits rights that consumer law grants you and that cannot be
+        limited by agreement.
+      </p>
 
-      <h2>9. User Conduct and Acceptable Use</h2>
-      <p>You agree not to upload illegal, harmful, or infringing Content; engage in fraud; or circumvent security measures.</p>
+      <h2>9. Complaints</h2>
+      <p>
+        If something does not work as described, write to{' '}
+        <a href="mailto:contact@routemarket.io">contact@routemarket.io</a>. Tell us what you
+        expected, what happened instead, and which account it concerns. We aim to reply within
+        14 days.
+      </p>
+      <p>
+        Consumers in the European Union may also use the European Commission's online dispute
+        resolution platform at{' '}
+        <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer">
+          ec.europa.eu/consumers/odr
+        </a>.
+      </p>
 
-      <h2>10. Content Moderation (DSA Compliance)</h2>
-      <p>Users may report Content via contact@routemarket.io. We will review and respond with a clear statement of reasons (DSA Art. 17). Users may lodge complaints within 6 months of a moderation decision (DSA Art. 20).</p>
+      <h2>10. Changes to these Terms</h2>
+      <p>
+        We may update these Terms — for example when the Service itself changes. We will
+        publish the new version here with a new date, and for changes that materially affect
+        your rights we will notify registered users at least 14 days in advance. Continuing to
+        use the Service after that means you accept the new version.
+      </p>
 
-      <h2>11. Disclaimer of Warranties and Safety</h2>
-      <p><strong>IMPORTANT:</strong> Route Packages are not verified by RouteMarket.io for accuracy, safety, or legality. You use them at your own risk.</p>
-      <p>THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND. This does not affect your statutory consumer rights.</p>
-
-      <h2>12. Limitation of Liability</h2>
-      <p>RouteMarket.io's total liability shall not exceed the greater of: (a) amount paid in the preceding 12 months, or (b) EUR 100. Nothing excludes liability for death, personal injury, or fraud.</p>
-
-      <h2>13. Indemnification</h2>
-      <p>You agree to indemnify RouteMarket.io from claims arising from your use of the Service, violation of these Terms, or violation of third party rights.</p>
-
-      <h2>14. Termination</h2>
-      <p>You may terminate your account at any time. Previously purchased Route Packages remain accessible for 30 days after termination.</p>
-
-      <h2>15. Governing Law and Jurisdiction</h2>
-      <h3>15.1 EU/EEA Users</h3>
-      <p>Governed by the laws of Poland. EU consumers also benefit from mandatory provisions of their country of residence.</p>
-      <h3>15.2 UK Users</h3>
-      <p>Governed by the laws of England and Wales.</p>
-      <h3>15.3 US Users</h3>
-      <p>Governed by the laws of Delaware. Disputes resolved through binding arbitration (opt-out within 30 days).</p>
-      <h3>15.4 All Other Users</h3>
-      <p>Governed by the laws of Poland.</p>
-
-      <h2>16. Miscellaneous</h2>
-      <p>Severability, entire agreement, assignment restrictions, and no-waiver provisions apply. These Terms together with the Privacy Policy, Cookie Policy, Refund Policy, and other policies constitute the entire agreement.</p>
-
-      <h2>Contact</h2>
-      <p>Email: <a href="mailto:contact@routemarket.io">contact@routemarket.io</a><br />
-      Operator: Dawid Majka<br />
-      Address: ul. Czeresniowa 67/2, Medlow, 55-020, Poland</p>
+      <h2>11. Governing law</h2>
+      <p>
+        These Terms are governed by Polish law. This does not deprive consumers of the
+        protection of mandatory provisions of the law of their country of habitual residence.
+      </p>
     </LegalLayout>
   );
 }

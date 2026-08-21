@@ -70,14 +70,14 @@ const AdminUsers = leniwie(() => import("./pages/admin/AdminUsers"));
 const AdminAtlas = leniwie(() => import("./pages/admin/AdminAtlas"));
 const GuideHub = leniwie(() => import("./components/GuideHub"));
 const NavigationLauncher = leniwie(() => import("./components/NavigationLauncher"));
+const NowaWersja = leniwie(() => import("./components/NowaWersja"));
+const ZgodaCookies = leniwie(() => import("./components/ZgodaCookies"));
 const Terms = leniwie(() => import("./pages/legal/Terms"));
 const Privacy = leniwie(() => import("./pages/legal/Privacy"));
 const Cookies = leniwie(() => import("./pages/legal/Cookies"));
-const Refunds = leniwie(() => import("./pages/legal/Refunds"));
 const Documents = leniwie(() => import("./pages/legal/Documents"));
 const AcceptableUse = leniwie(() => import("./pages/legal/AcceptableUse"));
 const Copyright = leniwie(() => import("./pages/legal/Copyright"));
-const DSACompliance = leniwie(() => import("./pages/legal/DSACompliance"));
 
 const queryClient = new QueryClient();
 
@@ -99,6 +99,11 @@ const App = () => (
               <Suspense fallback={null}>
                 <GuideHub />
                 <NavigationLauncher />
+                {/* Karta otwarta przed wdrożeniem nie pobiera już index.html — router
+                    obsługuje nawigację po stronie przeglądarki, więc stary interfejs
+                    potrafi wisieć godzinami mimo świeżego kodu na serwerze. */}
+                <NowaWersja />
+                <ZgodaCookies />
               </Suspense>
               <Suspense fallback={null}>
                 <Routes>
@@ -111,11 +116,14 @@ const App = () => (
                   <Route path="/legal/terms" element={<Terms />} />
                   <Route path="/legal/privacy" element={<Privacy />} />
                   <Route path="/legal/cookies" element={<Cookies />} />
-                  <Route path="/legal/refunds" element={<Refunds />} />
                   <Route path="/legal/documents" element={<Documents />} />
+                  {/* Zwroty i osobna strona DSA opisywały marketplace, którego nie ma.
+                      Adresy zostają jako przekierowania — mogą wisieć w wyszukiwarkach. */}
+                  <Route path="/legal/refunds" element={<Navigate to="/legal/terms" replace />} />
+                  <Route path="/legal/dsa-compliance" element={<Navigate to="/legal/acceptable-use" replace />} />
+                  <Route path="/legal/creator-agreement" element={<Navigate to="/legal/terms" replace />} />
                   <Route path="/legal/acceptable-use" element={<AcceptableUse />} />
                   <Route path="/legal/copyright" element={<Copyright />} />
-                  <Route path="/legal/dsa-compliance" element={<DSACompliance />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/brand" element={<Brand />} />
 

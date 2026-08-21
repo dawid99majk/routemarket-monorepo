@@ -8,26 +8,13 @@ export interface LegalDocMeta {
 
 // Static fallback for SSR / offline
 export const LEGAL_DOCS: Record<string, LegalDocMeta> = {
-  terms: {
-    version: '1.0.0',
-    publishedAt: '2026-03-22',
-    contentHash: 'sha256-terms-v1-a3b2c1',
-  },
-  privacy: {
-    version: '1.0.0',
-    publishedAt: '2026-03-22',
-    contentHash: 'sha256-privacy-v1-d4e5f6',
-  },
-  cookies: {
-    version: '1.0.0',
-    publishedAt: '2026-03-22',
-    contentHash: 'sha256-cookies-v1-g7h8i9',
-  },
-  refunds: {
-    version: '1.0.0',
-    publishedAt: '2026-03-22',
-    contentHash: 'sha256-refunds-v1-j0k1l2',
-  },
+  // Wersja 2.0.0: dokumenty przepisane z marketplace'u na planer. Poprzednie
+  // opisywały sprzedaż tras, prowizję i wypłaty — rzeczy, których nigdy tu nie było.
+  terms: { version: '2.0.0', publishedAt: '2026-08-18', contentHash: 'sha256-terms-v2' },
+  privacy: { version: '2.0.0', publishedAt: '2026-08-18', contentHash: 'sha256-privacy-v2' },
+  cookies: { version: '2.0.0', publishedAt: '2026-08-18', contentHash: 'sha256-cookies-v2' },
+  'acceptable-use': { version: '2.0.0', publishedAt: '2026-08-18', contentHash: 'sha256-aup-v2' },
+  copyright: { version: '2.0.0', publishedAt: '2026-08-18', contentHash: 'sha256-copyright-v2' },
 };
 
 /** Fetch latest legal document versions from the database */

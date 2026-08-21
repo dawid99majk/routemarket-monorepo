@@ -44,8 +44,8 @@ export default function Footer() {
               <Link to="/legal/cookies" className="hover:text-foreground transition-colors">
                 {t('legal.cookies')}
               </Link>
-              <Link to="/legal/refunds" className="hover:text-foreground transition-colors">
-                {t('legal.refunds')}
+              <Link to="/legal/acceptable-use" className="hover:text-foreground transition-colors">
+                Acceptable use
               </Link>
               <Link to="/legal/documents" className="hover:text-foreground transition-colors">
                 Documents
