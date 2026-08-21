@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,7 +88,8 @@ const NAWIGACJA = [
 ];
 
 interface Tablica {
-  id: string; name: string; author_display: string | null; copy_count: number; place_count: number;
+  id: string; name: string; destination: string | null; author_display: string | null;
+  copy_count: number; like_count: number | null; place_count: number; photos?: string[];
 }
 
 export default function Index() {
@@ -102,12 +103,13 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('trip_projects')
-        .select('id, name, author_display, copy_count')
-        .eq('is_public', true).order('copy_count', { ascending: false }).limit(3);
+        .select('id, name, destination, author_display, copy_count, like_count')
+        .eq('is_public', true).limit(12);
       if (!data?.length) return setTablice([]);
       const { data: miejsca } = await supabase.from('trip_project_places')
         .select('project_id, image_url').in('project_id', data.map((b: any) => b.id));
-      setTablice(data.map((b: any) => {
+      const popularnosc = (b: any) => (b.like_count ?? 0) + (b.copy_count ?? 0) * 2;
+      setTablice([...data].sort((a: any, b: any) => popularnosc(b) - popularnosc(a)).map((b: any) => {
         const swoje = (miejsca ?? []).filter((m: any) => m.project_id === b.id);
         return {
           ...b,
@@ -374,22 +376,34 @@ export default function Index() {
                 pasuje. Twoje tablice możesz współdzielić z osobą, z którą jedziesz.
               </p>
             </div>
-            <Button variant="outline" onClick={() => navigate(user ? '/start' : '/auth')}>
-              Przeglądaj tablice
+            <Button variant="outline" onClick={() => navigate('/tablice')}>
+              Przeglądaj wszystkie
             </Button>
           </div>
 
-          <div className="mt-10 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))]">
-            {tablice.map((t) => (
-              <TablicaKafelek
-                key={t.id}
-                nazwa={t.name}
-                meta={`${t.place_count} miejsc${t.copy_count > 0 ? ` · ${t.copy_count} kopii` : ''}`}
-                zdjecia={t.photos ?? []}
-                autor={t.author_display || 'Podróżnik'}
-                onClick={() => navigate(user ? '/start' : '/auth')}
-              />
-            ))}
+          <div className="mt-10 -mx-10 px-10 overflow-x-auto
+                          [scrollbar-width:thin] snap-x snap-mandatory">
+            <div className="flex gap-5 pb-2">
+              {tablice.map((t) => (
+                <div key={t.id} className="w-[290px] shrink-0 snap-start">
+                  <TablicaKafelek
+                    nazwa={t.name}
+                    meta={[t.destination, `${t.place_count} miejsc`].filter(Boolean).join(' · ')}
+                    zdjecia={t.photos ?? []}
+                    autor={t.author_display || 'Podróżnik'}
+                    odznaka={
+                      (t.like_count ?? 0) > 0 || (t.copy_count ?? 0) > 0 ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-muted
+                                         px-2 py-0.5 text-[11px] font-mono tabular-nums text-muted-foreground">
+                          <Heart className="w-3 h-3" /> {t.like_count ?? 0}
+                        </span>
+                      ) : undefined
+                    }
+                    onClick={() => navigate(`/tablica/${t.id}`)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}

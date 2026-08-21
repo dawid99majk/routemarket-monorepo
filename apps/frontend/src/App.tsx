@@ -50,6 +50,8 @@ const Discover = leniwie(() => import("./pages/Discover"));
 const Favorites = leniwie(() => import("./pages/Favorites"));
 const Collections = leniwie(() => import("./pages/Collections"));
 const Zapisane = leniwie(() => import("./pages/Zapisane"));
+const Tablice = leniwie(() => import("./pages/Tablice"));
+const TablicaPubliczna = leniwie(() => import("./pages/TablicaPubliczna"));
 const TripPlans = leniwie(() => import("./pages/TripPlans"));
 const RouteBuilderV2 = leniwie(() => import("./pages/v2/RouteBuilderV2"));
 
@@ -129,6 +131,10 @@ const App = () => (
 
                   {/* Authenticated routes */}
                   <Route path="/zapisane" element={<ProtectedRoute><Zapisane /></ProtectedRoute>} />
+                  {/* Publiczne tablice bez logowania — to jedyna droga, żeby
+                      opublikowana tablica mogła kogokolwiek z zewnątrz zaprosić. */}
+                  <Route path="/tablice" element={<Tablice />} />
+                  <Route path="/tablica/:id" element={<TablicaPubliczna />} />
                   {/* Ulubione i kolekcje były osobnymi ekranami dla tej samej intencji.
                       Stare adresy zostają jako przekierowania — mogą wisieć w zakładkach
                       przeglądarki albo w wysłanych odnośnikach. */}
