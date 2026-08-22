@@ -1,22 +1,20 @@
+# Do zaindeksowania jest tu jedno: publiczne tablice i miejsca z katalogu.
+# Reszta to widoki zalogowanego użytkownika — robot dostaje w nich pustą powłokę
+# aplikacji, więc zabieranie na nie limitu indeksowania nie ma sensu.
+
 User-agent: *
 Allow: /
+Allow: /tablica/
+Allow: /miejsce/
+Allow: /tablice
 
 Disallow: /admin/
 Disallow: /auth
-Disallow: /auth/callback
-Disallow: /auth/error
 Disallow: /profile
-Disallow: /my-routes
-Disallow: /my-purchases
-Disallow: /favorites
-Disallow: /creator-dashboard
-Disallow: /creator-routes
-Disallow: /creator-earnings
-Disallow: /creator-stats
-Disallow: /create
-Disallow: /edit-route/
-Disallow: /payment-success
-Disallow: /messages
+Disallow: /start
+Disallow: /odkrywaj
+Disallow: /plany
+Disallow: /zapisane
+Disallow: /kolekcje
 
 Sitemap: https://routemarket.io/sitemap.xml
-Sitemap: https://yzisjpkesqwwzonvlfzb.supabase.co/functions/v1/sitemap

@@ -111,6 +111,52 @@ export class RouteBuilderRepository {
     return data ?? [];
   }
 
+  /**
+   * Dane na wizytówkę publicznej tablicy. Zwraca null także wtedy, gdy tablica
+   * istnieje, ale nie jest publiczna — robot nie ma prawa zobaczyć jej tytułu
+   * bardziej niż jej treści.
+   */
+  async publicBoardCard(id: string): Promise<any | null> {
+    const { data: b } = await supabase
+      .from('trip_projects')
+      .select('id, name, destination, days, author_display, is_public')
+      .eq('id', id).eq('is_public', true).maybeSingle();
+    if (!b) return null;
+
+    const { data: places } = await supabase
+      .from('trip_project_places')
+      .select('name, image_url, priority')
+      .eq('project_id', id)
+      .order('sort_order', { ascending: true });
+
+    const lista = places ?? [];
+    return {
+      ...b,
+      place_count: lista.length,
+      // Nazwy z kubełka „na pewno": to one opisują tablicę, a nie odrzucone pomysły.
+      sample_names: lista.filter((p: any) => p.priority === 'must').map((p: any) => p.name).slice(0, 6),
+      photo: lista.find((p: any) => p.image_url)?.image_url ?? null,
+    };
+  }
+
+  /** Dane na wizytówkę miejsca z katalogu. */
+  async catalogCardBySlug(slug: string): Promise<any | null> {
+    const { data } = await supabase
+      .from('place_catalog')
+      .select('slug, name, city, country, lat, lng, description, wiki_extract, photos')
+      .eq('slug', slug).maybeSingle();
+    return data ?? null;
+  }
+
+  /** Adresy do mapy strony: publiczne tablice i wszystkie miejsca katalogu. */
+  async sitemapEntries(): Promise<{ boards: any[]; places: any[] }> {
+    const [{ data: boards }, { data: places }] = await Promise.all([
+      supabase.from('trip_projects').select('id, updated_at').eq('is_public', true),
+      supabase.from('place_catalog').select('slug, updated_at').limit(5000),
+    ]);
+    return { boards: boards ?? [], places: places ?? [] };
+  }
+
   async listCatalogByCity(city: string, limit = 40): Promise<any[]> {
     const { data } = await supabase
       .from('place_catalog').select('*')

@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { RouteRequirementsSchema } from './types/index.js';
 import { repo } from './db/repository.js';
 import { geocodingService } from './services/geocoding.js';
+import { wizytowkaTablicy, wizytowkaMiejsca, stronaZWizytowka } from './services/wizytowki.js';
 import { routingService } from './services/routing.js';
 import { gpxService } from './services/gpx.js';
 import { reportService } from './services/report.js';
@@ -1482,6 +1483,66 @@ function kategoriaZRodzaju(kind: string | null | undefined): string {
   if (/^(hotel|hostel|guest_house|apartment)$/.test(kind)) return 'hotel';
   return 'attraction';
 }
+
+/**
+ * Strony z prawdziwymi znacznikami dla robotów i podglądów odnośników.
+ *
+ * Te trzy adresy nginx kieruje tutaj zamiast wprost do kontenera frontu. Zwracamy
+ * ten sam index.html, który dostałaby przeglądarka — więc aplikacja startuje
+ * normalnie — tylko z podmienionym tytułem, opisem i obrazkiem. Bez tego każdy
+ * odnośnik do tablicy czy miejsca wyglądał w udostępnianiu identycznie jak strona
+ * główna, a dla wyszukiwarek był jej duplikatem.
+ */
+app.get('/tablica/:id', async (c) => {
+  try {
+    const w = await wizytowkaTablicy(c.req.param('id'));
+    return c.html(await stronaZWizytowka(w));
+  } catch (err: any) {
+    console.warn('[wizytowka/tablica]', err.message);
+    return c.html(await stronaZWizytowka(null));
+  }
+});
+
+app.get('/miejsce/:slug', async (c) => {
+  try {
+    const w = await wizytowkaMiejsca(c.req.param('slug'));
+    return c.html(await stronaZWizytowka(w));
+  } catch (err: any) {
+    console.warn('[wizytowka/miejsce]', err.message);
+    return c.html(await stronaZWizytowka(null));
+  }
+});
+
+/**
+ * Mapa strony budowana z bazy. Poprzednia była plikiem statycznym z kwietnia,
+ * wymieniała siedemdziesiąt adresów i ani jednej publicznej tablicy ani miejsca
+ * z katalogu — czyli pomijała całą treść, która ma się w ogóle znaleźć.
+ */
+app.get('/sitemap.xml', async (c) => {
+  try {
+    const { boards, places } = await repo.sitemapEntries();
+    const dzien = (d: any) => (d ? String(d).slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const wpis = (loc: string, lastmod: string, prio: string) =>
+      `  <url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><priority>${prio}</priority></url>`;
+
+    const wiersze = [
+      wpis('https://routemarket.io/', dzien(null), '1.0'),
+      wpis('https://routemarket.io/tablice', dzien(null), '0.9'),
+      ...boards.map((b: any) => wpis(`https://routemarket.io/tablica/${b.id}`, dzien(b.updated_at), '0.8')),
+      ...places.map((p: any) => wpis(`https://routemarket.io/miejsce/${p.slug}`, dzien(p.updated_at), '0.6')),
+    ];
+
+    c.header('Content-Type', 'application/xml; charset=utf-8');
+    c.header('Cache-Control', 'public, max-age=3600');
+    return c.body(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${wiersze.join('\n')}
+</urlset>`);
+  } catch (err: any) {
+    console.error('[sitemap]', err.message);
+    return c.text('', 500);
+  }
+});
 
 app.post('/catalog/seed', async (c) => {
   try {
