@@ -685,6 +685,8 @@ app.post('/plan-trip', async (c) => {
     // miejsce i oczekiwać, że resztę dnia agent zaproponuje sam. Bez puli
     // kandydatów planer nie miałby czym wypełnić czasu poza "spacerem".
     let fillerPois: PoiCandidate[] = [];
+    let fillerSights: PoiCandidate[] = [];
+    let fillerFood: PoiCandidate[] = [];
     // Środek miasta przydaje się jeszcze raz niżej, przy sprawdzaniu współrzędnych
     // od modelu, więc żyje poza tym blokiem.
     let center: { lat: number; lng: number } | null = null;
@@ -695,15 +697,23 @@ app.post('/plan-trip', async (c) => {
         poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 15 }).catch(() => [])
       ]);
       const pinnedNames = new Set(body.places.map((p) => p.name.toLowerCase()));
-      fillerPois = [...sights, ...food].filter((c) => !pinnedNames.has(c.name.toLowerCase()));
-      console.log(`[plan-trip] ${fillerPois.length} propozycji do wypełnienia dnia`);
+      const nieprzypiete = (c: any) => !pinnedNames.has(c.name.toLowerCase());
+      // Rozdzielone, bo w prompcie pełnią różne role: zabytkami wypełnia się dzień,
+      // a lokalami obsadza konkretne godziny posiłków. Zlane w jedną listę model
+      // traktował jednakowo i zostawiał "Kolacja" jako pustą pozycję bez miejsca.
+      fillerSights = sights.filter(nieprzypiete);
+      fillerFood = food.filter(nieprzypiete);
+      fillerPois = [...fillerSights, ...fillerFood];
+      console.log(`[plan-trip] ${fillerSights.length} propozycji do zwiedzania, `
+        + `${fillerFood.length} lokali na posiłki`);
     } catch (err) {
       console.warn('[plan-trip] Nie udało się pobrać propozycji:', err);
     }
 
-    const fillerLines = fillerPois.slice(0, 35)
-      .map((c) => `- "${c.name}" (${c.kind}${c.openingHours ? `, godziny: ${c.openingHours}` : ''})`)
-      .join('\n');
+    const opisPoi = (c: any) =>
+      `- "${c.name}" (${c.kind}${c.openingHours ? `, godziny: ${c.openingHours}` : ''})`;
+    const fillerLines = fillerSights.slice(0, 30).map(opisPoi).join('\n');
+    const foodLines = fillerFood.slice(0, 15).map(opisPoi).join('\n');
 
     const prefOpisy = opiszPreferencje(body.creator_preferences);
     const prefLines = prefOpisy.map((o) => `- ${o}`).join('\n');
@@ -729,6 +739,9 @@ ${fillerLines ? `ZWERYFIKOWANE MIEJSCA W TYM MIEŚCIE, KTÓRYCH UŻYTKOWNIK NIE 
 (możesz i POWINIENEŚ nimi wypełnić resztę dnia — kopiuj nazwy dokładnie):
 ${fillerLines}` : ''}
 
+${foodLines ? `LOKALE NA POSIŁKI W TYM MIEŚCIE (kopiuj nazwy dokładnie):
+${foodLines}` : ''}
+
 BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a całe okno to ${Math.round(budget / 60)} h.
 
 ${clusterHint}
@@ -744,10 +757,17 @@ ZASADY:
 5. KRÓTSZA WIZYTA ZAMIAST REZYGNACJI. Jeśli miejsce jest otwarte, ale zostało mniej czasu, niż wynosi pełne zwiedzanie, ZAPLANUJ JE NA TYLE, ILE ZOSTAŁO, i napisz to wprost w "note", np. "zamykają o 18:00 — masz 60 z 90 min, wejdź od razu". Turysta sam zdecyduje, czy mu to wystarczy. Do "not_scheduled" trafia tylko to, co jest ZAMKNIĘTE danego dnia albo czego naprawdę nie da się wcisnąć.
 6. TABLICA TO INSPIRACJA, NIE RAMA. Użytkownik mógł przypiąć jedno miejsce i oczekuje, że resztę dnia ZAPROPONUJESZ TY. Wypełnij wolny czas konkretnymi miejscami z listy powyżej, dobranymi do jego preferencji i leżącymi blisko kotwic tego dnia. W polu "source" wpisz "pinned" dla miejsc przypiętych przez użytkownika i "suggested" dla Twoich propozycji, żeby wiedział, co jest czyje.
    Gdy w okolicy naprawdę nie ma czego dodać, dopiero wtedy zaproponuj nazwany spacer ("spacer po Starym Mieście: Rynek, Katharinenstraße"). Samo "czas wolny" jest zawsze błędem.
-7. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
+7. POSIŁEK TO MIEJSCE, NIE GODZINA. Jeśli w stałych punktach dnia jest obiad albo kolacja,
+   wstaw w tym czasie KONKRETNY LOKAL z listy powyżej i jego nazwę wpisz w "name" — wybierz
+   taki, który leży blisko punktu, w którym użytkownik akurat wtedy będzie, a nie najlepszy
+   w mieście. Sama "Kolacja" bez nazwy lokalu jest pustą pozycją: nie da się jej pokazać na
+   mapie, dodać do trasy ani sprawdzić godzin otwarcia. Gdy w okolicy naprawdę nie ma nic
+   z listy, napisz w "note", w której dzielnicy szukać, zamiast zostawiać samo słowo.
+   Uwzględnij preferencje użytkownika co do jedzenia, jeśli je podano.
+8. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
    "not_scheduled" DOTYCZY WYŁĄCZNIE MIEJSC Z TABLICY UŻYTKOWNIKA. Twoich niewykorzystanych propozycji NIE WYPISUJ TAM — użytkownik ich nie wybierał i nie interesuje go, że nie weszły. Lista propozycji to Twoja pula do wypełniania dnia, nie zobowiązanie.
-8. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
-9. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
+9. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
+10. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
 
 ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
 
