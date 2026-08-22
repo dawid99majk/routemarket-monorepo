@@ -66,10 +66,16 @@ export default function Terms() {
         with us.
       </p>
       <p>
-        If you publish a board or a collection, you additionally allow other users to view it
-        and copy it into their own accounts. Publishing is always your explicit choice and
-        can be reversed at any time — although copies already made by others will remain in
-        their accounts, because they are their content from that moment on.
+        If you publish a board or a collection, it becomes readable by anyone who has the
+        link — including people without an account, and including search engines. Publishing
+        also makes visible the display name you sign it with. Copying it into an account, or
+        marking it as liked, requires being signed in.
+      </p>
+      <p>
+        Publishing is always your explicit choice and can be reversed at any time. Withdrawing
+        it stops further access, but copies already made by others remain in their accounts,
+        because they are their content from that moment on. A page that was public may also
+        persist for a while in search engine caches, which we do not control.
       </p>
       <p>
         What you may and may not publish is set out in the{' '}

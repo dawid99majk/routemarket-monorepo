@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
@@ -29,9 +28,9 @@ type Porzadek = typeof PORZADKI[number]['id'];
  * dyndał na tablicy — ale nie było ani jednej trasy, która by tu prowadziła.
  * Funkcja bez odbiorcy: dawało się opublikować, nie dawało się znaleźć.
  *
- * Lista jest pusta dla niezalogowanych i to nie jest usterka: polityki obejmują
- * rolę authenticated, bo przełącznik publikacji obiecuje autorowi widoczność dla
- * osób z kontem, nie dla całego internetu.
+ * Galeria działa bez konta — polityki odczytu obejmują rolę anon, więc opublikowana
+ * tablica może zaprosić kogoś z zewnątrz. Konto potrzebne jest dopiero, żeby coś
+ * z nią zrobić: polubić albo skopiować do siebie.
  *
  * Popularność liczymy jako polubienia plus kopie. Kopia jest mocniejszym sygnałem
  * niż polubienie, bo kosztuje decyzję o własnym wyjeździe — stąd podwójna waga.
@@ -44,7 +43,6 @@ export default function Tablice() {
   const [ladowanie, setLadowanie] = useState(true);
   const [inicjaly, setInicjaly] = useState<string | null>(null);
   const [moje, setMoje] = useState<Set<string>>(new Set());
-  const [zalogowany, setZalogowany] = useState<boolean | null>(null);
 
   useEffect(() => { (async () => setInicjaly(await inicjalyUzytkownika()))(); }, []);
 
@@ -73,7 +71,6 @@ export default function Tablice() {
     }
 
     const { data: u } = await supabase.auth.getUser();
-    setZalogowany(!!u.user);
     if (u.user) {
       const { data: lk } = await (supabase as any).from('board_likes')
         .select('project_id').eq('user_id', u.user.id);
@@ -146,22 +143,13 @@ export default function Tablice() {
         ) : widoczne.length === 0 ? (
           <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
             <h2 className="font-display font-light text-[24px]">
-              {szukaj ? 'Nic nie pasuje'
-                : zalogowany === false ? 'Tablice widzą zalogowani'
-                : 'Nikt jeszcze nic nie opublikował'}
+              {szukaj ? 'Nic nie pasuje' : 'Nikt jeszcze nic nie opublikował'}
             </h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
-              {szukaj ? 'Spróbuj innego miasta albo wyczyść wyszukiwanie.'
-                : zalogowany === false
-                  ? 'Autorzy udostępniają tablice osobom z kontem. Załóż je — zajmuje chwilę i nic nie kosztuje.'
-                  : 'Możesz być pierwszy — otwórz swoją tablicę i włącz publikację w zakładce Dostęp.'}
+              {szukaj
+                ? 'Spróbuj innego miasta albo wyczyść wyszukiwanie.'
+                : 'Możesz być pierwszy — otwórz swoją tablicę i włącz publikację w zakładce Dostęp.'}
             </p>
-            {zalogowany === false && !szukaj && (
-              <Button className="mt-6 bg-primary hover:bg-primary/90"
-                onClick={() => navigate('/auth?redirect=/tablice')}>
-                Zaloguj się ↗
-              </Button>
-            )}
           </div>
         ) : (
           <div className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,248px),1fr))]">

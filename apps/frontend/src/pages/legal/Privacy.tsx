@@ -151,9 +151,11 @@ export default function Privacy() {
         <li><strong>Account and your content</strong> — for as long as the account exists.
             After you ask us to delete it, up to 30 days, which is the time needed to remove
             it from backups as well.</li>
-        <li><strong>Boards you published</strong> — copies already made by other users stay
-            in their accounts and are their content from that moment on. Withdrawing
-            publication stops further copying but does not withdraw copies already made.</li>
+        <li><strong>Boards you published</strong> — a published board, together with the
+            display name signing it, is readable by anyone with the link, including without an
+            account. Withdrawing publication stops further access, but copies already made by
+            others stay in their accounts as their content, and search engine caches may hold
+            the page for a time beyond our control.</li>
         <li><strong>Server logs</strong> — up to 90 days.</li>
         <li><strong>Token usage history</strong> — for the lifetime of the account, as a
             record of operations performed.</li>

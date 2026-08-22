@@ -2111,9 +2111,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       <h3 className="text-sm font-semibold">Tablica publiczna</h3>
                       <p className="text-[13px] text-muted-foreground mt-1 text-pretty">
                         {active?.is_public
-                          ? `Każdy zalogowany widzi tę tablicę i może ją skopiować do siebie.${
+                          ? `Tablica jest w internecie: obejrzy ją każdy, kto dostanie odnośnik, także bez konta. Skopiować albo polubić może ją tylko osoba zalogowana. Widoczna jest też nazwa, którą się podpisujesz.${
                               active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
-                          : 'Widzisz ją tylko Ty i osoby, którym ją udostępniłeś. Po opublikowaniu każdy zalogowany będzie mógł ją skopiować do swoich wyjazdów.'}
+                          : 'Widzisz ją tylko Ty i osoby, którym ją udostępniłeś imiennie. Po opublikowaniu obejrzy ją każdy, kto dostanie odnośnik — także bez konta — a zalogowani będą mogli ją skopiować do siebie.'}
                       </p>
                     </div>
                     <Button size="sm" variant={active?.is_public ? 'outline' : 'default'}

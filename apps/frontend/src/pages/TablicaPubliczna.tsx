@@ -22,10 +22,11 @@ const KUBELKI = [
  * żadna trasa, która by tu prowadziła. Publikowanie było funkcją bez odbiorcy:
  * dawało się opublikować, nie dawało się obejrzeć.
  *
- * „Publiczna" znaczy tu „widoczna dla zalogowanych", nie „widoczna w internecie" —
- * tak brzmi obietnica przy przełączniku publikacji i tak działają polityki, które
- * obejmują wyłącznie rolę authenticated. Niezalogowanemu mówimy to wprost, zamiast
- * udawać, że tablicy nie ma.
+ * „Publiczna" znaczy „widoczna w internecie": polityki odczytu obejmują też rolę
+ * anon, więc tablicę obejrzy każdy, kto dostanie odnośnik, bez zakładania konta.
+ * Zrobić z nią nie może nic — polubienia i licznik kopii wymagają roli
+ * authenticated, więc gościowi nie pokazujemy przycisków, których i tak baza by
+ * nie przyjęła. Zamiast wyszarzonych guzików dostaje jedno zaproszenie.
  */
 export default function TablicaPubliczna() {
   const { id } = useParams<{ id: string }>();
@@ -136,25 +137,6 @@ export default function TablicaPubliczna() {
     );
   }
 
-  if (!tablica && !jaId) {
-    return (
-      <div className="min-h-screen bg-background">
-        <PlannerHeader initials={inicjaly} />
-        <div className="max-w-[1400px] mx-auto px-6 py-16 text-center">
-          <h1 className="font-display font-light text-[28px]">Tablice widzą zalogowani</h1>
-          <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
-            Autor udostępnił tę tablicę osobom z kontem. Załóż je albo zaloguj się — zajmuje
-            to chwilę i nic nie kosztuje.
-          </p>
-          <Button className="mt-6 bg-primary hover:bg-primary/90"
-            onClick={() => navigate(`/auth?redirect=/tablica/${id}`)}>
-            Zaloguj się, żeby zobaczyć ↗
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   if (!tablica) {
     return (
       <div className="min-h-screen bg-background">
@@ -205,21 +187,39 @@ export default function TablicaPubliczna() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={przelaczPolubienie}
-              aria-pressed={polubiona}
-              className={`h-10 inline-flex items-center gap-2 rounded-full border px-4 text-sm
-                          transition-colors ${polubiona
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-border bg-card hover:bg-muted'}`}>
-              <Heart className={`w-4 h-4 ${polubiona ? 'fill-accent' : ''}`} />
-              {tablica.like_count ?? 0}
-            </button>
-            <Button onClick={skopiujDoSiebie} disabled={kopiuje}
-              className="h-10 bg-primary hover:bg-primary/90">
-              {kopiuje
-                ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Kopiuję…</>
-                : <><Copy className="w-4 h-4 mr-1.5" /> Skopiuj do siebie</>}
-            </Button>
+            {/* Gość widzi liczbę, nie przycisk. Wyszarzony guzik kusiłby do
+                kliknięcia, po którym i tak nic by się nie stało — baza odrzuca
+                polubienia i podbicie licznika kopii od roli anon. */}
+            {jaId ? (
+              <>
+                <button onClick={przelaczPolubienie}
+                  aria-pressed={polubiona}
+                  className={`h-10 inline-flex items-center gap-2 rounded-full border px-4 text-sm
+                              transition-colors ${polubiona
+                                ? 'border-accent bg-accent/10 text-accent'
+                                : 'border-border bg-card hover:bg-muted'}`}>
+                  <Heart className={`w-4 h-4 ${polubiona ? 'fill-accent' : ''}`} />
+                  {tablica.like_count ?? 0}
+                </button>
+                <Button onClick={skopiujDoSiebie} disabled={kopiuje}
+                  className="h-10 bg-primary hover:bg-primary/90">
+                  {kopiuje
+                    ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Kopiuję…</>
+                    : <><Copy className="w-4 h-4 mr-1.5" /> Skopiuj do siebie</>}
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="h-10 inline-flex items-center gap-2 rounded-full border border-border
+                                 bg-muted/40 px-4 text-sm text-muted-foreground font-mono tabular-nums">
+                  <Heart className="w-4 h-4" /> {tablica.like_count ?? 0}
+                </span>
+                <Button onClick={() => navigate(`/auth?redirect=/tablica/${id}`)}
+                  className="h-10 bg-primary hover:bg-primary/90">
+                  Załóż konto, żeby skopiować ↗
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
