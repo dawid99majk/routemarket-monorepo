@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, Heart } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Heart, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,6 +99,7 @@ export default function Index() {
   const [klimat, setKlimat] = useState('family');
   const [tablice, setTablice] = useState<Tablica[]>([]);
   const [zakladam, setZakladam] = useState(false);
+  const [szukajTablic, setSzukajTablic] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -376,9 +377,31 @@ export default function Index() {
                 pasuje. Twoje tablice możesz współdzielić z osobą, z którą jedziesz.
               </p>
             </div>
-            <Button variant="outline" onClick={() => navigate('/tablice')}>
-              Przeglądaj wszystkie
-            </Button>
+            {/* Szukanie tu, a nie dopiero w galerii: to jest pierwszy ekran i to na
+                nim pada pytanie „czy ktoś już był tam, dokąd jadę". Wpisanie miasta
+                przenosi do galerii z gotowym zapytaniem, zamiast filtrować pasek
+                kafli, w którym i tak mieści się kilkanaście pozycji. */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={szukajTablic}
+                  onChange={(e) => setSzukajTablic(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      navigate(`/tablice${szukajTablic.trim() ? `?q=${encodeURIComponent(szukajTablic.trim())}` : ''}`);
+                    }
+                  }}
+                  placeholder="Szukaj tablicy po mieście"
+                  className="h-10 w-[220px] rounded-full border border-border bg-card pl-9 pr-4
+                             text-sm outline-none focus:border-primary transition-colors"
+                />
+              </div>
+              <Button variant="outline" onClick={() =>
+                navigate(`/tablice${szukajTablic.trim() ? `?q=${encodeURIComponent(szukajTablic.trim())}` : ''}`)}>
+                Przeglądaj wszystkie
+              </Button>
+            </div>
           </div>
 
           <div className="mt-10 -mx-10 px-10 overflow-x-auto

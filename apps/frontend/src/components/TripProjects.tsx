@@ -1047,7 +1047,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       if (error) throw error;
       setShares((prev) => [...prev, data]);
       setShareEmail('');
-      toast.success('Zaproszenie wysłane e-mailem — tablica czeka na tę osobę po zalogowaniu');
+      // Żaden mail stąd nie wychodzi — w całym API nie ma wysyłki poczty. Dostęp
+      // działa: has_project_access dopasowuje adres z tokenu, więc tablica pojawi
+      // się tej osobie po zalogowaniu. Komunikat mówi więc, co się stało naprawdę,
+      // i zostawia wysłanie odnośnika użytkownikowi.
+      toast.success('Dodano dostęp — tablica pojawi się tej osobie po zalogowaniu tym adresem. Powiadomienia nie wysyłamy, prześlij jej odnośnik sam.');
     } catch (err: any) {
       toast.error(err.message.includes('duplicate') ? 'Ta osoba już ma dostęp' : err.message);
     } finally {
@@ -2136,7 +2140,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       value={shareEmail}
                       onChange={(e) => setShareEmail(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && shareProject()}
-                      placeholder="adres e-mail osoby, która ma współtworzyć"
+                      placeholder="adres e-mail osoby — musi zalogować się tym samym"
                       className="flex-1"
                     />
                     <Button onClick={shareProject} disabled={sharing || !shareEmail.trim()} variant="outline">

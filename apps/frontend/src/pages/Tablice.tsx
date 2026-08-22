@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -37,8 +37,11 @@ type Porzadek = typeof PORZADKI[number]['id'];
  */
 export default function Tablice() {
   const navigate = useNavigate();
+  const [parametry] = useSearchParams();
   const [tablice, setTablice] = useState<Publiczna[]>([]);
-  const [szukaj, setSzukaj] = useState('');
+  // Zapytanie wpisane na stronie głównej przyjeżdża adresem, żeby wejście
+  // z landingu od razu pokazywało wynik, a nie pustą wyszukiwarkę.
+  const [szukaj, setSzukaj] = useState(parametry.get('q') ?? '');
   const [porzadek, setPorzadek] = useState<Porzadek>('popularne');
   const [ladowanie, setLadowanie] = useState(true);
   const [inicjaly, setInicjaly] = useState<string | null>(null);
