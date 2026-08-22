@@ -243,6 +243,11 @@ export default function Discover() {
     const q = query.trim().toLowerCase();
     return places.filter((p) => {
       if (q && !(`${p.name} ${p.kind ?? ''} ${p.description}`.toLowerCase().includes(q))) return false;
+      // Nocleg wypada z domyślnej listy: „dodaj hotel do tablicy jako miejsce do
+      // zobaczenia" nie ma sensu, a przy dziesięciu hotelach na miasto rozpychałby
+      // feed kosztem atrakcji. Pokazuje się dopiero po wybraniu tej kategorii —
+      // wtedy pytanie brzmi „gdzie się zatrzymać", a nie „co zwiedzić".
+      if (kategoria === 'wszystkie' && (p.category ?? 'attraction') === 'hotel') return false;
       if (kategoria !== 'wszystkie' && (p.category ?? 'attraction') !== kategoria) return false;
       if (filter === 'kids')  return (p.vibe_tags ?? []).some((t) => KIDS_TAGS.includes(t));
       if (filter === 'short') return (p.visit_minutes ?? 999) <= 60;

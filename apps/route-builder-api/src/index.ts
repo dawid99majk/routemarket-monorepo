@@ -1506,20 +1506,25 @@ app.post('/catalog/seed', async (c) => {
     //
     // Promień dla jedzenia jest mniejszy: knajpa cztery kilometry za centrum nie
     // jest odpowiedzią na pytanie „gdzie zjeść przy okazji zwiedzania".
-    const [zwiedzanie, jedzenie, wieczory] = await Promise.all([
+    const [zwiedzanie, jedzenie, wieczory, noclegi] = await Promise.all([
       poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'city_walk',
         { radiusKm: 4, limit: take }),
       poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food',
         { radiusKm: 2, limit: Math.max(6, Math.round(take / 2)) }),
       poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'nightlife',
         { radiusKm: 2, limit: Math.max(4, Math.round(take / 4)) }),
+      // Noclegów zbieramy garść, nie listę do przeglądania: bazę wybiera się raz,
+      // a nie porównuje czterdziestu hoteli w planerze. Mają służyć podpowiedziom
+      // punktu startowego, nie wypełniać feed miejsc do zobaczenia.
+      poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'hotel',
+        { radiusKm: 3, limit: 10 }).catch(() => []),
     ]);
 
     // Ten sam obiekt bywa w kilku zapytaniach — bar w zabytkowej kamienicy wraca
     // i jako nightlife, i jako food. Pierwsze wystąpienie wygrywa, bo listy idą
     // w kolejności ważności dla planowania.
     const widziane = new Set<string>();
-    const candidates = [...zwiedzanie, ...jedzenie, ...wieczory].filter((p) => {
+    const candidates = [...zwiedzanie, ...jedzenie, ...wieczory, ...noclegi].filter((p) => {
       const klucz = String(p.id ?? `${p.name}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`);
       if (widziane.has(klucz)) return false;
       widziane.add(klucz);
@@ -1579,7 +1584,8 @@ app.post('/catalog/seed', async (c) => {
 
     etapy.zdjecia_i_zapis = Date.now() - tEtap;
     console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc `
-      + `(zwiedzanie ${zwiedzanie.length}, jedzenie ${jedzenie.length}, wieczory ${wieczory.length}) `
+      + `(zwiedzanie ${zwiedzanie.length}, jedzenie ${jedzenie.length}, `
+      + `wieczory ${wieczory.length}, noclegi ${noclegi.length}) `
       + `w ${Date.now() - t0} ms ` +
       `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
     // needs_enrich mówi klientowi, że warto od razu poprosić o opisy.
@@ -2234,7 +2240,10 @@ app.post('/places/suggest', async (c) => {
               id: null, slug: null, name: nazwa, city: city.trim(),
               country: centrum.countryCode ?? null,
               lat: Number(d.lat), lng: Number(d.lon),
-              category: 'attraction', kind: d.type || d.category || null,
+              // Rodzaj zamiast wpisanej na sztywno atrakcji: przy szukaniu bazy
+              // podpowiedź "Hotel Mercure" opisana jako atrakcja wygląda na pomyłkę.
+              category: kategoriaZRodzaju(d.type || d.class || null),
+              kind: d.type || d.category || null,
               photos: [], visit_minutes: null, opening_hours: null,
               description: null, source: 'osm',
             });
