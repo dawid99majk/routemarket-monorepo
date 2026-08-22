@@ -173,7 +173,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [narzedzie, setNarzedzie] = useState<NarzedzieId | null>(null);
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
+  /**
+   * Grupowanie po kategoriach było wyłączone i schowane pod małym odnośnikiem, więc
+   * przy tablicy z restauracjami i atrakcjami wszystko leżało jednym ciągiem. Włącza
+   * się teraz samo, gdy tablica ma więcej niż jedną kategorię — przy samych atrakcjach
+   * podział na jedną grupę byłby tylko dodatkowym nagłówkiem.
+   */
   const [grouped, setGrouped] = useState(false);
+  const [grupowanieRuszone, setGrupowanieRuszone] = useState(false);
   const [startQuery, setStartQuery] = useState('');
   const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
   const [pokazStart, setPokazStart] = useState(false);
@@ -245,6 +252,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       .map((x) => ({ id: x.id, name: x.name, lat: x.lat, lng: x.lng,
                      visit_minutes: x.visit_minutes, kubelek: x.priority as any })),
     [places]);
+
+  useEffect(() => {
+    // Raz ruszony przełącznik zostaje po stronie użytkownika — automat ma podpowiadać
+    // przy pierwszym wejściu, a nie cofać cudzą decyzję przy każdym dodaniu miejsca.
+    if (grupowanieRuszone) return;
+    const kategorie = new Set(places.map((x) => x.category || 'other'));
+    if (kategorie.size > 1) setGrouped(true);
+  }, [places, grupowanieRuszone]);
 
   const kadrZeStartem = useMemo(
     () => (startNaMapie ? [...naMapie, startNaMapie] : naMapie),
@@ -2174,7 +2189,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {(
               <div>
                 <div className="flex items-center justify-end mb-2">
-                  <button onClick={() => setGrouped((v) => !v)}
+                  <button onClick={() => { setGrouped((v) => !v); setGrupowanieRuszone(true); }}
                     className="text-[12px] text-muted-foreground hover:text-foreground transition-colors
                                underline decoration-dotted underline-offset-4">
                     {grouped ? 'bez podziału na kategorie' : 'pogrupuj wg kategorii'}

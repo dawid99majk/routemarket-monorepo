@@ -42,6 +42,21 @@ const FILTERS = [
 ] as const;
 type FilterId = typeof FILTERS[number]['id'];
 
+/**
+ * Kategoria to inne pytanie niż filtry powyżej. Tamte mówią, do czego miejsce się
+ * nadaje („na deszcz", „z dziećmi"), ta mówi, czym ono jest. Mieszanie ich w jeden
+ * rząd pigułek kazałoby wybierać między „na deszcz" a „jedzenie", choć to nie są
+ * warianty tego samego.
+ */
+const KATEGORIE = [
+  { id: 'wszystkie', label: 'Wszystko' },
+  { id: 'attraction', label: 'Atrakcje' },
+  { id: 'food', label: 'Jedzenie' },
+  { id: 'nightlife', label: 'Wieczory' },
+  { id: 'hotel', label: 'Nocleg' },
+] as const;
+type KategoriaId = typeof KATEGORIE[number]['id'];
+
 const KIDS_TAGS = ['dla-dzieci', 'zielone', 'nadwodne', 'spacerowe'];
 const RAIN_KINDS = ['museum', 'gallery', 'attraction', 'theatre'];
 
@@ -97,6 +112,7 @@ export default function Discover() {
   /** Ile kart pokazujemy. Rośnie przy przewijaniu, nie przy każdym zapytaniu. */
   const [ileWidocznych, setIleWidocznych] = useState(24);
   const [pokazMape, setPokazMape] = useState(true);
+  const [kategoria, setKategoria] = useState<KategoriaId>('wszystkie');
   /** Miejsce pod kursorem albo wskazane pinezką — wiąże kartę z punktem na mapie. */
   const [aktywne, setAktywne] = useState<string | null>(null);
   const [obszar, setObszar] = useState<{ pn: number; pd: number; wsch: number; zach: number } | null>(null);
@@ -227,6 +243,7 @@ export default function Discover() {
     const q = query.trim().toLowerCase();
     return places.filter((p) => {
       if (q && !(`${p.name} ${p.kind ?? ''} ${p.description}`.toLowerCase().includes(q))) return false;
+      if (kategoria !== 'wszystkie' && (p.category ?? 'attraction') !== kategoria) return false;
       if (filter === 'kids')  return (p.vibe_tags ?? []).some((t) => KIDS_TAGS.includes(t));
       if (filter === 'short') return (p.visit_minutes ?? 999) <= 60;
       if (filter === 'walk')  return true;
@@ -523,6 +540,27 @@ export default function Discover() {
             placeholder="Szukaj: plaża, ruiny, deszczowy dzień…"
             className="flex-1 min-w-[180px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
           />
+          <div className="w-px self-stretch bg-border hidden sm:block" />
+          {/* Kategorie przed filtrami klimatu: najpierw „czego szukam", potem
+              „jakie ma być". Pokazujemy tylko te, które w tym mieście istnieją —
+              pusta pigułka „Nocleg" byłaby obietnicą bez pokrycia. */}
+          <div className="flex flex-wrap gap-1.5">
+            {KATEGORIE.filter((k) => k.id === 'wszystkie'
+                || places.some((p) => (p.category ?? 'attraction') === k.id)).map((k) => (
+              <button
+                key={k.id}
+                onClick={() => setKategoria(k.id)}
+                aria-pressed={kategoria === k.id}
+                className={`rounded-full px-3 py-1 text-xs border transition-colors ${
+                  kategoria === k.id
+                    ? 'bg-foreground border-foreground text-background'
+                    : 'bg-background border-border hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                {k.label}
+              </button>
+            ))}
+          </div>
           <div className="w-px self-stretch bg-border hidden sm:block" />
           <div className="flex flex-wrap gap-1.5">
             {FILTERS.map((f) => (

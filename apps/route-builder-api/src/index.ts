@@ -1449,6 +1449,20 @@ const VIBE_TAGS = [
  * pustą półką, a treść musi skądś przyjść — bierzemy ją z OSM (fakty i
  * współrzędne) plus jedno wywołanie modelu na opisy i znaczniki dla całej partii.
  */
+/**
+ * Rodzaj z OpenStreetMap na kategorię tablicy.
+ *
+ * Warunek sprawdzał dotąd tylko restaurację i kawiarnię, choć zapytanie o jedzenie
+ * zwraca sześć rodzajów — bar, pub, fast_food i lodziarnia lądowały wśród atrakcji.
+ */
+function kategoriaZRodzaju(kind: string | null | undefined): string {
+  if (!kind) return 'attraction';
+  if (/^(restaurant|cafe|fast_food|ice_cream|bakery)$/.test(kind)) return 'food';
+  if (/^(bar|pub|nightclub|biergarten)$/.test(kind)) return 'nightlife';
+  if (/^(hotel|hostel|guest_house|apartment)$/.test(kind)) return 'hotel';
+  return 'attraction';
+}
+
 app.post('/catalog/seed', async (c) => {
   try {
     const { city, limit } = await c.req.json() as { city: string; limit?: number };
@@ -1464,9 +1478,33 @@ app.post('/catalog/seed', async (c) => {
     etapy.geokoder = Date.now() - tEtap;
     const take = Math.min(40, Math.max(6, limit ?? 24));
     tEtap = Date.now();
-    const candidates = await poiService.fetchCandidates(
-      { lat: center.lat, lng: center.lng }, 'city_walk', { radiusKm: 4, limit: take }
-    );
+
+    // Zbieranie pytało wyłącznie o zwiedzanie, więc katalog był w całości
+    // atrakcjami — restauracja mogła trafić na tablicę tylko przez wyszukiwanie
+    // tekstowe, nigdy przez katalog miasta. Warstwa POI ma osobne zapytania do
+    // Overpassa dla jedzenia i wieczorów; wystarczyło zacząć ich używać.
+    //
+    // Promień dla jedzenia jest mniejszy: knajpa cztery kilometry za centrum nie
+    // jest odpowiedzią na pytanie „gdzie zjeść przy okazji zwiedzania".
+    const [zwiedzanie, jedzenie, wieczory] = await Promise.all([
+      poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'city_walk',
+        { radiusKm: 4, limit: take }),
+      poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food',
+        { radiusKm: 2, limit: Math.max(6, Math.round(take / 2)) }),
+      poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'nightlife',
+        { radiusKm: 2, limit: Math.max(4, Math.round(take / 4)) }),
+    ]);
+
+    // Ten sam obiekt bywa w kilku zapytaniach — bar w zabytkowej kamienicy wraca
+    // i jako nightlife, i jako food. Pierwsze wystąpienie wygrywa, bo listy idą
+    // w kolejności ważności dla planowania.
+    const widziane = new Set<string>();
+    const candidates = [...zwiedzanie, ...jedzenie, ...wieczory].filter((p) => {
+      const klucz = String(p.id ?? `${p.name}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`);
+      if (widziane.has(klucz)) return false;
+      widziane.add(klucz);
+      return true;
+    });
     etapy.overpass = Date.now() - tEtap;
     if (candidates.length === 0) return c.json({ city, added: 0, places: [] });
 
@@ -1492,7 +1530,7 @@ app.post('/catalog/seed', async (c) => {
           country: center.countryCode ?? null,
           lat: p.lat,
           lng: p.lng,
-          category: p.kind === 'restaurant' || p.kind === 'cafe' ? 'food' : 'attraction',
+          category: kategoriaZRodzaju(p.kind),
           kind: p.kind,
           description: '',
           photos: photoSets[j] || [],
@@ -1520,7 +1558,9 @@ app.post('/catalog/seed', async (c) => {
     }
 
     etapy.zdjecia_i_zapis = Date.now() - tEtap;
-    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc w ${Date.now() - t0} ms ` +
+    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc `
+      + `(zwiedzanie ${zwiedzanie.length}, jedzenie ${jedzenie.length}, wieczory ${wieczory.length}) `
+      + `w ${Date.now() - t0} ms ` +
       `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
     // needs_enrich mówi klientowi, że warto od razu poprosić o opisy.
     return c.json({
@@ -1876,7 +1916,7 @@ app.post('/places/from-link', async (c) => {
       const lista = (dopasowane.length ? dopasowane : kandydaci).slice(0, 20).map((k: any) => ({
         name: k.name, lat: k.lat, lng: k.lng, kind: k.kind ?? null,
         opening_hours: k.openingHours ?? null, website: k.website ?? null,
-        category: k.kind === 'restaurant' || k.kind === 'cafe' ? 'food' : 'attraction',
+        category: kategoriaZRodzaju(k.kind),
       }));
 
       console.log(`[places/from-link] obszar "${fraza}": ${lista.length} miejsc`);
