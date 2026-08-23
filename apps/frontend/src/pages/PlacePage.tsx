@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
+import { opisMiejsca } from '@/lib/opis';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -74,7 +75,7 @@ export default function PlacePage() {
     // Warunki geograficzne i tagowe umie policzyć baza: to samo miasto, ramka
     // ~2 km wokół punktu i przecięcie vibe_tags. Trzy wąskie zapytania zamiast
     // jednej hurtowni, a logika niżej pracuje na tej samej strukturze co dotąd.
-    const POOL_COLS = 'id, slug, name, city, country, lat, lng, category, kind, description, photos, visit_minutes, vibe_tags, pin_count';
+    const POOL_COLS = 'id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, visit_minutes, vibe_tags, pin_count';
     const poolQueries = [
       data.city
         ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id).eq('city', data.city).limit(300)
@@ -274,7 +275,7 @@ export default function PlacePage() {
 
             {(place.description || place.wiki_extract) && (
               <p className="text-[17px] leading-[1.6] mt-5 max-w-[60ch] text-foreground/85 text-pretty">
-                {place.description || place.wiki_extract}
+                {opisMiejsca(place)}
               </p>
             )}
 

@@ -23,6 +23,7 @@ import { zakresDat, wTerminie } from '@/lib/daty';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { opisMiejsca } from '@/lib/opis';
 import { format, parse, isValid } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -2027,7 +2028,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </div>
                             </div>
                             <p className="text-xs text-muted-foreground leading-relaxed flex-1">
-                              {r.description || r.wiki_extract}
+                              {opisMiejsca(r)}
                             </p>
                             <div className="flex flex-wrap gap-1.5 text-[11px]">
                               {r.visit_minutes && <Badge variant="secondary">{r.visit_minutes} min</Badge>}
@@ -2651,7 +2652,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         <Loader2 className="w-4 h-4 animate-spin" /> Sprawdzam, co to za miejsce…
                       </p>
                     )}
-                    {placeCard.description && <p className="text-sm leading-relaxed">{placeCard.description}</p>}
+                    {opisMiejsca(placeCard) && <p className="text-sm leading-relaxed">{opisMiejsca(placeCard)}</p>}
                     {placeCard.recommendation && (
                       <p className="text-xs bg-primary/10/70 border border-primary/30 rounded-md p-2.5 leading-relaxed">
                         <strong className="block text-[10px] uppercase tracking-wider text-primary mb-0.5">Wskazówka</strong>

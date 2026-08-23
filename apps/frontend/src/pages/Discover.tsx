@@ -11,6 +11,7 @@ import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { opisMiejsca } from '@/lib/opis';
 
 interface CatalogPlace {
   id: string;
@@ -181,7 +182,7 @@ export default function Discover() {
     // Jawna lista kolumn: karta feedu nie potrzebuje wiki_extract (bywa dłuższy
     // niż cała reszta wiersza razem wzięta) ani pól redakcyjnych.
     let q = supabase.from('place_catalog')
-      .select('id, slug, name, city, country, lat, lng, category, kind, description, photos, opening_hours, visit_minutes, vibe_tags, pin_count, created_at')
+      .select('id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, opening_hours, visit_minutes, vibe_tags, pin_count, created_at')
       .limit(200);
     if (c) q = q.ilike('city', `%${c}%`);
     const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
@@ -242,7 +243,7 @@ export default function Discover() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return places.filter((p) => {
-      if (q && !(`${p.name} ${p.kind ?? ''} ${p.description}`.toLowerCase().includes(q))) return false;
+      if (q && !(`${p.name} ${p.kind ?? ''} ${opisMiejsca(p)}`.toLowerCase().includes(q))) return false;
       // Nocleg wypada z domyślnej listy: „dodaj hotel do tablicy jako miejsce do
       // zobaczenia" nie ma sensu, a przy dziesięciu hotelach na miasto rozpychałby
       // feed kosztem atrakcji. Pokazuje się dopiero po wybraniu tej kategorii —
@@ -739,9 +740,9 @@ export default function Discover() {
                           {p.city}{p.country ? ` / ${p.country}` : ''}
                         </p>
                       )}
-                      {p.description && (
+                      {opisMiejsca(p) && (
                         <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed line-clamp-3 text-pretty">
-                          {p.description}
+                          {opisMiejsca(p)}
                         </p>
                       )}
                       {(duration || p.opening_hours) && (

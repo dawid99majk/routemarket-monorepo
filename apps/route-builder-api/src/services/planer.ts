@@ -26,6 +26,7 @@ import { callGeminiTracked } from './ai-usage.js';
 import { geocodingService } from './geocoding.js';
 import { poiService, type PoiCandidate } from './poi.js';
 import { describeAvailability, isOpenDuring } from './opening-hours.js';
+import { instrukcjaJezyka, type KodJezyka } from './jezyki.js';
 
 export interface MiejsceWejscie {
   name: string;
@@ -175,6 +176,7 @@ export interface KontekstPlanu {
   zadanie: ZadaniePlanu;
   klucz: string;
   userId: string | null;
+  jezyk: KodJezyka;
   dni: InfoDnia[];
   /** Miejsca przypisane do konkretnego dnia (indeks 0 = dzień 1). */
   grupy: MiejsceWejscie[][];
@@ -258,7 +260,8 @@ function przydzielGrupyDoDni(grupy: MiejsceWejscie[][], dni: InfoDnia[], oknoOd:
  */
 export async function przygotujKontekst(
   zadanie: ZadaniePlanu,
-  userId: string | null
+  userId: string | null,
+  jezyk: KodJezyka = 'pl'
 ): Promise<KontekstPlanu> {
   const oknoOd = czasNaMinuty(zadanie.window.start);
   const oknoDo = czasNaMinuty(zadanie.window.end);
@@ -313,6 +316,7 @@ export async function przygotujKontekst(
     zadanie,
     klucz: process.env.GEMINI_API_KEY || '',
     userId,
+    jezyk,
     dni,
     grupy,
     minutNaDzien,
@@ -462,7 +466,8 @@ ZASADY:
 
 ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
 
-Odpowiedz WYŁĄCZNIE obiektem JSON opisującym ten jeden dzień.`;
+Odpowiedz WYŁĄCZNIE obiektem JSON opisującym ten jeden dzień.
+${instrukcjaJezyka(k.jezyk)}`;
 }
 
 

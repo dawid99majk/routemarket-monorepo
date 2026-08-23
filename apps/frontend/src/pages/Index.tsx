@@ -8,26 +8,18 @@ import { utworzWyjazd } from '@/lib/newTrip';
 import PlannerHeader from '@/components/PlannerHeader';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
 const KLIMATY = [
-  { id: 'family', label: 'z dziećmi' },
-  { id: 'couple', label: 'we dwoje' },
-  { id: 'business', label: 'w delegację' },
-  { id: 'friends', label: 'ze znajomymi' },
-  { id: 'solo', label: 'sam' },
+  { id: 'family', klucz: 'landing.klimat.family' },
+  { id: 'couple', klucz: 'landing.klimat.couple' },
+  { id: 'business', klucz: 'landing.klimat.business' },
+  { id: 'friends', klucz: 'landing.klimat.friends' },
+  { id: 'solo', klucz: 'landing.klimat.solo' },
 ];
 
-const KROKI = [
-  ['01', 'Powiedz, dokąd i z kim',
-    'Miasto, termin i klimat wyjazdu. Agent od razu podsuwa pierwsze miejsca, także takie, których nie miałeś na liście.'],
-  ['02', 'Zapisuj, co Cię interesuje',
-    'Feed atrakcji ze zdjęciem, czasem zwiedzania i godzinami otwarcia. Jedno kliknięcie odkłada miejsce na tablicę.'],
-  ['03', 'Rozstrzygnij wątpliwości',
-    'Tablica ma trzy kubełki: na pewno, być może, nie. Odrzucone nie znikają — zawsze możesz je przywrócić.'],
-  ['04', 'Odbierz gotową trasę',
-    'Plan na każdy dzień z godzinami, kolejnością i czasem dojazdu. Na końcu plik GPX do zegarka albo nawigacji.'],
-];
+const KROKI = ['01', '02', '03', '04'];
 
 const PLAN_DEMO = [
   ['14:20', 'Amfiteatr w Durrës', '1 g 30 min · cień po 15:00'],
@@ -63,28 +55,15 @@ const GPX_PRZYKLAD = `<gpx version="1.1" creator="Routemarket">
   <trk><name>Trasa pieszo · 3,8 km</name></trk>
 </gpx>`;
 
-const KANALY = [
-  ['Zegarek i licznik', 'Garmin, Suunto, Coros, Wahoo — standardowy GPX z punktami trasy i śladem.'],
-  ['Twoja aplikacja mapowa', 'Organic Maps, Komoot, Gaia, Locus. Plik otwiera się bez konwersji.'],
-  ['Nawigacja Routemarket', 'Wbudowane prowadzenie od punktu do punktu, z godzinami z planu. Mapa pobiera się przed wyjazdem i działa bez zasięgu.'],
-];
+const KANALY = ['zegarek', 'mapy', 'nawigacja'];
 
-const FAQ = [
-  ['Skąd biorą się miejsca?',
-    'Z otwartych baz danych o atrakcjach, opinii podróżników i tablic publikowanych przez użytkowników. Godziny otwarcia i czas zwiedzania są weryfikowane przed pokazaniem w feedzie.'],
-  ['Czy agent nie wciśnie mi za dużo na jeden dzień?',
-    'Odwrotnie — kiedy plan przestaje być realny, pisze o tym wprost i proponuje, co przenieść. Możesz zadać własne ograniczenie, na przykład maksymalnie cztery godziny dziennie.'],
-  ['Czy działa poza Europą?',
-    'Tak. Planer jest globalny, interfejs dostępny w kilku językach, a odległości i czasy liczone lokalnym transportem.'],
-  ['Co z aplikacją na telefon?',
-    'Wersja przeglądarkowa działa na telefonie już teraz. Aplikacje iOS i Android, z pobieraniem map do trybu offline, są w przygotowaniu.'],
-];
+const FAQ = ['zrodla', 'przeciazenie', 'poza_europa', 'aplikacja'];
 
 const NAWIGACJA = [
-  ['Jak to działa', '#jak-to-dziala'],
-  ['Przykładowy plan', '#przyklad'],
-  ['Nawigacja i GPX', '#gpx'],
-  ['Tablice', '#tablice'],
+  ['landing.nav.jak', '#jak-to-dziala'],
+  ['landing.nav.przyklad', '#przyklad'],
+  ['landing.nav.gpx', '#gpx'],
+  ['landing.nav.tablice', '#tablice'],
 ];
 
 interface Tablica {
@@ -93,6 +72,7 @@ interface Tablica {
 }
 
 export default function Index() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [cel, setCel] = useState('');
@@ -154,11 +134,11 @@ export default function Index() {
     <div className="flex gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
       <input value={cel} onChange={(e) => setCel(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && zacznij()}
-        placeholder="Dokąd jedziesz?"
+        placeholder={t('landing.dokad')}
         className="flex-1 min-w-0 bg-transparent px-3 h-11 text-[16px] outline-none placeholder:text-muted-foreground" />
       <Button onClick={zacznij} disabled={zakladam}
         className="bg-primary hover:bg-primary/90 shrink-0 h-11 px-5">
-        {zakladam ? 'Zakładam…' : 'Zacznij planować'}
+        {zakladam ? t('landing.zakladam') : t('landing.cta_glowne')}
       </Button>
     </div>
   );
@@ -179,13 +159,13 @@ export default function Index() {
           <nav className="hidden lg:flex items-center gap-6">
             {NAWIGACJA.map(([label, href]) => (
               <a key={href} href={href}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors">{label}</a>
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t(label)}</a>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => navigate('/auth')}>Zaloguj się</Button>
+            <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => navigate('/auth')}>{t('common.login')}</Button>
             <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90">
-              Zaplanuj wyjazd
+              {t('landing.cta_naglowek')}
             </Button>
           </div>
         </div>
@@ -196,21 +176,19 @@ export default function Index() {
         {/* 1. Hero */}
         <section className="pt-[88px] pb-[72px] grid gap-10 [grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))] items-start">
           <div>
-            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary">Planner wyjazdów</p>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary">{t('landing.nadtytul')}</p>
             <h1 className="font-display font-light mt-4 text-balance leading-[1.04] tracking-[-0.03em]
                            text-[clamp(38px,4.4vw,62px)]">
-              Zbierz miejsca. Resztę ułoży agent.
+              {t('landing.hero.tytul')}
             </h1>
             <p className="text-[18px] leading-relaxed text-foreground/80 mt-6 max-w-[52ch] text-pretty">
-              Wyszukujesz atrakcje i wrzucasz je na tablicę wyjazdu — „na pewno", „być może", „nie".
-              Agent układa z nich plan na każdy dzień, z realnymi godzinami i czasem dojazdu,
-              i oddaje gotowy plik GPX do zegarka albo nawigacji.
+              {t('landing.hero.opis')}
             </p>
 
             <div className="mt-8">{poleDestynacji}</div>
 
             <div className="flex flex-wrap items-center gap-2 mt-5">
-              <span className="text-sm text-muted-foreground mr-1">Jadę</span>
+              <span className="text-sm text-muted-foreground mr-1">{t('landing.jade')}</span>
               {KLIMATY.map((k) => (
                 <button key={k.id} onClick={() => setKlimat(k.id)}
                   className={`rounded-full px-3.5 py-1.5 text-[13px] border transition-colors ${
@@ -218,13 +196,13 @@ export default function Index() {
                       ? 'bg-primary border-primary text-primary-foreground'
                       : 'border-border hover:bg-muted'
                   }`}>
-                  {k.label}
+                  {t(k.klucz)}
                 </button>
               ))}
             </div>
 
             <p className="font-mono text-[12px] text-muted-foreground mt-6">
-              Bez karty · plan gotowy w kilka minut · działa też offline w terenie
+              {t('landing.hero.zapewnienia')}
             </p>
           </div>
 
@@ -267,16 +245,16 @@ export default function Index() {
       {/* 2. Jak to działa */}
       <section id="jak-to-dziala" className="bg-card border-y border-border">
         <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-20">
-          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Jak to działa</p>
+          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">{t('landing.nav.jak')}</p>
           <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
             Cztery kroki od pomysłu do trasy w zegarku
           </h2>
           <div className="mt-12 border-t border-border grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))]">
-            {KROKI.map(([nr, tytul, opis], i) => (
+            {KROKI.map((nr, i) => (
               <div key={nr} className={`pt-6 pb-2 px-6 ${i > 0 ? 'md:border-l border-border' : 'md:pl-0'}`}>
                 <span className="font-mono text-[13px] tabular-nums text-primary">{nr}</span>
-                <h3 className="font-display text-[20px] mt-3 leading-snug">{tytul}</h3>
-                <p className="text-[14px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{opis}</p>
+                <h3 className="font-display text-[20px] mt-3 leading-snug">{t(`landing.krok.${nr}.tytul`)}</h3>
+                <p className="text-[14px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{t(`landing.krok.${nr}.opis`)}</p>
               </div>
             ))}
           </div>
@@ -287,7 +265,7 @@ export default function Index() {
       <section id="przyklad" className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
         <div className="lg:sticky lg:top-[100px] max-w-[460px]">
-          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Prawdziwy przykład</p>
+          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">{t('landing.przyklad_nadtytul')}</p>
           <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
             Trzy popołudnia w Durrës, z sześciolatkiem
           </h2>
@@ -316,7 +294,7 @@ export default function Index() {
               </div>
               <div className="mt-5 rounded-md bg-warning/15 border border-warning/30 px-4 py-3.5 flex items-start gap-3">
                 <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground
-                                 border border-warning/45 rounded-full px-2.5 py-1 shrink-0">Realizm</span>
+                                 border border-warning/45 rounded-full px-2.5 py-1 shrink-0">{t('landing.realizm')}</span>
                 <p className="text-[13px] leading-relaxed text-warning-foreground text-pretty">{d.realizm}</p>
               </div>
             </div>
@@ -329,7 +307,7 @@ export default function Index() {
         <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
           <div>
-            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary-light">Nawigacja i GPX</p>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary-light">{t('landing.nav.gpx')}</p>
             <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
               Plan kończy się plikiem, nie zakładką w przeglądarce
             </h2>
@@ -337,10 +315,10 @@ export default function Index() {
               Trasa wychodzi z Routemarket w formacie, który rozumie sprzęt — nie tylko nasza strona.
             </p>
             <div className="mt-8">
-              {KANALY.map(([tytul, opis], i) => (
+              {KANALY.map((tytul, i) => (
                 <div key={tytul} className={`py-5 ${i > 0 ? 'border-t border-primary-foreground/15' : ''}`}>
-                  <h3 className="font-display text-[17px]">{tytul}</h3>
-                  <p className="text-[14px] leading-relaxed text-primary-foreground/70 mt-1.5 text-pretty">{opis}</p>
+                  <h3 className="font-display text-[17px]">{t(`landing.kanal.${tytul}.tytul`)}</h3>
+                  <p className="text-[14px] leading-relaxed text-primary-foreground/70 mt-1.5 text-pretty">{t(`landing.kanal.${tytul}.opis`)}</p>
                 </div>
               ))}
             </div>
@@ -392,14 +370,14 @@ export default function Index() {
                       navigate(`/tablice${szukajTablic.trim() ? `?q=${encodeURIComponent(szukajTablic.trim())}` : ''}`);
                     }
                   }}
-                  placeholder="Szukaj tablicy po mieście"
+                  placeholder={t('landing.szukaj_tablicy')}
                   className="h-10 w-full sm:w-[220px] rounded-full border border-border bg-card pl-9 pr-4
                              text-sm outline-none focus:border-primary transition-colors"
                 />
               </div>
               <Button variant="outline" onClick={() =>
                 navigate(`/tablice${szukajTablic.trim() ? `?q=${encodeURIComponent(szukajTablic.trim())}` : ''}`)}>
-                Przeglądaj wszystkie
+                {t('landing.przegladaj')}
               </Button>
             </div>
           </div>
@@ -436,14 +414,14 @@ export default function Index() {
         <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-20
                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))] items-start">
           <div>
-            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Częste pytania</p>
-            <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight">Zanim zaczniesz</h2>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">{t('landing.faq_nadtytul')}</p>
+            <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight">{t('landing.faq_tytul')}</h2>
           </div>
           <div>
-            {FAQ.map(([q, a], i) => (
+            {FAQ.map((q, i) => (
               <div key={q} className={`py-6 ${i > 0 ? 'border-t border-border' : 'pt-0'}`}>
-                <h3 className="font-display text-[18px] leading-snug">{q}</h3>
-                <p className="text-[15px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{a}</p>
+                <h3 className="font-display text-[18px] leading-snug">{t(`landing.faq.${q}.pytanie`)}</h3>
+                <p className="text-[15px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{t(`landing.faq.${q}.odpowiedz`)}</p>
               </div>
             ))}
           </div>
@@ -472,8 +450,8 @@ export default function Index() {
             <a href="#jak-to-dziala" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Jak to działa</a>
             <a href="#gpx" className="text-sm text-muted-foreground hover:text-foreground transition-colors">GPX</a>
             <a href="#tablice" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Tablice</a>
-            <button onClick={() => navigate('/legal/privacy')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Prywatność</button>
-            <button onClick={() => navigate('/contact')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Kontakt</button>
+            <button onClick={() => navigate('/legal/privacy')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.stopka_prywatnosc')}</button>
+            <button onClick={() => navigate('/contact')} className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t('landing.stopka_kontakt')}</button>
           </nav>
           <span className="ml-auto font-mono text-[12px] text-muted-foreground">
             Aplikacje iOS i Android — wkrótce

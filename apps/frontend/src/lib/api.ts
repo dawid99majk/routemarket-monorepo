@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import i18n from '@/i18n';
 
 /**
  * Jedyna droga do route-builder-api. Endpointy generujące trasy kosztują u
@@ -10,6 +11,17 @@ import { supabase } from '@/integrations/supabase/client';
  */
 
 const BASE = import.meta.env.VITE_API_URL || '/route-builder-api';
+
+/**
+ * Język użytkownika dopinamy tutaj, a nie w każdym wywołaniu z osobna. Treść
+ * odpowiedzi — plan dnia, opisy miejsc, wydarzenia — powstaje u modelu, więc
+ * serwer musi wiedzieć, w jakim języku ma ją napisać. Nagłówek obejmuje
+ * wszystkie endpointy naraz, także te, które dopiero powstaną, i nie zmienia
+ * kształtu żadnego payloadu.
+ */
+function jezykUzytkownika(): string {
+  return i18n.language?.split('-')[0] || 'pl';
+}
 
 /** Wywiad potrafi liczyć ponad minutę, więc limit jest hojny — ma ratować z zawieszenia, nie ucinać poprawną pracę. */
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -62,6 +74,7 @@ export async function apiPost<T = any>(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept-Language': jezykUzytkownika(),
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify(body),
@@ -130,7 +143,11 @@ export async function apiStream(
   try {
     res = await fetch(`${BASE}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept-Language': jezykUzytkownika(),
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(body),
       signal: opts.signal,
     });

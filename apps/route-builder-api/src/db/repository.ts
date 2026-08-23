@@ -69,6 +69,38 @@ export class RouteBuilderRepository {
     return data;
   }
 
+  /**
+   * Opisy czekające na tłumaczenie: mają wersję polską, nie mają docelowej.
+   *
+   * Filtrujemy po stronie bazy, a nie w Node: przy czterystu miejscach różnica
+   * jest bez znaczenia, ale ten sam zapytanie posłuży przy czterdziestu
+   * tysiącach, a wtedy ściąganie całego katalogu po to, żeby odrzucić 90%,
+   * przestanie być obojętne.
+   */
+  async listOpisyDoTlumaczenia(jezyk: string, limit = 60): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('place_catalog')
+      .select('id, name, description, description_i18n')
+      .not('description_i18n->>pl', 'is', null)
+      .is(`description_i18n->>${jezyk}`, null)
+      .limit(limit);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  }
+
+  /** Ile opisów jest w każdym języku — do raportu po tłumaczeniu. */
+  async pokrycieJezykow(jezyki: string[]): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const j of jezyki) {
+      const { count } = await supabase
+        .from('place_catalog')
+        .select('id', { count: 'exact', head: true })
+        .not(`description_i18n->>${j}`, 'is', null);
+      out[j] = count ?? 0;
+    }
+    return out;
+  }
+
   async setVibeTags(id: string, tags: string[]): Promise<void> {
     await supabase.from('place_catalog').update({ vibe_tags: tags }).eq('id', id);
   }

@@ -19,6 +19,8 @@ import { describeAvailability, isOpenDuring } from './services/opening-hours.js'
 import { callGeminiTracked } from './services/ai-usage.js';
 import { streamSSE } from 'hono/streaming';
 import { pobierzZewnetrzna, NiedozwolonyAdres } from './services/bezpieczne-pobieranie.js';
+import { jezykZadania, JEZYKI_UI, type KodJezyka } from './services/jezyki.js';
+import { przetlumaczPaczke } from './services/tlumaczenia.js';
 import {
   przygotujKontekst, ulozDzien, opiszPreferencje, clusterPlacesByProximity,
   type ZadaniePlanu,
@@ -76,6 +78,7 @@ const ENDPOINTY_SERWISOWE = [
   '/catalog/backfill-country',
   '/catalog/enrich',
   '/catalog/refresh-photos',
+  '/catalog/translate-descriptions',
 ];
 
 const tylkoAdministrator: MiddlewareHandler = async (c, next) => {
@@ -1520,7 +1523,7 @@ app.post('/plan-trip/stream', async (c) => {
     const zaczeto = Date.now();
     try {
       await wyslij('etap', { opis: 'Sprawdzam godziny otwarcia i szukam miejsc w okolicy' });
-      const kontekst = await przygotujKontekst(body, tokenUserId);
+      const kontekst = await przygotujKontekst(body, tokenUserId, jezykZadania(c));
 
       const ile = kontekst.dni.length;
       await wyslij('etap', {
@@ -1570,6 +1573,73 @@ app.post('/plan-trip/stream', async (c) => {
       await wyslij('blad', { blad: err.message });
     }
   });
+});
+
+/**
+ * Tłumaczenie opisów katalogu na języki interfejsu.
+ *
+ * Opisy są współdzielone, a nie generowane na żądanie, więc język nie może być
+ * parametrem pojedynczego zapytania: pierwszy Niemiec, który zasiałby miasto,
+ * nadpisałby opisy wszystkim pozostałym. Stąd osobny wymiar w danych
+ * (description_i18n) i osobna, jednorazowa operacja, która go wypełnia.
+ *
+ * Idzie paczkami po piętnaście, sekwencyjnie. Równolegle byłoby szybciej i
+ * skończyłoby się limitem po stronie modelu w połowie katalogu — a wtedy nie
+ * wiadomo, co się zapisało, a co nie.
+ */
+app.post('/catalog/translate-descriptions', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({})) as { languages?: string[]; limit?: number };
+    const cele = (body.languages ?? JEZYKI_UI.filter((j) => j !== 'pl')) as KodJezyka[];
+    const nieznane = cele.filter((j) => !(JEZYKI_UI as readonly string[]).includes(j));
+    if (nieznane.length) return c.json({ error: `Nieznane języki: ${nieznane.join(', ')}` }, 400);
+
+    const limit = Math.min(body.limit ?? 500, 1000);
+    const PACZKA = 15;
+    const raport: Record<string, { przetlumaczono: number; pominieto: number }> = {};
+
+    for (const jezyk of cele) {
+      const doZrobienia = await repo.listOpisyDoTlumaczenia(jezyk, limit);
+      let zrobione = 0;
+      for (let i = 0; i < doZrobienia.length; i += PACZKA) {
+        const paczka = doZrobienia.slice(i, i + PACZKA);
+        const wejscie = paczka.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          tekst: String(r.description_i18n?.pl ?? r.description ?? ''),
+        })).filter((x) => x.tekst);
+        if (!wejscie.length) continue;
+
+        let mapa: Record<string, string> = {};
+        try {
+          mapa = await przetlumaczPaczke(wejscie, jezyk, c.get('userId') || null);
+        } catch (err: any) {
+          console.warn(`[tlumaczenia] ${jezyk}, paczka ${i / PACZKA + 1}: ${err.message}`);
+          continue;
+        }
+
+        for (const r of paczka) {
+          const tekst = mapa[r.id];
+          if (!tekst) continue;
+          // updateCatalogPlace odrzuca łatki jednopolowe, a przy okazji chcemy
+          // znacznik czasu — stąd dwa pola zamiast jednego.
+          await repo.updateCatalogPlace(r.id, {
+            description_i18n: { ...(r.description_i18n ?? {}), [jezyk]: tekst },
+            updated_at: new Date().toISOString(),
+          });
+          zrobione++;
+        }
+      }
+      raport[jezyk] = { przetlumaczono: zrobione, pominieto: doZrobienia.length - zrobione };
+      console.log(`[tlumaczenia] ${jezyk}: ${zrobione}/${doZrobienia.length}`);
+    }
+
+    const pokrycie = await repo.pokrycieJezykow([...JEZYKI_UI]);
+    return c.json({ raport, pokrycie });
+  } catch (e: any) {
+    console.error('[catalog/translate-descriptions]', e);
+    return c.json({ error: e.message }, 500);
+  }
 });
 
 app.post('/marketing/tresci', async (c) => {
