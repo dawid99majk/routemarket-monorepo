@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
 
 interface PlannerHeaderProps {
@@ -17,13 +18,16 @@ function ostatniaTablica(): string | null {
   try { return localStorage.getItem('rm_ostatnia_tablica'); } catch { return null; }
 }
 
-function zakladki() {
+function zakladki(admin: boolean) {
   const id = ostatniaTablica();
   return [
     { label: 'Start', path: '/start' },
     { label: 'Odkrywaj', path: '/odkrywaj' },
     { label: 'Tablica', path: id ? `/plany/${id}` : '/plany' },
     { label: 'Plan', path: id ? `/plany/${id}?widok=plan` : '/plany' },
+    // Warsztat to narzędzie właściciela, nie funkcja serwisu — stąd osobny
+    // warunek zamiast stałej pozycji dla wszystkich.
+    ...(admin ? [{ label: 'Warsztat', path: '/marketing' }] : []),
   ];
 }
 
@@ -34,6 +38,7 @@ function zakladki() {
  */
 export default function PlannerHeader({ context, initials }: PlannerHeaderProps) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const { pathname, search } = useLocation();
   const here = pathname + search;
 
@@ -54,19 +59,19 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
 
   return (
     <header className="sticky top-0 z-20 h-16 border-b border-border bg-background/85 backdrop-blur-[8px]">
-      <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center gap-6">
+      <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-6 flex items-center gap-3 sm:gap-6">
         {/* Logotyp prowadzi na stronę główną — tak działa wszędzie i tego się po nim
             spodziewamy. Wejście do planera ma własną zakładkę „Start". */}
         <button onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
           <span className="font-display text-[19px] tracking-tight">Routemarket</span>
-          <span className="font-narrow uppercase tracking-[0.18em] text-[9px] text-muted-foreground
+          <span className="hidden sm:inline font-narrow uppercase tracking-[0.18em] text-[9px] text-muted-foreground
                            border border-border rounded-full px-2 py-0.5">
             Planner
           </span>
         </button>
 
-        <nav className="flex items-center gap-1">
-          {zakladki().map((t) => (
+        <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {zakladki(isAdmin).map((t) => (
             <button key={t.label} onClick={() => navigate(t.path)}
               className={`px-3.5 py-1.5 text-sm rounded-sm transition-colors ${
                 isActive(t.path) ? 'bg-muted font-medium' : 'text-foreground/70 hover:bg-muted/60'

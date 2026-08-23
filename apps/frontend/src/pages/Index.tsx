@@ -174,7 +174,7 @@ export default function Index() {
 
       {!user && (
       <header className="sticky top-0 z-30 h-[68px] border-b border-border bg-background/85 backdrop-blur-[8px]">
-        <div className="max-w-[1280px] mx-auto h-full px-10 flex items-center gap-8">
+        <div className="max-w-[1280px] mx-auto h-full px-5 sm:px-10 flex items-center gap-4 sm:gap-8">
           <a href="#gora" className="font-display text-[20px] font-medium shrink-0">Routemarket</a>
           <nav className="hidden lg:flex items-center gap-6">
             {NAWIGACJA.map(([label, href]) => (
@@ -183,7 +183,7 @@ export default function Index() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => navigate('/auth')}>Zaloguj się</Button>
+            <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => navigate('/auth')}>Zaloguj się</Button>
             <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90">
               Zaplanuj wyjazd
             </Button>
@@ -192,7 +192,7 @@ export default function Index() {
       </header>
       )}
 
-      <main id="gora" className="max-w-[1280px] mx-auto px-10">
+      <main id="gora" className="max-w-[1280px] mx-auto px-5 sm:px-10">
         {/* 1. Hero */}
         <section className="pt-[88px] pb-[72px] grid gap-10 [grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))] items-start">
           <div>
@@ -266,7 +266,7 @@ export default function Index() {
 
       {/* 2. Jak to działa */}
       <section id="jak-to-dziala" className="bg-card border-y border-border">
-        <div className="max-w-[1280px] mx-auto px-10 py-20">
+        <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-20">
           <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Jak to działa</p>
           <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
             Cztery kroki od pomysłu do trasy w zegarku
@@ -284,7 +284,7 @@ export default function Index() {
       </section>
 
       {/* 3. Prawdziwy przykład */}
-      <section id="przyklad" className="max-w-[1280px] mx-auto px-10 py-[88px]
+      <section id="przyklad" className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
         <div className="lg:sticky lg:top-[100px] max-w-[460px]">
           <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Prawdziwy przykład</p>
@@ -326,7 +326,7 @@ export default function Index() {
 
       {/* 4. Nawigacja i GPX */}
       <section id="gpx" className="bg-foreground text-background">
-        <div className="max-w-[1280px] mx-auto px-10 py-[88px]
+        <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
           <div>
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary-light">Nawigacja i GPX</p>
@@ -363,7 +363,7 @@ export default function Index() {
 
       {/* 5. Tablice od podróżników — tylko gdy naprawdę są */}
       {tablice.length > 0 && (
-        <section id="tablice" className="max-w-[1280px] mx-auto px-10 py-[88px]">
+        <section id="tablice" className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]">
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div className="max-w-[560px]">
               <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
@@ -381,8 +381,8 @@ export default function Index() {
                 nim pada pytanie „czy ktoś już był tam, dokąd jadę". Wpisanie miasta
                 przenosi do galerii z gotowym zapytaniem, zamiast filtrować pasek
                 kafli, w którym i tak mieści się kilkanaście pozycji. */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-none min-w-0">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={szukajTablic}
@@ -393,7 +393,7 @@ export default function Index() {
                     }
                   }}
                   placeholder="Szukaj tablicy po mieście"
-                  className="h-10 w-[220px] rounded-full border border-border bg-card pl-9 pr-4
+                  className="h-10 w-full sm:w-[220px] rounded-full border border-border bg-card pl-9 pr-4
                              text-sm outline-none focus:border-primary transition-colors"
                 />
               </div>
@@ -404,7 +404,7 @@ export default function Index() {
             </div>
           </div>
 
-          <div className="mt-10 -mx-10 px-10 overflow-x-auto
+          <div className="mt-10 -mx-5 px-5 sm:-mx-10 sm:px-10 overflow-x-auto
                           [scrollbar-width:thin] snap-x snap-mandatory">
             <div className="flex gap-5 pb-2">
               {tablice.map((t) => (
@@ -433,7 +433,7 @@ export default function Index() {
 
       {/* 6. Częste pytania */}
       <section className="bg-card border-y border-border">
-        <div className="max-w-[1280px] mx-auto px-10 py-20
+        <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-20
                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))] items-start">
           <div>
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Częste pytania</p>
@@ -451,7 +451,7 @@ export default function Index() {
       </section>
 
       {/* 7. Końcowe CTA */}
-      <section className="max-w-[1280px] mx-auto px-10 py-24 text-center">
+      <section className="max-w-[1280px] mx-auto px-5 sm:px-10 py-24 text-center">
         <h2 className="font-display font-light mx-auto max-w-[18ch] text-balance leading-tight
                        text-[clamp(34px,3.6vw,48px)]">
           Dokąd jedziesz w tym roku?
@@ -466,7 +466,7 @@ export default function Index() {
       </section>
 
       <footer className="border-t border-border">
-        <div className="max-w-[1280px] mx-auto px-10 py-11 flex flex-wrap items-center gap-6">
+        <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-11 flex flex-wrap items-center gap-6">
           <span className="font-display text-[18px] font-medium">Routemarket</span>
           <nav className="flex flex-wrap items-center gap-5">
             <a href="#jak-to-dziala" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Jak to działa</a>

@@ -18,7 +18,7 @@ import { podpisPubliczny } from '@/lib/uzytkownik';
 import { AXES, type RoutePreferenceValues } from '@/components/RoutePreferences';
 import OsPreferencji from '@/components/OsPreferencji';
 import PasekNarzedziTablicy, { type NarzedzieId } from '@/components/PasekNarzedziTablicy';
-import { apiPost } from '@/lib/api';
+import { apiPost, apiStream } from '@/lib/api';
 import { zakresDat, wTerminie } from '@/lib/daty';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
@@ -190,9 +190,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   /** Sekundy od startu planowania. Samo kółko przy zapytaniu trwającym minutę
    *  wygląda jak zawieszenie — licznik dowodzi, że coś się dzieje. */
   const [planSekundy, setPlanSekundy] = useState(0);
+  /** Co serwer właśnie robi. Przychodzi ze strumienia, więc nie trzeba zgadywać. */
+  const [etapPlanu, setEtapPlanu] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!planning) { setPlanSekundy(0); return; }
+    if (!planning) { setPlanSekundy(0); setEtapPlanu(null); return; }
     const t = setInterval(() => setPlanSekundy((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [planning]);
@@ -1245,7 +1247,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               lat: hotelZTablicy.lat ?? undefined,
               lng: hotelZTablicy.lng ?? undefined }
           : null;
-      const data = await apiPost<any>('/plan-trip', {
+      const zadanie = {
         destination: active.destination,
         days: active.days || 1,
         window: { start: planForm.start, end: planForm.end },
@@ -1262,12 +1264,70 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
         })),
         creator_preferences: mergePreferences(userPrefs, active)
-      });
-      setPlan(data);
-      setPlanDay(0);
-      // Plan powstaje z tablicy, ale mieszka w swojej zakładce. Bez tego skoku
-      // przycisk "ułóż plan" wyglądałby, jakby nic nie zrobił.
-      navigate(`/plany/${active.id}?widok=plan`);
+      };
+
+      /**
+       * Plan przychodzi dzień po dniu. Każdy gotowy dzień od razu ląduje na
+       * ekranie, więc czytanie zaczyna się, zanim policzy się reszta — a przy
+       * planie na kilka dni to różnica między patrzeniem w licznik a czytaniem
+       * pierwszego dnia.
+       *
+       * Stan trzymamy w obiekcie, nie w zmiennej: przypisania dzieją się w
+       * wywołaniu zwrotnym, a TypeScript zawęziłby wtedy typ zmiennej do jej
+       * wartości początkowej.
+       */
+      const stan = { blad: null as string | null };
+      let zebrane: any = { days: [], warnings: [], not_scheduled: [] };
+
+      try {
+        await apiStream('/plan-trip/stream', zadanie, (z) => {
+          if (z.typ === 'etap') {
+            setEtapPlanu(z.opis ?? null);
+          } else if (z.typ === 'dzien' && z.dzien) {
+            zebrane = {
+              ...zebrane,
+              days: [...zebrane.days, z.dzien].sort((a: any, b: any) => a.day - b.day),
+            };
+            setPlan(zebrane);
+            setEtapPlanu(`Gotowy dzień ${z.dzien.day} z ${active.days || 1}`);
+            if (zebrane.days.length === 1) {
+              setPlanDay(0);
+              // Plan powstaje z tablicy, ale mieszka w swojej zakładce. Skok robimy
+              // przy pierwszym dniu, żeby użytkownik zobaczył go od razu.
+              navigate(`/plany/${active.id}?widok=plan`);
+            }
+          } else if (z.typ === 'blad-dnia') {
+            stan.blad = `dzień ${z.numer}: ${z.blad}`;
+          } else if (z.typ === 'koniec') {
+            zebrane = {
+              ...zebrane,
+              warnings: z.warnings ?? [],
+              not_scheduled: z.not_scheduled ?? [],
+            };
+            setPlan(zebrane);
+          } else if (z.typ === 'blad') {
+            stan.blad = z.blad ?? 'Nieznany błąd planera';
+          }
+        });
+      } catch (e: any) {
+        stan.blad = e?.message ?? String(e);
+      }
+
+      if (!zebrane.days.length) {
+        // Droga odwrotu. Strumień może nie przejść przez firmowe proxy albo
+        // rozszerzenie przeglądarki, a wtedy lepiej poczekać dłużej na stary
+        // endpoint niż zostawić użytkownika z komunikatem o błędzie.
+        console.warn('[plan] strumień nie dowiózł dni, wracam do jednego wywołania:', stan.blad);
+        setEtapPlanu('Ponawiam bez strumienia — to potrwa dłużej');
+        zebrane = await apiPost<any>('/plan-trip', zadanie);
+        setPlan(zebrane);
+        setPlanDay(0);
+        navigate(`/plany/${active.id}?widok=plan`);
+      } else if (stan.blad) {
+        toast.warning(`Część planu się nie policzyła (${stan.blad}). Reszta jest gotowa.`);
+      }
+
+      const data = zebrane;
       // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
       const { data: saved } = await supabase
         .from('trip_plans')
@@ -3079,14 +3139,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0 mt-0.5" />
                     <div className="min-w-0">
                       <p className="text-[13px]">
-                        Sprawdzam godziny otwarcia, liczę dojścia i układam dni.
+                        {etapPlanu ?? 'Sprawdzam godziny otwarcia, liczę dojścia i układam dni.'}
                       </p>
-                      {/* Licznik zamiast wymyślonych etapów. Postępu z serwera nie
-                          dostajemy, więc udawany pasek "krok 2 z 4" byłby teatrem —
-                          upływ czasu i widełki są prawdziwe i wystarczą, żeby nie
-                          brać zapytania za zawieszenie. */}
+                      {/* Etapy są teraz prawdziwe — serwer melduje każdy gotowy dzień,
+                          więc nie ma tu już zgadywania. Licznik zostaje obok, bo
+                          odpowiada na inne pytanie: nie „co się dzieje", tylko
+                          „czy to jeszcze normalny czas". */}
                       <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1">
-                        {planSekundy} s · zwykle trwa 40–90 s
+                        {planSekundy} s · dni pojawiają się pojedynczo
                       </p>
                       {planSekundy > 100 && (
                         <p className="text-[12px] text-muted-foreground mt-1.5 text-pretty">

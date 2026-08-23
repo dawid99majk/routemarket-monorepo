@@ -27,7 +27,7 @@ export default function LegalLayout({ docKey, children }: LegalLayoutProps) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <main className="flex-1 w-full min-w-0 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {meta && (
           <div className="flex flex-wrap items-center gap-3 mb-6 text-xs text-muted-foreground">
             <span>{t('legal.version')}: {meta.version}</span>
@@ -35,6 +35,13 @@ export default function LegalLayout({ docKey, children }: LegalLayoutProps) {
             <span>{t('legal.published_at')}: {meta.publishedAt}</span>
           </div>
         )}
+        {/* Trzykolumnowe tabele w polityce prywatności i cookies nie mieszczą się
+            na telefonie, a w prose nie da się ich opakować kontenerem bez zmiany
+            treści dokumentów. Przewijanie ustawiamy więc na samej tabeli. */}
+        <style>{`
+          .prose table { display: block; overflow-x: auto; max-width: 100%; }
+          .prose table th, .prose table td { white-space: normal; min-width: 8rem; }
+        `}</style>
         <article className="prose prose-neutral dark:prose-invert max-w-none">
           {children}
         </article>

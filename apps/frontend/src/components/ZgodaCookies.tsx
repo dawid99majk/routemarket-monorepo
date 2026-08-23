@@ -58,7 +58,7 @@ export default function ZgodaCookies() {
       className="fixed inset-x-0 bottom-0 z-[1600] border-t border-border bg-card shadow-token-lg
                  animate-in fade-in slide-in-from-bottom-2 duration-200"
     >
-      <div className="max-w-[1400px] mx-auto px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <p className="text-[13px] leading-relaxed text-muted-foreground flex-1 min-w-[260px] text-pretty">
           RouteMarket stores only what it needs to keep you signed in and remember your
           settings. With your agreement we would also measure how the site is used, so we can
@@ -70,17 +70,17 @@ export default function ZgodaCookies() {
         </p>
         {/* Odmowa nie może być trudniejsza od zgody — dwa przyciski tej samej wagi,
             bez przygaszania tego niewygodnego. */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:shrink-0">
           <button
             onClick={() => zdecyduj('odrzucone')}
-            className="h-10 rounded-full border border-border bg-background px-4 text-sm
+            className="flex-1 sm:flex-none h-10 rounded-full border border-border bg-background px-4 text-sm
                        hover:bg-muted transition-colors"
           >
             Only what is necessary
           </button>
           <button
             onClick={() => zdecyduj('przyjete')}
-            className="h-10 rounded-full bg-primary text-primary-foreground px-4 text-sm
+            className="flex-1 sm:flex-none h-10 rounded-full bg-primary text-primary-foreground px-4 text-sm
                        hover:bg-primary/90 transition-colors"
           >
             Allow statistics

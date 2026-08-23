@@ -85,3 +85,90 @@ export async function apiPost<T = any>(
     opts.signal?.removeEventListener('abort', forwardAbort);
   }
 }
+
+/** Zdarzenie ze strumienia planera. Pole `typ` rozstrzyga, co niesie reszta. */
+export interface ZdarzenieStrumienia {
+  typ: 'etap' | 'dzien' | 'blad-dnia' | 'koniec' | 'blad';
+  opis?: string;
+  dni?: number;
+  dzien?: any;
+  numer?: number;
+  blad?: string;
+  warnings?: string[];
+  not_scheduled?: { name: string; reason?: string }[];
+  sekundy?: number;
+}
+
+/**
+ * Odbiór odpowiedzi podawanej po kawałku (SSE).
+ *
+ * `EventSource` odpada, bo umie tylko GET, a planer dostaje na wejściu całą
+ * tablicę miejsc — to musi być POST. Zamiast tego czytamy ciało odpowiedzi
+ * strumieniem i sami rozcinamy je po pustej linii, zgodnie z formatem SSE.
+ *
+ * Bufor jest tu nie dla ozdoby: kawałek przychodzący z sieci prawie nigdy nie
+ * kończy się równo na granicy zdarzenia, więc ostatni, niedomknięty fragment
+ * musi doczekać następnej porcji danych, zamiast trafić do JSON.parse.
+ *
+ * Limitu czasu celowo nie ma takiego jak w apiPost: strumień z założenia trwa,
+ * a jego sens polega na tym, że w międzyczasie coś już widać. Przerwanie zostaje
+ * po stronie wywołującego, przez `signal`.
+ */
+export async function apiStream(
+  path: string,
+  body: unknown,
+  naZdarzenie: (z: ZdarzenieStrumienia) => void,
+  opts: { signal?: AbortSignal } = {}
+): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    throw new ApiError('Sesja wygasła. Zaloguj się ponownie, żeby kontynuować.', 401);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  } catch {
+    throw new ApiError('Brak połączenia z serwerem. Sprawdź sieć i spróbuj ponownie.', 0);
+  }
+
+  if (!res.ok) {
+    const payload = await res.json().catch(() => null);
+    throw new ApiError(messageForStatus(res.status, payload), res.status, payload?.retry_after_s);
+  }
+  if (!res.body) throw new ApiError('Serwer nie odesłał strumienia.', 0);
+
+  const czytnik = res.body.getReader();
+  const dekoder = new TextDecoder();
+  let bufor = '';
+
+  while (true) {
+    const { done, value } = await czytnik.read();
+    if (done) break;
+    bufor += dekoder.decode(value, { stream: true });
+
+    let granica: number;
+    while ((granica = bufor.indexOf('\n\n')) !== -1) {
+      const ramka = bufor.slice(0, granica);
+      bufor = bufor.slice(granica + 2);
+      for (const linia of ramka.split('\n')) {
+        if (!linia.startsWith('data:')) continue;
+        const surowe = linia.slice(5).trim();
+        if (!surowe) continue;
+        try {
+          naZdarzenie(JSON.parse(surowe) as ZdarzenieStrumienia);
+        } catch {
+          // Pojedyncze zdarzenie nie do odczytania nie może przerwać całego
+          // planu — reszta dni przyjdzie osobnymi ramkami.
+          console.warn('[apiStream] pominięto nieczytelne zdarzenie');
+        }
+      }
+    }
+  }
+}

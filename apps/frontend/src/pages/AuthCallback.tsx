@@ -10,7 +10,16 @@ export default function AuthCallback() {
       if (error || !session) {
         navigate('/auth/error?msg=' + encodeURIComponent(error?.message || 'Authentication failed'));
       } else {
-        navigate('/start');
+        // Cel zapisany przed wyjsciem do Google. Sprawdzamy go tak samo jak
+        // parametr z adresu: wartosc z sessionStorage tez moze byc podmieniona,
+        // a przekierowanie na obcy adres byloby otwartym przekierowaniem.
+        let cel = '/start';
+        try {
+          const zapisany = sessionStorage.getItem('rm_powrot_po_logowaniu');
+          sessionStorage.removeItem('rm_powrot_po_logowaniu');
+          if (zapisany && zapisany.startsWith('/') && !zapisany.startsWith('//')) cel = zapisany;
+        } catch { /* tryb prywatny — zostaje wartosc domyslna */ }
+        navigate(cel, { replace: true });
       }
     });
   }, [navigate]);

@@ -47,10 +47,10 @@ const MyRoutes = leniwie(() => import("./pages/MyRoutes"));
 const PlacePage = leniwie(() => import("./pages/PlacePage"));
 const Start = leniwie(() => import('./pages/Start'));
 const Discover = leniwie(() => import("./pages/Discover"));
-const Favorites = leniwie(() => import("./pages/Favorites"));
 const Collections = leniwie(() => import("./pages/Collections"));
 const Zapisane = leniwie(() => import("./pages/Zapisane"));
 const Tablice = leniwie(() => import("./pages/Tablice"));
+const Marketing = leniwie(() => import("./pages/Marketing"));
 const TablicaPubliczna = leniwie(() => import("./pages/TablicaPubliczna"));
 const TripPlans = leniwie(() => import("./pages/TripPlans"));
 const RouteBuilderV2 = leniwie(() => import("./pages/v2/RouteBuilderV2"));
@@ -134,6 +134,7 @@ const App = () => (
                   {/* Publiczne tablice bez logowania — to jedyna droga, żeby
                       opublikowana tablica mogła kogokolwiek z zewnątrz zaprosić. */}
                   <Route path="/tablice" element={<Tablice />} />
+                  <Route path="/marketing" element={<ProtectedAdminRoute><Marketing /></ProtectedAdminRoute>} />
                   <Route path="/tablica/:id" element={<TablicaPubliczna />} />
                   {/* Ulubione i kolekcje były osobnymi ekranami dla tej samej intencji.
                       Stare adresy zostają jako przekierowania — mogą wisieć w zakładkach
@@ -144,7 +145,6 @@ const App = () => (
                   <Route path="/kolekcja/:slug" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
                   <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
-                  <Route path="/ulubione" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
                   <Route path="/miejsce/:slug" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
