@@ -1,7 +1,16 @@
 server {
     listen 80;
     server_name routemarket.io www.routemarket.io supabase.routemarket.io;
-    return 301 https://$host$request_uri;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 
 server {
@@ -10,11 +19,55 @@ server {
 
     ssl_certificate /etc/letsencrypt/live/routemarket.io/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/routemarket.io/privkey.pem;
+
+    # Naglowki bezpieczenstwa. Swiadomie BEZ "preload": wpis na liste preload
+    # przegladarek jest praktycznie nieodwracalny (usuniecie trwa miesiacami),
+    # a sam max-age z includeSubDomains daje ta sama ochrone bez zobowiazania.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
+    # Trzy adresy obsługuje API, bo wymagają znaczników zależnych od treści.
+    # Zwraca ten sam index.html co front, tylko z podmienionym tytułem, opisem
+    # i obrazkiem — aplikacja startuje normalnie, a robot i podgląd odnośnika
+    # dostają to, co opisuje konkretną tablicę albo miejsce, a nie stronę główną.
+    location ^~ /tablica/ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ /miejsce/ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Mapa strony budowana z bazy zamiast pliku sprzed pół roku.
+    location = /sitemap.xml {
+        proxy_pass http://127.0.0.1:8081/sitemap.xml;
+        proxy_set_header Host $host;
+    }
+
     location / {
-        proxy_pass http://127.0.0.1:8501;
+        proxy_pass http://127.0.0.1:8089;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /atlas/ {
+        proxy_pass http://127.0.0.1:8501/atlas/;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -36,6 +89,12 @@ server {
     location /route-builder-api/ {
         proxy_pass http://127.0.0.1:8081/;
         proxy_http_version 1.1;
+        # Tura wywiadu to Gemini + geokodowanie kilkunastu nazw + dwa przebiegi
+        # routingu; domyślne 60 s ucinało ją jako 504, a użytkownik widział
+        # milczącego agenta. Frontend czeka 180 s, proxy musi wytrzymać tyle samo.
+        proxy_read_timeout 200;
+        proxy_send_timeout 200;
+        proxy_connect_timeout 15;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -49,6 +108,14 @@ server {
 
     ssl_certificate /etc/letsencrypt/live/routemarket.io/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/routemarket.io/privkey.pem;
+
+    # Naglowki bezpieczenstwa. Swiadomie BEZ "preload": wpis na liste preload
+    # przegladarek jest praktycznie nieodwracalny (usuniecie trwa miesiacami),
+    # a sam max-age z includeSubDomains daje ta sama ochrone bez zobowiazania.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 

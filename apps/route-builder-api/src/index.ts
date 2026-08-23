@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import { serve } from '@hono/node-server';
 import { zValidator } from '@hono/zod-validator';
 import { RouteRequirementsSchema } from './types/index.js';
@@ -11,11 +11,18 @@ import { reportService } from './services/report.js';
 import { gpxParserService } from './services/gpx-parser.js';
 
 import { authMiddleware } from './middleware/auth.js';
+import { faktyTablicy, wygenerujTresci, type Kanal } from './services/marketing.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { poiService, poiClusterCenter, PoiCandidate } from './services/poi.js';
 import { routeValidatorService } from './services/route-validator.js';
 import { describeAvailability, isOpenDuring } from './services/opening-hours.js';
 import { callGeminiTracked } from './services/ai-usage.js';
+import { streamSSE } from 'hono/streaming';
+import { pobierzZewnetrzna, NiedozwolonyAdres } from './services/bezpieczne-pobieranie.js';
+import {
+  przygotujKontekst, ulozDzien, opiszPreferencje, clusterPlacesByProximity,
+  type ZadaniePlanu,
+} from './services/planer.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
@@ -42,12 +49,46 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/events/refresh': { windowMs: 10 * 60_000, max: 6 },
   '/discover-places': { windowMs: 5 * 60_000, max: 20 },
   '/plan-trip': { windowMs: 5 * 60_000, max: 20 },
-  '/geocode-points': { windowMs: 5 * 60_000, max: 60 }
+  '/geocode-points': { windowMs: 5 * 60_000, max: 60 },
+  '/marketing/tresci': { windowMs: 10 * 60_000, max: 20 },
+  '/plan-trip/stream': { windowMs: 5 * 60_000, max: 20 },
+  // Oba przyjmują adres od użytkownika i karmią nim model. Bez logowania i
+  // limitu byłby to darmowy generator kosztów po stronie Gemini, dostępny
+  // dla każdego bota, który znajdzie ten adres.
+  '/places/extract': { windowMs: 5 * 60_000, max: 15 },
+  '/places/from-link': { windowMs: 5 * 60_000, max: 30 }
 };
 
 for (const [path, limit] of Object.entries(AI_ENDPOINTS)) {
   app.use(path, authMiddleware);
   app.use(path, rateLimit({ name: path, ...limit }));
+}
+
+/**
+ * Ścieżki serwisowe: masowe zapisy do katalogu i hurtowe odpytywanie zewnętrznych
+ * usług o zdjęcia i współrzędne. Nie miały żadnej kontroli — ani logowania, ani
+ * roli — więc dowolny bot mógł uruchomić przepisywanie katalogu i rachunek za
+ * geokodowanie. To narzędzia utrzymaniowe, nie funkcje serwisu, więc zamykamy je
+ * rolą, a nie limitem zapytań.
+ */
+const ENDPOINTY_SERWISOWE = [
+  '/board/refresh-photos',
+  '/catalog/backfill-country',
+  '/catalog/enrich',
+  '/catalog/refresh-photos',
+];
+
+const tylkoAdministrator: MiddlewareHandler = async (c, next) => {
+  const uzytkownik = c.get('user') as { roles?: string[] } | undefined;
+  if (!uzytkownik?.roles?.includes('admin')) {
+    return c.json({ error: 'Operacja dostępna tylko dla administratora' }, 403);
+  }
+  await next();
+};
+
+for (const path of ENDPOINTY_SERWISOWE) {
+  app.use(path, authMiddleware);
+  app.use(path, tylkoAdministrator);
 }
 
 /** Kształt odpowiedzi agenta wywiadu, wymuszany na Gemini (OpenAPI subset). */
@@ -332,55 +373,6 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"waypoints": ["nazwa1", "nazwa2", ...]}`;
  * karty do przypięcia. Nazwy są dopasowywane do OpenStreetMap, więc karta niesie
  * realne współrzędne i godziny otwarcia, a nie tylko opis od modelu.
  */
-/**
- * Preferencje jako zdania, nie liczby. Model dostawał w planerze surowe
- * "pace=100, effort=15" i musiał zgadywać, co znaczy każdy klucz i w którą stronę
- * rośnie — a kierunki są nieoczywiste: wysokie effort znaczy "chętnie podejdę pod
- * górę", nie "unikam wysiłku". Wyszukiwanie miało to opisane po ludzku od początku,
- * planer nie; teraz oba korzystają z jednego źródła.
- *
- * Osie w okolicach środka pomijamy: brak zdania to nie jest wskazówka.
- */
-function opiszPreferencje(prefs: Record<string, number> | null | undefined): string[] {
-  if (!prefs) return [];
-  const OSIE: Record<string, { gora: string; dol: string }> = {
-    pace: {
-      gora: 'Woli mniej miejsc, ale spędzić w każdym więcej czasu.',
-      dol: 'Woli zobaczyć więcej miejsc, nawet krócej w każdym.',
-    },
-    popularity: {
-      gora: 'Woli miejsca niszowe i nieoczywiste niż największe ikony.',
-      dol: 'Chce przede wszystkim klasyków i miejsc must-see.',
-    },
-    wandering: {
-      gora: 'Lubi błądzenie po okolicy — zostaw luz między punktami.',
-      dol: 'Woli trasę konkretną, od punktu do punktu, bez nadkładania drogi.',
-    },
-    dining: {
-      gora: 'W jedzeniu preferuje lokalny street food i tanie, autentyczne miejsca.',
-      dol: 'W jedzeniu preferuje eleganckie restauracje i kawiarnie z górnej półki.',
-    },
-    effort: {
-      gora: 'Podejścia, schody i wzniesienia są mile widziane.',
-      dol: 'Unikaj długiego chodzenia, stromych podejść i schodów.',
-    },
-    crowds: {
-      gora: 'Unika tłumów — doceni miejsca mniej oblegane.',
-      dol: 'Tłumy nie przeszkadzają — popularne miejsca są w porządku.',
-    },
-  };
-
-  const out: string[] = [];
-  for (const [klucz, opis] of Object.entries(OSIE)) {
-    const v = prefs[klucz];
-    if (v == null) continue;
-    if (v > 60) out.push(opis.gora);
-    else if (v < 40) out.push(opis.dol);
-  }
-  return out;
-}
-
-
 app.post('/discover-places', async (c) => {
   try {
     const { query, destination, category, limit, creator_preferences } = await c.req.json() as {
@@ -550,62 +542,6 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
  * (godziny otwarcia, czasy przejść), a modelowi zostawiamy kolejność i narrację —
  * odwrotnie byłoby zgadywaniem: model nie policzy rzetelnie, czy zdążysz.
  */
-
-/**
- * Podział miejsc na dni po położeniu. Model potrafi napisać, że grupuje punkty
- * blisko siebie, ale geometrii nie liczy — i wychodziły dni skaczące przez całe
- * miasto. Prościej policzyć to tutaj i podać mu gotową podpowiedź, którą wciąż
- * może nadpisać, gdy godziny otwarcia każą inaczej.
- *
- * Algorytm: k najdalszych od siebie zalążków, potem przypisanie każdego miejsca
- * do najbliższego z nich. Bez iteracji — przy kilkunastu punktach i 2-4 dniach
- * wynik jest stabilny, a wynik ma być podpowiedzią, nie wyrocznią.
- */
-function clusterPlacesByProximity<T extends { name: string; lat?: number | null; lng?: number | null }>(
-  places: T[],
-  groups: number
-): T[][] {
-  const located = places.filter((p) => p.lat != null && p.lng != null);
-  if (groups <= 1 || located.length <= groups) return [places];
-
-  const km = (a: any, b: any) => {
-    const dLat = (a.lat - b.lat) * 111;
-    const dLng = (a.lng - b.lng) * 111 * Math.cos((a.lat * Math.PI) / 180);
-    return Math.sqrt(dLat * dLat + dLng * dLng);
-  };
-
-  const seeds: T[] = [located[0]];
-  while (seeds.length < groups) {
-    let best: T | null = null;
-    let bestDist = -1;
-    for (const p of located) {
-      if (seeds.includes(p)) continue;
-      const nearest = Math.min(...seeds.map((sd) => km(p, sd)));
-      if (nearest > bestDist) { bestDist = nearest; best = p; }
-    }
-    if (!best) break;
-    seeds.push(best);
-  }
-
-  const buckets: T[][] = seeds.map(() => []);
-  for (const p of located) {
-    let idx = 0;
-    let bestDist = Infinity;
-    seeds.forEach((sd, i) => {
-      const d = km(p, sd);
-      if (d < bestDist) { bestDist = d; idx = i; }
-    });
-    buckets[idx].push(p);
-  }
-  // Miejsca bez współrzędnych trafiają do najliczniejszej grupy — nie mamy czym
-  // ich przypisać, a gubienie ich po cichu byłoby gorsze.
-  const unlocated = places.filter((p) => p.lat == null || p.lng == null);
-  if (unlocated.length) {
-    const biggest = buckets.reduce((a, b) => (b.length > a.length ? b : a), buckets[0]);
-    biggest.push(...unlocated);
-  }
-  return buckets.filter((b) => b.length > 0);
-}
 
 app.post('/plan-trip', async (c) => {
   try {
@@ -1119,6 +1055,13 @@ const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagr
  */
 const CAMERA_DUMP = /\b(dsc[_\s-]?\d|dscn\d|img[_\s-]?\d|imgp\d|p\d{7}|photo[_\s-]?\d|cimg\d|_mg_\d)/i;
 
+/**
+ * Kadry pokazujące fragment, nie obiekt: żyrandol, sufit, tablica, klamka.
+ * Takiego pliku nie odrzucamy — przy małym muzeum bywa jedynym, jaki istnieje —
+ * ale nie może trafić na kartę jako zdjęcie główne, gdy jest czym go zastąpić.
+ */
+const PHOTO_DETAL = /(interior|wnetrz|detail|detal|ceiling|sufit|chandelier|zyrandol|żyrandol|plaque|tablica|inscription|inskrypcj|door|drzwi|window|okno|staircase|schody|fresco|fresk|mosaic|mozaik|column|kolumn|ornament|handle|klamka|sign\b)/i;
+
 const stripDiacritics = (t: string) =>
   t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -1175,6 +1118,9 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
       const title = String(p.title || '').toLowerCase();
       return nameTokens.some((t) => title.includes(t.toLowerCase()));
     })
+    // Detale na koniec, reszta w oryginalnej kolejnosci trafnosci. Sortowanie
+    // jest stabilne, wiec wewnatrz obu grup ranking z Commons zostaje nietkniety.
+    .sort((a, b) => Number(PHOTO_DETAL.test(a.title || '')) - Number(PHOTO_DETAL.test(b.title || '')))
     .map((p) => p.imageinfo?.[0]?.thumburl)
     .filter((u: string | undefined): u is string => !!u && /\.(jpg|jpeg|png)$/i.test(u.split('?')[0]));
 }
@@ -1204,16 +1150,24 @@ async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }
         .filter((pg) => pg.original?.source)
         .map((pg) => {
           const title = stripDiacritics(pg.title || '');
+          // Slowa tytulu, nie surowy napis. Dopasowanie podciagiem dawalo trafienia
+          // miedzy roznymi miejscami: token "roman" z "Ateneul Roman" siedzi w
+          // "Piata Romana", wiec plac wygrywal z filharmonia, gdy ta akurat nie
+          // miala zdjecia wiodacego.
+          const slowaTytulu = new Set(title.split(/[^a-z0-9]+/).filter(Boolean));
           const c = pg.coordinates?.[0];
           const km = c ? kmApart(origin, { lat: c.lat, lng: c.lon }) : 9;
-          const hits = tokens.filter((t) => title.includes(t)).length;
-          const clash = WIKI_KIND.some((k) => title.includes(k) && !nameKinds.includes(k));
+          const hits = tokens.filter((t) => slowaTytulu.has(t)).length;
+          const clash = WIKI_KIND.some((k) => slowaTytulu.has(k) && !nameKinds.includes(k));
           return { pg, hits, km, clash };
         })
         // Artykuł musi pasować nazwą. Samo "leży blisko" nie wystarcza — w
         // starówce w promieniu stu metrów jest kilkanaście obiektów z własnym
         // artykułem i każdy z nich byłby wtedy równie dobrym kandydatem.
-        .filter((r) => r.hits > 0 && !r.clash)
+        // Jedno wspolne slowo to za malo, gdy nazwa ma ich kilka: "Muzeum
+        // Narodowe" i "Muzeum Techniki" dziela polowe nazwy i sa czym innym.
+        // Zadamy polowy tokenow — przy nazwie jednoslownej to dalej jeden token.
+        .filter((r) => r.hits > 0 && !r.clash && r.hits >= Math.ceil(tokens.length / 2))
         .sort((a, b) => b.hits - a.hits || a.km - b.km);
 
       const best = scored[0]?.pg?.original?.source as string | undefined;
@@ -1518,6 +1472,134 @@ app.get('/miejsce/:slug', async (c) => {
  * wymieniała siedemdziesiąt adresów i ani jednej publicznej tablicy ani miejsca
  * z katalogu — czyli pomijała całą treść, która ma się w ogóle znaleźć.
  */
+/**
+ * Materiały promocyjne dla konkretnej publicznej tablicy.
+ *
+ * Endpoint jest zamknięty rolą administratora, a nie cennikiem tokenów. Cennik
+ * ma sens tam, gdzie użytkownik prosi o wynik dla siebie; tutaj wynik służy
+ * promocji platformy, więc obciążanie za niego właściciela byłoby tarciem bez
+ * powodu. Zamknięcie musi być jednak po stronie serwera — sama osłona trasy
+ * w przeglądarce zostawiłaby otwarte wejście do modelu dla każdego zalogowanego.
+ */
+/**
+ * Plan wyjazdu podawany dzień po dniu, zamiast jednym pakietem na końcu.
+ *
+ * Stary `/plan-trip` liczył cały wyjazd jednym wywołaniem modelu: średnio 43 s,
+ * w najgorszym zmierzonym przypadku 112 s, i przez cały ten czas na ekranie
+ * tykał licznik sekund. Tutaj dni liczą się równolegle, a każdy gotowy leci do
+ * przeglądarki od razu — pierwszy dzień pojawia się, zanim ostatni się policzy,
+ * i całość trwa tyle, co najwolniejszy dzień, a nie tyle, co ich suma.
+ *
+ * Dni wysyłamy w kolejności numerów, choć liczą się równolegle. Kolejność
+ * ukończenia byłaby szybsza o ułamek sekundy i gorsza dla czytającego: plan,
+ * w którym dzień trzeci wskakuje przed pierwszym, wygląda na zepsuty.
+ *
+ * Stary endpoint zostaje nietknięty jako droga odwrotu — gdyby strumień padł
+ * u kogoś na firmowym proxy, front ma się czym poratować. Obie ścieżki dzielą
+ * ten sam serwis, więc nie mogą rozjechać się co do treści planu.
+ */
+app.post('/plan-trip/stream', async (c) => {
+  const tokenUserId = c.get('userId') || null;
+  const shortfall = await ensureTokens(tokenUserId, 'plan-trip');
+  if (shortfall) return c.json({ error: shortfall, needs_tokens: true }, 402);
+
+  const body = await c.req.json() as ZadaniePlanu;
+  if (!body.places?.length) return c.json({ error: 'Brak przypiętych miejsc' }, 400);
+
+  // Bez tego nagłówka nginx zbuforowałby całą odpowiedź i oddał ją dopiero na
+  // końcu — dni docierałyby naraz, czyli dokładnie tak, jak przed zmianą, tyle
+  // że okrężną drogą. Nagłówek dotyczy tej jednej odpowiedzi, więc buforowanie
+  // pozostałych endpointów zostaje nietknięte.
+  c.header('X-Accel-Buffering', 'no');
+  c.header('Cache-Control', 'no-cache, no-transform');
+
+  return streamSSE(c, async (stream) => {
+    const wyslij = (typ: string, dane: Record<string, unknown>) =>
+      stream.writeSSE({ data: JSON.stringify({ typ, ...dane }) });
+
+    const zaczeto = Date.now();
+    try {
+      await wyslij('etap', { opis: 'Sprawdzam godziny otwarcia i szukam miejsc w okolicy' });
+      const kontekst = await przygotujKontekst(body, tokenUserId);
+
+      const ile = kontekst.dni.length;
+      await wyslij('etap', {
+        opis: ile === 1 ? 'Układam plan dnia' : `Układam ${ile} dni naraz`,
+        dni: ile,
+      });
+
+      // Wszystkie dni ruszają teraz; pętla niżej tylko odbiera wyniki.
+      const wRobocie = kontekst.dni.map((d) =>
+        ulozDzien(kontekst, d.index)
+          .then((dzien) => ({ ok: true as const, dzien }))
+          .catch((err: any) => ({ ok: false as const, numer: d.index, blad: err.message }))
+      );
+
+      const ostrzezenia: string[] = [];
+      const nieZaplanowane: { name: string; reason?: string }[] = [];
+      let udane = 0;
+
+      for (const oczekiwane of wRobocie) {
+        const wynik = await oczekiwane;
+        if (wynik.ok) {
+          udane++;
+          ostrzezenia.push(...(wynik.dzien.warnings ?? []));
+          nieZaplanowane.push(...(wynik.dzien.not_scheduled ?? []));
+          await wyslij('dzien', { dzien: wynik.dzien });
+        } else {
+          console.warn(`[plan-trip/stream] dzień ${wynik.numer}: ${wynik.blad}`);
+          await wyslij('blad-dnia', { numer: wynik.numer, blad: wynik.blad });
+        }
+      }
+
+      if (!udane) throw new Error('Nie udało się ułożyć żadnego dnia. Spróbuj ponownie.');
+
+      // Opłata dopiero teraz: użytkownik ma już plan przed oczami.
+      await repo.chargeTokens(tokenUserId!, TOKEN_PRICES['plan-trip'], 'plan dni', body.destination);
+
+      const sekundy = Math.round((Date.now() - zaczeto) / 100) / 10;
+      console.log(`[plan-trip/stream] ${udane}/${ile} dni w ${sekundy} s`);
+      await wyslij('koniec', {
+        warnings: [...new Set(ostrzezenia)],
+        not_scheduled: nieZaplanowane.filter((n, i, a) =>
+          a.findIndex((x) => x.name.trim().toLowerCase() === n.name.trim().toLowerCase()) === i),
+        sekundy,
+      });
+    } catch (err: any) {
+      console.error('[plan-trip/stream]', err);
+      await wyslij('blad', { blad: err.message });
+    }
+  });
+});
+
+app.post('/marketing/tresci', async (c) => {
+  try {
+    const uzytkownik = c.get('user') as { roles?: string[] } | undefined;
+    if (!uzytkownik?.roles?.includes('admin')) {
+      return c.json({ error: 'Narzędzie dostępne tylko dla administratora' }, 403);
+    }
+
+    const body = await c.req.json() as { tablicaId?: string; kanal?: Kanal };
+    const kanal = body.kanal ?? 'instagram';
+    if (!['instagram', 'facebook', 'seo'].includes(kanal)) {
+      return c.json({ error: `Nieznany kanał: ${kanal}` }, 400);
+    }
+    if (!body.tablicaId) return c.json({ error: 'Brak tablicaId' }, 400);
+
+    const fakty = await faktyTablicy(body.tablicaId);
+    if (!fakty) {
+      // Tablica prywatna albo nieistniejąca — z zewnątrz to ten sam przypadek.
+      return c.json({ error: 'Nie znaleziono publicznej tablicy o tym identyfikatorze' }, 404);
+    }
+
+    const warianty = await wygenerujTresci(kanal, fakty, c.get('userId') || null);
+    return c.json({ kanal, fakty, warianty });
+  } catch (err: any) {
+    console.error('[marketing]', err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.get('/sitemap.xml', async (c) => {
   try {
     const { boards, places } = await repo.sitemapEntries();
@@ -2115,13 +2197,17 @@ app.post('/places/extract', async (c) => {
       }
 
       try {
-        const res = await fetch(adres, {
-          headers: { 'User-Agent': COMMONS_UA },
-          redirect: 'follow',
-          signal: AbortSignal.timeout(12_000),
+        // Adres sprawdzany po ROZWIĄZANIU nazwy w DNS, nie po samym napisie, i na
+        // każdym skoku przekierowania osobno — inaczej wystarczyłaby własna domena
+        // wskazująca na pętlę zwrotną albo przekierowanie na metadane maszyny.
+        const pobrane = await pobierzZewnetrzna(adres, {
+          naglowki: { 'User-Agent': COMMONS_UA },
+          limitMs: 12_000,
         });
-        if (!res.ok) return c.json({ error: `Strona odpowiedziała błędem ${res.status}.` }, 422);
-        const html = await res.text();
+        if (pobrane.status >= 400) {
+          return c.json({ error: `Strona odpowiedziała błędem ${pobrane.status}.` }, 422);
+        }
+        const html = pobrane.tekst;
         // Sam tekst: znaczniki, skrypty i style tylko zaśmiecają wejście modelu.
         tresc = html
           .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -2132,7 +2218,10 @@ app.post('/places/extract', async (c) => {
           .trim()
           .slice(0, 12_000);
         zrodlo = 'artykuł';
-      } catch {
+      } catch (err) {
+        // Odmowa z powodu adresu to nie awaria pobierania — użytkownik ma dostać
+        // inny komunikat i inny kod niż przy stronie, która po prostu nie odpowiada.
+        if (err instanceof NiedozwolonyAdres) return c.json({ error: err.message }, 400);
         return c.json({ error: 'Nie udało się pobrać tej strony.' }, 422);
       }
     }
