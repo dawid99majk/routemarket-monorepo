@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { TRIP_PRESETS, EMPTY_AXES } from '@/lib/tripPresets';
+import { useTranslation } from 'react-i18next';
 
 type Priority = 'must' | 'nice' | 'rejected';
 
@@ -82,6 +83,7 @@ const plural = (n: number, one: string, few: string, many: string) => {
 };
 
 export default function Start() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [imie, setImie] = useState<string | null>(null);
@@ -275,7 +277,7 @@ export default function Start() {
   };
 
   const startTrip = async () => {
-    if (!city.trim()) return toast.error('Podaj miasto lub region');
+    if (!city.trim()) return toast.error(t('start.podaj_miasto_lub_region'));
     setCreating(true);
     const parsed = parseTerm(term);
     const { data: userData } = await supabase.auth.getUser();
@@ -294,7 +296,7 @@ export default function Start() {
     if (error) return toast.error(error.message);
 
     if (term.trim() && !parsed) {
-      toast.info('Nie rozpoznałem terminu — wyjazd zapisany jako szkic. Datę ustawisz na tablicy.');
+      toast.info(t('start.nie_rozpozna_em_terminu_wyjazd'));
     }
     navigate('/odkrywaj');
   };
@@ -345,14 +347,14 @@ export default function Start() {
 
   const noweWyjazdPanel = (
     <div className="rounded-md bg-foreground text-background p-7 flex flex-col">
-      <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-primary-light">Nowy wyjazd</p>
-      <h2 className="font-display font-light text-[26px] leading-tight mt-2.5">Dokąd tym razem?</h2>
+      <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-primary-light">{t('start.nowy_wyjazd')}</p>
+      <h2 className="font-display font-light text-[26px] leading-tight mt-2.5">{t('start.dokad_tym_razem')}</h2>
 
-      <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Miasto lub region"
+      <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={t('start.miasto_lub_region')}
         className="mt-6 w-full rounded-sm bg-primary-foreground/[0.07] border border-primary-foreground/20
                    px-3.5 h-11 text-background placeholder:text-primary-foreground/45
                    focus:outline-none focus:border-primary-light transition-colors" />
-      <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Termin — np. 12–14 września"
+      <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t('start.termin_np_12_14_wrzesnia')}
         onKeyDown={(e) => e.key === 'Enter' && startTrip()}
         className="mt-3 w-full rounded-sm bg-primary-foreground/[0.07] border border-primary-foreground/20
                    px-3.5 h-11 text-background placeholder:text-primary-foreground/45
@@ -377,7 +379,7 @@ export default function Start() {
       <button onClick={startTrip} disabled={creating}
         className="mt-7 w-full rounded-sm bg-primary-light text-foreground py-3 text-sm font-medium
                    hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
-        {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Zakładam…</> : <>Zacznij planować <ArrowRight className="w-4 h-4" /></>}
+        {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> {t('start.zak_adam')}</> : <>{t('start.zacznij_planowac')} <ArrowRight className="w-4 h-4" /></>}
       </button>
       <p className="text-[12px] text-primary-foreground/70 mt-3 leading-relaxed">
         Agent zaproponuje pierwsze miejsca na podstawie klimatu i długości pobytu.
@@ -465,8 +467,8 @@ export default function Start() {
                   className="bg-primary hover:bg-primary/90">
                   {activePlan ? 'Otwórz plan ↗' : 'Ułóż plan ↗'}
                 </Button>
-                <Button variant="outline" onClick={() => navigate('/odkrywaj')}>Dodaj więcej miejsc</Button>
-                <Button variant="ghost" onClick={() => navigate(`/plany/${active.id}`)}>Tablica</Button>
+                <Button variant="outline" onClick={() => navigate('/odkrywaj')}>{t('start.dodaj_wiecej_miejsc')}</Button>
+                <Button variant="ghost" onClick={() => navigate(`/plany/${active.id}`)}>{t('start.tablica')}</Button>
               </div>
             </div>
 
@@ -536,7 +538,7 @@ export default function Start() {
           <section className="mt-5 rounded-md bg-card border border-border">
             <div className="flex items-start justify-between gap-4 px-7 pt-6 pb-5">
               <div>
-                <h2 className="font-display text-[18px]">Wymaga decyzji</h2>
+                <h2 className="font-display text-[18px]">{t('start.wymaga_decyzji')}</h2>
                 <p className="text-[13px] text-muted-foreground mt-1">
                   Miejsca w „być może” blokują agentowi ułożenie ostatecznej trasy.
                 </p>
@@ -572,8 +574,8 @@ export default function Start() {
                       {decisionNote(p)}
                     </p>
                     <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline" onClick={() => decide(p, 'must')}>Na pewno</Button>
-                      <Button size="sm" variant="outline" onClick={() => decide(p, 'rejected')}>Nie tym razem</Button>
+                      <Button size="sm" variant="outline" onClick={() => decide(p, 'must')}>{t('start.na_pewno')}</Button>
+                      <Button size="sm" variant="outline" onClick={() => decide(p, 'rejected')}>{t('start.nie_tym_razem')}</Button>
                     </div>
                   </div>
                 ))}
@@ -594,7 +596,7 @@ export default function Start() {
           <div className="mt-10 grid lg:grid-cols-2 gap-5 items-start">
           <section>
             <div className="flex items-baseline justify-between gap-4">
-              <h2 className="font-display text-[18px]">Twoje wyjazdy</h2>
+              <h2 className="font-display text-[18px]">{t('start.twoje_wyjazdy')}</h2>
               <span className="font-mono text-[13px] tabular-nums text-muted-foreground">{projects.length}</span>
             </div>
             <div className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
@@ -625,7 +627,7 @@ export default function Start() {
           {boards.length > 0 && (
             <section>
               <div className="flex items-baseline justify-between gap-4">
-                <h2 className="font-display text-[18px]">Tablice od podróżników</h2>
+                <h2 className="font-display text-[18px]">{t('start.tablice_od_podroznikow')}</h2>
                 {active?.destination && (
                   <span className="text-[13px] text-muted-foreground">{active.destination}</span>
                 )}
@@ -645,7 +647,7 @@ export default function Start() {
                       <Button size="sm" variant="outline" disabled={copying === b.id}
                         onClick={() => copyBoard(b)}>
                         {copying === b.id
-                          ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Kopiuję…</>
+                          ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> {t('start.kopiuje')}</>
                           : 'Skopiuj'}
                       </Button>
                     }

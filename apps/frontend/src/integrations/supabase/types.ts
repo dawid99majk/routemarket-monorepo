@@ -107,6 +107,32 @@ export type Database = {
         }
         Relationships: []
       }
+      board_likes: {
+        Row: {
+          created_at: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_likes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "trip_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_places: {
         Row: {
           collection_id: string
@@ -295,6 +321,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string
+          description_i18n: Json
           id: string
           kind: string | null
           lat: number
@@ -321,6 +348,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string
+          description_i18n?: Json
           id?: string
           kind?: string | null
           lat: number
@@ -347,6 +375,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string
+          description_i18n?: Json
           id?: string
           kind?: string | null
           lat?: number
@@ -469,6 +498,68 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      place_sponsorships: {
+        Row: {
+          advertiser: string
+          category: string | null
+          city: string | null
+          created_at: string
+          ends_on: string
+          id: string
+          note: string | null
+          place_id: string
+          starts_on: string
+        }
+        Insert: {
+          advertiser: string
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          ends_on: string
+          id?: string
+          note?: string | null
+          place_id: string
+          starts_on: string
+        }
+        Update: {
+          advertiser?: string
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          ends_on?: string
+          id?: string
+          note?: string | null
+          place_id?: string
+          starts_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_sponsorships_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poi_cache: {
+        Row: {
+          data: Json
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          data: Json
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -877,15 +968,18 @@ export type Database = {
           destination_lng: number | null
           dining: number | null
           effort: number | null
+          end_date: string | null
           fill_percent: number
           hours_per_day: number | null
           id: string
           is_public: boolean
+          like_count: number
           name: string
           notes: string
           pace: number | null
           popularity: number | null
           published_at: string | null
+          start_date: string | null
           start_lat: number | null
           start_lng: number | null
           start_name: string | null
@@ -905,15 +999,18 @@ export type Database = {
           destination_lng?: number | null
           dining?: number | null
           effort?: number | null
+          end_date?: string | null
           fill_percent?: number
           hours_per_day?: number | null
           id?: string
           is_public?: boolean
+          like_count?: number
           name: string
           notes?: string
           pace?: number | null
           popularity?: number | null
           published_at?: string | null
+          start_date?: string | null
           start_lat?: number | null
           start_lng?: number | null
           start_name?: string | null
@@ -933,15 +1030,18 @@ export type Database = {
           destination_lng?: number | null
           dining?: number | null
           effort?: number | null
+          end_date?: string | null
           fill_percent?: number
           hours_per_day?: number | null
           id?: string
           is_public?: boolean
+          like_count?: number
           name?: string
           notes?: string
           pace?: number | null
           popularity?: number | null
           published_at?: string | null
+          start_date?: string | null
           start_lat?: number | null
           start_lng?: number | null
           start_name?: string | null
@@ -1044,6 +1144,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      rm_podbij_kopie: { Args: { p_project: string }; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

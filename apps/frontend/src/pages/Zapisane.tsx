@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PlannerHeader from '@/components/PlannerHeader';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
+import { useTranslation } from 'react-i18next';
 
 interface Kolekcja { id: string; name: string; slug: string; is_public: boolean }
 
@@ -25,6 +26,7 @@ interface Kolekcja { id: string; name: string; slug: string; is_public: boolean 
  * fakcie, przez tych, którzy chcą porządku.
  */
 export default function Zapisane() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [places, setPlaces] = useState<any[]>([]);
   const [kolekcje, setKolekcje] = useState<Kolekcja[]>([]);
@@ -124,7 +126,7 @@ export default function Zapisane() {
       image_url: place.photos?.[0] ?? null, source: 'catalog',
     });
     if (error) return toast.error(error.message);
-    toast.success('Dodano do tablicy');
+    toast.success(t('zapisane.dodano_do_tablicy'));
   };
 
   return (
@@ -148,7 +150,7 @@ export default function Zapisane() {
           <div className="flex items-center gap-2">
             <Input value={nowaNazwa} onChange={(e) => setNowaNazwa(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && zalozKolekcje()}
-              placeholder="Nazwa nowej kolekcji" className="w-[220px]" />
+              placeholder={t('zapisane.nazwa_nowej_kolekcji')} className="w-[220px]" />
             <Button variant="outline" onClick={zalozKolekcje} disabled={!nowaNazwa.trim() || zakladam}>
               <Plus className="w-4 h-4 mr-1.5" /> Kolekcja
             </Button>
@@ -186,7 +188,7 @@ export default function Zapisane() {
         ) : places.length === 0 ? (
           <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
             <Heart className="w-9 h-9 text-muted-foreground/40 mx-auto" />
-            <h2 className="font-display font-light text-[24px] mt-4">Nic tu jeszcze nie ma</h2>
+            <h2 className="font-display font-light text-[24px] mt-4">{t('zapisane.nic_tu_jeszcze_nie_ma')}</h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
               Zapisane to miejsca odłożone na później — bez decydowania, kiedy i czy w ogóle
               tam pojedziesz. Klikaj serce wszędzie, gdzie coś Ci się spodoba.
@@ -216,7 +218,7 @@ export default function Zapisane() {
                       </div>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); usun(p.id); }}
-                      aria-label="Usuń z zapisanych"
+                      aria-label={t('zapisane.usun_z_zapisanych')}
                       className="absolute top-2 right-2 w-8 h-8 rounded-full bg-ink/40 hover:bg-ink/60
                                  backdrop-blur flex items-center justify-center">
                       <Heart className="w-4 h-4 fill-accent text-accent" />
@@ -236,7 +238,7 @@ export default function Zapisane() {
                   {kolekcje.length > 0 && (
                     <select value=""
                       onChange={(e) => { if (e.target.value) { przelaczKolekcje(p.id, e.target.value); e.target.value = ''; } }}
-                      aria-label="Odłóż do kolekcji"
+                      aria-label={t('zapisane.od_oz_do_kolekcji')}
                       className="w-full text-[11px] border border-border rounded-md px-2 py-1.5
                                  bg-background hover:bg-muted cursor-pointer">
                       <option value="">
@@ -254,7 +256,7 @@ export default function Zapisane() {
                   {boards.length > 0 && (
                     <select value=""
                       onChange={(e) => { if (e.target.value) { dodajDoTablicy(p, e.target.value); e.target.value = ''; } }}
-                      aria-label="Dodaj do tablicy"
+                      aria-label={t('zapisane.dodaj_do_tablicy')}
                       className="w-full text-[11px] border border-border rounded-md px-2 py-1.5
                                  bg-background hover:bg-muted cursor-pointer">
                       <option value="">+ dodaj do wyjazdu</option>

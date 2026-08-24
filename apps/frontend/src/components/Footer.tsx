@@ -67,7 +67,7 @@ export default function Footer() {
                     variant="outline"
                     size="sm"
                     className="h-8 gap-2 text-xs"
-                    aria-label="Change language"
+                    aria-label={t('common.zmien_jezyk')}
                   >
                     <Globe className="h-3.5 w-3.5" />
                     <span>{currentLang.flag}</span>

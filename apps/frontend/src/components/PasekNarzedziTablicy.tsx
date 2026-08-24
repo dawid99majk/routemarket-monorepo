@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export type NarzedzieId = 'prefs' | 'szukaj' | 'wydarzenia' | 'udostepnij';
 
@@ -35,6 +36,7 @@ interface PasekNarzedziTablicyProps {
 export default function PasekNarzedziTablicy({
   narzedzia, otwarte, onZmiana,
 }: PasekNarzedziTablicyProps) {
+  const { t } = useTranslation();
   const aktywne = narzedzia.find((n) => n.id === otwarte) ?? null;
   const kotwica = useRef<HTMLDivElement>(null);
 
@@ -60,7 +62,7 @@ export default function PasekNarzedziTablicy({
 
   return (
     <div ref={kotwica} className="scroll-mt-20">
-      <div role="tablist" aria-label="Narzędzia tablicy" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div role="tablist" aria-label={t('narzedzia.narzedzia_tablicy')} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {narzedzia.map((n) => {
           const czyAktywne = n.id === otwarte;
           return (
@@ -116,7 +118,7 @@ export default function PasekNarzedziTablicy({
             <div className="relative p-5 sm:p-6">
               <button
                 onClick={() => onZmiana(null)}
-                aria-label="Zamknij narzędzie"
+                aria-label={t('narzedzia.zamknij_narzedzie')}
                 className="absolute top-4 right-4 w-8 h-8 rounded-full border border-border bg-card
                            flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors"
               >

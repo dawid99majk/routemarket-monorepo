@@ -8,6 +8,7 @@ import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import { zakresDat } from '@/lib/daty';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
+import { useTranslation } from 'react-i18next';
 
 const KUBELKI = [
   { id: 'must', label: 'Na pewno', kolor: 'bg-primary' },
@@ -29,6 +30,7 @@ const KUBELKI = [
  * nie przyjęła. Zamiast wyszarzonych guzików dostaje jedno zaproszenie.
  */
 export default function TablicaPubliczna() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tablica, setTablica] = useState<any | null>(null);
@@ -94,7 +96,7 @@ export default function TablicaPubliczna() {
   const skopiujDoSiebie = async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return navigate(`/auth?redirect=/tablica/${id}`);
-    if (u.user.id === tablica.user_id) return toast.info('To Twoja tablica');
+    if (u.user.id === tablica.user_id) return toast.info(t('publiczna.twoja'));
     setKopiuje(true);
     try {
       const { data: kopia, error } = await (supabase as any).from('trip_projects').insert({
@@ -117,7 +119,7 @@ export default function TablicaPubliczna() {
       // Licznik kopii utrzymuje właściciel oryginału; podbijamy go przez RPC,
       // bo polityka nie pozwala obcemu pisać po cudzym wierszu.
       await (supabase as any).rpc('rm_podbij_kopie', { p_project: id });
-      toast.success('Tablica jest u Ciebie — zmień, co nie pasuje');
+      toast.success(t('publiczna.skopiowana'));
       navigate(`/plany/${kopia.id}`);
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się skopiować');
@@ -142,12 +144,12 @@ export default function TablicaPubliczna() {
       <div className="min-h-screen bg-background">
         <PlannerHeader initials={inicjaly} />
         <div className="max-w-[1400px] mx-auto px-6 py-16 text-center">
-          <h1 className="font-display font-light text-[28px]">Nie ma takiej tablicy</h1>
+          <h1 className="font-display font-light text-[28px]">{t('publiczna.brak_tytul')}</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-[44ch] mx-auto text-pretty">
-            Albo nigdy nie została opublikowana, albo autor cofnął publikację.
+            {t('publiczna.brak_opis')}
           </p>
           <Button className="mt-6 bg-primary hover:bg-primary/90" onClick={() => navigate('/')}>
-            Wróć na stronę główną
+            {t('publiczna.wroc')}
           </Button>
         </div>
       </div>
@@ -204,8 +206,8 @@ export default function TablicaPubliczna() {
                 <Button onClick={skopiujDoSiebie} disabled={kopiuje}
                   className="h-10 bg-primary hover:bg-primary/90">
                   {kopiuje
-                    ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Kopiuję…</>
-                    : <><Copy className="w-4 h-4 mr-1.5" /> Skopiuj do siebie</>}
+                    ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('publiczna.kopiuje')}</>
+                    : <><Copy className="w-4 h-4 mr-1.5" /> {t('publiczna.skopiuj')}</>}
                 </Button>
               </>
             ) : (

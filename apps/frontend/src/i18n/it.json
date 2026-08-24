@@ -27,7 +27,15 @@
     "max": "Max",
     "min": "Min",
     "or": "o",
-    "signup": "Registrati"
+    "signup": "Registrati",
+    "zmien_jezyk": "Cambia lingua"
+  },
+  "cookies": {
+    "aria": "Consenso alle statistiche",
+    "opis": "RouteMarket memorizza solo ciò che è necessario per farti rimanere connesso e per ricordare le tue impostazioni. Con il tuo consenso, misureremmo anche come viene utilizzato il sito, per vedere dove le persone si perdono. Dettagli in",
+    "polityka": "Politica sui cookie",
+    "tylko_niezbedne": "Solo l'essenziale",
+    "zgoda": "Consenso alle statistiche"
   },
   "filters": {
     "any_difficulty": "Qualsiasi difficoltà",
@@ -39,6 +47,23 @@
     "region": "Regione",
     "season": "Stagione"
   },
+  "galeria": {
+    "autor": "Viaggiatore",
+    "brak_tablic": "Nessuno ha ancora pubblicato nulla",
+    "brak_tablic_opis": "Puoi essere il primo: apri la tua bacheca e abilita la pubblicazione nella scheda Accesso.",
+    "brak_wynikow": "Nessun risultato",
+    "brak_wynikow_opis": "Prova un'altra città o cancella la ricerca.",
+    "miejsc": "luoghi",
+    "nadtytul": "Bacheche dei viaggiatori",
+    "podtytul": "Copia la bacheca di qualcuno che c'è stato prima di te ed elimina ciò che non ti si addice.",
+    "porzadek": {
+      "najwieksze": "Più posti",
+      "nowe": "Più recenti",
+      "popularne": "Più popolari"
+    },
+    "szukaj": "Cerca per città, nome della bacheca o autore",
+    "tytul": "Non iniziare con una bacheca vuota"
+  },
   "index": {
     "clear_all_filters": "Cancella tutti i filtri",
     "routes_found": "{{count}} percorsi trovati",
@@ -48,10 +73,43 @@
     "sort_price_high": "Prezzo: Alto → Basso",
     "sort_price_low": "Prezzo: Basso → Alto"
   },
+  "kolekcje": {
+    "anuluj": "Annulla",
+    "kolekcja_utworzona": "Collezione creata",
+    "moje_kolekcje": "Le mie collezioni",
+    "nazwa_np_modernizm_w_polsce": "Nome, es. \"Modernismo in Polonia\"",
+    "nie_znaleziono_kolekcji_albo_jest": "Collezione non trovata o privata.",
+    "ta_kolekcja_jest_jeszcze_pusta": "Questa collezione è ancora vuota.",
+    "usun_z_kolekcji": "Rimuovi dalla collezione",
+    "utworz": "Crea"
+  },
   "landing": {
     "cta_glowne": "Inizia a pianificare",
     "cta_naglowek": "Pianifica il viaggio",
+    "demo": {
+      "poz1": "1 h 30 min · ombra dopo le 15:00",
+      "poz2": "25 min · 7 min a piedi",
+      "poz3": "40 min · terrazza sul porto",
+      "poz4": "30 min · ritorno in hotel"
+    },
     "dokad": "Dove vai?",
+    "dzien": {
+      "1": {
+        "meta": "3 h 25 min · 3,8 km a piedi",
+        "realizm": "Tre punti per 3,5 ore. Ci starebbe un quarto, ma l'anfiteatro e le mura sono molte scale per un solo pomeriggio.",
+        "tytul": "Giorno 1 — città vecchia"
+      },
+      "2": {
+        "meta": "3 h 50 min · 2 viaggi in auto",
+        "realizm": "Giorno con due viaggi in auto. Golem e il parco distano 6 minuti, quindi l'ordine è importante.",
+        "tytul": "Giorno 2 — acqua e sabbia"
+      },
+      "3": {
+        "meta": "3 h 10 min · 2,6 km a piedi",
+        "realizm": "Il museo chiude alle 16:00 — è l'unico punto del giorno con un limite rigido. Il resto è flessibile.",
+        "tytul": "Giorno 3 — ultimo pomeriggio"
+      }
+    },
     "faq": {
       "aplikacja": {
         "odpowiedz": "La versione browser funziona già sul telefono. Le app iOS e Android, con download di mappe per la modalità offline, sono in preparazione.",
@@ -135,10 +193,49 @@
   "legal": {
     "all_rights_reserved": "Tutti i diritti riservati.",
     "cookies": "Informativa sui Cookie",
+    "jezyk_wiazacy": "Questo documento è disponibile in inglese e solo la versione inglese è vincolante. Le traduzioni degli altri contenuti del servizio sono ausiliarie; in caso di discrepanza, prevale il testo inglese.",
     "privacy": "Informativa sulla Privacy",
     "published_at": "Pubblicato il",
     "terms": "Termini di Servizio",
     "version": "Versione"
+  },
+  "miejsce": {
+    "agent_radzi": "L'agente consiglia",
+    "najpierw_za_oz_wyjazd_do": "Prima crea un viaggio a cui salvare",
+    "nie_znaleziono_takiego_miejsca": "Nessun luogo trovato.",
+    "od_oz_do_kolekcji": "Salva nella collezione",
+    "od_ozone_do_kolekcji": "Salvato nella collezione",
+    "podobne_w_klimacie": "Simili per atmosfera",
+    "wroc_do_odkrywania": "Torna a esplorare",
+    "zapisane_od_oz_do_kolekcji": "Salvato · salva nella collezione ▾"
+  },
+  "naglowek": {
+    "odkrywaj": "Esplora",
+    "plan": "Piano",
+    "start": "Inizio",
+    "tablica": "Bacheca",
+    "warsztat": "Officina",
+    "zapisane": "Salvati",
+    "zapisane_miejsca": "Luoghi salvati"
+  },
+  "narzedzia": {
+    "narzedzia_tablicy": "Strumenti della bacheca",
+    "zamknij_narzedzie": "Chiudi strumento"
+  },
+  "odkrywaj": {
+    "bez_po_ozenia_nie_ma": "· senza posizione, non è sulla mappa",
+    "do_ulubionych": "Ai preferiti",
+    "miasto": "Città",
+    "najpierw_wybierz_wyjazd_do_ktorego": "Prima scegli il viaggio a cui salvare",
+    "podaj_miasto_ktore_mamy_przejrzec": "Inserisci la città da esplorare",
+    "pokaz_wszystkie": "Mostra tutto",
+    "pokazuj_tylko_to_co_widac": "Mostra solo ciò che è visibile sulla mappa",
+    "szukaj_plaza_ruiny_deszczowy_dzien": "Cerca: spiaggia, rovine, giorno di pioggia…",
+    "ta_przegladarka_nie_udostepnia_po": "Questo browser non condivide la posizione",
+    "tablica": "Bacheca",
+    "twoj_hotel_parking_dworzec": "Il tuo hotel, parcheggio, stazione…",
+    "wyczysc_fraze": "Cancella frase",
+    "wyjazd_do_ktorego_zapisujesz_miejsca": "Viaggio a cui salvi i luoghi"
   },
   "profile": {
     "account_info": "Informazioni account",
@@ -158,10 +255,100 @@
     "username": "Nome visualizzato",
     "username_placeholder": "Il tuo nome..."
   },
+  "publiczna": {
+    "brak_opis": "O non è mai stata pubblicata, o l'autore ha annullato la pubblicazione.",
+    "brak_tytul": "Questa bacheca non esiste",
+    "kopiuje": "Copia in corso…",
+    "skopiowana": "La bacheca è tua — cambia ciò che non ti piace",
+    "skopiuj": "Copia nella tua bacheca",
+    "twoja": "Questa è la tua bacheca",
+    "wroc": "Torna alla pagina principale"
+  },
   "seo": {
     "contact": {
       "description": "Contatta il team RouteMarket. Supporto tecnico, richieste creatori e acquirenti.",
       "title": "Contatti — RouteMarket"
     }
+  },
+  "start": {
+    "dodaj_wiecej_miejsc": "Aggiungi altri luoghi",
+    "dokad_tym_razem": "Dove questa volta?",
+    "kopiuje": "Copia…",
+    "miasto_lub_region": "Città o regione",
+    "na_pewno": "Certo",
+    "nie_rozpozna_em_terminu_wyjazd": "Non ho riconosciuto il termine — viaggio salvato come bozza. Puoi impostare la data sulla bacheca.",
+    "nie_tym_razem": "Non questa volta",
+    "nowy_wyjazd": "Nuovo viaggio",
+    "podaj_miasto_lub_region": "Inserisci città o regione",
+    "tablica": "Bacheca",
+    "tablice_od_podroznikow": "Bacheche dei viaggiatori",
+    "termin_np_12_14_wrzesnia": "Data - es. 12-14 settembre",
+    "twoje_wyjazdy": "I tuoi viaggi",
+    "wymaga_decyzji": "Richiede una decisione",
+    "zacznij_planowac": "Inizia a pianificare",
+    "zak_adam": "Suppongo..."
+  },
+  "tablica": {
+    "adres_e_mail_osoby_musi": "indirizzo email della persona - deve accedere con lo stesso",
+    "bez_pinezki_na_mapie": "Senza puntina sulla mappa",
+    "byc_moze": "Forse",
+    "charakter_wyjazdu_nadpisze_twoje_domyslne": "Tipo di viaggio - sovrascriverà le tue preferenze predefinite per questo piano",
+    "daleko_od_reszty": "Lontano dal resto:",
+    "dni": "Giorni",
+    "do_przejscia": "Da percorrere:",
+    "dodaj_do_tablicy": "Aggiungi alla bacheca",
+    "dodaj_miejsca": "Aggiungi luoghi",
+    "dodano_dostep_tablica_pojawi_sie": "Accesso aggiunto - la bacheca apparirà a questa persona dopo aver effettuato l'accesso con questo indirizzo. Non inviamo notifiche, inviale tu il link.",
+    "ile_czasu_zaplanowac": "Quanto tempo pianificare",
+    "kiedy_jedziecie": "Quando partite?",
+    "koniec_nie_moze_byc_przed": "La fine non può essere prima dell'inizio",
+    "kopiuj_tablice": "Copia bacheca",
+    "licze": "Calcolo...",
+    "licze_przebieg": "Calcolo il percorso...",
+    "miasto": "Città",
+    "moje_po_ozenie": "La mia posizione",
+    "moze": "Forse",
+    "mozliwe_duplikaty": "Possibili duplicati:",
+    "na_pewno": "Sicuramente",
+    "nastepne_zdjecie": "Immagine successiva",
+    "nazwa_np_bukareszt_delegacja": "Nome, es. Bucarest - delegazione",
+    "nic_nie_znalaz_em_dla": "Non ho trovato nulla per questa ricerca - prova a riformularla",
+    "nie_uda_o_sie_ustalic": "Non è stato possibile determinare la posizione di alcuni luoghi",
+    "nie_zmiesci_o_sie": "Non è stato possibile inserire",
+    "nie_znalaz_em_w_tym": "Non ho trovato nessun luogo in questo testo",
+    "odrzuc": "Rifiuta",
+    "planu_jeszcze_nie_ma": "Il piano non esiste ancora",
+    "podaj_miasto_w_ktorym_planujesz": "Inserisci la città in cui stai pianificando il viaggio",
+    "podaj_nazwe_planu_np_bukareszt": "Inserisci il nome del piano, es. \"Bucarest - delegazione\"",
+    "poprzednie_zdjecie": "Immagine precedente",
+    "preferencje_tego_wyjazdu": "Preferenze di questo viaggio",
+    "przelicz_dok_adnie": "Calcola con precisione",
+    "przelicz_plan": "Ricalcola il piano",
+    "punktow": "Punti:",
+    "skad_zaczynacie": "Da dove iniziate?",
+    "skopiowano_tablice_razem_z_miejscami": "Tabella copiata con i luoghi – cambia il carattere e pianifica a modo tuo",
+    "ta_przegladarka_nie_udostepnia_po": "Questo browser non fornisce la posizione",
+    "tablica_publiczna": "Tabella pubblica",
+    "ten_dzien_ma_za_ma": "Questo giorno ha troppo pochi punti con coordinate",
+    "to_wydarzenie_jest_juz_na": "Questo evento è già sulla tabella",
+    "uk_adam": "Sto organizzando…",
+    "usun_z_tablicy": "Rimuovi dalla tabella",
+    "w_tym_obszarze_nic_nie": "Non ho trovato nulla in quest'area",
+    "wiecej_niz_da_sie_przejsc": "– più di quanto si possa percorrere",
+    "wklej_odnosnik_z_map_google": "Incolla il link da Google Maps, OpenStreetMap o Apple Maps",
+    "wklej_opis_posta_liste_z": "Incolla la descrizione del post, l'elenco dal blog o l'indirizzo dell'articolo – estrarrò i luoghi",
+    "wroc_do_byc_moze": "Torna a \"Forse\"",
+    "wskazowka": "Suggerimento",
+    "wspo_tworcy_tablicy": "Co-creatori della tabella",
+    "za_ma_o_miejsc_ze": "Troppo pochi luoghi con coordinate per tracciare un percorso",
+    "zaloguj_sie_aby_tworzyc_projekty": "Accedi per creare progetti"
+  },
+  "zapisane": {
+    "dodaj_do_tablicy": "Aggiungi alla tabella",
+    "dodano_do_tablicy": "Aggiunto alla tabella",
+    "nazwa_nowej_kolekcji": "Nome della nuova collezione",
+    "nic_tu_jeszcze_nie_ma": "Ancora niente qui",
+    "od_oz_do_kolekcji": "Metti nella collezione",
+    "usun_z_zapisanych": "Rimuovi dai salvati"
   }
 }

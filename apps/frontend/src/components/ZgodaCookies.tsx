@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const KLUCZ = 'rm_zgoda_cookies';
 const POMIAR = 'G-HSM8K88KY0';
@@ -33,6 +34,7 @@ function wlaczPomiar() {
 }
 
 export default function ZgodaCookies() {
+  const { t } = useTranslation();
   const [widoczny, setWidoczny] = useState(false);
 
   useEffect(() => {
@@ -54,18 +56,16 @@ export default function ZgodaCookies() {
     <div
       role="dialog"
       aria-live="polite"
-      aria-label="Zgoda na statystyki"
+      aria-label={t('cookies.aria')}
       className="fixed inset-x-0 bottom-0 z-[1600] border-t border-border bg-card shadow-token-lg
                  animate-in fade-in slide-in-from-bottom-2 duration-200"
     >
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <p className="text-[13px] leading-relaxed text-muted-foreground flex-1 min-w-[260px] text-pretty">
-          RouteMarket stores only what it needs to keep you signed in and remember your
-          settings. With your agreement we would also measure how the site is used, so we can
-          see where people get stuck. Details in the{' '}
+          {t('cookies.opis')}{' '}
           <a href="/legal/cookies" className="underline decoration-dotted underline-offset-2
                                               hover:text-foreground transition-colors">
-            Cookie Policy
+            {t('cookies.polityka')}
           </a>.
         </p>
         {/* Odmowa nie może być trudniejsza od zgody — dwa przyciski tej samej wagi,
@@ -76,14 +76,14 @@ export default function ZgodaCookies() {
             className="flex-1 sm:flex-none h-10 rounded-full border border-border bg-background px-4 text-sm
                        hover:bg-muted transition-colors"
           >
-            Only what is necessary
+            {t('cookies.tylko_niezbedne')}
           </button>
           <button
             onClick={() => zdecyduj('przyjete')}
             className="flex-1 sm:flex-none h-10 rounded-full bg-primary text-primary-foreground px-4 text-sm
                        hover:bg-primary/90 transition-colors"
           >
-            Allow statistics
+            {t('cookies.zgoda')}
           </button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import { opisMiejsca } from '@/lib/opis';
+import { useTranslation } from 'react-i18next';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -38,6 +39,7 @@ const kmBetween = (a: {lat:number;lng:number}, b: {lat:number;lng:number}) => {
  * po prostu fałszywe.
  */
 export default function PlacePage() {
+  const { t } = useTranslation();
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
@@ -159,7 +161,7 @@ export default function PlacePage() {
 
   const setBucket = async (bucket: Bucket) => {
     if (!place) return;
-    if (!activeBoard) return toast.error('Najpierw załóż wyjazd, do którego zapisujemy');
+    if (!activeBoard) return toast.error(t('miejsce.najpierw_za_oz_wyjazd_do'));
     if (mark === bucket) {
       setMark(null);
       await supabase.from('trip_project_places')
@@ -213,8 +215,8 @@ export default function PlacePage() {
     <div className="min-h-screen bg-background">
       <PlannerHeader />
       <div className="flex flex-col items-center justify-center py-32 gap-4">
-        <p className="text-muted-foreground">Nie znaleziono takiego miejsca.</p>
-        <Button onClick={() => navigate('/odkrywaj')}>Wróć do odkrywania</Button>
+        <p className="text-muted-foreground">{t('miejsce.nie_znaleziono_takiego_miejsca')}</p>
+        <Button onClick={() => navigate('/odkrywaj')}>{t('miejsce.wroc_do_odkrywania')}</Button>
       </div>
     </div>
   );
@@ -304,7 +306,7 @@ export default function PlacePage() {
             {similar.length > 0 && (
               <section className="mt-12">
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                  <h2 className="font-display text-[22px]">Podobne w klimacie</h2>
+                  <h2 className="font-display text-[22px]">{t('miejsce.podobne_w_klimacie')}</h2>
                   {place.city && (
                     <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                       {similar.some((sp) => sp.city !== place.city)
@@ -373,12 +375,12 @@ export default function PlacePage() {
                           .insert({ collection_id: e.target.value, place_id: place.id });
                         e.target.value = '';
                         if (error) return toast.error(error.message);
-                        toast.success('Odłożone do kolekcji');
+                        toast.success(t('miejsce.od_ozone_do_kolekcji'));
                         setPoZapisie(false);
                       }}
-                      aria-label="Odłóż do kolekcji"
+                      aria-label={t('miejsce.od_oz_do_kolekcji')}
                       className="w-full text-[12px] bg-transparent outline-none cursor-pointer">
-                      <option value="">Zapisane · odłóż do kolekcji ▾</option>
+                      <option value="">{t('miejsce.zapisane_od_oz_do_kolekcji')}</option>
                       {kolekcje.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
                     </select>
                   ) : (
@@ -392,7 +394,7 @@ export default function PlacePage() {
             </div>
 
             <div className="rounded-md bg-muted border border-border p-4">
-              <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">Agent radzi</h2>
+              <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">{t('miejsce.agent_radzi')}</h2>
               {agentTip ? (
                 <p className="text-sm leading-relaxed mt-2.5 text-foreground/85">{agentTip}</p>
               ) : (

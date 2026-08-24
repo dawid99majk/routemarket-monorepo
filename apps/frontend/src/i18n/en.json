@@ -27,7 +27,15 @@
     "max": "Max",
     "min": "Min",
     "or": "or",
-    "signup": "Sign up"
+    "signup": "Sign up",
+    "zmien_jezyk": "Change language"
+  },
+  "cookies": {
+    "aria": "Consent to statistics",
+    "opis": "RouteMarket only stores what's necessary to keep you logged in and remember your settings. With your consent, we would also measure how the site is used to see where people get lost. Details in our",
+    "polityka": "Cookie Policy",
+    "tylko_niezbedne": "Only essential",
+    "zgoda": "Consent to statistics"
   },
   "filters": {
     "any_difficulty": "Any difficulty",
@@ -39,6 +47,23 @@
     "region": "Region",
     "season": "Season"
   },
+  "galeria": {
+    "autor": "Traveler",
+    "brak_tablic": "No one has published anything yet",
+    "brak_tablic_opis": "You can be the first — open your board and enable publishing in the Access tab.",
+    "brak_wynikow": "Nothing matches",
+    "brak_wynikow_opis": "Try another city or clear your search.",
+    "miejsc": "places",
+    "nadtytul": "Boards from travelers",
+    "podtytul": "Copy a board from someone who's been there before you, and remove what doesn't suit you.",
+    "porzadek": {
+      "najwieksze": "Most places",
+      "nowe": "Newest",
+      "popularne": "Most popular"
+    },
+    "szukaj": "Search by city, board name, or author",
+    "tytul": "Don't start with an empty board"
+  },
   "index": {
     "clear_all_filters": "Clear all filters",
     "routes_found": "{{count}} routes found",
@@ -48,10 +73,43 @@
     "sort_price_high": "Price: High → Low",
     "sort_price_low": "Price: Low → High"
   },
+  "kolekcje": {
+    "anuluj": "Cancel",
+    "kolekcja_utworzona": "Collection created",
+    "moje_kolekcje": "My collections",
+    "nazwa_np_modernizm_w_polsce": "Name, e.g. \"Modernism in Poland\"",
+    "nie_znaleziono_kolekcji_albo_jest": "Collection not found or it's private.",
+    "ta_kolekcja_jest_jeszcze_pusta": "This collection is still empty.",
+    "usun_z_kolekcji": "Remove from collection",
+    "utworz": "Create"
+  },
   "landing": {
     "cta_glowne": "Start planning",
     "cta_naglowek": "Plan your trip",
+    "demo": {
+      "poz1": "1 h 30 min · shade after 3 PM",
+      "poz2": "25 min · 7 min walk",
+      "poz3": "40 min · terrace above the port",
+      "poz4": "30 min · return to hotel"
+    },
     "dokad": "Where are you going?",
+    "dzien": {
+      "1": {
+        "meta": "3 h 25 min · 3.8 km walk",
+        "realizm": "Three points for 3.5 hours. A fourth could fit, but the amphitheater and walls involve many stairs for one afternoon.",
+        "tytul": "Day 1 — old town"
+      },
+      "2": {
+        "meta": "3 h 50 min · 2 car rides",
+        "realizm": "A day with two car rides. Golem and the park are 6 minutes apart, so the order matters.",
+        "tytul": "Day 2 — water and sand"
+      },
+      "3": {
+        "meta": "3 h 10 min · 2.6 km walk",
+        "realizm": "The museum closes at 4 PM — this is the only point of the day with a hard limit. The rest is flexible.",
+        "tytul": "Day 3 — last afternoon"
+      }
+    },
     "faq": {
       "aplikacja": {
         "odpowiedz": "The browser version works on your phone now. iOS and Android apps, with offline map downloads, are in preparation.",
@@ -135,10 +193,49 @@
   "legal": {
     "all_rights_reserved": "All rights reserved.",
     "cookies": "Cookie Policy",
+    "jezyk_wiazacy": "This document is provided in English, and only the English version is binding. Translations of other content on the website are for reference only; in case of discrepancies, the English text shall prevail.",
     "privacy": "Privacy Policy",
     "published_at": "Published",
     "terms": "Terms of Service",
     "version": "Version"
+  },
+  "miejsce": {
+    "agent_radzi": "Agent's advice",
+    "najpierw_za_oz_wyjazd_do": "First, create a trip to save to",
+    "nie_znaleziono_takiego_miejsca": "No such place found.",
+    "od_oz_do_kolekcji": "Add to collection",
+    "od_ozone_do_kolekcji": "Added to collection",
+    "podobne_w_klimacie": "Similar in vibe",
+    "wroc_do_odkrywania": "Back to discovering",
+    "zapisane_od_oz_do_kolekcji": "Saved · add to collection ▾"
+  },
+  "naglowek": {
+    "odkrywaj": "Discover",
+    "plan": "Plan",
+    "start": "Start",
+    "tablica": "Board",
+    "warsztat": "Workshop",
+    "zapisane": "Saved",
+    "zapisane_miejsca": "Saved places"
+  },
+  "narzedzia": {
+    "narzedzia_tablicy": "Board tools",
+    "zamknij_narzedzie": "Close tool"
+  },
+  "odkrywaj": {
+    "bez_po_ozenia_nie_ma": "· no location, not on map",
+    "do_ulubionych": "To favorites",
+    "miasto": "City",
+    "najpierw_wybierz_wyjazd_do_ktorego": "First, select a trip to save to",
+    "podaj_miasto_ktore_mamy_przejrzec": "Enter a city to browse",
+    "pokaz_wszystkie": "Show all",
+    "pokazuj_tylko_to_co_widac": "Show only what's visible on the map",
+    "szukaj_plaza_ruiny_deszczowy_dzien": "Search: beach, ruins, rainy day…",
+    "ta_przegladarka_nie_udostepnia_po": "This browser does not provide location",
+    "tablica": "Board",
+    "twoj_hotel_parking_dworzec": "Your hotel, parking, station…",
+    "wyczysc_fraze": "Clear phrase",
+    "wyjazd_do_ktorego_zapisujesz_miejsca": "Trip to which you save places"
   },
   "profile": {
     "account_info": "Account information",
@@ -158,10 +255,100 @@
     "username": "Display name",
     "username_placeholder": "Your name..."
   },
+  "publiczna": {
+    "brak_opis": "Either it was never published, or the author revoked the publication.",
+    "brak_tytul": "No such board",
+    "kopiuje": "Copying…",
+    "skopiowana": "The board is yours — change what doesn't fit",
+    "skopiuj": "Copy to your account",
+    "twoja": "This is your board",
+    "wroc": "Return to homepage"
+  },
   "seo": {
     "contact": {
       "description": "Get in touch with the RouteMarket team. Technical support, creator and buyer enquiries.",
       "title": "Contact — RouteMarket"
     }
+  },
+  "start": {
+    "dodaj_wiecej_miejsc": "Add more places",
+    "dokad_tym_razem": "Where to this time?",
+    "kopiuje": "Copying…",
+    "miasto_lub_region": "City or region",
+    "na_pewno": "Are you sure?",
+    "nie_rozpozna_em_terminu_wyjazd": "I didn't recognize the term — trip saved as a draft. You can set the date on the board.",
+    "nie_tym_razem": "Not this time",
+    "nowy_wyjazd": "New trip",
+    "podaj_miasto_lub_region": "Enter city or region",
+    "tablica": "Board",
+    "tablice_od_podroznikow": "Boards from travelers",
+    "termin_np_12_14_wrzesnia": "Date — e.g., September 12–14",
+    "twoje_wyjazdy": "Your trips",
+    "wymaga_decyzji": "Requires decision",
+    "zacznij_planowac": "Start planning",
+    "zak_adam": "I assume…"
+  },
+  "tablica": {
+    "adres_e_mail_osoby_musi": "Person's email address — they must log in with the same one",
+    "bez_pinezki_na_mapie": "No pin on the map",
+    "byc_moze": "Maybe",
+    "charakter_wyjazdu_nadpisze_twoje_domyslne": "Trip type — will override your default preferences for this plan",
+    "daleko_od_reszty": "Far from the rest:",
+    "dni": "Days",
+    "do_przejscia": "To cover:",
+    "dodaj_do_tablicy": "Add to board",
+    "dodaj_miejsca": "Add places",
+    "dodano_dostep_tablica_pojawi_sie": "Access added — the board will appear to this person after logging in with this address. We do not send notifications, please send them the link yourself.",
+    "ile_czasu_zaplanowac": "How much time to plan",
+    "kiedy_jedziecie": "When are you going?",
+    "koniec_nie_moze_byc_przed": "End cannot be before start",
+    "kopiuj_tablice": "Copy board",
+    "licze": "Calculating…",
+    "licze_przebieg": "Calculating mileage…",
+    "miasto": "City",
+    "moje_po_ozenie": "My location",
+    "moze": "Maybe",
+    "mozliwe_duplikaty": "Possible duplicates:",
+    "na_pewno": "Definitely",
+    "nastepne_zdjecie": "Next photo",
+    "nazwa_np_bukareszt_delegacja": "Name, e.g., Bucharest — delegation",
+    "nic_nie_znalaz_em_dla": "I found nothing for this query — try rephrasing it",
+    "nie_uda_o_sie_ustalic": "Could not determine the location of some places",
+    "nie_zmiesci_o_sie": "Did not fit",
+    "nie_znalaz_em_w_tym": "I found no places in this text",
+    "odrzuc": "Reject",
+    "planu_jeszcze_nie_ma": "No plan yet",
+    "podaj_miasto_w_ktorym_planujesz": "Enter the city where you are planning your trip",
+    "podaj_nazwe_planu_np_bukareszt": "Enter the plan name, e.g., \"Bucharest — delegation\"",
+    "poprzednie_zdjecie": "Previous photo",
+    "preferencje_tego_wyjazdu": "Trip preferences",
+    "przelicz_dok_adnie": "Calculate precisely",
+    "przelicz_plan": "Recalculate plan",
+    "punktow": "Points:",
+    "skad_zaczynacie": "Where do you start?",
+    "skopiowano_tablice_razem_z_miejscami": "Board copied with places — change character and plan your way",
+    "ta_przegladarka_nie_udostepnia_po": "This browser does not provide location",
+    "tablica_publiczna": "Public board",
+    "ten_dzien_ma_za_ma": "This day has too few points with coordinates",
+    "to_wydarzenie_jest_juz_na": "This event is already on the board",
+    "uk_adam": "Arranging…",
+    "usun_z_tablicy": "Remove from board",
+    "w_tym_obszarze_nic_nie": "Found nothing in this area",
+    "wiecej_niz_da_sie_przejsc": "— more than can be walked",
+    "wklej_odnosnik_z_map_google": "Paste a link from Google Maps, OpenStreetMap or Apple Maps",
+    "wklej_opis_posta_liste_z": "Paste a post description, blog list or article address — I'll extract places from it",
+    "wroc_do_byc_moze": "Back to “Maybe”",
+    "wskazowka": "Hint",
+    "wspo_tworcy_tablicy": "Board co-creators",
+    "za_ma_o_miejsc_ze": "Too few places with coordinates to set a route",
+    "zaloguj_sie_aby_tworzyc_projekty": "Log in to create projects"
+  },
+  "zapisane": {
+    "dodaj_do_tablicy": "Add to board",
+    "dodano_do_tablicy": "Added to board",
+    "nazwa_nowej_kolekcji": "New collection name",
+    "nic_tu_jeszcze_nie_ma": "Nothing here yet",
+    "od_oz_do_kolekcji": "Put in collection",
+    "usun_z_zapisanych": "Remove from saved"
   }
 }

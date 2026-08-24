@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface PlannerHeaderProps {
   /** Kontekst aktywnego wyjazdu po prawej, np. "Durrës · 3 dni · z dziećmi". */
@@ -21,13 +22,13 @@ function ostatniaTablica(): string | null {
 function zakladki(admin: boolean) {
   const id = ostatniaTablica();
   return [
-    { label: 'Start', path: '/start' },
-    { label: 'Odkrywaj', path: '/odkrywaj' },
-    { label: 'Tablica', path: id ? `/plany/${id}` : '/plany' },
-    { label: 'Plan', path: id ? `/plany/${id}?widok=plan` : '/plany' },
+    { klucz: 'naglowek.start', path: '/start' },
+    { klucz: 'naglowek.odkrywaj', path: '/odkrywaj' },
+    { klucz: 'naglowek.tablica', path: id ? `/plany/${id}` : '/plany' },
+    { klucz: 'naglowek.plan', path: id ? `/plany/${id}?widok=plan` : '/plany' },
     // Warsztat to narzędzie właściciela, nie funkcja serwisu — stąd osobny
     // warunek zamiast stałej pozycji dla wszystkich.
-    ...(admin ? [{ label: 'Warsztat', path: '/marketing' }] : []),
+    ...(admin ? [{ klucz: 'naglowek.warsztat', path: '/marketing' }] : []),
   ];
 }
 
@@ -37,6 +38,7 @@ function zakladki(admin: boolean) {
  * skok do innej aplikacji. Projekt zakłada jeden pasek i trzy zakładki.
  */
 export default function PlannerHeader({ context, initials }: PlannerHeaderProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { pathname, search } = useLocation();
@@ -71,12 +73,14 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
         </button>
 
         <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {zakladki(isAdmin).map((t) => (
-            <button key={t.label} onClick={() => navigate(t.path)}
+          {/* Zmienna nazywa się `zakladka`, nie `t` — inaczej przesłoniłaby funkcję
+              tłumaczenia i wewnątrz mapy nie dałoby się wywołać t(). */}
+          {zakladki(isAdmin).map((zakladka) => (
+            <button key={zakladka.klucz} onClick={() => navigate(zakladka.path)}
               className={`px-3.5 py-1.5 text-sm rounded-sm transition-colors ${
-                isActive(t.path) ? 'bg-muted font-medium' : 'text-foreground/70 hover:bg-muted/60'
+                isActive(zakladka.path) ? 'bg-muted font-medium' : 'text-foreground/70 hover:bg-muted/60'
               }`}>
-              {t.label}
+              {t(zakladka.klucz)}
             </button>
           ))}
         </nav>
@@ -90,11 +94,11 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
           {/* Jedno wejście: kolekcje są podzbiorami zapisanych, a nie osobnym
               zbiorem, więc dwa przyciski obok siebie pytały użytkownika o różnicę,
               której nie ma. */}
-          <button onClick={() => navigate('/zapisane')} title="Zapisane miejsca" aria-label="Zapisane"
+          <button onClick={() => navigate('/zapisane')} title={t('naglowek.zapisane_miejsca')} aria-label={t('naglowek.zapisane')}
             className="h-8 inline-flex items-center gap-1.5 rounded-full bg-muted px-3
                        hover:bg-border transition-colors">
             <Heart className="w-4 h-4 text-muted-foreground" />
-            <span className="text-[13px] text-muted-foreground hidden sm:inline">Zapisane</span>
+            <span className="text-[13px] text-muted-foreground hidden sm:inline">{t('naglowek.zapisane')}</span>
           </button>
           {initials && (
             <button onClick={() => navigate('/profile')}

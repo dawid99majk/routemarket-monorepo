@@ -22,28 +22,16 @@ const KLIMATY = [
 const KROKI = ['01', '02', '03', '04'];
 
 const PLAN_DEMO = [
-  ['14:20', 'Amfiteatr w Durrës', '1 g 30 min · cień po 15:00'],
-  ['16:05', 'Forum bizantyjskie', '25 min · 7 min pieszo'],
-  ['16:45', 'Wieża Wenecka', '40 min · taras nad portem'],
-  ['17:35', 'Promenada Durrës', '30 min · powrót pod hotel'],
+  ['14:20', 'Amfiteatr w Durrës', 'landing.demo.poz1'],
+  ['16:05', 'Forum bizantyjskie', 'landing.demo.poz2'],
+  ['16:45', 'Wieża Wenecka', 'landing.demo.poz3'],
+  ['17:35', 'Promenada Durrës', 'landing.demo.poz4'],
 ];
 
 const DNI = [
-  {
-    tytul: 'Dzień 1 — stare miasto', meta: '3 g 25 min · 3,8 km pieszo',
-    przystanki: ['Amfiteatr', 'Forum bizantyjskie', 'Wieża Wenecka', 'Promenada'],
-    realizm: 'Trzy punkty na 3,5 godziny. Zmieściłby się czwarty, ale amfiteatr i mury to dużo schodów jak na jedno popołudnie.',
-  },
-  {
-    tytul: 'Dzień 2 — woda i piasek', meta: '3 g 50 min · 2 przejazdy autem',
-    przystanki: ['Plaża Golem', 'Park zabaw Adriatik', 'Bazar rybny'],
-    realizm: 'Dzień z dwoma przejazdami autem. Golem i park dzieli 6 minut, więc kolejność ma znaczenie.',
-  },
-  {
-    tytul: 'Dzień 3 — ostatnie popołudnie', meta: '3 g 10 min · 2,6 km pieszo',
-    przystanki: ['Muzeum Archeologiczne', 'Mury Kalaja', 'Plaża Currila'],
-    realizm: 'Muzeum zamyka o 16:00 — to jedyny punkt dnia z twardym limitem. Reszta jest elastyczna.',
-  },
+  { nr: 1, przystanki: ['Amfiteatr', 'Forum bizantyjskie', 'Wieża Wenecka', 'Promenada'] },
+  { nr: 2, przystanki: ['Plaża Golem', 'Park zabaw Adriatik', 'Bazar rybny'] },
+  { nr: 3, przystanki: ['Muzeum Archeologiczne', 'Mury Kalaja', 'Plaża Currila'] },
 ];
 
 const GPX_PRZYKLAD = `<gpx version="1.1" creator="Routemarket">
@@ -226,7 +214,7 @@ export default function Index() {
                                      flex items-center justify-center text-[11px] font-medium mt-0.5">{i + 1}</span>
                     <div className="min-w-0">
                       <div className="font-display text-[15px] leading-snug">{nazwa}</div>
-                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">{meta}</div>
+                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">{t(meta)}</div>
                     </div>
                   </div>
                 </div>
@@ -284,9 +272,9 @@ export default function Index() {
 
         <div className="space-y-4">
           {DNI.map((d) => (
-            <div key={d.tytul} className="rounded-md bg-card border border-border p-6">
-              <h3 className="font-display text-[20px] leading-snug">{d.tytul}</h3>
-              <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">{d.meta}</p>
+            <div key={d.nr} className="rounded-md bg-card border border-border p-6">
+              <h3 className="font-display text-[20px] leading-snug">{t(`landing.dzien.${d.nr}.tytul`)}</h3>
+              <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">{t(`landing.dzien.${d.nr}.meta`)}</p>
               <div className="flex flex-wrap gap-1.5 mt-4">
                 {d.przystanki.map((p) => (
                   <span key={p} className="rounded-full bg-muted px-3 py-1 text-[12px] text-foreground/75">{p}</span>
@@ -295,7 +283,7 @@ export default function Index() {
               <div className="mt-5 rounded-md bg-warning/15 border border-warning/30 px-4 py-3.5 flex items-start gap-3">
                 <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground
                                  border border-warning/45 rounded-full px-2.5 py-1 shrink-0">{t('landing.realizm')}</span>
-                <p className="text-[13px] leading-relaxed text-warning-foreground text-pretty">{d.realizm}</p>
+                <p className="text-[13px] leading-relaxed text-warning-foreground text-pretty">{t(`landing.dzien.${d.nr}.realizm`)}</p>
               </div>
             </div>
           ))}

@@ -27,7 +27,15 @@
     "max": "Max",
     "min": "Min",
     "or": "lub",
-    "signup": "Stwórz konto"
+    "signup": "Stwórz konto",
+    "zmien_jezyk": "Zmień język"
+  },
+  "cookies": {
+    "aria": "Zgoda na statystyki",
+    "opis": "RouteMarket przechowuje tylko to, co potrzebne, żebyś pozostał zalogowany i żeby zapamiętać Twoje ustawienia. Za Twoją zgodą mierzylibyśmy też, jak korzysta się ze strony, żeby widzieć, gdzie ludzie się gubią. Szczegóły w",
+    "polityka": "Polityce cookies",
+    "tylko_niezbedne": "Tylko to, co niezbędne",
+    "zgoda": "Zgoda na statystyki"
   },
   "filters": {
     "any_difficulty": "Dowolna trudność",
@@ -39,6 +47,23 @@
     "region": "Region",
     "season": "Sezon"
   },
+  "galeria": {
+    "autor": "Podróżnik",
+    "brak_tablic": "Nikt jeszcze nic nie opublikował",
+    "brak_tablic_opis": "Możesz być pierwszy — otwórz swoją tablicę i włącz publikację w zakładce Dostęp.",
+    "brak_wynikow": "Nic nie pasuje",
+    "brak_wynikow_opis": "Spróbuj innego miasta albo wyczyść wyszukiwanie.",
+    "miejsc": "miejsc",
+    "nadtytul": "Tablice od podróżników",
+    "podtytul": "Skopiuj tablicę kogoś, kto był tam przed Tobą, i wyrzuć z niej to, co do Ciebie nie pasuje.",
+    "porzadek": {
+      "najwieksze": "Najwięcej miejsc",
+      "nowe": "Najnowsze",
+      "popularne": "Najpopularniejsze"
+    },
+    "szukaj": "Szukaj po mieście, nazwie tablicy albo autorze",
+    "tytul": "Nie zaczynaj od pustej tablicy"
+  },
   "index": {
     "clear_all_filters": "Wyczyść wszystkie filtry",
     "routes_found": "{{count}} tras znaleziono",
@@ -48,10 +73,43 @@
     "sort_price_high": "Cena: od najwyższej",
     "sort_price_low": "Cena: od najniższej"
   },
+  "kolekcje": {
+    "anuluj": "Anuluj",
+    "kolekcja_utworzona": "Kolekcja utworzona",
+    "moje_kolekcje": "Moje kolekcje",
+    "nazwa_np_modernizm_w_polsce": "Nazwa, np. „Modernizm w Polsce”",
+    "nie_znaleziono_kolekcji_albo_jest": "Nie znaleziono kolekcji albo jest prywatna.",
+    "ta_kolekcja_jest_jeszcze_pusta": "Ta kolekcja jest jeszcze pusta.",
+    "usun_z_kolekcji": "Usuń z kolekcji",
+    "utworz": "Utwórz"
+  },
   "landing": {
     "cta_glowne": "Zacznij planować",
     "cta_naglowek": "Zaplanuj wyjazd",
+    "demo": {
+      "poz1": "1 g 30 min · cień po 15:00",
+      "poz2": "25 min · 7 min pieszo",
+      "poz3": "40 min · taras nad portem",
+      "poz4": "30 min · powrót pod hotel"
+    },
     "dokad": "Dokąd jedziesz?",
+    "dzien": {
+      "1": {
+        "meta": "3 g 25 min · 3,8 km pieszo",
+        "realizm": "Trzy punkty na 3,5 godziny. Zmieściłby się czwarty, ale amfiteatr i mury to dużo schodów jak na jedno popołudnie.",
+        "tytul": "Dzień 1 — stare miasto"
+      },
+      "2": {
+        "meta": "3 g 50 min · 2 przejazdy autem",
+        "realizm": "Dzień z dwoma przejazdami autem. Golem i park dzieli 6 minut, więc kolejność ma znaczenie.",
+        "tytul": "Dzień 2 — woda i piasek"
+      },
+      "3": {
+        "meta": "3 g 10 min · 2,6 km pieszo",
+        "realizm": "Muzeum zamyka o 16:00 — to jedyny punkt dnia z twardym limitem. Reszta jest elastyczna.",
+        "tytul": "Dzień 3 — ostatnie popołudnie"
+      }
+    },
     "faq": {
       "aplikacja": {
         "odpowiedz": "Wersja przeglądarkowa działa na telefonie już teraz. Aplikacje iOS i Android, z pobieraniem map do trybu offline, są w przygotowaniu.",
@@ -135,10 +193,49 @@
   "legal": {
     "all_rights_reserved": "Wszelkie prawa zastrzeżone.",
     "cookies": "Polityka cookies",
+    "jezyk_wiazacy": "Ten dokument jest udostępniany w wersji angielskiej i tylko ona jest wiążąca. Tłumaczenia pozostałych treści serwisu mają charakter pomocniczy; w razie rozbieżności rozstrzyga tekst angielski.",
     "privacy": "Polityka prywatności",
     "published_at": "Opublikowano",
     "terms": "Regulamin",
     "version": "Wersja"
+  },
+  "miejsce": {
+    "agent_radzi": "Agent radzi",
+    "najpierw_za_oz_wyjazd_do": "Najpierw załóż wyjazd, do którego zapisujemy",
+    "nie_znaleziono_takiego_miejsca": "Nie znaleziono takiego miejsca.",
+    "od_oz_do_kolekcji": "Odłóż do kolekcji",
+    "od_ozone_do_kolekcji": "Odłożone do kolekcji",
+    "podobne_w_klimacie": "Podobne w klimacie",
+    "wroc_do_odkrywania": "Wróć do odkrywania",
+    "zapisane_od_oz_do_kolekcji": "Zapisane · odłóż do kolekcji ▾"
+  },
+  "naglowek": {
+    "odkrywaj": "Odkrywaj",
+    "plan": "Plan",
+    "start": "Start",
+    "tablica": "Tablica",
+    "warsztat": "Warsztat",
+    "zapisane": "Zapisane",
+    "zapisane_miejsca": "Zapisane miejsca"
+  },
+  "narzedzia": {
+    "narzedzia_tablicy": "Narzędzia tablicy",
+    "zamknij_narzedzie": "Zamknij narzędzie"
+  },
+  "odkrywaj": {
+    "bez_po_ozenia_nie_ma": "· bez położenia, nie ma go na mapie",
+    "do_ulubionych": "Do ulubionych",
+    "miasto": "Miasto",
+    "najpierw_wybierz_wyjazd_do_ktorego": "Najpierw wybierz wyjazd, do którego zapisujemy",
+    "podaj_miasto_ktore_mamy_przejrzec": "Podaj miasto, które mamy przejrzeć",
+    "pokaz_wszystkie": "Pokaż wszystkie",
+    "pokazuj_tylko_to_co_widac": "Pokazuj tylko to, co widać na mapie",
+    "szukaj_plaza_ruiny_deszczowy_dzien": "Szukaj: plaża, ruiny, deszczowy dzień…",
+    "ta_przegladarka_nie_udostepnia_po": "Ta przeglądarka nie udostępnia położenia",
+    "tablica": "Tablica",
+    "twoj_hotel_parking_dworzec": "Twój hotel, parking, dworzec…",
+    "wyczysc_fraze": "Wyczyść frazę",
+    "wyjazd_do_ktorego_zapisujesz_miejsca": "Wyjazd, do którego zapisujesz miejsca"
   },
   "profile": {
     "account_info": "Informacje o koncie",
@@ -158,10 +255,100 @@
     "username": "Nazwa użytkownika",
     "username_placeholder": "Twoja nazwa..."
   },
+  "publiczna": {
+    "brak_opis": "Albo nigdy nie została opublikowana, albo autor cofnął publikację.",
+    "brak_tytul": "Nie ma takiej tablicy",
+    "kopiuje": "Kopiuję…",
+    "skopiowana": "Tablica jest u Ciebie — zmień, co nie pasuje",
+    "skopiuj": "Skopiuj do siebie",
+    "twoja": "To Twoja tablica",
+    "wroc": "Wróć na stronę główną"
+  },
   "seo": {
     "contact": {
       "description": "Skontaktuj się z zespołem RouteMarket. Pomoc techniczna, pytania dla twórców tras i kupujących.",
       "title": "Kontakt — RouteMarket"
     }
+  },
+  "start": {
+    "dodaj_wiecej_miejsc": "Dodaj więcej miejsc",
+    "dokad_tym_razem": "Dokąd tym razem?",
+    "kopiuje": "Kopiuję…",
+    "miasto_lub_region": "Miasto lub region",
+    "na_pewno": "Na pewno",
+    "nie_rozpozna_em_terminu_wyjazd": "Nie rozpoznałem terminu — wyjazd zapisany jako szkic. Datę ustawisz na tablicy.",
+    "nie_tym_razem": "Nie tym razem",
+    "nowy_wyjazd": "Nowy wyjazd",
+    "podaj_miasto_lub_region": "Podaj miasto lub region",
+    "tablica": "Tablica",
+    "tablice_od_podroznikow": "Tablice od podróżników",
+    "termin_np_12_14_wrzesnia": "Termin — np. 12–14 września",
+    "twoje_wyjazdy": "Twoje wyjazdy",
+    "wymaga_decyzji": "Wymaga decyzji",
+    "zacznij_planowac": "Zacznij planować",
+    "zak_adam": "Zakładam…"
+  },
+  "tablica": {
+    "adres_e_mail_osoby_musi": "adres e-mail osoby — musi zalogować się tym samym",
+    "bez_pinezki_na_mapie": "Bez pinezki na mapie",
+    "byc_moze": "Być może",
+    "charakter_wyjazdu_nadpisze_twoje_domyslne": "Charakter wyjazdu — nadpisze Twoje domyślne preferencje na czas tego planu",
+    "daleko_od_reszty": "Daleko od reszty:",
+    "dni": "Dni",
+    "do_przejscia": "Do przejścia:",
+    "dodaj_do_tablicy": "Dodaj do tablicy",
+    "dodaj_miejsca": "Dodaj miejsca",
+    "dodano_dostep_tablica_pojawi_sie": "Dodano dostęp — tablica pojawi się tej osobie po zalogowaniu tym adresem. Powiadomienia nie wysyłamy, prześlij jej odnośnik sam.",
+    "ile_czasu_zaplanowac": "Ile czasu zaplanować",
+    "kiedy_jedziecie": "Kiedy jedziecie?",
+    "koniec_nie_moze_byc_przed": "Koniec nie może być przed początkiem",
+    "kopiuj_tablice": "Kopiuj tablicę",
+    "licze": "Liczę…",
+    "licze_przebieg": "Liczę przebieg…",
+    "miasto": "Miasto",
+    "moje_po_ozenie": "Moje położenie",
+    "moze": "Może",
+    "mozliwe_duplikaty": "Możliwe duplikaty:",
+    "na_pewno": "Na pewno",
+    "nastepne_zdjecie": "Następne zdjęcie",
+    "nazwa_np_bukareszt_delegacja": "Nazwa, np. Bukareszt — delegacja",
+    "nic_nie_znalaz_em_dla": "Nic nie znalazłem dla tego zapytania — spróbuj inaczej je sformułować",
+    "nie_uda_o_sie_ustalic": "Nie udało się ustalić położenia części miejsc",
+    "nie_zmiesci_o_sie": "Nie zmieściło się",
+    "nie_znalaz_em_w_tym": "Nie znalazłem w tym tekście żadnego miejsca",
+    "odrzuc": "Odrzuć",
+    "planu_jeszcze_nie_ma": "Planu jeszcze nie ma",
+    "podaj_miasto_w_ktorym_planujesz": "Podaj miasto, w którym planujesz wyjazd",
+    "podaj_nazwe_planu_np_bukareszt": "Podaj nazwę planu, np. „Bukareszt — delegacja”",
+    "poprzednie_zdjecie": "Poprzednie zdjęcie",
+    "preferencje_tego_wyjazdu": "Preferencje tego wyjazdu",
+    "przelicz_dok_adnie": "Przelicz dokładnie",
+    "przelicz_plan": "Przelicz plan",
+    "punktow": "Punktów:",
+    "skad_zaczynacie": "Skąd zaczynacie?",
+    "skopiowano_tablice_razem_z_miejscami": "Skopiowano tablicę razem z miejscami — zmień charakter i planuj po swojemu",
+    "ta_przegladarka_nie_udostepnia_po": "Ta przeglądarka nie udostępnia położenia",
+    "tablica_publiczna": "Tablica publiczna",
+    "ten_dzien_ma_za_ma": "Ten dzień ma za mało punktów ze współrzędnymi",
+    "to_wydarzenie_jest_juz_na": "To wydarzenie jest już na tablicy",
+    "uk_adam": "Układam…",
+    "usun_z_tablicy": "Usuń z tablicy",
+    "w_tym_obszarze_nic_nie": "W tym obszarze nic nie znalazłem",
+    "wiecej_niz_da_sie_przejsc": "— więcej, niż da się przejść",
+    "wklej_odnosnik_z_map_google": "Wklej odnośnik z Map Google, OpenStreetMap albo Apple Maps",
+    "wklej_opis_posta_liste_z": "Wklej opis posta, listę z bloga albo adres artykułu — wyłuskam z tego miejsca",
+    "wroc_do_byc_moze": "Wróć do „Być może”",
+    "wskazowka": "Wskazówka",
+    "wspo_tworcy_tablicy": "Współtwórcy tablicy",
+    "za_ma_o_miejsc_ze": "Za mało miejsc ze współrzędnymi, żeby wyznaczyć trasę",
+    "zaloguj_sie_aby_tworzyc_projekty": "Zaloguj się, aby tworzyć projekty"
+  },
+  "zapisane": {
+    "dodaj_do_tablicy": "Dodaj do tablicy",
+    "dodano_do_tablicy": "Dodano do tablicy",
+    "nazwa_nowej_kolekcji": "Nazwa nowej kolekcji",
+    "nic_tu_jeszcze_nie_ma": "Nic tu jeszcze nie ma",
+    "od_oz_do_kolekcji": "Odłóż do kolekcji",
+    "usun_z_zapisanych": "Usuń z zapisanych"
   }
 }

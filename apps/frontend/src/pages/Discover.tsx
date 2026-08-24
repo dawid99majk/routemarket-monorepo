@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { opisMiejsca } from '@/lib/opis';
+import { useTranslation } from 'react-i18next';
 
 interface CatalogPlace {
   id: string;
@@ -91,6 +92,7 @@ function popoludnia(n: number | null | undefined): string {
 }
 
 export default function Discover() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [city, setCity] = useState('');
   const [query, setQuery] = useState('');
@@ -286,7 +288,7 @@ export default function Discover() {
    * kliknięcie innego przenosi. Bez potwierdzeń i bez okien — tak mówi projekt.
    */
   const mark = async (place: CatalogPlace, bucket: Bucket) => {
-    if (!activeBoard) return toast.error('Najpierw wybierz wyjazd, do którego zapisujemy');
+    if (!activeBoard) return toast.error(t('odkrywaj.najpierw_wybierz_wyjazd_do_ktorego'));
     const current = marks[place.id];
 
     if (current === bucket) {
@@ -408,7 +410,7 @@ export default function Discover() {
    * dostajemy — dlatego to osobny przycisk, a nie coś, co dzieje się przy wejściu.
    */
   const zUrzadzenia = () => {
-    if (!navigator.geolocation) return toast.error('Ta przeglądarka nie udostępnia położenia');
+    if (!navigator.geolocation) return toast.error(t('odkrywaj.ta_przegladarka_nie_udostepnia_po'));
     setLokalizowanie(true);
     navigator.geolocation.getCurrentPosition(
       (poz) => {
@@ -431,7 +433,7 @@ export default function Discover() {
   };
 
   const seedCity = async () => {
-    if (!city.trim()) return toast.error('Podaj miasto, które mamy przejrzeć');
+    if (!city.trim()) return toast.error(t('odkrywaj.podaj_miasto_ktore_mamy_przejrzec'));
     setSeeding(true);
     try {
       const data = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 24 }, { timeoutMs: 180_000 });
@@ -492,7 +494,7 @@ export default function Discover() {
                 <select
                   value={activeBoard ?? ''}
                   onChange={(e) => przelaczWyjazd(e.target.value)}
-                  aria-label="Wyjazd, do którego zapisujesz miejsca"
+                  aria-label={t('odkrywaj.wyjazd_do_ktorego_zapisujesz_miejsca')}
                   className="rounded-full border border-border bg-card px-3 py-1 text-[13px]
                              hover:border-primary transition-colors max-w-[320px] truncate"
                 >
@@ -528,7 +530,7 @@ export default function Discover() {
               {/* Tablica dostępna też tutaj, nie tylko w pasku: zapisując miejsca
                   najczęściej chce się sprawdzić, co już się uzbierało. */}
               <Button variant="outline"
-                onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>Tablica</Button>
+                onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>{t('odkrywaj.tablica')}</Button>
               <Button className="bg-primary hover:bg-primary/90"
                 onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}>
                 Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
@@ -543,7 +545,7 @@ export default function Discover() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Szukaj: plaża, ruiny, deszczowy dzień…"
+            placeholder={t('odkrywaj.szukaj_plaza_ruiny_deszczowy_dzien')}
             className="flex-1 min-w-[180px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
           />
           <div className="w-px self-stretch bg-border hidden sm:block" />
@@ -592,7 +594,7 @@ export default function Discover() {
           <div className="relative">
             <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input list="miasta" value={city} onChange={(e) => setCity(e.target.value)}
-              placeholder="Miasto" className="pl-8 h-8 w-36 text-sm" />
+              placeholder={t('odkrywaj.miasto')} className="pl-8 h-8 w-36 text-sm" />
             <datalist id="miasta">{cities.map((c) => <option key={c} value={c} />)}</datalist>
           </div>
         </div>
@@ -641,10 +643,10 @@ export default function Discover() {
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {query.trim() && (
-                    <Button variant="outline" onClick={() => setQuery('')}>Wyczyść frazę</Button>
+                    <Button variant="outline" onClick={() => setQuery('')}>{t('odkrywaj.wyczysc_fraze')}</Button>
                   )}
                   {filter !== FILTERS[0].id && (
-                    <Button variant="outline" onClick={() => setFilter(FILTERS[0].id)}>Pokaż wszystkie</Button>
+                    <Button variant="outline" onClick={() => setFilter(FILTERS[0].id)}>{t('odkrywaj.pokaz_wszystkie')}</Button>
                   )}
                   {tylkoZObszaru && obszar && visible.length > 0 && (
                     <Button variant="outline" onClick={() => setTylkoZObszaru(false)}>
@@ -719,7 +721,7 @@ export default function Discover() {
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleFavorite(p); }}
-                        aria-label="Do ulubionych"
+                        aria-label={t('odkrywaj.do_ulubionych')}
                         className="absolute right-2.5 bottom-2.5 w-7 h-7 rounded-full bg-background/85 backdrop-blur-sm
                                    flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       >
@@ -790,7 +792,7 @@ export default function Discover() {
                     <span className="text-sm truncate flex-1">
                       {(board as any).start_name}
                       {(board as any).start_lat == null && (
-                        <span className="text-[12px] text-muted-foreground"> · bez położenia, nie ma go na mapie</span>
+                        <span className="text-[12px] text-muted-foreground"> {t('odkrywaj.bez_po_ozenia_nie_ma')}</span>
                       )}
                     </span>
                     <button onClick={() => zapiszStart('', null, null)}
@@ -804,7 +806,7 @@ export default function Discover() {
                       <div className="relative flex-1 min-w-0">
                         <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         <Input value={startQuery} onChange={(e) => setStartQuery(e.target.value)}
-                          placeholder="Twój hotel, parking, dworzec…" className="pl-8 h-9 text-sm" />
+                          placeholder={t('odkrywaj.twoj_hotel_parking_dworzec')} className="pl-8 h-9 text-sm" />
                       </div>
                       <Button variant="outline" size="sm" onClick={zUrzadzenia} disabled={lokalizowanie}
                         className="shrink-0 h-9">
@@ -842,7 +844,7 @@ export default function Discover() {
                 <input type="checkbox" checked={tylkoZObszaru}
                   onChange={(e) => setTylkoZObszaru(e.target.checked)}
                   className="accent-primary w-4 h-4" />
-                <span className="flex-1">Pokazuj tylko to, co widać na mapie</span>
+                <span className="flex-1">{t('odkrywaj.pokazuj_tylko_to_co_widac')}</span>
                 <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                   {wObszarze.length}
                 </span>

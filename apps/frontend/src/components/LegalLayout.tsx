@@ -45,6 +45,12 @@ export default function LegalLayout({ docKey, children }: LegalLayoutProps) {
         <article className="prose prose-neutral dark:prose-invert max-w-none">
           {children}
         </article>
+
+        {/* Wersja angielska jest wiążąca. Dokumenty nie są tłumaczone maszynowo:
+            błędny przekład paragrafu to odpowiedzialność, nie niewygoda. */}
+        <p className="mt-10 pt-5 border-t border-border text-xs text-muted-foreground text-pretty">
+          {t('legal.jezyk_wiazacy')}
+        </p>
       </main>
 
       <Footer />

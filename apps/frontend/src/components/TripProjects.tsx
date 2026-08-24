@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { opisMiejsca } from '@/lib/opis';
 import { format, parse, isValid } from 'date-fns';
 import { pl } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 
 interface TripProject extends Partial<AxisValues> {
   id: string;
@@ -149,6 +150,7 @@ interface TripProjectsProps {
 }
 
 export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<TripProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -398,10 +400,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
   const createProject = async () => {
     // Ciche wyjście zostawiało użytkownika z wrażeniem, że przycisk nie działa
-    if (!form.name.trim()) return toast.error('Podaj nazwę planu, np. „Bukareszt — delegacja”');
-    if (!form.destination.trim()) return toast.error('Podaj miasto, w którym planujesz wyjazd');
+    if (!form.name.trim()) return toast.error(t('tablica.podaj_nazwe_planu_np_bukareszt'));
+    if (!form.destination.trim()) return toast.error(t('tablica.podaj_miasto_w_ktorym_planujesz'));
     const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return toast.error('Zaloguj się, aby tworzyć projekty');
+    if (!userData.user) return toast.error(t('tablica.zaloguj_sie_aby_tworzyc_projekty'));
     const { data, error } = await supabase
       .from('trip_projects')
       .insert({
@@ -495,7 +497,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const dni = od && doDnia
       ? Math.round((new Date(doDnia).getTime() - new Date(od).getTime()) / 86_400_000) + 1
       : null;
-    if (dni !== null && dni < 1) return toast.error('Koniec nie może być przed początkiem');
+    if (dni !== null && dni < 1) return toast.error(t('tablica.koniec_nie_moze_byc_przed'));
 
     const patch: any = { start_date: od, end_date: doDnia };
     // Liczba dni wynika z terminu — trzymanie dwóch niezależnych prawd o długości
@@ -515,7 +517,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    * osobne kliknięcie, a nie coś, co dzieje się przy wejściu na tablicę.
    */
   const startZUrzadzenia = () => {
-    if (!navigator.geolocation) return toast.error('Ta przeglądarka nie udostępnia położenia');
+    if (!navigator.geolocation) return toast.error(t('tablica.ta_przegladarka_nie_udostepnia_po'));
     setLokalizowanie(true);
     navigator.geolocation.getCurrentPosition(
       (poz) => {
@@ -562,7 +564,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       if (Array.isArray(d.places)) {
         setWyluskane(d.places);
         setZLinku(null);
-        if (d.places.length === 0) toast.info('W tym obszarze nic nie znalazłem');
+        if (d.places.length === 0) toast.info(t('tablica.w_tym_obszarze_nic_nie'));
         else toast.success(`Znalazłem ${d.places.length} miejsc w tym obszarze`);
       } else {
         setZLinku(d.place);
@@ -604,7 +606,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           : { text: wejscie, city: active.destination },
         { timeoutMs: 120_000 });
       setWyluskane(d.places ?? []);
-      if (!d.places?.length) toast.info('Nie znalazłem w tym tekście żadnego miejsca');
+      if (!d.places?.length) toast.info(t('tablica.nie_znalaz_em_w_tym'));
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się wyłuskać miejsc');
     } finally {
@@ -633,7 +635,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       });
       setResults(data.places || []);
       if (!data.places || data.places.length === 0) {
-        toast.info('Nic nie znalazłem dla tego zapytania — spróbuj inaczej je sformułować');
+        toast.info(t('tablica.nic_nie_znalaz_em_dla'));
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -807,7 +809,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const points = (day.items || [])
       .filter((it: any) => it.lat != null && it.lng != null)
       .map((it: any) => ({ lat: it.lat, lng: it.lng, name: it.name }));
-    if (points.length < 2) return toast.error('Ten dzień ma za mało punktów ze współrzędnymi');
+    if (points.length < 2) return toast.error(t('tablica.ten_dzien_ma_za_ma'));
 
     setDayRoutes((prev) => ({ ...prev, [day.day]: 'loading' }));
     try {
@@ -887,7 +889,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const wydarzenieNaTablice = async (ev: any) => {
     if (!active) return;
     if (places.some((p) => p.name === ev.name)) {
-      return toast.info('To wydarzenie jest już na tablicy');
+      return toast.info(t('tablica.to_wydarzenie_jest_juz_na'));
     }
     const zKatalogu = ev.place_id
       ? (await (supabase as any).from('place_catalog').select('*').eq('id', ev.place_id).maybeSingle()).data
@@ -1050,7 +1052,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     }
     setProjects((prev) => [copy, ...prev]);
     setActiveId(copy.id);
-    toast.success('Skopiowano tablicę razem z miejscami — zmień charakter i planuj po swojemu');
+    toast.success(t('tablica.skopiowano_tablice_razem_z_miejscami'));
   };
 
   const shareProject = async () => {
@@ -1069,7 +1071,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       // działa: has_project_access dopasowuje adres z tokenu, więc tablica pojawi
       // się tej osobie po zalogowaniu. Komunikat mówi więc, co się stało naprawdę,
       // i zostawia wysłanie odnośnika użytkownikowi.
-      toast.success('Dodano dostęp — tablica pojawi się tej osobie po zalogowaniu tym adresem. Powiadomienia nie wysyłamy, prześlij jej odnośnik sam.');
+      toast.success(t('tablica.dodano_dostep_tablica_pojawi_sie'));
     } catch (err: any) {
       toast.error(err.message.includes('duplicate') ? 'Ta osoba już ma dostęp' : err.message);
     } finally {
@@ -1141,7 +1143,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           resolved[i] = hit ? { ...hit, name, type: 'waypoint' } : (null as any);
         }
       } catch {
-        toast.error('Nie udało się ustalić położenia części miejsc');
+        toast.error(t('tablica.nie_uda_o_sie_ustalic'));
       }
     }
 
@@ -1168,7 +1170,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     }
 
     if (waypoints.length < 2) {
-      toast.error('Za mało miejsc ze współrzędnymi, żeby wyznaczyć trasę');
+      toast.error(t('tablica.za_ma_o_miejsc_ze'));
       return;
     }
     waypoints[0].type = 'start';
@@ -1442,18 +1444,18 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       <div className="space-y-5">
         {creating && (
           <div className="grid gap-2 sm:grid-cols-4 p-4 bg-muted/50 rounded-md">
-            <Input placeholder="Nazwa, np. Bukareszt — delegacja" value={form.name}
+            <Input placeholder={t('tablica.nazwa_np_bukareszt_delegacja')} value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })} className="sm:col-span-2" />
-            <Input placeholder="Miasto" value={form.destination}
+            <Input placeholder={t('tablica.miasto')} value={form.destination}
               onChange={(e) => setForm({ ...form, destination: e.target.value })} />
             <div className="flex gap-2">
-              <Input placeholder="Dni" type="number" value={form.days}
+              <Input placeholder={t('tablica.dni')} type="number" value={form.days}
                 onChange={(e) => setForm({ ...form, days: e.target.value })} />
               <Input placeholder="h/dzień" type="number" value={form.hours}
                 onChange={(e) => setForm({ ...form, hours: e.target.value })} />
             </div>
             <div className="sm:col-span-4 space-y-1.5">
-              <span className="text-xs text-muted-foreground">Charakter wyjazdu — nadpisze Twoje domyślne preferencje na czas tego planu</span>
+              <span className="text-xs text-muted-foreground">{t('tablica.charakter_wyjazdu_nadpisze_twoje_domyslne')}</span>
               <div className="flex flex-wrap gap-1.5">
                 {TRIP_PRESETS.map((preset) => (
                   <button
@@ -1547,8 +1549,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {active && view === 'plan' && plan && (
               <Button variant="outline" onClick={buildPlan} disabled={planning}>
                 {planning
-                  ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Liczę…</>
-                  : <><RefreshCw className="w-4 h-4 mr-1.5" /> Przelicz plan</>}
+                  ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('tablica.licze')}</>
+                  : <><RefreshCw className="w-4 h-4 mr-1.5" /> {t('tablica.przelicz_plan')}</>}
               </Button>
             )}
             {/* Dodawanie miejsc jako stała akcja nagłówka. Wcześniej jedynym widocznym
@@ -1596,7 +1598,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                hover:text-primary transition-colors disabled:opacity-60">
                     {lokalizowanie
                       ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Szukam…</>
-                      : <><Crosshair className="w-3.5 h-3.5" /> Moje położenie</>}
+                      : <><Crosshair className="w-3.5 h-3.5" /> {t('tablica.moje_po_ozenie')}</>}
                   </button>
                   <button onClick={() => { setPokazStart(true); setStartQuery(''); }}
                     className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
@@ -1611,7 +1613,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <div className="flex flex-wrap items-center gap-3">
                   <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm">Skąd zaczynacie?</div>
+                    <div className="text-sm">{t('tablica.skad_zaczynacie')}</div>
                     <div className="text-[13px] text-muted-foreground">
                       Hotel, parking, dworzec — planer zacznie i skończy tam każdy dzień.
                     </div>
@@ -1620,7 +1622,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
                       {lokalizowanie
                         ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
-                        : <><Crosshair className="w-4 h-4 mr-1.5" /> Moje położenie</>}
+                        : <><Crosshair className="w-4 h-4 mr-1.5" /> {t('tablica.moje_po_ozenie')}</>}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
                       Ustaw punkt startowy
@@ -1699,7 +1701,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <div className="flex flex-wrap items-center gap-3">
                   <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm">Kiedy jedziecie?</div>
+                    <div className="text-sm">{t('tablica.kiedy_jedziecie')}</div>
                     <div className="text-[13px] text-muted-foreground">
                       Bez terminu wszystko działa — z terminem godziny otwarcia liczą się dla
                       właściwej pory roku, a wydarzenia z Twoich dni idą na górę.
@@ -1759,7 +1761,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       {/* Proporcja czasu: świadomy wybór, jak gęsty ma być dzień */}
                       <div className="rounded-md border bg-muted/30 px-4 py-3">
                         <div className="flex items-baseline justify-between gap-3 mb-2">
-                          <span className="text-sm font-medium">Ile czasu zaplanować</span>
+                          <span className="text-sm font-medium">{t('tablica.ile_czasu_zaplanowac')}</span>
                           <span className="text-sm font-semibold text-primary tabular-nums">
                             {active.fill_percent ?? 70}%
                           </span>
@@ -1790,7 +1792,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
                               {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
                               {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
-                              {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> — więcej, niż da się przejść</span>}
+                              {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> {t('tablica.wiecej_niz_da_sie_przejsc')}</span>}
                             </p>
                           </div>
                         )}
@@ -1809,7 +1811,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           jedzie się z dziećmi w tempie z delegacji. */}
                       <div className="border-t border-border pt-4 space-y-5">
                         <div className="flex items-baseline justify-between gap-3">
-                          <h3 className="font-display text-[17px]">Preferencje tego wyjazdu</h3>
+                          <h3 className="font-display text-[17px]">{t('tablica.preferencje_tego_wyjazdu')}</h3>
                           <button
                             onClick={() => AXES.forEach((os) => ustawOs(os.key, null))}
                             className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
@@ -1910,7 +1912,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     <div className="flex gap-2">
                       <Input value={link} onChange={(e) => setLink(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && rozpoznajLink()}
-                        placeholder="Wklej odnośnik z Map Google, OpenStreetMap albo Apple Maps"
+                        placeholder={t('tablica.wklej_odnosnik_z_map_google')}
                         className="flex-1" />
                       <Button variant="outline" onClick={rozpoznajLink} disabled={linkBusy || !link.trim()}>
                         {linkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Rozpoznaj'}
@@ -1926,9 +1928,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         </div>
                         <div className="flex flex-wrap gap-2 mt-3">
                           <Button size="sm" onClick={() => dodajZLinku('must')}
-                            className="bg-primary hover:bg-primary/90">Na pewno</Button>
-                          <Button size="sm" variant="outline" onClick={() => dodajZLinku('nice')}>Być może</Button>
-                          <Button size="sm" variant="ghost" onClick={() => setZLinku(null)}>Odrzuć</Button>
+                            className="bg-primary hover:bg-primary/90">{t('tablica.na_pewno')}</Button>
+                          <Button size="sm" variant="outline" onClick={() => dodajZLinku('nice')}>{t('tablica.byc_moze')}</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setZLinku(null)}>{t('tablica.odrzuc')}</Button>
                         </div>
                       </div>
                     )}
@@ -1943,7 +1945,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       value={wklejony}
                       onChange={(e) => setWklejony(e.target.value)}
                       rows={3}
-                      placeholder="Wklej opis posta, listę z bloga albo adres artykułu — wyłuskam z tego miejsca"
+                      placeholder={t('tablica.wklej_opis_posta_liste_z')}
                       className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm
                                  outline-none focus:border-foreground/30 transition-colors resize-y"
                     />
@@ -1982,9 +1984,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </div>
                               <div className="flex gap-1.5 shrink-0">
                                 <Button size="sm" onClick={() => dodajWyluskane(m, 'must')}
-                                  className="bg-primary hover:bg-primary/90 h-7 px-2.5 text-[12px]">Na pewno</Button>
+                                  className="bg-primary hover:bg-primary/90 h-7 px-2.5 text-[12px]">{t('tablica.na_pewno')}</Button>
                                 <Button size="sm" variant="outline" onClick={() => dodajWyluskane(m, 'nice')}
-                                  className="h-7 px-2.5 text-[12px]">Może</Button>
+                                  className="h-7 px-2.5 text-[12px]">{t('tablica.moze')}</Button>
                               </div>
                             </div>
                           </div>
@@ -2188,7 +2190,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <div className="border-t pt-4">
                   <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-4">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold">Tablica publiczna</h3>
+                      <h3 className="text-sm font-semibold">{t('tablica.tablica_publiczna')}</h3>
                       <p className="text-[13px] text-muted-foreground mt-1 text-pretty">
                         {active?.is_public
                           ? `Tablica jest w internecie: obejrzy ją każdy, kto dostanie odnośnik, także bez konta. Skopiować albo polubić może ją tylko osoba zalogowana. Widoczna jest też nazwa, którą się podpisujesz.${
@@ -2216,7 +2218,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       value={shareEmail}
                       onChange={(e) => setShareEmail(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && shareProject()}
-                      placeholder="adres e-mail osoby — musi zalogować się tym samym"
+                      placeholder={t('tablica.adres_e_mail_osoby_musi')}
                       className="flex-1"
                     />
                     <Button onClick={shareProject} disabled={sharing || !shareEmail.trim()} variant="outline">
@@ -2281,7 +2283,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                          bg-card pl-3 pr-1.5 py-1 text-[12px]">
                               {x.name}
                               <button onClick={() => movePlace(x.id, 'nice')}
-                                title="Wróć do „Być może”"
+                                title={t('tablica.wroc_do_byc_moze')}
                                 className="rounded-full px-2 py-0.5 text-[11px] text-muted-foreground
                                            hover:bg-muted hover:text-foreground transition-colors">
                                 przywróć
@@ -2366,7 +2368,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                                    hover:text-primary transition-colors">
                                         {p.name}
                                       </button>
-                                      <button onClick={() => unpin(p.id)} aria-label="Usuń z tablicy"
+                                      <button onClick={() => unpin(p.id)} aria-label={t('tablica.usun_z_tablicy')}
                                         className="text-muted-foreground/50 hover:text-destructive shrink-0
                                                    opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -2410,7 +2412,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                              flex flex-col items-center justify-center gap-1.5 text-muted-foreground
                                              hover:border-primary/50 hover:text-primary transition-colors">
                                   <Plus className="w-5 h-5" />
-                                  <span className="text-[12px]">Dodaj miejsca</span>
+                                  <span className="text-[12px]">{t('tablica.dodaj_miejsca')}</span>
                                 </button>
                               ) : (
                                 <div className="w-full h-[104px] rounded-md border border-dashed border-border/70" />
@@ -2511,11 +2513,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   </span>
                 )}
                 {shares.length > 0 && (
-                  <span className="text-xs flex items-center gap-1 text-muted-foreground px-2" title="Współtwórcy tablicy">
+                  <span className="text-xs flex items-center gap-1 text-muted-foreground px-2" title={t('tablica.wspo_tworcy_tablicy')}>
                     <Users className="w-3.5 h-3.5" /> {shares.length}
                   </span>
                 )}
-                <button onClick={duplicateProject} title="Kopiuj tablicę"
+                <button onClick={duplicateProject} title={t('tablica.kopiuj_tablice')}
                   className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-muted transition-colors">
                   <Copy className="w-4 h-4" />
                 </button>
@@ -2597,11 +2599,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             flex items-center justify-center hover:bg-background transition-colors`;
                           return (
                             <>
-                              <button type="button" aria-label="Poprzednie zdjęcie"
+                              <button type="button" aria-label={t('tablica.poprzednie_zdjecie')}
                                 onClick={() => przesun(-1)} className={`${strzalka} left-2`}>
                                 <ChevronLeft className="w-4 h-4" />
                               </button>
-                              <button type="button" aria-label="Następne zdjęcie"
+                              <button type="button" aria-label={t('tablica.nastepne_zdjecie')}
                                 onClick={() => przesun(1)} className={`${strzalka} right-2`}>
                                 <ChevronRight className="w-4 h-4" />
                               </button>
@@ -2655,7 +2657,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     {opisMiejsca(placeCard) && <p className="text-sm leading-relaxed">{opisMiejsca(placeCard)}</p>}
                     {placeCard.recommendation && (
                       <p className="text-xs bg-primary/10/70 border border-primary/30 rounded-md p-2.5 leading-relaxed">
-                        <strong className="block text-[10px] uppercase tracking-wider text-primary mb-0.5">Wskazówka</strong>
+                        <strong className="block text-[10px] uppercase tracking-wider text-primary mb-0.5">{t('tablica.wskazowka')}</strong>
                         {placeCard.recommendation}
                       </p>
                     )}
@@ -2684,13 +2686,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               <div className="rounded-md border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">
                 {outliers.length > 0 && (
                   <p className="text-xs text-warning-foreground">
-                    <strong>Daleko od reszty:</strong> {outliers.map((p) => p.name).join(', ')}.
+                    <strong>{t('tablica.daleko_od_reszty')}</strong> {outliers.map((p) => p.name).join(', ')}.
                     {' '}Dojazd zje czas przeznaczony na zwiedzanie — rozważ osobny dzień albo odpuszczenie.
                   </p>
                 )}
                 {duplicates.length > 0 && (
                   <p className="text-xs text-warning-foreground">
-                    <strong>Możliwe duplikaty:</strong> {duplicates.join('; ')} — to samo miejsce pod dwiema nazwami.
+                    <strong>{t('tablica.mozliwe_duplikaty')}</strong> {duplicates.join('; ')} — to samo miejsce pod dwiema nazwami.
                   </p>
                 )}
               </div>
@@ -2808,17 +2810,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             <span>Zwiedzanie: <strong className="font-mono tabular-nums text-foreground">{(minutes / 60).toFixed(1)} h</strong></span>
                             {measured ? (
                               <>
-                                <span>Do przejścia: <strong className="font-mono tabular-nums text-foreground">{measured.km.toFixed(1)} km</strong></span>
+                                <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">{measured.km.toFixed(1)} km</strong></span>
                                 <span>Marsz: <strong className="font-mono tabular-nums text-foreground">{Math.round(measured.h * 60)} min</strong></span>
                                 <span className="text-primary">przeliczone po chodnikach</span>
                               </>
                             ) : (
                               <>
-                                {km > 0 && <span>Do przejścia: <strong className="font-mono tabular-nums text-foreground">ok. {km.toFixed(1)} km</strong></span>}
+                                {km > 0 && <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">ok. {km.toFixed(1)} km</strong></span>}
                                 {km > 0 && <span>Marsz: <strong className="font-mono tabular-nums text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
                               </>
                             )}
-                            <span>Punktów: <strong className="font-mono tabular-nums text-foreground">{items.length}</strong></span>
+                            <span>{t('tablica.punktow')} <strong className="font-mono tabular-nums text-foreground">{items.length}</strong></span>
                             {items.filter((it: any) => it.lat != null).length >= 2 && !measured && (
                               <button
                                 onClick={() => recalcDay(day)}
@@ -2826,8 +2828,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 className="ml-auto flex items-center gap-1 text-primary hover:text-primary hover:underline disabled:opacity-60"
                               >
                                 {exact === 'loading'
-                                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Liczę przebieg…</>
-                                  : <><RefreshCw className="w-3 h-3" /> Przelicz dokładnie</>}
+                                  ? <><Loader2 className="w-3 h-3 animate-spin" /> {t('tablica.licze_przebieg')}</>
+                                  : <><RefreshCw className="w-3 h-3" /> {t('tablica.przelicz_dok_adnie')}</>}
                               </button>
                             )}
                           </div>
@@ -2867,7 +2869,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 {nrNaMapie}
                               </span>
                             ) : (
-                              <span title="Bez pinezki na mapie"
+                              <span title={t('tablica.bez_pinezki_na_mapie')}
                                 className="w-6 h-6 rounded-full shrink-0 mt-0.5 border border-dashed border-border" />
                             )}
                             <div className="min-w-0 flex-1">
@@ -2889,7 +2891,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             {suggested && !alreadyPinned && (
                               <button
                                 onClick={() => pinSuggestion(it)}
-                                title="Dodaj do tablicy"
+                                title={t('tablica.dodaj_do_tablicy')}
                                 className="text-muted-foreground hover:text-primary shrink-0 mt-0.5"
                               >
                                 <Pin className="w-3.5 h-3.5" />
@@ -2905,7 +2907,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
                 {plan.not_scheduled?.length > 0 && (
                   <div className="rounded-md border border-warning/40 bg-warning/60 p-3">
-                    <div className="text-sm font-semibold text-warning-foreground mb-1">Nie zmieściło się</div>
+                    <div className="text-sm font-semibold text-warning-foreground mb-1">{t('tablica.nie_zmiesci_o_sie')}</div>
                     {plan.not_scheduled.map((n: any) => (
                       <div key={n.name} className="text-xs text-warning-foreground">
                         <strong>{n.name}</strong>{n.reason ? ` — ${n.reason}` : ''}
@@ -3011,7 +3013,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 przycisk, zamiast zostawiać białą stronę. */}
             {!plan && savedPlans.length === 0 && (
               <div className="rounded-md border border-border bg-card px-6 py-16 text-center">
-                <h2 className="font-display font-light text-[24px]">Planu jeszcze nie ma</h2>
+                <h2 className="font-display font-light text-[24px]">{t('tablica.planu_jeszcze_nie_ma')}</h2>
                 <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
                   {mustCount > 0
                     ? `Na tablicy czeka ${mustCount} ${mustCount === 1 ? 'miejsce' : 'miejsc'} oznaczonych „na pewno”. Ułóż z nich dni.`
@@ -3023,7 +3025,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   onClick={() => navigate(mustCount > 0 ? '/plany?widok=plan' : '/plany')}
                 >
                   {planning
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Układam…</>
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('tablica.uk_adam')}</>
                     : mustCount > 0
                       ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
                       : 'Wróć na tablicę'}

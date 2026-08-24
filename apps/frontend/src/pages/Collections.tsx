@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { Input } from '@/components/ui/input';
+import { useTranslation } from 'react-i18next';
 
 interface Collection {
   id: string;
@@ -28,6 +29,7 @@ const slugify = (name: string) =>
  * wejściem do serwisu, jakie istnieje: cudzy gust działa lepiej niż wyszukiwarka.
  */
 export default function Collections() {
+  const { t } = useTranslation();
   const [inicjaly, setInicjaly] = useState<string | null>(null);
   useEffect(() => { (async () => setInicjaly(await inicjalyUzytkownika()))(); }, []);
   const { slug } = useParams<{ slug?: string }>();
@@ -81,7 +83,7 @@ export default function Collections() {
     setCollections((prev) => [data, ...prev]);
     setNewName('');
     setCreating(false);
-    toast.success('Kolekcja utworzona');
+    toast.success(t('kolekcje.kolekcja_utworzona'));
   };
 
   const togglePublic = async () => {
@@ -120,8 +122,8 @@ export default function Collections() {
     if (!current) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-          <p className="text-muted-foreground">Nie znaleziono kolekcji albo jest prywatna.</p>
-          <Button onClick={() => navigate('/kolekcje')}>Moje kolekcje</Button>
+          <p className="text-muted-foreground">{t('kolekcje.nie_znaleziono_kolekcji_albo_jest')}</p>
+          <Button onClick={() => navigate('/kolekcje')}>{t('kolekcje.moje_kolekcje')}</Button>
         </div>
       );
     }
@@ -153,7 +155,7 @@ export default function Collections() {
         <main className="max-w-6xl mx-auto px-4 py-6">
           {places.length === 0 ? (
             <div className="text-center py-16 space-y-3">
-              <p className="text-muted-foreground">Ta kolekcja jest jeszcze pusta.</p>
+              <p className="text-muted-foreground">{t('kolekcje.ta_kolekcja_jest_jeszcze_pusta')}</p>
               <Button onClick={() => navigate('/odkrywaj')} className="bg-primary hover:bg-primary/90">
                 Znajdź miejsca
               </Button>
@@ -174,7 +176,7 @@ export default function Collections() {
                       {isOwner && (
                         <button
                           onClick={(e) => { e.stopPropagation(); removePlace(p.id); }}
-                          aria-label="Usuń z kolekcji"
+                          aria-label={t('kolekcje.usun_z_kolekcji')}
                           className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 backdrop-blur flex items-center justify-center text-white"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -221,10 +223,10 @@ export default function Collections() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
-              placeholder="Nazwa, np. „Modernizm w Polsce”"
+              placeholder={t('kolekcje.nazwa_np_modernizm_w_polsce')}
             />
-            <Button onClick={create} className="bg-primary hover:bg-primary/90">Utwórz</Button>
-            <Button variant="ghost" onClick={() => { setCreating(false); setNewName(''); }}>Anuluj</Button>
+            <Button onClick={create} className="bg-primary hover:bg-primary/90">{t('kolekcje.utworz')}</Button>
+            <Button variant="ghost" onClick={() => { setCreating(false); setNewName(''); }}>{t('kolekcje.anuluj')}</Button>
           </div>
         )}
 
