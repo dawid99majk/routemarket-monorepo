@@ -122,7 +122,12 @@ export class RouteBuilderRepository {
   }
 
   async listCatalogAll(city: string | null, limit = 500): Promise<any[]> {
-    let q = supabase.from('place_catalog').select('id, name, city, lat, lng, photos').limit(limit);
+    // description i description_i18n sa tu potrzebne: /catalog/enrich filtruje po nich
+    // "ktore miejsca nie maja jeszcze opisu". Bez nich filtr przepuszczal wszystko
+    // i endpoint nadpisywal gotowe opisy.
+    let q = supabase.from('place_catalog')
+      .select('id, name, kind, city, lat, lng, photos, description, description_i18n, visit_minutes')
+      .limit(limit);
     if (city) q = q.ilike('city', city);
     const { data, error } = await q;
     if (error) throw new Error(error.message);

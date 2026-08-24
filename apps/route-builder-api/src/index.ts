@@ -1903,9 +1903,11 @@ app.post('/catalog/enrich', async (c) => {
     if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
 
     const wszystkie = await repo.listCatalogAll(city.trim(), 200);
-    const doOpisania = wszystkie
-      .filter((m: any) => !m.description || String(m.description).trim() === '')
-      .slice(0, limit);
+    // Opis moze siedziec w starej kolumnie albo w wymiarze jezykowym — brak
+    // liczy sie dopiero wtedy, gdy nie ma go w zadnym z tych miejsc.
+    const bezOpisu = (m: any) =>
+      !String(m.description ?? '').trim() && !String(m.description_i18n?.pl ?? '').trim();
+    const doOpisania = wszystkie.filter(bezOpisu).slice(0, limit);
     if (doOpisania.length === 0) return c.json({ city, enriched: 0 });
 
     const prompt = `Opisujesz miejsca w mieście ${city} dla serwisu planowania wyjazdów.
@@ -1972,8 +1974,12 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
       const tags = Array.isArray(d.vibe_tags)
         ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)
         : [];
+      // Zapis w obie strony: stara kolumna zostaje jako zapas dla miejsc, ktore
+      // czytaja ja wprost, a wymiar jezykowy jest tym, z ktorego korzysta front
+      // i z ktorego tlumaczy sie na pozostale jezyki.
       await repo.updateCatalogPlace(m.id, {
         description: d.description,
+        description_i18n: { ...(m.description_i18n ?? {}), pl: d.description },
         vibe_tags: tags,
         visit_minutes: d.visit_minutes ?? m.visit_minutes ?? null,
         updated_at: new Date().toISOString()
