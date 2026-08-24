@@ -161,6 +161,28 @@ const areWaypointsGeometricallyEqual = (a: any[], b: any[]) => {
   return a.every((p, i) => Math.abs(p.lat - b[i].lat) < 0.00001 && Math.abs(p.lng - b[i].lng) < 0.00001);
 };
 
+/**
+ * Ksztalt kolumny `requirements` w route_builder_projects. Trzymamy w niej stan
+ * wywiadu i gotowa trase, zeby uzytkownik mogl wrocic do przerwanej rozmowy.
+ * Pola sa opcjonalne, bo zapis powstaje etapami: po pierwszej odpowiedzi jest
+ * w niej sam `phase`, a geometria dochodzi dopiero po policzeniu trasy.
+ */
+interface ZapisaneWymagania {
+  chatMessages?: unknown[];
+  phase?: string;
+  tripProfile?: Record<string, unknown>;
+  distanceTargetKm?: number;
+  gpxData?: string;
+  guideText?: string;
+  vehicleType?: string;
+  bikeSubtype?: string;
+  /** Punkty trasy zapisane jako [lat, lng, wysokosc] — tak zwraca je routing. */
+  geometry?: number[][];
+  /** Ksztalt opisany na miejscu, zeby nie ciagnac typu z pakietu maszyny. */
+  waypoints?: { lat: number; lng: number; type?: string; kind?: string; name?: string }[];
+  autoCalculate?: boolean;
+}
+
 export default function RouteBuilderV2({ initialData, onBack }: { initialData?: any, onBack?: () => void }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -477,7 +499,10 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       supabase.from('route_builder_projects').select('*').eq('id', projectId).single()
         .then(({ data }) => {
            if (data && data.requirements) {
-              const reqs = data.requirements;
+              // `requirements` to kolumna jsonb — baza nie zna jej ksztaltu, wiec
+              // typy wygenerowane ze schematu oddaja ja jako unie Json. Opisujemy
+              // ja raz, tutaj, zamiast rzutowac przy kazdym odczycie pola.
+              const reqs = data.requirements as unknown as ZapisaneWymagania;
               if (reqs.chatMessages) setField('chatMessages', reqs.chatMessages);
               if (reqs.phase) setField('phase', reqs.phase);
               if (reqs.tripProfile) setField('tripProfile', reqs.tripProfile);
@@ -675,7 +700,15 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     // Dynamic import of html2pdf to prevent load-time crashes
     // @ts-ignore
     const html2pdfModule = await import('html2pdf.js');
-    const html2pdf = html2pdfModule.default || html2pdfModule;
+    // html2pdf.js nie dowozi wlasnych typow, a `default || modul` daje unie,
+    // ktorej TypeScript nie uzna za wywolywalna. Opisujemy tylko ten fragment
+    // API, z ktorego faktycznie korzystamy.
+    type Html2Pdf = () => {
+      set: (opcje: unknown) => {
+        from: (element: HTMLElement) => { save: () => Promise<void> };
+      };
+    };
+    const html2pdf = (html2pdfModule.default || html2pdfModule) as unknown as Html2Pdf;
     
     // Tworzymy kopię elementu, by PDF nie miał tła i szarych ramek (chcemy "czysty" styl druku)
     const printElement = element.cloneNode(true) as HTMLElement;

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import { opisMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
+import { jakoZdjecia } from '@/lib/zBazy';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -63,7 +64,7 @@ export default function PlacePage() {
     if (!slug) return;
     setLoading(true);
     const { data } = await supabase.from('place_catalog').select('*').eq('slug', slug).maybeSingle();
-    setPlace(data ?? null);
+    setPlace(data ? ({ ...data, photos: jakoZdjecia(data.photos) } as CatalogPlace) : null);
     setLoading(false);
     setPhotoIdx(0);
     setAgentTip(null);

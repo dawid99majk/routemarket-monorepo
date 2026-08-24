@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseGpx } from '@/lib/gpx-parser';
 import NavigationMode from './NavigationMode';
 import type { Polyline } from '@/lib/geo-utils';
+import { jakoObiekt } from '@/lib/zBazy';
 
 interface NavigableRoute {
   id: string;
@@ -55,13 +56,16 @@ export default function NavigationLauncher() {
 
       const usable: NavigableRoute[] = [];
       for (const project of data || []) {
-        const gpx = project.requirements?.gpxData;
+        // `requirements` to kolumna jsonb — typy ze schematu oddaja ja jako
+        // unie Json, wiec ksztalt opisujemy tu, na granicy danych.
+        const wymagania = jakoObiekt<{ gpxData?: string; title?: string }>(project.requirements);
+        const gpx = wymagania?.gpxData;
         if (!gpx) continue;
         try {
           const parsed = parseGpx(gpx);
           const track = (parsed?.trackPoints || []) as Polyline;
           if (track.length >= 2) {
-            usable.push({ id: project.id, title: project.requirements?.title || 'Trasa bez nazwy', track });
+            usable.push({ id: project.id, title: wymagania?.title || 'Trasa bez nazwy', track });
           }
         } catch {
           // Uszkodzony ślad pomijamy — nie ma powodu wywracać całej listy

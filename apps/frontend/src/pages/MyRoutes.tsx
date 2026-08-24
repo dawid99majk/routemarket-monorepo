@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import Logo from '@/components/Logo';
 import { supabase } from '@/integrations/supabase/client';
+import { jakoObiekt } from '@/lib/zBazy';
 
 interface BuilderProject {
   id: string;
@@ -43,7 +44,10 @@ export default function MyRoutes() {
         .from('route_builder_projects')
         .select('id, created_at, updated_at, requirements')
         .order('updated_at', { ascending: false, nullsFirst: false });
-      setProjects(data || []);
+      setProjects((data ?? []).map((r) => ({
+        ...r,
+        requirements: jakoObiekt<BuilderProject['requirements']>(r.requirements) ?? {},
+      })));
       setLoading(false);
     })();
   }, [navigate]);

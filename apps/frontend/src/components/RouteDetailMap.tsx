@@ -123,7 +123,7 @@ function RouteDetailMapInner({
           });
         }
 
-        bounds.extend(latLngs);
+        bounds.extend(L.latLngBounds(latLngs));
 
         // Jeśli to wybrany wariant, dodaj jego dedykowane POI
         if (isSelected && alt.pois && alt.pois.length > 0) {
@@ -145,7 +145,7 @@ function RouteDetailMapInner({
         lineJoin: 'round',
       }).addTo(map);
 
-      bounds.extend(latLngs);
+      bounds.extend(L.latLngBounds(latLngs));
     }
 
     // Wyznaczenie punktów startowych i końcowych na podstawie aktywnej trasy

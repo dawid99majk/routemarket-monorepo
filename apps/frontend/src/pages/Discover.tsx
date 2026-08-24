@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { opisMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
+import { jakoZdjecia } from '@/lib/zBazy';
 
 interface CatalogPlace {
   id: string;
@@ -194,7 +195,7 @@ export default function Discover() {
     // potrafił dotrzeć po wyniku dla pełnej nazwy i wyczyścić listę. Odświeżenie
     // strony pomagało, bo puszczało jedno zapytanie zamiast dziewięciu.
     if (seq !== loadSeq.current) return;
-    setPlaces(data ?? []);
+    setPlaces((data ?? []).map((r) => ({ ...r, photos: jakoZdjecia(r.photos) })) as CatalogPlace[]);
     if (!ciche) setLoading(false);
   }, [city]);
 

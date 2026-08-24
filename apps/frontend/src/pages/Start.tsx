@@ -121,7 +121,12 @@ export default function Start() {
         .order('created_at', { ascending: false }),
     ]);
     setProjects(pr ?? []);
-    setPlaces(pl ?? []);
+    // Priorytet jest w bazie zwyklym tekstem; zawezamy go tutaj, zamiast
+    // rzutowac cala tablice i zgadywac, ze kolumna trzyma tylko trzy wartosci.
+    setPlaces((pl ?? []).map((r) => ({
+      ...r,
+      priority: (r.priority === 'must' || r.priority === 'rejected' ? r.priority : 'nice') as Priority,
+    })));
     setPlans(sp ?? []);
     setLoading(false);
 

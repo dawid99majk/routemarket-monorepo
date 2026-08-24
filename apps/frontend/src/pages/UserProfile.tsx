@@ -22,7 +22,9 @@ export default function UserProfile() {
   const { data: liczby } = useQuery({
     queryKey: ['statystyki-planera'],
     queryFn: async () => {
-      const licz = async (tabela: string) => {
+      // Nazwa tabeli zawezona do tych, ktore faktycznie liczymy — inaczej
+      // literowka w nazwie przechodzilaby az do zapytania do bazy.
+      const licz = async (tabela: 'trip_projects' | 'trip_project_places' | 'trip_plans') => {
         const { count } = await supabase
           .from(tabela).select('id', { count: 'exact', head: true });
         return count ?? 0;

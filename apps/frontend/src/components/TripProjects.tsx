@@ -27,6 +27,9 @@ import { opisMiejsca } from '@/lib/opis';
 import { format, parse, isValid } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
+import type { Database } from '@/integrations/supabase/types';
+
+type AktualizacjaProjektu = Database['public']['Tables']['trip_projects']['Update'];
 
 interface TripProject extends Partial<AxisValues> {
   id: string;
@@ -36,9 +39,36 @@ interface TripProject extends Partial<AxisValues> {
   hours_per_day: number | null;
   trip_type: string | null;
   fill_percent?: number | null;
+  // Kolumny dołożone później: publikacja tablicy, licznik kopii, punkt startowy
+  // i termin wyjazdu. Kod korzystał z nich przez `as any`, więc literówka w
+  // nazwie przechodziła bez słowa aż do działającej aplikacji.
+  is_public?: boolean;
+  copy_count?: number;
+  like_count?: number;
+  published_at?: string | null;
+  author_display?: string | null;
+  start_name?: string | null;
+  start_lat?: number | null;
+  start_lng?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 type Priority = 'must' | 'nice' | 'rejected';
+
+/**
+ * Priorytet w bazie jest zwykłym tekstem, więc typy wygenerowane ze schematu
+ * oddają go jako `string`. Zamiast rzutować wynik zapytania — co wyłącza
+ * sprawdzanie i przepuściłoby literówkę w nazwie kubełka — zawężamy wartość
+ * przy wejściu. Nieznana wpada do „być może": to kubełek bez konsekwencji,
+ * a zgubienie miejsca byłoby gorsze niż zaklasyfikowanie go nie tam.
+ */
+const jakoPriorytet = (v: string | null | undefined): Priority =>
+  v === 'must' || v === 'rejected' ? v : 'nice';
+
+/** Wiersz z bazy jako miejsce tablicy, z zawężonym priorytetem. */
+const jakoMiejsce = (r: Record<string, unknown>): PinnedPlace =>
+  ({ ...r, priority: jakoPriorytet(r.priority as string) } as PinnedPlace);
 
 interface PinnedPlace {
   id: string;
@@ -52,6 +82,13 @@ interface PinnedPlace {
   website: string | null;
   image_url: string | null;
   wiki_extract: string | null;
+  // Bez współrzędnych nie da się ani narysować mapy tablicy, ani przekazać
+  // pinezek planerowi. Kolumny są w bazie od dawna i kod je czyta — brakowało
+  // ich wyłącznie w tym opisie, więc każde użycie było błędem typu.
+  lat: number | null;
+  lng: number | null;
+  catalog_id?: string | null;
+  source?: string | null;
 }
 
 interface DiscoveredPlace {
@@ -343,7 +380,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         .eq('project_id', activeId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
-      setPlaces(data || []);
+      setPlaces((data ?? []).map(jakoMiejsce));
       // Na pustej tablicy panel wyszukiwania jest jedyną treścią — nie ma czego
       // zwijać, a użytkownik i tak zaczyna od dodania pierwszego miejsca.
       if (!(data || []).length) setNarzedzie('szukaj');
@@ -370,7 +407,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const togglePublic = async () => {
     if (!active) return;
     setPublishing(true);
-    const nowe = !(active as any).is_public;
+    const nowe = !active.is_public;
     const autor = nowe ? await podpisPubliczny() : null;
     const { error } = await supabase.from('trip_projects').update({
       is_public: nowe,
@@ -392,9 +429,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    */
   const ustawOs = async (klucz: keyof RoutePreferenceValues, wartosc: number | null) => {
     if (!active) return;
-    setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, [klucz]: wartosc } as any : p)));
+    setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, [klucz]: wartosc } : p)));
+    // Klucz obliczany daje obiektowi sygnaturę indeksową, a typy Supabase ją
+    // odrzucają. `klucz` jest jednak zawsze jedną z osi preferencji, więc
+    // zawężamy do typu aktualizacji tej tabeli zamiast wyłączać sprawdzanie.
+    const zmiana: AktualizacjaProjektu = { [klucz]: wartosc };
     const { error } = await supabase.from('trip_projects')
-      .update({ [klucz]: wartosc }).eq('id', active.id);
+      .update(zmiana).eq('id', active.id);
     if (error) toast.error(error.message);
   };
 
@@ -694,7 +735,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       setResults((prev) => [place, ...prev]);
       return toast.error(error.message);
     }
-    setPlaces((prev) => [...prev, data]);
+    setPlaces((prev) => [...prev, jakoMiejsce(data)]);
     toast.success(`Dodano: ${place.name}`);
 
     // Katalog dopisujemy po fakcie. Nieudany zapis nie ma prawa cofnąć przypięcia —
@@ -910,7 +951,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     }).select('*').single();
 
     if (error) return toast.error(error.message);
-    setPlaces((prev) => [...prev, data]);
+    setPlaces((prev) => [...prev, jakoMiejsce(data)]);
     toast.success(zKatalogu
       ? `Dodane do tablicy: ${ev.name}`
       : `Dodane do tablicy: ${ev.name} — bez punktu na mapie, ustaw go na kartce`);
@@ -1224,7 +1265,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
       .single();
     if (error) return toast.error(error.message);
-    setPlaces((prev) => [...prev, data]);
+    setPlaces((prev) => [...prev, jakoMiejsce(data)]);
     toast.success(`Dodano do tablicy: ${item.name}`);
   };
 
@@ -1241,10 +1282,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       // Punkt startowy z tablicy ma pierwszeństwo; hotel przypięty jako zwykłe
       // miejsce jest zapasem, gdy nikt startu nie ustawił.
       const hotelZTablicy = places.find((p) => p.category === 'hotel');
-      const start = (active as any).start_name
-        ? { name: (active as any).start_name,
-            lat: (active as any).start_lat ?? undefined,
-            lng: (active as any).start_lng ?? undefined }
+      const start = active.start_name
+        ? { name: active.start_name,
+            lat: active.start_lat ?? undefined,
+            lng: active.start_lng ?? undefined }
         : hotelZTablicy
           ? { name: hotelZTablicy.name,
               lat: hotelZTablicy.lat ?? undefined,
@@ -1581,14 +1622,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Punkt startowy nad kubełkami: zanim ktoś zacznie zbierać miejsca,
                 warto wiedzieć, skąd wychodzi — od tego zależy, co w ogóle ma sens. */}
             <div className="rounded-md border border-border bg-card px-4 py-3.5">
-              {(active as any).start_name ? (
+              {active.start_name ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <MapPin className="w-4 h-4 text-primary shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                       Punkt startowy
                     </div>
-                    <div className="text-sm truncate">{(active as any).start_name}</div>
+                    <div className="text-sm truncate">{active.start_name}</div>
                   </div>
                   {/* Przycisk położenia był tylko w gałęzi bez ustawionego startu,
                       więc kto raz wpisał hotel, nie mógł go już podmienić na swoje
@@ -1672,7 +1713,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 pytanie: kiedy i skąd. Wcześniej termin dawało się wpisać tylko przy
                 zakładaniu wyjazdu i nigdzie potem nie było go widać ani jak dodać. */}
             <div className="rounded-md border border-border bg-card px-4 py-3.5">
-              {(active as any).start_date ? (
+              {active.start_date ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <CalendarDays className="w-4 h-4 text-primary shrink-0" />
                   <div className="min-w-0 flex-1">
@@ -1680,13 +1721,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       Termin
                     </div>
                     <div className="text-sm truncate">
-                      {zakresDat((active as any).start_date, (active as any).end_date)}
+                      {zakresDat(active.start_date, active.end_date)}
                       {active.days ? ` · ${active.days} ${active.days === 1 ? 'dzień' : 'dni'}` : ''}
                     </div>
                   </div>
                   <button onClick={() => {
-                      setTerminOd((active as any).start_date ?? '');
-                      setTerminDo((active as any).end_date ?? '');
+                      setTerminOd(active.start_date ?? '');
+                      setTerminDo(active.end_date ?? '');
                       setPokazTermin(true);
                     }}
                     className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
@@ -2069,7 +2110,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 {
                   id: 'wydarzenia' as const,
                   etykieta: 'Wydarzenia',
-                  meta: (active as any).start_date && wydarzeniaPodzielone.wTerminieLista.length
+                  meta: active.start_date && wydarzeniaPodzielone.wTerminieLista.length
                     ? `${wydarzeniaPodzielone.wTerminieLista.length} w Twoim terminie`
                     : events.length ? `${events.length} znalezionych` : 'Sprawdź wydarzenia',
                   tytul: events.length
@@ -2178,7 +2219,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 {
                   id: 'udostepnij' as const,
                   etykieta: 'Dostęp',
-                  meta: (active as any).is_public
+                  meta: active.is_public
                     ? 'Publiczna'
                     : shares.length ? `Ty i ${shares.length} os.` : 'Tylko Ty',
                   tytul: 'Kto widzi tę tablicę',

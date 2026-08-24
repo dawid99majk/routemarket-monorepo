@@ -13,12 +13,10 @@ export default function AdminDashboard() {
         supabase.from('route_builder_projects').select('id', { count: 'exact' }),
       ]);
 
-      const publishedRoutes = (routesRes.data ?? []).filter(r => r.status === 'published').length;
 
       return {
         totalUsers: profilesRes.count ?? 0,
         totalRoutes: routesRes.count ?? 0,
-        publishedRoutes,
         totalAiProjects: aiProjectsRes.count ?? 0,
       };
     },
@@ -30,7 +28,7 @@ export default function AdminDashboard() {
 
   const cards = [
     { icon: Users, label: 'Użytkownicy', value: stats?.totalUsers ?? 0, sub: 'Zarejestrowanych kont' },
-    { icon: Map, label: 'Trasy', value: stats?.totalRoutes ?? 0, sub: `${stats?.publishedRoutes ?? 0} opublikowanych` },
+    { icon: Map, label: 'Trasy', value: stats?.totalRoutes ?? 0 },
     { icon: Sparkles, label: 'Projekty AI', value: stats?.totalAiProjects ?? 0, sub: 'Wygenerowanych tras' },
   ];
 

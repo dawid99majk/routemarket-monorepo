@@ -25,12 +25,25 @@ export interface ChatMessage {
 export interface Waypoint {
   lat: number;
   lng: number;
+  /** Rola punktu na trasie: 'start', 'end', punkt pośredni. */
   type: string;
   name?: string;
+  /**
+   * Rodzaj miejsca, gdy punkt przyszedł z planu dnia — 'parking', 'food'.
+   * Steruje kolorem pinezki i etykietą na mapie. Kolumna była już czytana
+   * przez interfejs, tylko nieopisana, więc każde użycie było błędem typu.
+   */
+  kind?: string;
 }
 
 export interface WizardContext {
   projectId: string | null;
+  /**
+   * Czy uzytkownik sam poprawil nazwe trasy. Od tej chwili agent jej nie rusza,
+   * inaczej kazda kolejna tura kasowalaby to, co wpisal. Wartosc byla ustawiana
+   * i czytana, brakowalo jej wylacznie w opisie kontekstu.
+   */
+  titleTouched?: boolean;
   userId: string | null;
   retries: number;
 
