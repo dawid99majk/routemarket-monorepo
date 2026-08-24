@@ -1,0 +1,772 @@
+<title>RouteMarket od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@400;500;600&family=Archivo+Narrow:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Paleta i typografia wprost z systemu RouteMarketu — dokument o produkcie
+     ma wyglądać jak produkt. Tokeny odpowiadają zmiennym z index.css aplikacji. */
+  :root {
+    --tlo:            hsl(158 8% 97%);
+    --tlo-karty:      hsl(0 0% 100%);
+    --tlo-wglebienie: hsl(158 10% 94%);
+    --tekst:          hsl(60 6% 14%);
+    --tekst-cichy:    hsl(40 5% 43%);
+    --linia:          hsl(60 6% 88%);
+    --linia-mocna:    hsl(60 6% 78%);
+    --szalwia:        hsl(158 28% 32%);
+    --szalwia-jasna:  hsl(158 24% 42%);
+    --blekit:         hsl(200 30% 48%);
+    --glina:          hsl(16 35% 45%);
+    --bursztyn:       hsl(22 60% 58%);
+
+    --tresc: 68ch;
+    --krok: clamp(1.5rem, 4vw, 2.75rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --tlo:            hsl(60 6% 11%);
+      --tlo-karty:      hsl(60 6% 14%);
+      --tlo-wglebienie: hsl(60 5% 17%);
+      --tekst:          hsl(42 31% 94%);
+      --tekst-cichy:    hsl(40 8% 65%);
+      --linia:          hsl(60 5% 24%);
+      --linia-mocna:    hsl(60 5% 34%);
+      --szalwia:        hsl(97 18% 58%);
+      --szalwia-jasna:  hsl(97 20% 68%);
+      --blekit:         hsl(200 32% 62%);
+      --glina:          hsl(16 40% 60%);
+      --bursztyn:       hsl(22 62% 66%);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --tlo:            hsl(60 6% 11%);
+    --tlo-karty:      hsl(60 6% 14%);
+    --tlo-wglebienie: hsl(60 5% 17%);
+    --tekst:          hsl(42 31% 94%);
+    --tekst-cichy:    hsl(40 8% 65%);
+    --linia:          hsl(60 5% 24%);
+    --linia-mocna:    hsl(60 5% 34%);
+    --szalwia:        hsl(97 18% 58%);
+    --szalwia-jasna:  hsl(97 20% 68%);
+    --blekit:         hsl(200 32% 62%);
+    --glina:          hsl(16 40% 60%);
+    --bursztyn:       hsl(22 62% 66%);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--tlo);
+    color: var(--tekst);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .strona {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 5rem) clamp(1.25rem, 4vw, 3rem) 6rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0 3.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    .strona { grid-template-columns: 200px minmax(0, 1fr); }
+  }
+
+  /* ---------- spis treści ---------- */
+  .spis { display: none; }
+
+  @media (min-width: 1024px) {
+    .spis {
+      display: block;
+      grid-row: 2;
+      position: sticky;
+      top: 2.5rem;
+      align-self: start;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .spis ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
+    .spis a {
+      color: var(--tekst-cichy);
+      text-decoration: none;
+      display: block;
+      padding-left: .7rem;
+      border-left: 2px solid var(--linia);
+      transition: color .15s, border-color .15s;
+    }
+    .spis a:hover, .spis a:focus-visible { color: var(--szalwia); border-left-color: var(--szalwia); }
+  }
+
+  main { grid-column: 1 / -1; min-width: 0; }
+  @media (min-width: 1024px) { main { grid-column: 2; grid-row: 2; } }
+
+  /* ---------- nagłówek dokumentu ---------- */
+  header.tytul {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    margin-bottom: clamp(3rem, 7vw, 4.5rem);
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--linia);
+  }
+
+  .nadtytul {
+    font-family: "Archivo Narrow", Inter, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .3em;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--szalwia);
+    margin: 0 0 1.1rem;
+  }
+
+  h1 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 300;
+    font-size: clamp(2.4rem, 6vw, 3.9rem);
+    line-height: 1.03;
+    letter-spacing: -.025em;
+    margin: 0 0 1.2rem;
+    text-wrap: balance;
+  }
+
+  .lead {
+    font-size: clamp(1.05rem, 2vw, 1.2rem);
+    line-height: 1.6;
+    color: var(--tekst);
+    max-width: var(--tresc);
+    margin: 0 0 1.5rem;
+    text-wrap: pretty;
+  }
+
+  .stopka-tytulu {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--tekst-cichy);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.4rem;
+  }
+
+  /* ---------- sekcje ---------- */
+  section { margin-bottom: clamp(3rem, 7vw, 4.5rem); scroll-margin-top: 2rem; }
+
+  h2 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(1.6rem, 3.2vw, 2.15rem);
+    line-height: 1.15;
+    letter-spacing: -.015em;
+    margin: 0 0 1.4rem;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 500;
+    font-size: 1.13rem;
+    line-height: 1.3;
+    margin: 2.2rem 0 .7rem;
+    text-wrap: balance;
+  }
+
+  p, ul, ol { max-width: var(--tresc); }
+  p { margin: 0 0 1.05rem; text-wrap: pretty; }
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.3rem; }
+  li { margin-bottom: .45rem; }
+  li::marker { color: var(--tekst-cichy); }
+
+  strong { font-weight: 600; }
+  a { color: var(--szalwia); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--szalwia); outline-offset: 3px; border-radius: 2px; }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: .855em;
+    background: var(--tlo-wglebienie);
+    padding: .12em .38em;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* ---------- przepływ: jedyne miejsce z numeracją ---------- */
+  .przeplyw { list-style: none; padding: 0; margin: 0; max-width: none;
+              display: flex; flex-direction: column; gap: 0; counter-reset: krok; }
+  .przeplyw li {
+    counter-increment: krok;
+    display: grid;
+    grid-template-columns: 2.6rem minmax(0, 1fr);
+    gap: 0 1.1rem;
+    padding: 1.2rem 0;
+    border-top: 1px solid var(--linia);
+    margin: 0;
+    max-width: none;
+  }
+  .przeplyw li:last-child { border-bottom: 1px solid var(--linia); }
+  .przeplyw li::before {
+    content: counter(krok, decimal-leading-zero);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--szalwia);
+    padding-top: .28rem;
+  }
+  .przeplyw b {
+    display: block;
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 500;
+    font-size: 1.05rem;
+    margin-bottom: .18rem;
+  }
+  .przeplyw span { color: var(--tekst-cichy); font-size: .945rem; max-width: 60ch; display: block; }
+
+  /* ---------- liczby ---------- */
+  .liczby {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+    gap: 1px;
+    background: var(--linia);
+    border: 1px solid var(--linia);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 0 1.4rem;
+  }
+  .liczby div { background: var(--tlo-karty); padding: 1rem 1.1rem; }
+  .liczby dt {
+    font-family: "Archivo Narrow", Inter, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--tekst-cichy);
+    margin-bottom: .3rem;
+  }
+  .liczby dd {
+    margin: 0;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.4rem;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+  .liczby dd small { font-size: .58em; color: var(--tekst-cichy); font-weight: 400; }
+
+  /* ---------- tabele ---------- */
+  .tabela-otoczka { overflow-x: auto; margin: 0 0 1.4rem; border: 1px solid var(--linia); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; background: var(--tlo-karty); }
+  th, td { text-align: left; padding: .65rem .9rem; border-bottom: 1px solid var(--linia); vertical-align: top; }
+  th {
+    font-family: "Archivo Narrow", Inter, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--tekst-cichy);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.liczba { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td code { background: none; padding: 0; }
+
+  /* ---------- wyróżnienia ---------- */
+  .uwaga {
+    border-left: 3px solid var(--glina);
+    background: var(--tlo-karty);
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    max-width: var(--tresc);
+    border-radius: 0 4px 4px 0;
+  }
+  .uwaga p:last-child { margin-bottom: 0; }
+  .uwaga .etykieta {
+    font-family: "Archivo Narrow", Inter, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .13em;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--glina);
+    display: block;
+    margin-bottom: .4rem;
+  }
+
+  .decyzja {
+    border: 1px solid var(--linia);
+    background: var(--tlo-karty);
+    border-radius: 4px;
+    padding: 1.15rem 1.3rem;
+    margin-bottom: 1rem;
+    max-width: var(--tresc);
+  }
+  .decyzja h4 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 500;
+    font-size: 1.02rem;
+    margin: 0 0 .5rem;
+    text-wrap: balance;
+  }
+  .decyzja p { margin-bottom: 0; font-size: .945rem; color: var(--tekst-cichy); }
+  .decyzja p + p { margin-top: .6rem; }
+  .decyzja em { color: var(--tekst); font-style: normal; font-weight: 500; }
+
+  .warstwy { display: flex; flex-direction: column; gap: 1px; background: var(--linia);
+             border: 1px solid var(--linia); border-radius: 4px; overflow: hidden; margin-bottom: 1.4rem; }
+  .warstwa { background: var(--tlo-karty); padding: 1rem 1.2rem; display: grid;
+             grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+  @media (min-width: 620px) { .warstwa { grid-template-columns: 190px minmax(0, 1fr); gap: 0 1.4rem; } }
+  .warstwa .nazwa { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82rem;
+                    color: var(--blekit); padding-top: .12rem; word-break: break-word; }
+  .warstwa .opis { color: var(--tekst-cichy); font-size: .93rem; }
+  .warstwa .opis b { color: var(--tekst); font-weight: 600; }
+
+  hr { border: none; border-top: 1px solid var(--linia); margin: 2.5rem 0; max-width: var(--tresc); }
+
+  footer {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--linia);
+    padding-top: 1.5rem;
+    font-size: 13px;
+    color: var(--tekst-cichy);
+    max-width: var(--tresc);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+
+<div class="strona">
+
+  <header class="tytul">
+    <p class="nadtytul">Dokument produktu</p>
+    <h1>RouteMarket od środka</h1>
+    <p class="lead">
+      Czym jest dzisiaj, jak działa pod spodem, jakie decyzje zapadły po drodze i dokąd to
+      zmierza. Pisane dla kogoś, kto ma wrócić do projektu po kilku miesiącach — albo wejść
+      w niego pierwszy raz.
+    </p>
+    <p class="stopka-tytulu">
+      <span>routemarket.io</span>
+      <span>stan na 23.08.2026</span>
+      <span>304 commity</span>
+    </p>
+  </header>
+
+  <nav class="spis" aria-label="Spis treści">
+    <ol>
+      <li><a href="#czym-jest">Czym jest</a></li>
+      <li><a href="#przeplyw">Przepływ użytkownika</a></li>
+      <li><a href="#warstwy">Warstwy danych</a></li>
+      <li><a href="#pod-spodem">Co jest pod spodem</a></li>
+      <li><a href="#decyzje">Decyzje i dlaczego</a></li>
+      <li><a href="#stan">Stan na dziś</a></li>
+      <li><a href="#kierunek">Dokąd zmierzamy</a></li>
+      <li><a href="#praca">Jak się z tym pracuje</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="czym-jest">
+      <h2>Czym jest</h2>
+      <p>
+        RouteMarket jest <strong>plannerem wyjazdów</strong>. Zbierasz miejsca, które Cię
+        interesują, a agent układa z nich plan na każdy dzień — z godzinami, kolejnością
+        i czasem dojazdu — i oddaje plik GPX do zegarka albo nawigacji.
+      </p>
+      <p>
+        Produkt zaczynał jako marketplace gotowych tras GPX: twórcy wystawiali trasy,
+        turyści je kupowali. Ten model został porzucony. Nazwa i domena zostały, ale
+        wszystko powyżej bazy danych zmieniło przeznaczenie — a ślady po marketplace
+        (Stripe, konta twórców, tłumaczenia tras) były przez długi czas usuwane partiami
+        i częściowo siedzą w repozytorium do dziś.
+      </p>
+      <p>
+        Różnica wobec innych plannerów jest jedna i warto ją nazwać wprost:
+        <strong>agent nie proponuje wyjazdu, tylko układa Twój</strong>. Punktem wyjścia
+        jest lista miejsc, które sam wybrałeś. Agent dokłada propozycje, żeby wypełnić
+        dzień, ale kotwicami zostaje to, co przypiąłeś.
+      </p>
+    </section>
+
+    <section id="przeplyw">
+      <h2>Przepływ użytkownika</h2>
+      <p>
+        Cała aplikacja jest zbudowana wokół tej sekwencji. Numeracja poniżej nie jest
+        ozdobą — kolejność ma znaczenie, bo każdy krok zasila następny.
+      </p>
+      <ol class="przeplyw">
+        <li>
+          <div>
+            <b>Mówisz, dokąd i z kim</b>
+            <span>Miasto, termin i klimat wyjazdu — z dziećmi, we dwoje, w delegację.
+            Klimat nie jest etykietą: przekłada się na preferencje, które sterują doborem
+            miejsc i tempem dnia.</span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Zbierasz miejsca na tablicę</b>
+            <span>Feed atrakcji ze zdjęciem, czasem zwiedzania i godzinami otwarcia.
+            Jedno kliknięcie odkłada miejsce na tablicę. Możesz też wkleić odnośnik z Map
+            Google albo opis z bloga — agent wyłuska z tego miejsca.</span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Rozstrzygasz wątpliwości</b>
+            <span>Tablica ma trzy kubełki: <em>na pewno</em>, <em>być może</em>, <em>nie</em>.
+            Odrzucone nie znikają — zawsze możesz je przywrócić. To jest sedno produktu,
+            a nie lista zakupów.</span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Agent układa plan</b>
+            <span>Dzień po dniu, równolegle. Uwzględnia godziny otwarcia, czas dojścia,
+            punkt startowy i stałe punkty dnia. Pierwszy dzień pojawia się na ekranie,
+            zanim policzą się pozostałe.</span>
+          </div>
+        </li>
+        <li>
+          <div>
+            <b>Zabierasz plan ze sobą</b>
+            <span>Plik GPX do zegarka albo aplikacji mapowej, albo wbudowana nawigacja
+            od punktu do punktu z godzinami z planu.</span>
+          </div>
+        </li>
+      </ol>
+      <p>
+        Tablicę można <strong>opublikować</strong>. Wtedy widzi ją każdy, także bez konta,
+        ale niczego nie kliknie — publiczna tablica jest do czytania, nie do edycji.
+        Zalogowany może ją polubić albo skopiować do siebie i przerobić pod swój wyjazd.
+      </p>
+    </section>
+
+    <section id="warstwy">
+      <h2>Warstwy danych</h2>
+      <p>
+        Rozróżnienie między tymi warstwami jest najważniejszą rzeczą do zrozumienia
+        w tym projekcie. Pomylenie ich jest źródłem większości błędów, które się
+        tu zdarzyły.
+      </p>
+      <div class="warstwy">
+        <div class="warstwa">
+          <div class="nazwa">place_catalog</div>
+          <div class="opis"><b>Wspólne dobro.</b> Katalog miejsc budowany z OpenStreetMap,
+          Wikipedii i modelu. Widzą go wszyscy, więc nic w nim nie może zależeć od
+          pojedynczego użytkownika — to dlatego opisy są trzymane osobno dla każdego
+          języka, a nie generowane pod tego, kto akurat zasiał miasto.</div>
+        </div>
+        <div class="warstwa">
+          <div class="nazwa">trip_projects<br>trip_project_places</div>
+          <div class="opis"><b>Prywatna praca użytkownika.</b> Tablica i miejsca na niej.
+          Domyślnie widoczne tylko dla właściciela i osób jawnie zaproszonych. Publikacja
+          otwiera odczyt, nigdy zapis.</div>
+        </div>
+        <div class="warstwa">
+          <div class="nazwa">trip_plans</div>
+          <div class="opis"><b>Wynik pracy agenta.</b> Z jednej tablicy może powstać wiele
+          planów — inne godziny, inny termin, inny charakter. Plany zostają, żeby dało się
+          je porównać.</div>
+        </div>
+        <div class="warstwa">
+          <div class="nazwa">poi_cache</div>
+          <div class="opis"><b>Pamięć o świecie zewnętrznym.</b> Odpowiedzi z Overpassa
+          trzymane w bazie, nie w pamięci procesu. Drugi użytkownik tego samego miasta
+          nie dotyka już Overpassa — Kraków spadł z 11–25 s do 51 ms.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pod-spodem">
+      <h2>Co jest pod spodem</h2>
+      <p>
+        Wszystko stoi na jednym VPS-ie (<code>213.165.94.18</code>), w monorepo
+        <code>/root/routemarket-workspace</code> zarządzanym przez pnpm. Nie ma tu chmury
+        ani orkiestracji — jest kilka kontenerów Dockera i nginx przed nimi.
+      </p>
+      <div class="tabela-otoczka">
+        <table>
+          <thead>
+            <tr><th>Element</th><th>Co robi</th><th>Port</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>frontend</code></td>
+              <td>Aplikacja React (Vite), Leaflet na mapy, Tailwind i Radix na interfejs</td>
+              <td class="liczba">8089</td>
+            </tr>
+            <tr>
+              <td><code>route-builder-api</code></td>
+              <td>Hono na Node. Planer, katalog, wyszukiwanie, wizytówki dla botów, marketing</td>
+              <td class="liczba">8081</td>
+            </tr>
+            <tr>
+              <td><code>supabase</code></td>
+              <td>Self-hosted: PostgreSQL z RLS, auth, storage, Kong jako brama</td>
+              <td class="liczba">8001</td>
+            </tr>
+            <tr>
+              <td><code>atlas-api</code></td>
+              <td>Starszy silnik tras z czasów marketplace, wciąż działa</td>
+              <td class="liczba">8787</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Skąd biorą się dane</h3>
+      <ul>
+        <li><strong>Gemini 2.5 Flash</strong> — plan dnia, opisy miejsc, wydarzenia,
+          wyłuskiwanie miejsc z tekstu, treści marketingowe. Każde wywołanie jest
+          logowane z czasem i kosztem w <code>ai_usage_log</code>.</li>
+        <li><strong>OpenStreetMap przez Overpass</strong> — punkty zainteresowania,
+          godziny otwarcia, współrzędne.</li>
+        <li><strong>Wikipedia i Wikimedia Commons</strong> — zdjęcia i skróty
+          encyklopedyczne.</li>
+        <li><strong>Nominatim</strong> — geokodowanie miast i adresów.</li>
+        <li><strong>BRouter</strong>, zapasowo GraphHopper — realny przebieg trasy pieszej
+          i rowerowej z elewacją.</li>
+      </ul>
+
+      <h3>Wielojęzyczność</h3>
+      <p>
+        Sześć języków: polski, angielski, niemiecki, francuski, hiszpański, włoski.
+        Kluczowe jest to, że <strong>przetłumaczony jest nie tylko interfejs, ale i treść</strong>.
+        Język użytkownika jedzie nagłówkiem <code>Accept-Language</code> aż do promptów, więc
+        Niemiec dostaje niemiecki plan dnia, a nie niemieckie menu nad polskim harmonogramem.
+      </p>
+      <p>
+        Nazw własnych miejsc świadomie nie tłumaczymy. „Panorama Racławicka" zostaje
+        Panoramą Racławicką także w niemieckim planie — pod taką nazwą turysta znajdzie
+        ją na mapie i na tabliczce przy wejściu.
+      </p>
+    </section>
+
+    <section id="decyzje">
+      <h2>Decyzje i dlaczego</h2>
+      <p>
+        Kilka rozstrzygnięć, które nie są oczywiste z samego kodu, a bez których łatwo
+        cofnąć się do gorszego rozwiązania.
+      </p>
+
+      <div class="decyzja">
+        <h4>Przydział miejsc do dni liczy serwer, nie model</h4>
+        <p>Model potrafi napisać, że grupuje punkty blisko siebie, ale geometrii nie liczy —
+        i wychodziły dni skaczące przez całe miasto. Skupiska liczymy ze współrzędnych,
+        a przydział grup do konkretnych dni dobieramy tak, żeby nie wpaść na dzień, w którym
+        muzeum z tego skupiska jest zamknięte.</p>
+        <p><em>Konsekwencja:</em> odkąd dni liczą się równolegle, przydział musi być wiążący.
+        Gdyby został podpowiedzią, dwa dni mogłyby zaplanować to samo miejsce.</p>
+      </div>
+
+      <div class="decyzja">
+        <h4>Godziny otwarcia sprawdza serwer, a nie prompt</h4>
+        <p>Zdarzyło się, że plan zawierał wizytę o 16:30 w miejscu zamkniętym o 15:00 —
+        z notatką modelu przyznającą się do tego. Reguła w prompcie była, dane o godzinach
+        były, a pozycja i tak weszła.</p>
+        <p><em>Dlatego:</em> po odpowiedzi modelu przechodzi deterministyczny strażnik.
+        Sprawdza wyłącznie moment wejścia, bo wizyta wystająca poza zamknięcie jest
+        dopuszczona świadomie — lepiej wejść na godzinę niż odpuścić.</p>
+      </div>
+
+      <div class="decyzja">
+        <h4>Plan przychodzi dzień po dniu</h4>
+        <p>Jedno wywołanie na cały wyjazd trwało średnio 44 s, a w ogonie 112 s — i przez
+        cały ten czas na ekranie tykał licznik sekund. Teraz każdy dzień to osobne,
+        krótsze wywołanie; lecą równolegle, a każdy gotowy trafia na ekran od razu.</p>
+        <p><em>Największą dźwignią nie była długość promptu</em>, tylko ograniczenie budżetu
+        rozumowania modelu. Bez limitu jeden dzień liczył się ~35 s, przy budżecie 512
+        spadł do ~5 s i nadal poprawnie rozumuje o godzinach otwarcia.</p>
+      </div>
+
+      <div class="decyzja">
+        <h4>Opisy katalogu są wymiarem danych, nie parametrem zapytania</h4>
+        <p>Kuszące jest dopisać do promptu „napisz po niemiecku". Byłby to błąd: opisy
+        w katalogu są współdzielone, więc pierwszy Niemiec zasiewający miasto nadpisałby
+        opisy wszystkim pozostałym.</p>
+        <p><em>Zamiast tego</em> kolumna <code>description_i18n</code> trzyma wersję dla
+        każdego języka, a tłumaczenie jest jednorazową operacją wsadową.</p>
+      </div>
+
+      <div class="decyzja">
+        <h4>Trzy kubełki zamiast listy</h4>
+        <p>„Nie" nie usuwa miejsca — odkłada je. Przy planowaniu wyjazdu odrzucenie rzadko
+        jest ostateczne: wraca się do niego, gdy zmieni się termin albo pogoda. Lista
+        z usuwaniem zmusza do decyzji wcześniej, niż człowiek jest gotów ją podjąć.</p>
+      </div>
+
+      <div class="uwaga">
+        <span class="etykieta">Pułapka warta zapamiętania</span>
+        <p>
+          Główny <code>tsconfig.json</code> ma <code>"files": []</code> i same referencje do
+          podprojektów — <code>tsc --noEmit</code> na nim nie sprawdzał <em>ani jednego pliku</em>
+          i zawsze kończył się zerem. Ten sam wykrzyknik siedział w skrypcie budowania, więc
+          wdrożenia przechodziły bez żadnej weryfikacji typów. Po włączeniu prawdziwego
+          sprawdzania wyszły 84 błędy, w tym dwa psujące działanie aplikacji.
+        </p>
+        <p>
+          Od tej pory <code>build</code> wskazuje jawnie na <code>tsconfig.app.json</code>
+          i wywali się na błędach typów. To jest cel, nie regres.
+        </p>
+      </div>
+    </section>
+
+    <section id="stan">
+      <h2>Stan na dziś</h2>
+      <p>
+        Liczby z żywej bazy, nie z pamięci. Skala jest jeszcze przedprodukcyjna — to
+        środowisko własne i testowe, nie ruch z zewnątrz.
+      </p>
+      <dl class="liczby">
+        <div><dt>Tablice</dt><dd>15 <small>/ 4 publiczne</small></dd></div>
+        <div><dt>Miejsca na tablicach</dt><dd>101</dd></div>
+        <div><dt>Wygenerowane plany</dt><dd>14</dd></div>
+        <div><dt>Katalog miejsc</dt><dd>414 <small>/ 17 miast</small></dd></div>
+        <div><dt>Języki</dt><dd>6</dd></div>
+        <div><dt>Klucze interfejsu</dt><dd>266</dd></div>
+        <div><dt>Opisy przetłumaczone</dt><dd>345 <small>× 6</small></dd></div>
+        <div><dt>Błędy typów</dt><dd>0 <small>/ było 84</small></dd></div>
+      </dl>
+
+      <h3>Czas oczekiwania na plan</h3>
+      <div class="tabela-otoczka">
+        <table>
+          <thead>
+            <tr><th>Wariant</th><th>Pierwszy dzień na ekranie</th><th>Cały plan</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Jedno wywołanie <span style="color:var(--tekst-cichy)">(poprzednio)</span></td>
+              <td class="liczba">78,9 s</td>
+              <td class="liczba">78,9 s</td>
+            </tr>
+            <tr>
+              <td>Strumień dzień po dniu</td>
+              <td class="liczba">5,5 s</td>
+              <td class="liczba">6,0 s</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:.9rem;color:var(--tekst-cichy)">
+        Pomiar przez publiczny adres, dla miasta obecnego już w <code>poi_cache</code>.
+        Świeże miasto dolicza ~8 s na geokodowanie i odpytanie Overpassa.
+      </p>
+
+      <h3>Co jest zabezpieczone</h3>
+      <ul>
+        <li>Kopia bazy codziennie o 02:30, z wywozem poza serwer i rotacją.</li>
+        <li>RLS na wszystkich tabelach; publiczna tablica jest do odczytu, zapis
+          wymaga własności albo jawnego udostępnienia.</li>
+        <li>Endpointy przyjmujące adres URL sprawdzają go po rozwiązaniu nazwy w DNS
+          i na każdym skoku przekierowania — sieć wewnętrzna jest niedostępna.</li>
+        <li>Operacje masowe na katalogu wymagają roli administratora.</li>
+        <li>Watchdog co 5 minut restartuje to, co padnie.</li>
+      </ul>
+    </section>
+
+    <section id="kierunek">
+      <h2>Dokąd zmierzamy</h2>
+
+      <h3>Najbliżej</h3>
+      <ul>
+        <li><strong>Tryb gościa.</strong> Dziś wszystko poza landingiem i galerią tablic
+          wymaga konta. Obietnica „plan gotowy w kilka minut" zderza się z formularzem
+          rejestracji jako pierwszym ekranem.</li>
+        <li><strong>Reszta interfejsu w sześciu językach.</strong> Treść generowana jest
+          już przetłumaczona; zostały napisy na ekranach, do których wchodzi się rzadziej.</li>
+        <li><strong>Paginacja katalogu.</strong> Feed kończy się na 200 pozycjach — w dużym
+          mieście użytkownik nigdy nie zobaczy dalszych.</li>
+      </ul>
+
+      <h3>Dalej</h3>
+      <ul>
+        <li><strong>Podział dwóch monolitów.</strong> <code>index.ts</code> w API ma 4,4 tys.
+          linii, <code>TripProjects.tsx</code> ponad 3,2 tys. Nie boli dziś, ale spowalnia
+          każdą kolejną zmianę i uniemożliwia sensowny przegląd kodu.</li>
+        <li><strong>Testy.</strong> Serce produktu — planowanie, walidacja, parsowanie
+          odpowiedzi modelu — nie ma ani jednego testu. Zacząć od czystych funkcji
+          i nagranych odpowiedzi, bez wołania modelu.</li>
+        <li><strong>Kanał alertów.</strong> Watchdog restartuje usługi, ale o awarii nikt
+          się nie dowiaduje.</li>
+        <li><strong>Aplikacje mobilne</strong> z pobieraniem map do trybu offline.</li>
+      </ul>
+
+      <h3>Model przychodu</h3>
+      <p>
+        Marketplace odpadł. Dziś działa <strong>licznik tokenów</strong>: zbieranie miejsc,
+        tablice i ulubione są darmowe, a tokeny pobiera się za momenty, w których użytkownik
+        świadomie prosi o wynik i ten wynik widzi — ułożenie planu, wyznaczenie trasy.
+      </p>
+      <p>
+        Drugi kierunek to <strong>sponsorowane miejsca</strong> w katalogu. Model danych
+        jest gotowy, ale serwowanie jest celowo nieaktywne — bez ruchu nie ma czego
+        sprzedawać, a wpuszczenie reklam do planu, zanim plan jest dobry, popsułoby
+        jedyną rzecz, która ten produkt broni.
+      </p>
+    </section>
+
+    <section id="praca">
+      <h2>Jak się z tym pracuje</h2>
+
+      <h3>Wdrożenie</h3>
+      <p>
+        Dwa skrypty w korzeniu monorepo. Oba weryfikują wynik, zamiast zakładać, że się udało.
+      </p>
+      <ul>
+        <li><code>./deploy-frontend.sh</code> — buduje, pakuje obraz, podnosi kontener
+          i sprawdza, czy strona odpowiada nowym stemplem.</li>
+        <li><code>./deploy-api.sh</code> — <strong>uruchamia build w tle i wraca natychmiast</strong>.
+          To najczęstsza pułapka: łańcuch obu skryptów wypisze tylko jedno „OK", od frontu,
+          a API może jeszcze chodzić na starym obrazie. Jedyny wiarygodny dowód to czas
+          startu kontenera.</li>
+      </ul>
+
+      <div class="uwaga">
+        <span class="etykieta">Historia lubi się powtarzać</span>
+        <p>
+          <code>apps/frontend/Dockerfile</code> tylko kopiuje gotowy katalog <code>dist</code> —
+          nie uruchamia Vite. Samo zbudowanie obrazu spakuje więc poprzednią wersję i wypisze
+          mylące „Image Built". Skrypty wdrożeniowe zamykają tę pułapkę, ale warto o niej
+          wiedzieć, zanim ktoś sięgnie po <code>docker compose build</code> wprost.
+        </p>
+      </div>
+
+      <h3>Po migracji bazy</h3>
+      <p>
+        <code>./gen-types.sh</code> przegenerowuje typy TypeScript ze schematu. Bez tego
+        nowa kolumna nie istnieje dla frontendu, a zapytanie o nią wygląda jak błąd typu.
+      </p>
+
+      <h3>Kopia lokalna</h3>
+      <p>
+        <code>kopia-vps/zapisz.sh</code> zdejmuje z serwera kod, zrzut bazy i konfigurację
+        nginxa. Można uruchamiać wielokrotnie: kod dosyła się różnicowo, a zrzuty bazy
+        narastają obok siebie ze znacznikiem czasu.
+      </p>
+      <p>
+        Zrzut idzie per schemat, bo <code>pg_dump</code> całej bazy naraz wywala się
+        segfaultem na obrazie Supabase — bez komunikatu, zostawiając plik zerowej długości.
+      </p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>
+      Dokument opisuje stan z 23 sierpnia 2026. Liczby pochodzą z żywej bazy i logów
+      użycia modelu; czasy planowania zmierzone przez publiczny adres, nie na localhoście.
+    </p>
+  </footer>
+
+</div>
