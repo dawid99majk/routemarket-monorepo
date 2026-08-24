@@ -145,7 +145,7 @@ const App = () => (
                   <Route path="/kolekcja/:slug" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
                   <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
-                  <Route path="/miejsce/:slug" element={<ProtectedRoute><PlacePage /></ProtectedRoute>} />
+                  <Route path="/miejsce/:slug" element={<PlacePage />} />
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/plany/:id" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />

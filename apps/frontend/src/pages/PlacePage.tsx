@@ -70,9 +70,6 @@ export default function PlacePage() {
     setAgentTip(null);
     if (!data) return;
 
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
-
     // Pula do „w okolicy" i „podobnych" schodziła z bazy jako 2000 pełnych
     // wierszy z wiki_extract — megabajty na wejście na każdą stronę miejsca.
     // Warunki geograficzne i tagowe umie policzyć baza: to samo miasto, ramka
@@ -94,26 +91,13 @@ export default function PlacePage() {
             .order('pin_count', { ascending: false }).limit(200)
         : null,
     ];
-    const [{ data: fav }, { data: projs }, ...poolParts] = await Promise.all([
-      supabase.from('place_favorites').select('place_id')
-        .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
-      supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
-      ...poolQueries.filter((q): q is NonNullable<typeof q> => q !== null),
-    ]);
+    const poolParts = await Promise.all(
+      poolQueries.filter((q): q is NonNullable<typeof q> => q !== null)
+    );
     const seen = new Set<string>();
     const all = poolParts
       .flatMap((part) => (part.data ?? []) as unknown as CatalogPlace[])
       .filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
-    setFavorite(!!fav);
-    setBoards(projs ?? []);
-    const boardId = (projs ?? [])[0]?.id ?? null;
-    setActiveBoard(boardId);
-
-    if (boardId) {
-      const { data: pinned } = await supabase.from('trip_project_places')
-        .select('priority').eq('project_id', boardId).eq('catalog_id', data.id).maybeSingle();
-      setMark((pinned?.priority as Bucket) ?? null);
-    }
 
     // „W okolicy" liczone z prawdziwych współrzędnych, nie zgadywane
     const pool = all;
@@ -138,6 +122,28 @@ export default function PlacePage() {
     const wMiescie = wgKlimatu.filter((r) => r.x.city && r.x.city === data.city);
     const gdzieIndziej = wgKlimatu.filter((r) => !r.x.city || r.x.city !== data.city);
     setSimilar([...wMiescie, ...gdzieIndziej].slice(0, 8).map((r) => r.x));
+
+    // Dopiero teraz rzeczy osobiste. Gość ma za sobą komplet treści strony —
+    // opis, zdjęcia, sąsiedztwo — a brakuje mu wyłącznie tego, co bez konta
+    // nie ma sensu: ulubionych i przypisania miejsca do własnej tablicy.
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return;
+
+    const [{ data: fav }, { data: projs }] = await Promise.all([
+      supabase.from('place_favorites').select('place_id')
+        .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
+      supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
+    ]);
+    setFavorite(!!fav);
+    setBoards(projs ?? []);
+    const boardId = (projs ?? [])[0]?.id ?? null;
+    setActiveBoard(boardId);
+
+    if (boardId) {
+      const { data: pinned } = await supabase.from('trip_project_places')
+        .select('priority').eq('project_id', boardId).eq('catalog_id', data.id).maybeSingle();
+      setMark((pinned?.priority as Bucket) ?? null);
+    }
   }, [slug]);
 
   useEffect(() => { load(); }, [load]);
