@@ -1,0 +1,555 @@
+<title>Trzy domy agentów</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@400;500;600&family=Archivo+Narrow:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Ten sam system co dokument produktowy — to jego towarzysz, nie osobny byt.
+     Różnica jest celowa i jedna: akcentem jest tu mineralny błękit, który
+     w systemie RouteMarketu oznacza dane techniczne, a nie szałwia od produktu.
+     Dokument operacyjny ma się odróżniać od opisu produktu na pierwszy rzut oka. */
+  :root {
+    --tlo:            hsl(200 10% 97%);
+    --tlo-karty:      hsl(0 0% 100%);
+    --tlo-wglebienie: hsl(200 12% 94%);
+    --tekst:          hsl(60 6% 14%);
+    --tekst-cichy:    hsl(40 5% 43%);
+    --linia:          hsl(200 8% 87%);
+    --blekit:         hsl(200 38% 40%);
+    --blekit-jasny:   hsl(200 32% 52%);
+    --szalwia:        hsl(158 28% 32%);
+    --glina:          hsl(16 40% 46%);
+    --bursztyn:       hsl(22 60% 52%);
+    --tresc: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --tlo:            hsl(200 8% 11%);
+      --tlo-karty:      hsl(200 7% 14%);
+      --tlo-wglebienie: hsl(200 7% 18%);
+      --tekst:          hsl(42 28% 93%);
+      --tekst-cichy:    hsl(40 8% 64%);
+      --linia:          hsl(200 6% 25%);
+      --blekit:         hsl(200 40% 66%);
+      --blekit-jasny:   hsl(200 36% 74%);
+      --szalwia:        hsl(97 20% 62%);
+      --glina:          hsl(16 44% 62%);
+      --bursztyn:       hsl(22 62% 66%);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --tlo:            hsl(200 8% 11%);
+    --tlo-karty:      hsl(200 7% 14%);
+    --tlo-wglebienie: hsl(200 7% 18%);
+    --tekst:          hsl(42 28% 93%);
+    --tekst-cichy:    hsl(40 8% 64%);
+    --linia:          hsl(200 6% 25%);
+    --blekit:         hsl(200 40% 66%);
+    --blekit-jasny:   hsl(200 36% 74%);
+    --szalwia:        hsl(97 20% 62%);
+    --glina:          hsl(16 44% 62%);
+    --bursztyn:       hsl(22 62% 66%);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--tlo);
+    color: var(--tekst);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .strona { max-width: 940px; margin: 0 auto; padding: clamp(2.5rem,6vw,4.5rem) clamp(1.25rem,4vw,2.5rem) 6rem; }
+
+  .nadtytul {
+    font-family: "Archivo Narrow", Inter, sans-serif;
+    text-transform: uppercase; letter-spacing: .3em; font-size: 11px;
+    font-weight: 600; color: var(--blekit); margin: 0 0 1.1rem;
+  }
+
+  h1 {
+    font-family: Fraunces, Georgia, serif; font-weight: 300;
+    font-size: clamp(2.2rem,5.5vw,3.4rem); line-height: 1.05;
+    letter-spacing: -.025em; margin: 0 0 1.1rem; text-wrap: balance;
+  }
+
+  .lead { font-size: clamp(1.02rem,2vw,1.14rem); line-height: 1.6; max-width: var(--tresc);
+          margin: 0 0 1.4rem; text-wrap: pretty; }
+
+  header.tytul { border-bottom: 1px solid var(--linia); padding-bottom: 2rem;
+                 margin-bottom: clamp(2.5rem,6vw,3.5rem); }
+
+  section { margin-bottom: clamp(2.8rem,6vw,4rem); scroll-margin-top: 2rem; }
+
+  h2 {
+    font-family: Fraunces, Georgia, serif; font-weight: 400;
+    font-size: clamp(1.5rem,3vw,2rem); line-height: 1.15;
+    letter-spacing: -.015em; margin: 0 0 1.2rem; text-wrap: balance;
+  }
+  h3 { font-family: Fraunces, Georgia, serif; font-weight: 500; font-size: 1.1rem;
+       line-height: 1.3; margin: 2rem 0 .65rem; text-wrap: balance; }
+
+  p, ul, ol { max-width: var(--tresc); }
+  p { margin: 0 0 1rem; text-wrap: pretty; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: .42rem; }
+  li::marker { color: var(--tekst-cichy); }
+  strong { font-weight: 600; }
+
+  code {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .85em;
+    background: var(--tlo-wglebienie); padding: .12em .38em; border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* --- trzy domy: taksonomia, nie sekwencja — etykiety, nie numery --- */
+  .domy { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.4rem; }
+  .dom {
+    border: 1px solid var(--linia); background: var(--tlo-karty);
+    border-radius: 5px; padding: 1.25rem 1.4rem;
+    border-left: 3px solid var(--blekit);
+  }
+  .dom.tresc-dom { border-left-color: var(--szalwia); }
+  .dom.zegar { border-left-color: var(--bursztyn); }
+  .dom .etykieta {
+    font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+    letter-spacing: .15em; font-size: 10px; font-weight: 600;
+    color: var(--blekit); display: block; margin-bottom: .45rem;
+  }
+  .dom.tresc-dom .etykieta { color: var(--szalwia); }
+  .dom.zegar .etykieta { color: var(--bursztyn); }
+  .dom h3 { margin: 0 0 .5rem; font-size: 1.12rem; }
+  .dom p { margin-bottom: .55rem; font-size: .95rem; }
+  .dom p:last-child { margin-bottom: 0; }
+  .dom .gdzie {
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .8rem;
+    color: var(--tekst-cichy); margin-top: .7rem; padding-top: .7rem;
+    border-top: 1px dashed var(--linia);
+  }
+
+  /* --- tabele --- */
+  .tabela-otoczka { overflow-x: auto; margin: 0 0 1.4rem; border: 1px solid var(--linia); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; font-size: .89rem; background: var(--tlo-karty); }
+  th, td { text-align: left; padding: .62rem .85rem; border-bottom: 1px solid var(--linia); vertical-align: top; }
+  th { font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+       letter-spacing: .1em; font-size: 10.5px; font-weight: 600; color: var(--tekst-cichy); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { background: none; padding: 0; }
+
+  .znacznik {
+    display: inline-block; font-family: "Archivo Narrow", Inter, sans-serif;
+    text-transform: uppercase; letter-spacing: .1em; font-size: 9.5px; font-weight: 600;
+    padding: .12rem .5rem; border-radius: 999px; white-space: nowrap;
+  }
+  .pelna  { background: hsl(158 28% 32% / .13); color: var(--szalwia); }
+  .brama  { background: hsl(22 60% 52% / .15);  color: var(--bursztyn); }
+  .nigdy  { background: hsl(16 40% 46% / .13);  color: var(--glina); }
+
+  /* --- uwaga --- */
+  .uwaga {
+    border-left: 3px solid var(--glina); background: var(--tlo-karty);
+    padding: 1rem 1.2rem; margin: 0 0 1.4rem; max-width: var(--tresc);
+    border-radius: 0 5px 5px 0;
+  }
+  .uwaga p:last-child { margin-bottom: 0; }
+  .uwaga .etykieta {
+    font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+    letter-spacing: .13em; font-size: 10px; font-weight: 600;
+    color: var(--glina); display: block; margin-bottom: .4rem;
+  }
+
+  /* --- dowody: lista znalezisk z jednej sesji --- */
+  .dowody { list-style: none; padding: 0; margin: 0 0 1.2rem; max-width: none;
+            border: 1px solid var(--linia); border-radius: 5px; overflow: hidden; }
+  .dowody li {
+    background: var(--tlo-karty); padding: .7rem 1rem; margin: 0;
+    border-bottom: 1px solid var(--linia); display: grid;
+    grid-template-columns: minmax(0,1fr); gap: .15rem; font-size: .92rem;
+  }
+  @media (min-width: 640px) { .dowody li { grid-template-columns: minmax(0,1fr) 210px; gap: 0 1rem; align-items: baseline; } }
+  .dowody li:last-child { border-bottom: none; }
+  .dowody .skutek { color: var(--tekst-cichy); font-size: .86rem; }
+
+  /* --- fazy: to JEST sekwencja, więc numery --- */
+  .fazy { list-style: none; padding: 0; margin: 0; counter-reset: faza; max-width: none; }
+  .fazy > li {
+    counter-increment: faza; display: grid; grid-template-columns: 2.4rem minmax(0,1fr);
+    gap: 0 1rem; padding: 1.15rem 0; border-top: 1px solid var(--linia); margin: 0; max-width: none;
+  }
+  .fazy > li:last-child { border-bottom: 1px solid var(--linia); }
+  .fazy > li::before {
+    content: counter(faza, decimal-leading-zero);
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px;
+    font-variant-numeric: tabular-nums; color: var(--blekit); padding-top: .3rem;
+  }
+  .fazy b { display: block; font-family: Fraunces, Georgia, serif; font-weight: 500;
+            font-size: 1.04rem; margin-bottom: .3rem; }
+  .fazy ul { margin: .4rem 0 0; padding-left: 1.15rem; }
+  .fazy li li { font-size: .93rem; color: var(--tekst-cichy); }
+
+  footer { border-top: 1px solid var(--linia); padding-top: 1.4rem; margin-top: 3rem;
+           font-size: 13px; color: var(--tekst-cichy); max-width: var(--tresc); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="strona">
+
+  <header class="tytul">
+    <p class="nadtytul">Plan automatyzacji</p>
+    <h1>Trzy domy agentów</h1>
+    <p class="lead">
+      Gdzie agenci mają pracować, co wolno im robić bez pytania, i od czego zacząć,
+      żeby pierwszy tydzień dał więcej niż sam entuzjazm. Plan dla routemarket.io,
+      oparty na narzędziach Claude.
+    </p>
+  </header>
+
+  <section id="teza">
+    <h2>Jedna rzecz, zanim cokolwiek</h2>
+    <p>
+      Naturalny odruch jest taki, żeby zacząć od agentów marketingowych — bo tam widać
+      efekt. Uważam, że to zły pierwszy ruch, i mam na to dowody z jednej sesji pracy
+      nad tym projektem.
+    </p>
+    <p>Sześć rzeczy, które znalazłem, i żadna nie została wykryta wcześniej:</p>
+    <ul class="dowody">
+      <li><span><strong>84 błędy typów</strong> w kodzie</span>
+          <span class="skutek">bo sprawdzanie nie sprawdzało niczego</span></li>
+      <li><span><strong>414 adresów</strong> w mapie strony za logowaniem</span>
+          <span class="skutek">robot widział treść, człowiek formularz</span></li>
+      <li><span>Polityka <code>„Anyone reads catalog"</code></span>
+          <span class="skutek">wpuszczała tylko zalogowanych</span></li>
+      <li><span><strong>344 martwe klucze</strong> tłumaczeń × 8 języków</span>
+          <span class="skutek">tłumaczone i utrzymywane bez powodu</span></li>
+      <li><span>Dwa hooki pytające o <strong>nieistniejące tabele</strong></span>
+          <span class="skutek">martwy kod, który wyglądał na żywy</span></li>
+      <li><span><code>/catalog/enrich</code> filtrował po kolumnie, której nie pobierał</span>
+          <span class="skutek">nadpisałby gotowe opisy</span></li>
+    </ul>
+    <p>
+      Każda z tych rzeczy jest <strong>wykrywalna mechanicznie</strong>. Żadnej nie
+      wykryto, bo nikt nie patrzył. Content skierowany na produkt, który po cichu gnije,
+      nie konwertuje — to dokładnie ten sam wniosek, do którego doszedłeś przy trybie
+      gościa, tylko szerszy.
+    </p>
+    <p>
+      Dlatego <strong>pierwszy agent, którego bym uruchomił, to nocny audytor</strong>,
+      a nie copywriter. Jest przy tym najtańszy: nie wymaga zgód, kont zewnętrznych ani
+      decyzji marketingowych.
+    </p>
+  </section>
+
+  <section id="domy">
+    <h2>Gdzie agenci mają mieszkać</h2>
+    <p>
+      Na pytanie „gdzie ich umieścić" nie ma jednej odpowiedzi. Są trzy, a podział między
+      nimi jest <strong>granicą bezpieczeństwa</strong>, nie porządkowaniem. Agent treści
+      z dostępem do produkcji to niepotrzebnie duży promień rażenia.
+    </p>
+
+    <div class="domy">
+      <div class="dom">
+        <span class="etykieta">Dom pierwszy</span>
+        <h3>Przy kodzie — agenci, którzy zmieniają produkt</h3>
+        <p>
+          Wszystko, co dotyka repozytorium, migracji i wdrożeń. Ci agenci potrzebują gita,
+          dostępu do VPS-a i możliwości uruchomienia buildu. Z tego samego powodu
+          <strong>nie mogą być w pełni autonomiczni</strong>: złe wdrożenie nie jest
+          odwracalne przez agenta, tylko przez człowieka o drugiej w nocy.
+        </p>
+        <p class="gdzie">Claude Code w repo · subagenci w <code>.claude/agents/</code> · hooki w <code>settings.json</code></p>
+      </div>
+
+      <div class="dom tresc-dom">
+        <span class="etykieta">Dom drugi</span>
+        <h3>Osobno, bez dostępu do repo — agenci treści</h3>
+        <p>
+          Copywriter nie potrzebuje repozytorium. Potrzebuje głosu marki, danych z katalogu
+          i narzędzi publikacji. Trzymanie go w tym samym miejscu co agentów produktowych
+          nic nie daje, a otwiera drogę, której nie musi być.
+        </p>
+        <p>
+          Praktycznie: osobny projekt Claude z własną pamięcią i brand voice, bez katalogu
+          roboczego wskazującego na repo. Dane katalogu dostaje przez <strong>odczyt</strong>,
+          nie przez klucz do bazy.
+        </p>
+        <p class="gdzie">Osobny projekt Claude · skille <code>brand-voice</code> i <code>marketing</code> · connectory publikacji</p>
+      </div>
+
+      <div class="dom zegar">
+        <span class="etykieta">Dom trzeci</span>
+        <h3>Na zegarze — agenci, którzy patrzą</h3>
+        <p>
+          Audytor i raportujący nie są rozmówcami. Mają się odpalić same, sprawdzić stan
+          i odezwać się tylko wtedy, gdy jest o czym mówić. Rozmowa z nimi jest wyjątkiem,
+          nie trybem pracy.
+        </p>
+        <p>
+          To jedyna grupa, którą warto od razu puścić w pełni automatycznie — bo
+          <strong>czytają, nie piszą</strong>. Agent, który tylko patrzy, nie ma jak zepsuć.
+        </p>
+        <p class="gdzie">Zadania cykliczne (cron) · sesje w chmurze · raport do pliku albo na czat</p>
+      </div>
+    </div>
+
+    <div class="uwaga">
+      <span class="etykieta">Dlaczego to nie jest przesada</span>
+      <p>
+        Klucz <code>service_role</code> do Supabase omija RLS całkowicie — widzi wszystkie
+        konta, wszystkie prywatne tablice, wszystko. Agent treści, który go dostanie „żeby
+        mieć dane do artykułu", ma w praktyce klucz do całej bazy. Dla raportowania właściwa
+        jest osobna rola tylko do odczytu, z jawnymi uprawnieniami do kilku tabel.
+      </p>
+    </div>
+  </section>
+
+  <section id="co-automatyzowac">
+    <h2>Co automatyzować — reguła odwracalności</h2>
+    <p>
+      Nie „czy AI to potrafi", tylko <strong>ile kosztuje pomyłka i jak szybko widać, że
+      zaszła</strong>. To jedno pytanie porządkuje całą resztę.
+    </p>
+    <div class="tabela-otoczka">
+      <table>
+        <thead>
+          <tr><th>Zadanie</th><th>Odwracalne?</th><th>Tryb</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Audyt kodu, bazy, mapy strony</td><td>nic nie zmienia</td>
+              <td><span class="znacznik pelna">pełna automatyzacja</span></td></tr>
+          <tr><td>Raport tygodniowy z liczb</td><td>nic nie zmienia</td>
+              <td><span class="znacznik pelna">pełna automatyzacja</span></td></tr>
+          <tr><td>Tłumaczenia interfejsu i opisów</td><td>tak, widać od razu</td>
+              <td><span class="znacznik pelna">pełna automatyzacja</span></td></tr>
+          <tr><td>Dogenerowanie opisów w katalogu</td><td>tak, kolumna do nadpisania</td>
+              <td><span class="znacznik pelna">pełna automatyzacja</span></td></tr>
+          <tr><td>Szkic artykułu, posta, newslettera</td><td>tak, to plik</td>
+              <td><span class="znacznik pelna">pełna automatyzacja</span></td></tr>
+          <tr><td>Zmiana w kodzie</td><td>tak, ale kosztownie</td>
+              <td><span class="znacznik brama">brama: przegląd i typy</span></td></tr>
+          <tr><td>Migracja bazy</td><td>zależy od migracji</td>
+              <td><span class="znacznik brama">brama: człowiek czyta SQL</span></td></tr>
+          <tr><td>Publikacja treści na zewnątrz</td><td>technicznie tak, wizerunkowo nie</td>
+              <td><span class="znacznik brama">brama: zatwierdzenie</span></td></tr>
+          <tr><td>Wdrożenie na produkcję</td><td>przez cofnięcie, z przestojem</td>
+              <td><span class="znacznik brama">brama: Ty klikasz</span></td></tr>
+          <tr><td>Usuwanie danych, kont, tabel</td><td>nie</td>
+              <td><span class="znacznik nigdy">nigdy</span></td></tr>
+          <tr><td>Płatności, tokeny, rozliczenia</td><td>nie</td>
+              <td><span class="znacznik nigdy">nigdy</span></td></tr>
+          <tr><td>Publikacja pod cudzą tożsamością</td><td>nie</td>
+              <td><span class="znacznik nigdy">nigdy</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="zestaw">
+    <h2>Zestaw agentów</h2>
+
+    <h3>Nocny audytor <span style="font-weight:400;color:var(--tekst-cichy);font-size:.9rem">— dom trzeci</span></h3>
+    <p>
+      Odpala się raz na dobę i sprawdza rzeczy, które psują się po cichu. Jeśli wszystko
+      gra — milczy. Zestaw startowy bierze się wprost z tego, co już się zepsuło:
+    </p>
+    <ul>
+      <li>typy: <code>npm run typecheck</code> — liczba błędów rośnie czy stoi na zerze</li>
+      <li>klucze tłumaczeń: czy któryś język stracił parytet, czy przybyły martwe</li>
+      <li>baza kontra kod: czy jakieś zapytanie idzie do tabeli, której już nie ma</li>
+      <li>mapa strony: czy każdy adres w niej odpowiada 200 <em>i</em> jest dostępny bez konta</li>
+      <li>polityki RLS: czy nazwa polityki zgadza się z tym, komu naprawdę daje dostęp</li>
+      <li>katalog: ile miejsc bez opisu, bez zdjęcia, bez współrzędnych</li>
+      <li>kopia zapasowa: czy wczorajsza istnieje i nie jest pusta</li>
+    </ul>
+    <p>
+      To jest też najlepszy pierwszy agent do zbudowania, bo <strong>każdy punkt tej listy
+      to jedna komenda</strong>, którą już umiemy uruchomić.
+    </p>
+
+    <h3>Reporter <span style="font-weight:400;color:var(--tekst-cichy);font-size:.9rem">— dom trzeci</span></h3>
+    <p>
+      Tygodniowy przegląd liczb: tablice, plany, koszt modelu na plan, pokrycie katalogu.
+      Wszystko z <code>ai_usage_log</code> i kilku zapytań.
+    </p>
+    <p>
+      Rzecz, którą raport musi mówić wprost: <strong>ruchu jeszcze nie ma</strong>. Pięć kont,
+      analityka wpięta dopiero za zgodą na cookies. Raport, który pokazuje zera wyglądające
+      jak wynik, jest gorszy niż raport, który mówi „na to nie mamy jeszcze danych".
+    </p>
+
+    <h3>Redaktor treści <span style="font-weight:400;color:var(--tekst-cichy);font-size:.9rem">— dom drugi</span></h3>
+    <p>
+      Twoje role Researcher, Copywriter i Visual Brief w jednym przepływie, bo w praktyce
+      i tak biegną po sobie. Materiałem źródłowym jest katalog: 414 miejsc z opisami
+      w sześciu językach.
+    </p>
+    <p>
+      Głos marki wyciągnąłbym z <em>istniejących tekstów produktu</em>, nie z briefu.
+      Ton, którym napisany jest interfejs i dokumentacja — rzeczowy, bez waty — jest już
+      spójny i można go opisać zamiast wymyślać.
+    </p>
+
+    <h3>Publisher <span style="font-weight:400;color:var(--tekst-cichy);font-size:.9rem">— dom drugi, za bramą</span></h3>
+    <p>
+      Publikuje zatwierdzone. Na tym etapie zatwierdzasz wszystko; automatyczne wypuszczanie
+      ma sens dopiero, gdy zobaczysz kilkadziesiąt wyników i będziesz wiedział, co wychodzi
+      przewidywalnie.
+    </p>
+
+    <h3>Przegląd przed wdrożeniem <span style="font-weight:400;color:var(--tekst-cichy);font-size:.9rem">— dom pierwszy</span></h3>
+    <p>
+      Nie osobny agent, tylko <strong>brama na ścieżce</strong>: zanim cokolwiek pójdzie na
+      produkcję, przechodzi przegląd kodu. To jedyne miejsce, gdzie warto wydać więcej
+      obliczeń, bo błąd wychodzi u użytkownika, a nie w konsoli.
+    </p>
+  </section>
+
+  <section id="narzedzia">
+    <h2>Które narzędzie do czego</h2>
+    <p>
+      Najczęstszy błąd przy takich zestawach to zbudowanie agenta tam, gdzie wystarczy
+      hook — albo odwrotnie.
+    </p>
+    <div class="tabela-otoczka">
+      <table>
+        <thead><tr><th>Narzędzie</th><th>Do czego</th><th>Kiedy NIE</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Hook</strong><br><code>settings.json</code></td>
+            <td>Rzeczy, które <em>zawsze</em> mają się wydarzyć. Uruchamia je środowisko, nie model</td>
+            <td>Gdy wymaga oceny sytuacji</td>
+          </tr>
+          <tr>
+            <td><strong>Skill</strong></td>
+            <td>Powtarzalna procedura z krokami: „jak wdrażamy", „jak piszemy posta"</td>
+            <td>Gdy to jednorazowe</td>
+          </tr>
+          <tr>
+            <td><strong>Subagent</strong><br><code>.claude/agents/</code></td>
+            <td>Zadanie w osobnym kontekście, żeby nie zaśmiecać głównego</td>
+            <td>Gdy zadanie potrzebuje całej dotychczasowej rozmowy</td>
+          </tr>
+          <tr>
+            <td><strong>Zadanie cykliczne</strong></td>
+            <td>Audytor i raport. Odpala się bez Ciebie</td>
+            <td>Gdy nie ma czego pilnować</td>
+          </tr>
+          <tr>
+            <td><strong>Pamięć</strong></td>
+            <td>Fakty nieoczywiste z kodu: pułapki wdrożeniowe, decyzje i ich powody</td>
+            <td>Na to, co widać w repo</td>
+          </tr>
+          <tr>
+            <td><strong>Connectory</strong></td>
+            <td>Publikacja, kalendarz, analityka</td>
+            <td>Do bazy produkcyjnej — tam własna rola do odczytu</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="uwaga">
+      <span class="etykieta">Hooki są tu najbardziej niedocenione</span>
+      <p>
+        Model może zapomnieć uruchomić sprawdzanie typów. Hook nie może — odpala go
+        środowisko. W tej sesji przez wiele godzin uruchamiałem sprawdzanie, które nie
+        sprawdzało niczego, i nie zauważyłem tego, bo nic mnie nie zmusiło do spojrzenia
+        na wynik. <strong>To, co musi się zdarzyć zawsze, nie powinno być instrukcją dla
+        modelu, tylko hookiem.</strong>
+      </p>
+    </div>
+  </section>
+
+  <section id="fazy">
+    <h2>Kolejność wdrożenia</h2>
+    <p>Każda faza ma dawać coś użytecznego sama z siebie, także gdyby następna nie powstała.</p>
+    <ol class="fazy">
+      <li>
+        <div>
+          <b>Fundament, który nie wymaga niczyjej zgody</b>
+          <ul>
+            <li>Hook: sprawdzanie typów przed każdym wdrożeniem — nie do pominięcia</li>
+            <li>Lista dozwolonych komend, żeby praca nie stawała na potwierdzeniach</li>
+            <li>Skill „jak wdrażamy" z pułapką <code>deploy-api.sh</code>, który wraca natychmiast</li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div>
+          <b>Nocny audytor</b>
+          <ul>
+            <li>Siedem punktów z listy wyżej, raz na dobę, cisza gdy wszystko gra</li>
+            <li>Raport do pliku w repo — historia stanu przyda się przy szukaniu, kiedy coś się zepsuło</li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div>
+          <b>Rola do odczytu i Reporter</b>
+          <ul>
+            <li>Osobna rola w Postgresie z jawnymi uprawnieniami do kilku tabel</li>
+            <li>Raport tygodniowy, mówiący wprost, czego jeszcze nie wiadomo</li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div>
+          <b>Dom treści</b>
+          <ul>
+            <li>Głos marki wyciągnięty z istniejących tekstów produktu</li>
+            <li>Pierwsza tablica przykładowa — oznaczona flagą, nie udająca czyjegoś wyjazdu</li>
+            <li>Jeden pełny przepływ: miasto → miejsca z katalogu → tablica → opis → post</li>
+          </ul>
+        </div>
+      </li>
+      <li>
+        <div>
+          <b>Publikacja za bramą</b>
+          <ul>
+            <li>Connector do social, każdy wpis zatwierdzasz</li>
+            <li>Automatyczne wypuszczanie dopiero, gdy wyniki będą przewidywalne</li>
+          </ul>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="czego-nie">
+    <h2>Czego bym nie automatyzował, nawet gdy się da</h2>
+    <ul>
+      <li>
+        <strong>Wdrożenia bez człowieka.</strong> Nie dlatego, że agent nie umie — umie.
+        Dlatego, że gdy padnie o drugiej w nocy, i tak wstaniesz Ty.
+      </li>
+      <li>
+        <strong>Migracji bazy bez przeczytania SQL-a.</strong> Wszystkie z tej sesji były
+        odwracalne, ale to była kwestia uwagi, nie zasady.
+      </li>
+      <li>
+        <strong>Treści udających człowieka.</strong> Tablica przykładowa ma flagę, opinia
+        ma być czyjaś albo jej nie ma. To nie jest ostrożność — fabrykowany dowód społeczny
+        jest ryzykiem, które wychodzi w najgorszym momencie.
+      </li>
+      <li>
+        <strong>Decyzji o priorytetach.</strong> Agent powie, co jest zepsute. Czy naprawiać
+        to przed contentem, czy po — zostaje Twoje.
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Plan opisuje stan z 24 sierpnia 2026. Znaleziska w sekcji otwierającej pochodzą
+      z jednej sesji pracy nad projektem i wszystkie zostały naprawione — służą tu jako
+      argument za audytem, nie jako lista otwartych spraw.
+    </p>
+  </footer>
+
+</div>
