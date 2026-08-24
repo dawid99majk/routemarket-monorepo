@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface TablicaKafelekProps {
   nazwa: string;
@@ -7,6 +8,12 @@ interface TablicaKafelekProps {
   /** Do trzech zdjęć z tablicy. Braki wypełniamy tintami tokenów. */
   zdjecia?: (string | null | undefined)[];
   autor?: string | null;
+  /**
+   * Tablica przygotowana przez RouteMarket, nie relacja z czyjegoś wyjazdu.
+   * Wyklucza się z `autor`: zamiast kółka z inicjałami — które deklaruje, że
+   * za tablicą stoi człowiek — pokazujemy etykietę.
+   */
+  przyklad?: boolean;
   odznaka?: ReactNode;
   akcja?: ReactNode;
   aktywny?: boolean;
@@ -35,8 +42,10 @@ const inicjaly = (t: string) =>
  * samych tintów, ale wprost mówi, że docelowo mają tam być fotografie miejsc.
  */
 export default function TablicaKafelek({
-  nazwa, meta, zdjecia = [], autor, odznaka, akcja, aktywny, onClick,
+  nazwa, meta, zdjecia = [], autor, przyklad, odznaka, akcja, aktywny, onClick,
 }: TablicaKafelekProps) {
+  const { t } = useTranslation();
+  const etykietaPrzykladu = t('galeria.przyklad');
   const pola = [0, 1, 2].map((i) => zdjecia[i] || null);
 
   return (
@@ -66,9 +75,15 @@ export default function TablicaKafelek({
           <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1.5 truncate">{meta}</p>
         )}
 
-        {(autor || akcja) && (
+        {(autor || przyklad || akcja) && (
           <div className="flex items-center gap-2.5 mt-3.5">
-            {autor && (
+            {przyklad ? (
+              <span className="inline-flex items-center rounded-full border border-primary/35
+                               bg-primary/8 px-2.5 py-0.5 font-narrow uppercase tracking-[0.14em]
+                               text-[10px] text-primary shrink-0">
+                {etykietaPrzykladu}
+              </span>
+            ) : autor ? (
               <>
                 <span className="w-7 h-7 rounded-full bg-accent/45 flex items-center justify-center
                                  text-[11px] font-medium shrink-0">
@@ -76,7 +91,7 @@ export default function TablicaKafelek({
                 </span>
                 <span className="text-[13px] text-muted-foreground truncate">{autor}</span>
               </>
-            )}
+            ) : null}
             {akcja && <div className="ml-auto shrink-0">{akcja}</div>}
           </div>
         )}

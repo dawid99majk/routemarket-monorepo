@@ -972,6 +972,7 @@ export type Database = {
           fill_percent: number
           hours_per_day: number | null
           id: string
+          is_example: boolean
           is_public: boolean
           like_count: number
           name: string
@@ -1003,6 +1004,7 @@ export type Database = {
           fill_percent?: number
           hours_per_day?: number | null
           id?: string
+          is_example?: boolean
           is_public?: boolean
           like_count?: number
           name: string
@@ -1034,6 +1036,7 @@ export type Database = {
           fill_percent?: number
           hours_per_day?: number | null
           id?: string
+          is_example?: boolean
           is_public?: boolean
           like_count?: number
           name?: string

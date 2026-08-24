@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 interface Publiczna {
   id: string; name: string; destination: string | null; days: number | null;
   author_display: string | null; copy_count: number | null; like_count: number | null;
+  is_example: boolean | null;
   published_at: string | null;
   place_count: number; photos: string[];
 }
@@ -54,7 +55,7 @@ export default function Tablice() {
   const wczytaj = useCallback(async () => {
     setLadowanie(true);
     const { data } = await (supabase as any).from('trip_projects')
-      .select('id, name, destination, days, author_display, copy_count, like_count, published_at')
+      .select('id, name, destination, days, author_display, copy_count, like_count, published_at, is_example')
       .eq('is_public', true)
       .limit(200);
 
@@ -161,7 +162,8 @@ export default function Tablice() {
                 nazwa={tab.name}
                 meta={[tab.destination, `${tab.place_count} ${t('galeria.miejsc')}`].filter(Boolean).join(' · ')}
                 zdjecia={tab.photos}
-                autor={tab.author_display || t('galeria.autor')}
+                przyklad={!!tab.is_example}
+                autor={tab.is_example ? null : (tab.author_display || t('galeria.autor'))}
                 odznaka={
                   <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5
                                     text-[11px] font-mono tabular-nums ${
