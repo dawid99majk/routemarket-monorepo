@@ -111,7 +111,11 @@ export async function wizytowkaTablicy(id: string): Promise<Wizytowka | null> {
     tytul: `${t.name} — ${czesci.join(' · ')} | RouteMarket`,
     // Nazwy miejsc zamiast ogólników: to one mówią, czy tablica jest warta kliknięcia.
     opis: t.sample_names?.length
-      ? `Gotowa tablica od ${t.author_display || 'podróżnika'}: ${t.sample_names.slice(0, 4).join(', ')}${ile > 4 ? ' i więcej' : ''}. Skopiuj ją do siebie i zmień, co nie pasuje.`
+      // Tablica przykładowa nie ma autora i nie wolno jej podpisywać cudzą ręką —
+      // karta odnośnika jest tym, co ludzie widzą po wklejeniu linku.
+      ? (t.is_example
+          ? `Przykładowy plan RouteMarket: ${t.sample_names.slice(0, 4).join(', ')}${ile > 4 ? ' i więcej' : ''}. Skopiuj go do siebie i zmień, co nie pasuje.`
+          : `Gotowa tablica od ${t.author_display || 'podróżnika'}: ${t.sample_names.slice(0, 4).join(', ')}${ile > 4 ? ' i więcej' : ''}. Skopiuj ją do siebie i zmień, co nie pasuje.`)
       : `Gotowa tablica wyjazdu do ${t.destination ?? 'miasta'}. Skopiuj ją do siebie i zmień, co nie pasuje.`,
     obrazek: t.photo ?? null,
     url: `https://routemarket.io/tablica/${id}`,

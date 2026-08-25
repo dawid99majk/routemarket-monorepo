@@ -156,7 +156,7 @@ export class RouteBuilderRepository {
   async publicBoardCard(id: string): Promise<any | null> {
     const { data: b } = await supabase
       .from('trip_projects')
-      .select('id, name, destination, days, author_display, is_public')
+      .select('id, name, destination, days, author_display, is_public, is_example')
       .eq('id', id).eq('is_public', true).maybeSingle();
     if (!b) return null;
 

@@ -167,7 +167,61 @@ export function clusterPlacesByProximity<T extends { name: string; lat?: number 
     const biggest = buckets.reduce((a, b) => (b.length > a.length ? b : a), buckets[0]);
     biggest.push(...unlocated);
   }
+
+  wyrownajGrupy(buckets, km);
   return buckets.filter((b) => b.length > 0);
+}
+
+/**
+ * Wyrównanie liczebności grup po podziale geograficznym.
+ *
+ * Sam podział po odległości wystarcza w mieście rozciągniętym, ale w zwartej
+ * starówce wszystkie punkty leżą bliżej jednego zalążka i wychodzi podział
+ * w rodzaju trzynaście do jednego. Dzień z trzynastoma kotwicami zgłasza potem
+ * dziewięć jako niemieszczące się, a dzień z jedną wypełnia się propozycjami
+ * agenta — użytkownik dostaje plan, w którym większość jego wyborów wypadła.
+ *
+ * Przesuwamy najmniej pasujące punkty: z grupy przeładowanej ten najdalszy od
+ * jej środka ciężkości, do grupy, której jest bliżej. Geometria zostaje
+ * kryterium, tylko przestaje być jedynym.
+ */
+function wyrownajGrupy<T extends { lat?: number | null; lng?: number | null }>(
+  grupy: T[][],
+  km: (a: any, b: any) => number
+): void {
+  const wszystkich = grupy.reduce((s, g) => s + g.length, 0);
+  const gorny = Math.ceil(wszystkich / grupy.length);
+  const srodek = (g: T[]) => {
+    const zPunktem = g.filter((p) => p.lat != null && p.lng != null);
+    if (!zPunktem.length) return null;
+    return {
+      lat: zPunktem.reduce((s, p) => s + (p.lat as number), 0) / zPunktem.length,
+      lng: zPunktem.reduce((s, p) => s + (p.lng as number), 0) / zPunktem.length,
+    };
+  };
+
+  // Kilka przebiegów wystarcza; pętla bez limitu mogłaby się zapętlić przy
+  // punktach równoodległych, a to jest dobieranie kolejności, nie optymalizacja.
+  for (let runda = 0; runda < wszystkich; runda++) {
+    const zaDuza = grupy.findIndex((g) => g.length > gorny);
+    if (zaDuza === -1) break;
+    const zaMala = grupy.findIndex((g) => g.length < gorny);
+    if (zaMala === -1) break;
+
+    const s = srodek(grupy[zaDuza]);
+    const kandydaci = grupy[zaDuza].filter((p) => p.lat != null && p.lng != null);
+    if (!s || !kandydaci.length) break;
+
+    // Najdalszy od środka własnej grupy — jego przynależność jest najsłabsza.
+    let najdalszy = kandydaci[0];
+    let dystans = -1;
+    for (const p of kandydaci) {
+      const d = km(p, s);
+      if (d > dystans) { dystans = d; najdalszy = p; }
+    }
+    grupy[zaDuza].splice(grupy[zaDuza].indexOf(najdalszy), 1);
+    grupy[zaMala].push(najdalszy);
+  }
 }
 
 interface InfoDnia { index: number; date: string; weekday: string; dateObj: Date }
@@ -189,6 +243,36 @@ export interface KontekstPlanu {
   /** Pula ze współrzędnymi do rozwiązywania pozycji planu. */
   pulaWspolrzednych: { name: string; lat: any; lng: any }[];
   center: { lat: number; lng: number } | null;
+}
+
+/**
+ * Czy wizyta zmieści się gdziekolwiek w oknie dnia.
+ *
+ * Poprzednio pytaliśmy, czy miejsce jest otwarte przez cały czas wizyty licząc
+ * od pierwszej minuty dnia — a to zupełnie inne pytanie. Muzeum otwierane
+ * o 10:00 przy dniu zaczynającym się o 9:00 „nie mieściło się", choć mieściło
+ * się doskonale, tylko później.
+ *
+ * Skanujemy co kwadrans, bo o tyle mniej więcej przesuwa się realny plan dnia.
+ * Zwracamy null, gdy godzin nie da się odczytać — brak wiedzy to nie to samo
+ * co zamknięte i nie może kończyć się wyrzuceniem miejsca.
+ */
+function mieciSieWOknie(
+  godziny: string | null | undefined,
+  dzien: Date,
+  oknoOd: number,
+  oknoDo: number,
+  minuty: number
+): boolean | null {
+  if (!godziny) return null;
+  const trwa = Math.max(1, Math.min(minuty, oknoDo - oknoOd));
+  let bylNull = false;
+  for (let start = oknoOd; start + trwa <= oknoDo; start += 15) {
+    const wynik = isOpenDuring(godziny, dzien, start, trwa);
+    if (wynik === true) return true;
+    if (wynik === null) bylNull = true;
+  }
+  return bylNull ? null : false;
 }
 
 const czasNaMinuty = (t: string): number => {
@@ -220,7 +304,7 @@ function przydzielGrupyDoDni(grupy: MiejsceWejscie[][], dni: InfoDnia[], oknoOd:
     let punkty = 0;
     for (const p of grupa) {
       const minuty = Math.min(p.visit_minutes || 60, minutNaDzien);
-      const otwarte = isOpenDuring(p.opening_hours, dzien.dateObj, oknoOd, minuty);
+      const otwarte = mieciSieWOknie(p.opening_hours, dzien.dateObj, oknoOd, oknoOd + minutNaDzien, minuty);
       if (otwarte === false) punkty -= p.priority === 'must' ? 3 : 1;
       else if (otwarte === true) punkty += p.priority === 'must' ? 2 : 1;
     }
@@ -401,7 +485,9 @@ function promptDnia(k: KontekstPlanu, numer: number): string {
 
   const opisMiejsca = (pl: MiejsceWejscie) => {
     const minuty = pl.visit_minutes || 60;
-    const mieciSie = isOpenDuring(pl.opening_hours, info.dateObj, czasNaMinuty(z.window.start), Math.min(minuty, k.minutNaDzien));
+    const mieciSie = mieciSieWOknie(
+      pl.opening_hours, info.dateObj,
+      czasNaMinuty(z.window.start), czasNaMinuty(z.window.end), minuty);
     const dostepnosc = describeAvailability(pl.opening_hours, info.dateObj);
     const werdykt = mieciSie === false ? ' — NIE MIEŚCI SIĘ W TWOIM OKNIE' : '';
     return `- "${pl.name}" [${pl.priority === 'must' ? 'KONIECZNIE' : 'jeśli wyjdzie'}, ${pl.category || 'attraction'}, ok. ${minuty} min] ${dostepnosc}${werdykt}`;
@@ -432,7 +518,10 @@ MIEJSCA PRZYPIĘTE PRZEZ UŻYTKOWNIKA NA TEN DZIEŃ — to KOTWICE dnia, nie ca�
 (przydzielone tutaj po położeniu, dostępność policzona dla ${info.weekday}):
 ${moje.length ? moje.map(opisMiejsca).join('\n') : '(na ten dzień nie przypadło żadne przypięte miejsce — zbuduj dzień z propozycji poniżej)'}
 
-${cudze.length ? `MIEJSCA ZAPLANOWANE W INNYCH DNIACH — NIE UŻYWAJ ICH TUTAJ:
+${cudze.length ? `MIEJSCA PRZYPISANE DO INNYCH DNI TEGO WYJAZDU — nie umieszczaj ich
+tutaj, żeby się nie zdublowały. To NIE są miejsca odrzucone przez użytkownika:
+NIE wpisuj ich do "not_scheduled" i nie tłumacz się z ich nieobecności, bo są
+w planie, tylko innego dnia:
 ${cudze.map((p) => `- "${p.name}"`).join('\n')}` : ''}
 
 ${zabytkiDnia ? `ZWERYFIKOWANE MIEJSCA W TYM MIEŚCIE, KTÓRYCH UŻYTKOWNIK NIE PRZYPIĄŁ
@@ -448,7 +537,14 @@ WYPEŁNIENIE DNIA: ${k.fillPercent}%. Zaplanuj ok. ${Math.round(budzetDnia / 60 
 W polu "summary" napisz jednym zdaniem, ile czasu zostaje wolnego i co można w nim zrobić w tej okolicy. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
 
 ZASADY:
-1. Miejsca oznaczone KONIECZNIE mają pierwszeństwo — wstaw je najpierw.
+1. KOTWICE PRZED PROPOZYCJAMI — reguła nadrzędna wobec wszystkich pozostałych.
+   Najpierw wstaw WSZYSTKIE miejsca oznaczone KONIECZNIE, dopiero potem wypełniaj
+   to, co zostało. Pominięcie kotwicy przy jednoczesnym dołożeniu własnej
+   propozycji jest BŁĘDEM PLANU, nawet gdy propozycja wydaje się ciekawsza:
+   użytkownik wybrał te miejsca świadomie, a Twoje propozycje są wypełniaczem
+   czasu, nie konkurencją dla nich.
+   Gdy kotwica naprawdę się nie mieści, najpierw skróć wizytę (zasada 5). Dopiero
+   gdy i to nie pomaga, wpisz ją do "not_scheduled" z prawdziwym powodem.
 2. NIGDY nie planuj wizyty w miejscu oznaczonym jako ZAMKNIĘTE tego dnia ani takiego, które NIE MIEŚCI SIĘ W OKNIE.
 3. Dzień ma być spójny geograficznie — kolejność układaj tak, żeby nie biegać przez miasto tam i z powrotem.
 4. NIGDY NIE ZOSTAWIAJ PUSTEGO DNIA. "Czas wolny" na kilka godzin przy niewykorzystanych miejscach to błąd planu, nie wynik.
