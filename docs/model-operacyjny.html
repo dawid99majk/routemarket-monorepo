@@ -1,0 +1,473 @@
+<title>Model operacyjny RouteMarket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@400;500;600&family=Archivo+Narrow:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Rodzina tych samych tokenów co dokument produktowy i plan agentów — to trzeci
+     dokument tej serii, nie osobny byt. Akcent mineralny jak w planie agentów,
+     bo to jego rozwinięcie; szałwia wraca jako kolor produktu w tabelach obszarów. */
+  :root {
+    --tlo: hsl(200 10% 97%); --tlo-karty: hsl(0 0% 100%); --tlo-wgl: hsl(200 12% 94%);
+    --tekst: hsl(60 6% 14%); --tekst-cichy: hsl(40 5% 43%); --linia: hsl(200 8% 87%);
+    --blekit: hsl(200 38% 40%); --szalwia: hsl(158 28% 32%);
+    --glina: hsl(16 40% 46%); --bursztyn: hsl(22 60% 50%);
+    --tresc: 68ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --tlo: hsl(200 8% 11%); --tlo-karty: hsl(200 7% 14%); --tlo-wgl: hsl(200 7% 18%);
+      --tekst: hsl(42 28% 93%); --tekst-cichy: hsl(40 8% 64%); --linia: hsl(200 6% 25%);
+      --blekit: hsl(200 40% 66%); --szalwia: hsl(97 20% 62%);
+      --glina: hsl(16 44% 62%); --bursztyn: hsl(22 62% 66%);
+    }
+  }
+  :root[data-theme="dark"] {
+    --tlo: hsl(200 8% 11%); --tlo-karty: hsl(200 7% 14%); --tlo-wgl: hsl(200 7% 18%);
+    --tekst: hsl(42 28% 93%); --tekst-cichy: hsl(40 8% 64%); --linia: hsl(200 6% 25%);
+    --blekit: hsl(200 40% 66%); --szalwia: hsl(97 20% 62%);
+    --glina: hsl(16 44% 62%); --bursztyn: hsl(22 62% 66%);
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--tlo); color: var(--tekst); margin: 0;
+         font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.65;
+         -webkit-font-smoothing: antialiased; }
+  .strona { max-width: 1000px; margin: 0 auto; padding: clamp(2.5rem,6vw,4.5rem) clamp(1.25rem,4vw,2.5rem) 6rem; }
+
+  .nadtytul { font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+              letter-spacing: .3em; font-size: 11px; font-weight: 600; color: var(--blekit); margin: 0 0 1.1rem; }
+  h1 { font-family: Fraunces, Georgia, serif; font-weight: 300; font-size: clamp(2.2rem,5.5vw,3.4rem);
+       line-height: 1.05; letter-spacing: -.025em; margin: 0 0 1.1rem; text-wrap: balance; }
+  .lead { font-size: clamp(1.02rem,2vw,1.14rem); max-width: var(--tresc); margin: 0 0 1.3rem; text-wrap: pretty; }
+  header.tytul { border-bottom: 1px solid var(--linia); padding-bottom: 2rem; margin-bottom: clamp(2.5rem,6vw,3.5rem); }
+
+  section { margin-bottom: clamp(2.8rem,6vw,4rem); }
+  h2 { font-family: Fraunces, Georgia, serif; font-weight: 400; font-size: clamp(1.5rem,3vw,2rem);
+       line-height: 1.15; letter-spacing: -.015em; margin: 0 0 1.2rem; text-wrap: balance; }
+  h3 { font-family: Fraunces, Georgia, serif; font-weight: 500; font-size: 1.1rem;
+       margin: 2rem 0 .65rem; text-wrap: balance; }
+  p, ul, ol { max-width: var(--tresc); }
+  p { margin: 0 0 1rem; text-wrap: pretty; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: .42rem; }
+  li::marker { color: var(--tekst-cichy); }
+  strong { font-weight: 600; }
+  code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .85em;
+         background: var(--tlo-wgl); padding: .12em .38em; border-radius: 3px; word-break: break-word; }
+
+  /* warstwy podłoża */
+  .warstwy { display: flex; flex-direction: column; gap: .9rem; margin-bottom: 1.4rem; }
+  .w { border: 1px solid var(--linia); background: var(--tlo-karty); border-radius: 5px;
+       padding: 1.15rem 1.3rem; border-left: 3px solid var(--blekit); }
+  .w .et { font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+           letter-spacing: .15em; font-size: 10px; font-weight: 600; color: var(--blekit);
+           display: block; margin-bottom: .4rem; }
+  .w h3 { margin: 0 0 .45rem; font-size: 1.08rem; }
+  .w p { margin-bottom: .5rem; font-size: .95rem; }
+  .w p:last-child { margin-bottom: 0; }
+  .w .test { font-size: .88rem; color: var(--tekst-cichy); margin-top: .7rem; padding-top: .7rem;
+             border-top: 1px dashed var(--linia); }
+  .w .test b { color: var(--tekst); font-weight: 600; }
+
+  .tab { overflow-x: auto; margin: 0 0 1.4rem; border: 1px solid var(--linia); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; background: var(--tlo-karty); }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--linia); vertical-align: top; }
+  th { font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase; letter-spacing: .1em;
+       font-size: 10.5px; font-weight: 600; color: var(--tekst-cichy); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { background: none; padding: 0; }
+
+  .zn { display: inline-block; font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+        letter-spacing: .1em; font-size: 9.5px; font-weight: 600; padding: .12rem .5rem;
+        border-radius: 999px; white-space: nowrap; }
+  .a { background: hsl(158 28% 32% / .13); color: var(--szalwia); }
+  .b { background: hsl(22 60% 50% / .15); color: var(--bursztyn); }
+  .c { background: hsl(16 40% 46% / .13); color: var(--glina); }
+
+  .uwaga { border-left: 3px solid var(--glina); background: var(--tlo-karty); padding: 1rem 1.2rem;
+           margin: 0 0 1.4rem; max-width: var(--tresc); border-radius: 0 5px 5px 0; }
+  .uwaga p:last-child { margin-bottom: 0; }
+  .uwaga .et { font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+               letter-spacing: .13em; font-size: 10px; font-weight: 600; color: var(--glina);
+               display: block; margin-bottom: .4rem; }
+
+  .obszar { border: 1px solid var(--linia); background: var(--tlo-karty); border-radius: 5px;
+            padding: 1.1rem 1.25rem; margin-bottom: .9rem; }
+  .obszar h3 { margin: 0 0 .3rem; font-size: 1.06rem; }
+  .obszar .rola { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem;
+                  color: var(--blekit); margin-bottom: .6rem; }
+  .obszar p { font-size: .94rem; margin-bottom: .5rem; }
+  .obszar p:last-child { margin-bottom: 0; }
+  .obszar .czlowiek { font-size: .89rem; color: var(--tekst-cichy); margin-top: .6rem;
+                      padding-top: .6rem; border-top: 1px dashed var(--linia); }
+  .obszar .czlowiek b { color: var(--glina); font-weight: 600; }
+
+  .etapy { list-style: none; padding: 0; margin: 0; counter-reset: e; max-width: none; }
+  .etapy > li { counter-increment: e; display: grid; grid-template-columns: 2.3rem minmax(0,1fr);
+                gap: 0 1rem; padding: 1.1rem 0; border-top: 1px solid var(--linia); margin: 0; max-width: none; }
+  .etapy > li:last-child { border-bottom: 1px solid var(--linia); }
+  .etapy > li::before { content: counter(e, decimal-leading-zero);
+                        font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px;
+                        font-variant-numeric: tabular-nums; color: var(--blekit); padding-top: .3rem; }
+  .etapy b { display: block; font-family: Fraunces, Georgia, serif; font-weight: 500;
+             font-size: 1.02rem; margin-bottom: .28rem; }
+  .etapy span { color: var(--tekst-cichy); font-size: .93rem; display: block; max-width: 62ch; }
+  .gotowe { color: var(--szalwia); font-weight: 600; font-size: .82rem;
+            font-family: "Archivo Narrow", Inter, sans-serif; text-transform: uppercase;
+            letter-spacing: .1em; }
+
+  footer { border-top: 1px solid var(--linia); padding-top: 1.4rem; margin-top: 3rem;
+           font-size: 13px; color: var(--tekst-cichy); max-width: var(--tresc); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="strona">
+
+  <header class="tytul">
+    <p class="nadtytul">Model operacyjny</p>
+    <h1>Podłoże, na którym agenci są tylko konfiguracją</h1>
+    <p class="lead">
+      Jak prowadzić routemarket.io tak, żeby dołożenie agenta od rozliczeń, obsługi
+      użytkownika albo promocji było wpisem w konfiguracji, a nie przebudową. Plus mapa
+      wszystkich obszarów: co agent robi sam, co przynosi do zatwierdzenia, czego nie
+      dotyka nigdy.
+    </p>
+  </header>
+
+  <section>
+    <h2>Zasada, z której wynika reszta</h2>
+    <p>
+      Lista agentów będzie się zmieniać — dziś marketing i audyt, za pół roku rozliczenia
+      i obsługa użytkownika, za rok coś, czego jeszcze nie ma. <strong>To, co nie może się
+      zmieniać, to podłoże, w które się wpinają.</strong>
+    </p>
+    <p>
+      Dlatego nie projektuję zestawu agentów. Projektuję cztery warstwy, w których agent
+      jest tylko konfiguracją: rolą w bazie, wpisem w harmonogramie i opisem zadania.
+      Sprawdzian jest prosty — <em>czy dołożenie agenta od faktur wymaga zmiany
+      czegokolwiek poza dodaniem roli i wpisu?</em> Jeśli tak, warstwa jest źle
+      zaprojektowana.
+    </p>
+
+    <div class="warstwy">
+      <div class="w">
+        <span class="et">Warstwa pierwsza</span>
+        <h3>Dostęp — rola na agenta, nie klucz do wszystkiego</h3>
+        <p>
+          Każdy agent dostaje własną rolę w Postgresie z <strong>uprawnieniami do
+          konkretnych kolumn</strong>, nie do tabel. Kolumna, która dojdzie później, nie
+          staje się widoczna sama z siebie.
+        </p>
+        <p>
+          Wzorzec już stoi: <code>raport_ro</code> widzi sześć tabel, wybrane kolumny
+          i zero danych osobowych — bez <code>user_id</code>, bez nazw prywatnych tablic.
+          Agent od rozliczeń dostanie <code>rozliczenia_ro</code> z dostępem do
+          <code>token_ledger</code>, ale nie do treści tablic.
+        </p>
+        <p class="test">
+          <b>Sprawdzian:</b> nowy agent = nowa rola. Nigdy nie <code>service_role</code> —
+          ten omija RLS całkowicie i daje dostęp do wszystkich kont naraz.
+        </p>
+      </div>
+
+      <div class="w">
+        <span class="et">Warstwa druga</span>
+        <h3>Obserwacja — jedno miejsce na ustalenia</h3>
+        <p>
+          Wszyscy agenci piszą znaleziska w tym samym kształcie: <em>co</em>, <em>waga</em>,
+          <em>dowód</em>, <em>proponowane działanie</em>. Do wspólnego katalogu, z datą
+          w nazwie.
+        </p>
+        <p>
+          Bez tego każdy agent wymyśli własny format i po pół roku nie da się odpowiedzieć
+          na pytanie „od kiedy to jest zepsute". Historia raportów jest tu ważniejsza niż
+          pojedynczy raport.
+        </p>
+        <p class="test">
+          <b>Sprawdzian:</b> czy da się przeszukać wszystkie ustalenia wszystkich agentów
+          jednym <code>grep</code>-em?
+        </p>
+      </div>
+
+      <div class="w">
+        <span class="et">Warstwa trzecia</span>
+        <h3>Zatwierdzanie — jedna kolejka, nie pięć skrzynek</h3>
+        <p>
+          Wszystko, co wymaga Twojej decyzji, ląduje w <strong>jednym miejscu</strong>,
+          posortowane po wadze. Nie w mailu od jednego agenta, czacie od drugiego i pliku
+          od trzeciego.
+        </p>
+        <p>
+          To jest warstwa, która decyduje, czy „ja tylko weryfikuję" jest wykonalne.
+          Ośmiu agentów po pięć rzeczy dziennie to czterdzieści decyzji — rozproszone są
+          nie do przejścia, zebrane i uszeregowane zajmują kwadrans.
+        </p>
+        <p class="test">
+          <b>Sprawdzian:</b> czy jest jedno miejsce, po którego przejrzeniu wiesz, że nic
+          nie czeka?
+        </p>
+      </div>
+
+      <div class="w">
+        <span class="et">Warstwa czwarta</span>
+        <h3>Działanie — próg wyznacza odwracalność</h3>
+        <p>
+          Nie „czy agent to potrafi", tylko ile kosztuje pomyłka i jak szybko widać, że
+          zaszła. Trzy poziomy: robi sam, przynosi do zatwierdzenia, nie dotyka nigdy.
+        </p>
+        <p>
+          Poziom jest przypisany do <em>rodzaju działania</em>, nie do agenta. Dzięki temu
+          nowy agent dziedziczy zasady: „publikuje na zewnątrz" znaczy to samo dla agenta
+          marketingowego i dla agenta od promocji.
+        </p>
+        <p class="test">
+          <b>Sprawdzian:</b> czy nowe działanie da się przypisać do poziomu bez dyskusji?
+        </p>
+      </div>
+    </div>
+
+    <div class="uwaga">
+      <span class="et">O tych 90 procentach — uczciwie</span>
+      <p>
+        Dziewięćdziesiąt procent <strong>zadań</strong> jest osiągalne. Dziewięćdziesiąt
+        procent <strong>ryzyka</strong> siedzi w pozostałych dziesięciu — i tak zostanie.
+        Dobrze zaprojektowany model nie udaje, że tę resztę też da się oddać; sprawia, że
+        jest tania w przejrzeniu.
+      </p>
+      <p>
+        Praktycznie znaczy to, że wąskim gardłem przestaje być praca, a staje się
+        <strong>Twoja uwaga</strong>. Dlatego warstwa trzecia jest ważniejsza od liczby
+        agentów, a agent, który zgłasza wszystko, jest gorszy od agenta, który zgłasza
+        rzeczy warte decyzji.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Gdzie co pracuje</h2>
+    <p>Masz trzy miejsca i każde nadaje się do czegoś innego.</p>
+    <div class="tab">
+      <table>
+        <thead><tr><th>Miejsce</th><th>Co tam żyje</th><th>Dlaczego właśnie tam</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>VPS</strong></td>
+            <td>Audytor, raport, zadania na katalogu, kopie zapasowe</td>
+            <td>Działa bez Ciebie i bez włączonego komputera. Blisko danych, więc nie wynosi ich na zewnątrz</td>
+          </tr>
+          <tr>
+            <td><strong>Twój komputer</strong><br><span style="color:var(--tekst-cichy);font-size:.85rem">Claude Code</span></td>
+            <td>Wszystko, co dotyka repo: zmiany, migracje, wdrożenia, przegląd kodu</td>
+            <td>Tu jest git i tu zapadają decyzje o produkcie. Wymaga Twojej obecności — i o to chodzi</td>
+          </tr>
+          <tr>
+            <td><strong>Claude Desktop<br>i claude.ai</strong></td>
+            <td>Treść, strategia, przeglądanie raportów, rozmowy o kierunku</td>
+            <td>Czytelnia i pracownia. Bez dostępu do repo i produkcji — mniejszy promień rażenia</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Podział nie jest porządkowaniem, tylko <strong>granicą uprawnień</strong>. Agent treści,
+      który dostanie klucz do produkcji „żeby mieć dane do artykułu", ma w praktyce dostęp
+      do wszystkich kont.
+    </p>
+  </section>
+
+  <section>
+    <h2>Obszary</h2>
+    <p>
+      Dziesięć obszarów, w których startup taki jak ten musi działać. Przy każdym:
+      co agent robi sam, i — ważniejsze — <strong>co zostaje przy Tobie</strong>.
+    </p>
+
+    <div class="obszar">
+      <h3>Jakość i utrzymanie <span class="gotowe">— stoi</span></h3>
+      <p class="rola">VPS · cron 3:30 · bez dostępu do zapisu</p>
+      <p>
+        Nocny audyt: typy, parytet tłumaczeń, zapytania do nieistniejących tabel,
+        dostępność adresów z mapy strony, polityki obiecujące więcej, niż dają, luki
+        w katalogu, świeżość kopii zapasowej. Milczy, gdy wszystko gra.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> decyzja, czy znalezisko naprawiamy teraz, czy zapisujemy na później.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Dane i decyzje <span class="gotowe">— stoi</span></h3>
+      <p class="rola">VPS · cron poniedziałek · rola <code>raport_ro</code></p>
+      <p>
+        Raport tygodniowy: liczby produktu, koszt modelu per operacja, pokrycie katalogu.
+        Mówi też wprost, czego jeszcze nie wiadomo — dziś nie ma ruchu, więc konwersji
+        nie da się mierzyć.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> co z tych liczb wynika. Raport pokazuje, nie interpretuje.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Rozwój platformy</h3>
+      <p class="rola">Twój komputer · Claude Code · pełny dostęp do repo</p>
+      <p>
+        Zmiany w kodzie, migracje, refaktory. Agent pisze, uruchamia typy, przygotowuje
+        migrację z zapytaniem kontrolnym. Przegląd kodu przed wdrożeniem jako brama.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> wdrożenie na produkcję i każda migracja — czytasz SQL, zanim pójdzie.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Treść i marketing</h3>
+      <p class="rola">Claude Desktop · bez dostępu do repo · katalog przez odczyt</p>
+      <p>
+        Research tematów, teksty w sześciu językach, briefy graficzne, opisy pod
+        wyszukiwarki. Materiałem źródłowym jest katalog: 414 miejsc z opisami.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> publikacja na zewnątrz. Zawsze, także gdy tekst jest dobry — bo to wychodzi pod Twoją nazwą.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Obsługa użytkownika</h3>
+      <p class="rola">Claude Desktop · rola <code>zgloszenia_ro</code> · bez adresów e-mail</p>
+      <p>
+        Segregacja zgłoszeń: co jest błędem, co prośbą o funkcję, co pytaniem. Szkic
+        odpowiedzi. Wychwycenie powtarzających się problemów — trzy podobne zgłoszenia
+        to sygnał produktowy, nie trzy zgłoszenia.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> każda odpowiedź do człowieka. To jest obszar, w którym byłbym najostrożniejszy — pomyłka jest publiczna i zostaje.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Rozliczenia</h3>
+      <p class="rola">VPS · rola <code>rozliczenia_ro</code> · wyłącznie odczyt</p>
+      <p>
+        Uzgadnianie sald tokenów, wykrywanie rozjazdów między obciążeniami a wykonaną
+        pracą, przygotowanie zestawień. Sygnał, gdy koszt modelu na plan odbiega od normy.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie i tylko przy Tobie:</b> każdy ruch pieniędzmi. Agent liczy i sygnalizuje — nie obciąża, nie zwraca, nie koryguje sald.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Design i spójność</h3>
+      <p class="rola">Twój komputer · odczyt repo</p>
+      <p>
+        Pilnowanie systemu: czy nowy ekran używa tokenów zamiast wartości wpisanych
+        wprost, czy typografia trzyma skalę, czy komponent nie powiela istniejącego.
+        Wychwytywanie rozjazdów, zanim urosną.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> redesign i każda zmiana kierunku wizualnego. Agent pilnuje spójności z tym, co jest — nie decyduje, co ma być.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Bezpieczeństwo i zgodność</h3>
+      <p class="rola">VPS · odczyt schematu i polityk</p>
+      <p>
+        Przegląd polityk RLS, wykrywanie tabel bez ochrony, nazw obiecujących więcej niż
+        dają, endpointów bez logowania. Częściowo już działa w nocnym audycie.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> dokumenty prawne i wszystko, co zmienia zakres dostępu. Agent zgłasza — otwiera człowiek.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Infrastruktura</h3>
+      <p class="rola">VPS · odczyt logów i stanu</p>
+      <p>
+        Świeżość i rozmiar kopii zapasowych, stan kontenerów, miejsce na dysku, błędy
+        w logach. Watchdog restartuje, agent zauważa wzorzec: „to już trzeci restart
+        w tym tygodniu".
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> wdrożenia i zmiany konfiguracji serwera. Gdy padnie o drugiej w nocy, i tak wstaniesz Ty.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Wzrost i promocje</h3>
+      <p class="rola">Claude Desktop · odczyt raportów</p>
+      <p>
+        Propozycje eksperymentów, analiza wyników, pomysły na promocje. Wymaga danych,
+        których jeszcze nie ma — więc realnie zaczyna działać po pojawieniu się ruchu.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> cennik i każda obietnica złożona użytkownikowi.</p>
+    </div>
+
+    <div class="obszar">
+      <h3>Propozycje usprawnień</h3>
+      <p class="rola">dowolne miejsce · odczyt</p>
+      <p>
+        Agent, który regularnie czyta raporty pozostałych i szuka wzorców, których żaden
+        z osobna nie widzi. Nie zgłasza usterek — proponuje, co zmienić, żeby przestały
+        się powtarzać.
+      </p>
+      <p class="czlowiek"><b>Przy Tobie:</b> priorytety. To jest ta decyzja, której nie warto oddawać.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Próg działania</h2>
+    <p>Przypisany do rodzaju czynności, nie do agenta — dzięki temu nowy agent dziedziczy zasady.</p>
+    <div class="tab">
+      <table>
+        <thead><tr><th>Rodzaj czynności</th><th>Próg</th><th>Dlaczego</th></tr></thead>
+        <tbody>
+          <tr><td>Czytanie, liczenie, raportowanie</td><td><span class="zn a">robi sam</span></td><td>nic nie zmienia</td></tr>
+          <tr><td>Pisanie do plików roboczych i szkiców</td><td><span class="zn a">robi sam</span></td><td>plik da się skasować</td></tr>
+          <tr><td>Uzupełnianie danych pochodnych<br><span style="color:var(--tekst-cichy);font-size:.85rem">opisy, tłumaczenia, zdjęcia</span></td><td><span class="zn a">robi sam</span></td><td>da się przegenerować</td></tr>
+          <tr><td>Zmiana w kodzie</td><td><span class="zn b">do zatwierdzenia</span></td><td>odwracalne, ale kosztownie</td></tr>
+          <tr><td>Migracja bazy</td><td><span class="zn b">do zatwierdzenia</span></td><td>zależy od migracji — czytasz SQL</td></tr>
+          <tr><td>Publikacja na zewnątrz</td><td><span class="zn b">do zatwierdzenia</span></td><td>technicznie odwracalna, wizerunkowo nie</td></tr>
+          <tr><td>Odpowiedź do użytkownika</td><td><span class="zn b">do zatwierdzenia</span></td><td>wysłanego nie da się cofnąć</td></tr>
+          <tr><td>Wdrożenie na produkcję</td><td><span class="zn b">do zatwierdzenia</span></td><td>cofnięcie oznacza przestój</td></tr>
+          <tr><td>Ruch pieniędzmi</td><td><span class="zn c">nigdy</span></td><td>nieodwracalne i cudze</td></tr>
+          <tr><td>Usuwanie danych i kont</td><td><span class="zn c">nigdy</span></td><td>nieodwracalne</td></tr>
+          <tr><td>Zmiana zakresu dostępu</td><td><span class="zn c">nigdy</span></td><td>błąd odsłania wszystko naraz</td></tr>
+          <tr><td>Treść udająca człowieka</td><td><span class="zn c">nigdy</span></td><td>wychodzi w najgorszym momencie</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kolejność</h2>
+    <ol class="etapy">
+      <li><div><b>Podłoże <span class="gotowe">— zrobione</span></b>
+        <span>Strażnik poleceń nieodwracalnych jako hook. Lista dozwolonych odczytów.
+        Skill wdrożeniowy z pułapkami. Wzorzec roli na agenta.</span></div></li>
+      <li><div><b>Obserwacja <span class="gotowe">— zrobione</span></b>
+        <span>Nocny audyt i raport tygodniowy w harmonogramie. Historia w plikach,
+        milczenie przy braku znalezisk.</span></div></li>
+      <li><div><b>Kolejka zatwierdzeń</b>
+        <span>Jedno miejsce na wszystko, co czeka na decyzję, uszeregowane po wadze.
+        Bez tego dalsze rozbudowywanie zestawu agentów zamienia Cię w wąskie gardło.</span></div></li>
+      <li><div><b>Dom treści</b>
+        <span>Głos marki wyciągnięty z istniejących tekstów produktu. Pierwsza tablica
+        przykładowa — z flagą, którą właśnie dołożyliśmy.</span></div></li>
+      <li><div><b>Obsługa użytkownika</b>
+        <span>Dopiero gdy będą użytkownicy. Segregacja i szkice odpowiedzi; wysyłka
+        zawsze przez Ciebie.</span></div></li>
+      <li><div><b>Rozliczenia i wzrost</b>
+        <span>Gdy pojawi się ruch i pieniądze. Rola do odczytu, sygnalizowanie rozjazdów,
+        zero uprawnień do ruchu środkami.</span></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Czym poznasz, że model działa</h2>
+    <ul>
+      <li><strong>Dołożenie agenta zajmuje godzinę, nie dzień.</strong> Nowa rola, wpis
+        w harmonogramie, opis zadania. Jeśli wymaga zmiany warstw — coś jest źle.</li>
+      <li><strong>Nie czytasz raportów, w których nic nie ma.</strong> Agent, który
+        codziennie pisze „wszystko w porządku", po tygodniu przestaje być czytany
+        i wtedy przestaje działać.</li>
+      <li><strong>Wiesz, kiedy skończyłeś.</strong> Jedna kolejka, która bywa pusta.</li>
+      <li><strong>Żaden agent nie ma dostępu, którego nie potrzebuje.</strong> Sprawdzian:
+        wypisz, co widzi każda rola, i zapytaj, po co jej to.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      Dokument opisuje stan z 24 sierpnia 2026. Warstwy pierwsza i druga są zbudowane
+      i działają; pozostałe to plan. Towarzyszy dokumentowi produktowemu
+      (<em>RouteMarket od środka</em>) i planowi agentów (<em>Trzy domy agentów</em>).
+    </p>
+  </footer>
+
+</div>
