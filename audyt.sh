@@ -23,7 +23,31 @@ ZNALEZISKA=0
 psql() { docker exec -i supabase-db psql -U postgres -X -t -A "$@"; }
 
 zapisz() { echo "$1" >> "$RAPORT"; }
-problem() { ZNALEZISKA=$((ZNALEZISKA+1)); zapisz "- **$1**"; }
+
+# problem <opis> [odcisk] [waga] [propozycja] [polecenie]
+#
+# Z odciskiem znalezisko trafia też do kolejki zatwierdzeń i czeka tam na
+# decyzję. Bez odcisku ląduje wyłącznie w raporcie — dla rzeczy, które warto
+# odnotować, ale nie ma o czym rozstrzygać.
+problem() {
+  ZNALEZISKA=$((ZNALEZISKA+1))
+  zapisz "- **$1**"
+  [ -z "${2:-}" ] && return 0
+  python3 - "$1" "$2" "${3:-wazne}" "${4:-}" "${5:-}" <<'PY' | ./kolejka.py dodaj >/dev/null 2>&1 || true
+import json, sys
+print(json.dumps({
+    'agent': 'audytor',
+    'obszar': sys.argv[2].split(':')[0],
+    'waga': sys.argv[3],
+    'tytul': sys.argv[1][:180],
+    'opis': sys.argv[1],
+    'dowod': {'raport': 'audyt/ostatni.md'},
+    'proponowane_dzialanie': sys.argv[4],
+    'polecenie': sys.argv[5] or None,
+    'odcisk': sys.argv[2],
+}, ensure_ascii=False))
+PY
+}
 
 {
   echo "# Audyt routemarket.io — $(date '+%Y-%m-%d %H:%M')"
@@ -37,7 +61,7 @@ BLEDY_FRONT=$(./node_modules/.bin/tsc --noEmit -p tsconfig.app.json 2>&1 | grep 
 cd "$REPO/apps/route-builder-api" || exit 1
 BLEDY_API=$(./node_modules/.bin/tsc --noEmit 2>&1 | grep -c 'error TS')
 if [ "$BLEDY_FRONT" -gt 0 ] || [ "$BLEDY_API" -gt 0 ]; then
-  problem "Błędy typów: front $BLEDY_FRONT, API $BLEDY_API (powinno być 0)"
+  problem "Błędy typów: front $BLEDY_FRONT, API $BLEDY_API (powinno być 0)" "typy:bledy" "pilne" "Naprawić przed kolejnym wdrożeniem — build i tak się na nich wywali."
 else
   zapisz "Front i API bez błędów."
 fi
@@ -102,7 +126,7 @@ for T in $(grep -rhoE "from\('[a-z_]+'\)" "$REPO/apps/frontend/src" "$REPO/apps/
   esac
 done
 if [ -n "$BRAKUJACE" ]; then
-  problem "Kod pyta o tabele, których nie ma w bazie:$BRAKUJACE"
+  problem "Kod pyta o tabele, których nie ma w bazie:$BRAKUJACE" "baza:brakujace-tabele" "pilne" "Usunąć martwy kod albo dodać brakującą tabelę."
 else
   zapisz "Każda odpytywana tabela istnieje."
 fi
@@ -113,7 +137,7 @@ zapisz "## Mapa strony"
 MAPA=$(curl -s --max-time 20 https://routemarket.io/sitemap.xml)
 ILE_URL=$(echo "$MAPA" | grep -c '<url>')
 if [ "$ILE_URL" -lt 5 ]; then
-  problem "Mapa strony ma tylko $ILE_URL adresów — sprawdź, czy się generuje"
+  problem "Mapa strony ma tylko $ILE_URL adresów — sprawdź, czy się generuje" "seo:mapa-pusta" "pilne" "Sprawdzić endpoint /sitemap.xml w API."
 else
   # Próbka, nie całość: 420 zapytań co noc to niepotrzebne obciążenie własnego
   # serwera. Pięć losowych wystarczy, żeby wychwycić awarię całej kategorii.
@@ -152,7 +176,7 @@ fi
 BEZ_RLS=$(psql -c "
   select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
   where n.nspname='public' and c.relkind='r' and not c.relrowsecurity;")
-[ "$BEZ_RLS" != "0" ] && problem "Tabel bez włączonego RLS: $BEZ_RLS"
+[ "$BEZ_RLS" != "0" ] && problem "Tabel bez włączonego RLS: $BEZ_RLS" "bezpieczenstwo:brak-rls" "pilne" "Włączyć RLS i dodać polityki — tabela bez RLS jest otwarta dla wszystkich ról."
 zapisz ""
 
 # ----------------------------------------------------------- 6. katalog ---
@@ -165,21 +189,21 @@ STAN=$(psql -F'|' -c "
   from public.place_catalog;")
 IFS='|' read -r WSZ BEZ_OPISU BEZ_FOTO BEZ_XY <<< "$STAN"
 zapisz "Miejsc: $WSZ · bez opisu: $BEZ_OPISU · bez zdjęcia: $BEZ_FOTO · bez współrzędnych: $BEZ_XY"
-[ "${BEZ_OPISU:-0}" -gt 20 ] && problem "$BEZ_OPISU miejsc bez opisu — strony w mapie bez treści"
-[ "${BEZ_XY:-0}" -gt 0 ] && problem "$BEZ_XY miejsc bez współrzędnych — nie da się ich zaplanować"
+[ "${BEZ_OPISU:-0}" -gt 20 ] && problem "$BEZ_OPISU miejsc bez opisu — strony w mapie bez treści" "katalog:bez-opisu" "wazne" "Dogenerować opisy przez /catalog/enrich, potem przetłumaczyć."
+[ "${BEZ_XY:-0}" -gt 0 ] && problem "$BEZ_XY miejsc bez współrzędnych — nie da się ich zaplanować" "katalog:bez-wspolrzednych" "wazne" "Uzupełnić przez geokodowanie albo usunąć z katalogu."
 zapisz ""
 
 # ------------------------------------------------------ 7. kopia zapasowa ---
 zapisz "## Kopia zapasowa"
 OSTATNIA=$(ls -t /root/backups/routemarket/db-*.sql.gz 2>/dev/null | head -1)
 if [ -z "$OSTATNIA" ]; then
-  problem "Brak jakiejkolwiek kopii bazy"
+  problem "Brak jakiejkolwiek kopii bazy" "infra:brak-kopii" "pilne" "Sprawdzić cron i skrypt /root/routemarket_backup.sh."
 else
   WIEK_H=$(( ( $(date +%s) - $(stat -c %Y "$OSTATNIA") ) / 3600 ))
   ROZMIAR=$(stat -c %s "$OSTATNIA")
   zapisz "Ostatnia: $(basename "$OSTATNIA"), sprzed ${WIEK_H} h, $(( ROZMIAR / 1024 / 1024 )) MB"
-  [ "$WIEK_H" -gt 30 ] && problem "Kopia bazy sprzed ${WIEK_H} h — cron mógł przestać działać"
-  [ "$ROZMIAR" -lt 1000000 ] && problem "Kopia bazy ma tylko $ROZMIAR B — podejrzanie mało"
+  [ "$WIEK_H" -gt 30 ] && problem "Kopia bazy sprzed ${WIEK_H} h — cron mógł przestać działać" "infra:kopia-stara" "pilne" "Sprawdzić log: /root/backups/routemarket/backup.log"
+  [ "$ROZMIAR" -lt 1000000 ] && problem "Kopia bazy ma tylko $ROZMIAR B — podejrzanie mało" "infra:kopia-mala" "pilne" "Sprawdzić, czy pg_dump nie kończy się po cichu błędem."
 fi
 zapisz ""
 
