@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { opisMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 
 interface CatalogPlace {
   id: string;
@@ -705,7 +706,7 @@ export default function Discover() {
                   <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block w-full text-left">
                     <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
                       {p.photos?.[0] && (
-                        <img src={p.photos[0]} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                        <img src={miniatura(p.photos[0], SZEROKOSC.kafelek)} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
                       )}
                       {pokazMape && (
                         <span className="absolute left-2.5 top-2.5 w-6 h-6 rounded-full bg-foreground text-background

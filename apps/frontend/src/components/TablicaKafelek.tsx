@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 
 interface TablicaKafelekProps {
   nazwa: string;
@@ -61,7 +62,7 @@ export default function TablicaKafelek({
       <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-[132px]">
         {pola.map((zdj, i) => (
           <div key={i} className={`overflow-hidden ${i === 0 ? 'row-span-2' : ''} ${zdj ? 'bg-muted' : tint(nazwa, i)}`}>
-            {zdj && <img src={zdj} alt="" loading="lazy" className="w-full h-full object-cover" />}
+            {zdj && <img src={miniatura(zdj, SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
           </div>
         ))}
       </div>

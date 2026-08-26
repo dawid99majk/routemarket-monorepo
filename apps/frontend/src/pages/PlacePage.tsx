@@ -9,6 +9,7 @@ import PlannerHeader from '@/components/PlannerHeader';
 import { opisMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -255,7 +256,7 @@ export default function PlacePage() {
             {photos.length > 0 && (
               <>
                 <div className="rounded-md overflow-hidden bg-muted h-[380px]">
-                  <img src={photos[Math.min(photoIdx, photos.length - 1)]} alt={place.name}
+                  <img src={miniatura(photos[Math.min(photoIdx, photos.length - 1)], SZEROKOSC.karta)} alt={place.name}
                     className="w-full h-full object-cover"
                     onError={(e) => setBroken((p) => new Set(p).add((e.target as HTMLImageElement).src))} />
                 </div>
@@ -266,7 +267,7 @@ export default function PlacePage() {
                         className={`h-24 rounded-md overflow-hidden bg-muted border transition-colors ${
                           i === Math.min(photoIdx, photos.length - 1) ? 'border-foreground/40' : 'border-border'
                         }`}>
-                        <img src={u} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        <img src={miniatura(u, 120)} alt="" className="w-full h-full object-cover" loading="lazy" />
                       </button>
                     ))}
                   </div>
@@ -327,7 +328,7 @@ export default function PlacePage() {
                     <button key={sp.id} onClick={() => navigate(`/miejsce/${sp.slug}`)}
                       className="text-left rounded-md overflow-hidden border border-border bg-card hover:shadow-token-md transition-shadow">
                       <div className="h-24 bg-muted">
-                        {sp.photos?.[0] && <img src={sp.photos[0]} alt={sp.name} loading="lazy" className="w-full h-full object-cover" />}
+                        {sp.photos?.[0] && <img src={miniatura(sp.photos[0], SZEROKOSC.kafelek)} alt={sp.name} loading="lazy" className="w-full h-full object-cover" />}
                       </div>
                       <div className="p-2.5">
                         <div className="text-[13px] font-medium leading-snug line-clamp-2">{sp.name}</div>
@@ -431,7 +432,7 @@ export default function PlacePage() {
                     <button key={n.id} onClick={() => navigate(`/miejsce/${n.slug}`)}
                       className="w-full flex items-center gap-3 text-left group">
                       <div className="w-11 h-11 rounded-sm overflow-hidden bg-muted shrink-0">
-                        {n.photos?.[0] && <img src={n.photos[0]} alt="" className="w-full h-full object-cover" loading="lazy" />}
+                        {n.photos?.[0] && <img src={miniatura(n.photos[0], SZEROKOSC.kafelek)} alt="" className="w-full h-full object-cover" loading="lazy" />}
                       </div>
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium truncate group-hover:text-primary transition-colors">{n.name}</div>
