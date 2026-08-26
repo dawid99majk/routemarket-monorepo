@@ -70,9 +70,13 @@ def main():
     tok = token()
 
     if '--tlumacz' in sys.argv:
-        print('Tłumaczenia na: %s' % ', '.join(JEZYKI))
+        # Można podać języki po fladze: ./opisy.py --tlumacz fr de
+        # Przydaje się, gdy jeden język zostaje w tyle — francuski pominął
+        # siedemnaście pozycji przy przebiegu na pięć języków naraz.
+        wybrane = [a for a in sys.argv[1:] if not a.startswith('--')] or JEZYKI
+        print('Tłumaczenia na: %s' % ', '.join(wybrane))
         odp, blad = wolaj('/catalog/translate-descriptions',
-                          {'languages': JEZYKI, 'limit': 2000}, tok, timeout=3600)
+                          {'languages': wybrane, 'limit': 2000}, tok, timeout=3600)
         print('  BŁĄD %s' % blad if blad else '  %s' % json.dumps(odp, ensure_ascii=False)[:300])
         return
 
