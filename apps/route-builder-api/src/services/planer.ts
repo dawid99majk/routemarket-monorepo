@@ -240,6 +240,9 @@ export interface KontekstPlanu {
   /** Surowe kandydaty, nie gotowy tekst: każdy dzień dostaje własny wycinek. */
   zabytki: PoiCandidate[];
   lokale: PoiCandidate[];
+  /** Wycinki ROZŁĄCZNE — dzień N nie zobaczy niczego, co dostał dzień M. */
+  zabytkiDnia: PoiCandidate[][];
+  lokaleDnia: PoiCandidate[][];
   /** Pula ze współrzędnymi do rozwiązywania pozycji planu. */
   pulaWspolrzednych: { name: string; lat: any; lng: any }[];
   center: { lat: number; lng: number } | null;
@@ -408,6 +411,8 @@ export async function przygotujKontekst(
     prefLines: prefOpisy.map((o) => `- ${o}`).join('\n'),
     zabytki: fillerSights,
     lokale: fillerFood,
+    zabytkiDnia: rozdzielPoi(fillerSights, grupy, 14),
+    lokaleDnia: rozdzielPoi(fillerFood, grupy, 6),
     pulaWspolrzednych,
     center,
   };
@@ -477,6 +482,95 @@ function wOkolicy(kandydaci: PoiCandidate[], kotwice: MiejsceWejscie[], ile: num
     .slice(0, ile);
 }
 
+function srodekKotwic(kotwice: MiejsceWejscie[]): { lat: number; lng: number } | null {
+  const zPunktem = kotwice.filter((p) => p.lat != null && p.lng != null);
+  if (!zPunktem.length) return null;
+  return {
+    lat: zPunktem.reduce((s, p) => s + (p.lat as number), 0) / zPunktem.length,
+    lng: zPunktem.reduce((s, p) => s + (p.lng as number), 0) / zPunktem.length,
+  };
+}
+
+function kmOd(srodek: { lat: number; lng: number }, a: { lat: any; lng: any }): number {
+  const dLat = (a.lat - srodek.lat) * 111;
+  const dLng = (a.lng - srodek.lng) * 111 * Math.cos((srodek.lat * Math.PI) / 180);
+  return Math.sqrt(dLat * dLat + dLng * dLng);
+}
+
+/**
+ * Rozdziela pulę propozycji na dni ROZŁĄCZNIE.
+ *
+ * Dni układają się równolegle i żaden nie wie, co wybrał drugi — na tym polega
+ * przyspieszenie z 79 do 5,5 sekundy. Dopóki każdy dzień dostawał najbliższe
+ * kandydatury liczone od własnego środka ciężkości, listy potrafiły być
+ * identyczne: w tablicy przykładowej dla Palermo oba dni siedzą w tym samym
+ * centrum, więc oba dostały tę samą trattorię i oba ją wstawiły na obiad.
+ *
+ * Rozwiązaniem NIE jest mówienie dniom o sobie nawzajem — to przywróciłoby
+ * zależność, którą równoległość miała usunąć. Wystarczy podzielić pulę z góry:
+ * kandydat trafia do dnia, którego środek ciężkości ma najbliżej, a dzień widzi
+ * wyłącznie swój przydział. Powtórzenie przestaje być możliwe, zamiast być
+ * odradzane w prompcie.
+ *
+ * Dzień, któremu po podziale zostało za mało, dobiera najbliższe z tego, czego
+ * nikt nie wziął — inaczej dzień w ciasnym sąsiedztwie zostałby bez propozycji.
+ */
+function rozdzielPoi(
+  kandydaci: PoiCandidate[],
+  grupy: MiejsceWejscie[][],
+  ile: number
+): PoiCandidate[][] {
+  const ileDni = Math.max(1, grupy.length);
+  const puste = () => Array.from({ length: ileDni }, () => [] as PoiCandidate[]);
+  if (ileDni === 1) return [wOkolicy(kandydaci, grupy[0] ?? [], ile)];
+
+  const srodki = grupy.map(srodekKotwic);
+  const zPunktem = kandydaci.filter((c) => c.lat != null && c.lng != null);
+
+  // Bez współrzędnych nie ma od czego mierzyć — rozdajemy po kolei, byle rozłącznie.
+  if (!srodki.some((s) => s) || !zPunktem.length) {
+    const wynik = puste();
+    kandydaci.forEach((c, i) => {
+      const d = i % ileDni;
+      if (wynik[d].length < ile) wynik[d].push(c);
+    });
+    return wynik;
+  }
+
+  const kubelki = puste();
+  for (const c of zPunktem) {
+    let naj = -1;
+    let najD = Infinity;
+    srodki.forEach((s, i) => {
+      if (!s) return;
+      const d = kmOd(s, c as any);
+      if (d < najD) { najD = d; naj = i; }
+    });
+    if (naj >= 0) kubelki[naj].push(c);
+  }
+
+  const wynik = puste();
+  const wziete = new Set<PoiCandidate>();
+  kubelki.forEach((kubel, i) => {
+    const s = srodki[i];
+    const posortowane = s
+      ? [...kubel].sort((a, b) => kmOd(s, a as any) - kmOd(s, b as any))
+      : kubel;
+    for (const c of posortowane.slice(0, ile)) { wynik[i].push(c); wziete.add(c); }
+  });
+
+  wynik.forEach((lista, i) => {
+    const s = srodki[i];
+    if (lista.length >= ile || !s) return;
+    const wolne = zPunktem
+      .filter((c) => !wziete.has(c))
+      .sort((a, b) => kmOd(s, a as any) - kmOd(s, b as any));
+    for (const c of wolne.slice(0, ile - lista.length)) { lista.push(c); wziete.add(c); }
+  });
+
+  return wynik;
+}
+
 function promptDnia(k: KontekstPlanu, numer: number): string {
   const z = k.zadanie;
   const info = k.dni[numer - 1];
@@ -495,8 +589,8 @@ function promptDnia(k: KontekstPlanu, numer: number): string {
 
   const opisPoi = (c: any) =>
     `- "${c.name}" (${c.kind}${c.openingHours ? `, godziny: ${c.openingHours}` : ''})`;
-  const zabytkiDnia = wOkolicy(k.zabytki, moje, 14).map(opisPoi).join('\n');
-  const lokaleDnia = wOkolicy(k.lokale, moje, 6).map(opisPoi).join('\n');
+  const zabytkiDnia = (k.zabytkiDnia[numer - 1] ?? []).map(opisPoi).join('\n');
+  const lokaleDnia = (k.lokaleDnia[numer - 1] ?? []).map(opisPoi).join('\n');
 
   const minutyWizyt = moje.reduce((s, p) => s + (p.visit_minutes || 60), 0);
   const budzetDnia = Math.round(k.minutNaDzien * k.fillPercent / 100);
@@ -665,6 +759,7 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
     warnings: Array.isArray(surowy.warnings) ? surowy.warnings : [],
   };
 
+  uzupelnijBraki(k, dzien);
   uzupelnijWspolrzedne(k, dzien);
   // Kolejność ma znaczenie: strażnik dokłada wpisy do not_scheduled, więc musi
   // zadziałać przed filtrem, który zostawia tam wyłącznie kotwice tego dnia.
@@ -701,6 +796,59 @@ const TRANSITION = /^(przejscie|przejazd|spacer|powrot|wyjazd|zejscie|wejscie|do
  * zbiory słów znaczących, ważone rzadkością: "muzeum" powtarza się w całej puli,
  * "amfiteatr" występuje raz, więc to drugie znaczy dużo więcej.
  */
+/**
+ * Dopełnia pola, których model nie musiał podać.
+ *
+ * Schemat wymaga tylko `time` i `name` — reszta jest opcjonalna, więc pozycja
+ * potrafi przyjść bez czasu trwania i rodzaju. W tablicy przykładowej dla
+ * Palermo wyszła tak „Galleria d'arte moderna": sama nazwa i godzina, w planie
+ * dnia widoczna jako punkt bez czasu.
+ *
+ * Zaostrzenie schematu nie byłoby lepsze: wymuszony `minutes` to liczba
+ * zgadnięta przez model pod przymusem, a nie wiedza. Czas trwania odczytujemy
+ * z tego, co model NAPRAWDĘ powiedział — z godziny kolejnej pozycji. Skoro
+ * następny punkt zaczyna się o 17:10, to na ten została godzina, niezależnie od
+ * tego, czy model wpisał to w osobne pole.
+ *
+ * Odstęp bije wartość z katalogu celowo, choć katalog jest dokładniejszy co do
+ * samego zwiedzania: wpisanie tam 90 minut tam, gdzie plan zostawił 60, kazałoby
+ * pozycji nachodzić na następną. Spójność osi czasu jest ważniejsza niż nominalna
+ * długość wizyty — z katalogu korzystamy dopiero dla ostatniej pozycji dnia,
+ * po której nie ma czego zmierzyć.
+ */
+function uzupelnijBraki(k: KontekstPlanu, dzien: DzienPlanu): void {
+  const wKatalogu = new Map<string, { minuty?: number; rodzaj?: string }>();
+  for (const p of k.zadanie.places) {
+    wKatalogu.set(p.name.trim().toLowerCase(),
+      { minuty: p.visit_minutes ?? undefined, rodzaj: p.category ?? undefined });
+  }
+  for (const c of [...k.zabytki, ...k.lokale]) {
+    const klucz = String(c.name || '').trim().toLowerCase();
+    if (klucz && !wKatalogu.has(klucz)) wKatalogu.set(klucz, { rodzaj: (c as any).kind });
+  }
+
+  dzien.items.forEach((item, i) => {
+    item.name = String(item.name || '').trim();
+    const znane = wKatalogu.get(item.name.toLowerCase());
+
+    if (item.source !== 'pinned' && item.source !== 'suggested') {
+      item.source = k.zadanie.places.some(
+        (p) => p.name.trim().toLowerCase() === item.name.toLowerCase()) ? 'pinned' : 'suggested';
+    }
+    if (!item.kind) item.kind = znane?.rodzaj || 'attraction';
+
+    if (typeof item.minutes !== 'number' || item.minutes <= 0) {
+      const nastepna = dzien.items[i + 1];
+      const od = czasNaMinuty(item.time);
+      const doNast = nastepna ? czasNaMinuty(nastepna.time) : NaN;
+      const zOdstepu = Number.isFinite(od) && Number.isFinite(doNast) ? doNast - od : NaN;
+      item.minutes = zOdstepu > 0 && zOdstepu <= 240
+        ? zOdstepu
+        : (znane?.minuty && znane.minuty > 0 ? znane.minuty : 45);
+    }
+  });
+}
+
 export function uzupelnijWspolrzedne(k: KontekstPlanu, dzien: DzienPlanu): void {
   const pula = k.pulaWspolrzednych.map((x) => ({ ...x, tokens: nameTokens(x.name) }));
   if (!pula.length) return;

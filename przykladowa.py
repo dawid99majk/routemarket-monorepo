@@ -128,21 +128,37 @@ def main():
     for m in kotwice:
         print('   • %-44s %-12s ważność %s' % (m['name'][:44], m['kind'] or '', m['waznosc'] or 0))
 
+    # Przebudowa NADPISUJE TABLICĘ W MIEJSCU. Wcześniej kasowała ją i tworzyła od
+    # nowa, więc każda przebudowa dawała nowy identyfikator i unieważniała link —
+    # a tablica przykładowa istnieje właśnie po to, żeby ją linkować i indeksować.
+    # `published_at` zostaje z pierwszej publikacji: to data udostępnienia, nie
+    # data ostatniej przebudowy.
     istnieje = psql("select id from public.trip_projects where name = %s" % ap(nazwa))
     if istnieje:
-        print('Zastępuję istniejącą tablicę %s.' % istnieje[0]['id'])
-        psql("delete from public.trip_projects where name = %s" % ap(nazwa), json_out=False)
-
-    surowe = psql("""
-        with w as (
-          insert into public.trip_projects
-            (user_id, name, destination, days, hours_per_day, fill_percent,
-             is_public, is_example, published_at, notes)
-          values (%s, %s, %s, %d, 9, 70, true, true, now(), '')
-          returning id
-        ) select coalesce(json_agg(w), '[]'::json) from w;
-    """ % (ap(WLASCICIEL), ap(nazwa), ap(miasto), dni), json_out=False)
-    tid = json.loads(surowe)[0]['id']
+        tid = istnieje[0]['id']
+        print('Nadpisuję istniejącą tablicę %s — adres bez zmian.' % tid)
+        psql("""
+            update public.trip_projects
+               set destination = %s, days = %d, hours_per_day = 9, fill_percent = 70,
+                   is_public = true, is_example = true, updated_at = now()
+             where id = %s
+        """ % (ap(miasto), dni, ap(tid)), json_out=False)
+        # Kasujemy wyłącznie zawartość tej jednej tablicy: stare miejsca i stare
+        # plany, bo za chwilę wstawiamy komplet od nowa.
+        psql("delete from public.trip_project_places where project_id = %s" % ap(tid),
+             json_out=False)
+        psql("delete from public.trip_plans where project_id = %s" % ap(tid), json_out=False)
+    else:
+        surowe = psql("""
+            with w as (
+              insert into public.trip_projects
+                (user_id, name, destination, days, hours_per_day, fill_percent,
+                 is_public, is_example, published_at, notes)
+              values (%s, %s, %s, %d, 9, 70, true, true, now(), '')
+              returning id
+            ) select coalesce(json_agg(w), '[]'::json) from w;
+        """ % (ap(WLASCICIEL), ap(nazwa), ap(miasto), dni), json_out=False)
+        tid = json.loads(surowe)[0]['id']
 
     wiersze = []
     for i, m in enumerate(kotwice + moze):
