@@ -283,6 +283,66 @@ export type Database = {
         }
         Relationships: []
       }
+      kolejka_zatwierdzen: {
+        Row: {
+          agent: string
+          dowod: Json
+          id: number
+          obszar: string
+          odcisk: string
+          opis: string
+          ostatnio_widziane: string
+          polecenie: string | null
+          powtorzen: number
+          proponowane_dzialanie: string
+          rozstrzygnieto: string | null
+          stan: string
+          tytul: string
+          utworzono: string
+          uwaga: string | null
+          waga: string
+          wynik: string | null
+        }
+        Insert: {
+          agent: string
+          dowod?: Json
+          id?: number
+          obszar: string
+          odcisk: string
+          opis?: string
+          ostatnio_widziane?: string
+          polecenie?: string | null
+          powtorzen?: number
+          proponowane_dzialanie?: string
+          rozstrzygnieto?: string | null
+          stan?: string
+          tytul: string
+          utworzono?: string
+          uwaga?: string | null
+          waga?: string
+          wynik?: string | null
+        }
+        Update: {
+          agent?: string
+          dowod?: Json
+          id?: number
+          obszar?: string
+          odcisk?: string
+          opis?: string
+          ostatnio_widziane?: string
+          polecenie?: string | null
+          powtorzen?: number
+          proponowane_dzialanie?: string
+          rozstrzygnieto?: string | null
+          stan?: string
+          tytul?: string
+          utworzono?: string
+          uwaga?: string | null
+          waga?: string
+          wynik?: string | null
+        }
+        Relationships: []
+      }
       legal_documents: {
         Row: {
           content_hash: string
@@ -338,6 +398,8 @@ export type Database = {
           updated_at: string
           vibe_tags: string[]
           visit_minutes: number | null
+          waznosc: number | null
+          waznosc_zrodlo: string | null
           website: string | null
           wiki_extract: string | null
         }
@@ -365,6 +427,8 @@ export type Database = {
           updated_at?: string
           vibe_tags?: string[]
           visit_minutes?: number | null
+          waznosc?: number | null
+          waznosc_zrodlo?: string | null
           website?: string | null
           wiki_extract?: string | null
         }
@@ -392,6 +456,8 @@ export type Database = {
           updated_at?: string
           vibe_tags?: string[]
           visit_minutes?: number | null
+          waznosc?: number | null
+          waznosc_zrodlo?: string | null
           website?: string | null
           wiki_extract?: string | null
         }

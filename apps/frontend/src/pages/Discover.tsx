@@ -185,10 +185,15 @@ export default function Discover() {
     // Jawna lista kolumn: karta feedu nie potrzebuje wiki_extract (bywa dłuższy
     // niż cała reszta wiersza razem wzięta) ani pól redakcyjnych.
     let q = supabase.from('place_catalog')
-      .select('id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, opening_hours, visit_minutes, vibe_tags, pin_count, created_at')
+      .select('id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, opening_hours, visit_minutes, vibe_tags, pin_count, waznosc, created_at')
       .limit(200);
     if (c) q = q.ilike('city', `%${c}%`);
-    const { data } = await q.order('pin_count', { ascending: false }).order('created_at', { ascending: false });
+    // Ważność przed przypięciami: przy braku użytkowników pin_count jest zerem
+    // dla wszystkiego, więc sam z siebie niczego nie porządkuje.
+    const { data } = await q
+      .order('waznosc', { ascending: false, nullsFirst: false })
+      .order('pin_count', { ascending: false })
+      .order('created_at', { ascending: false });
     // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
     // pustej listy po wyszukaniu: wpisanie "nowy york" wysyłało dziewięć zapytań,
     // po jednym na znak, a wracały w dowolnej kolejności. Wynik dla "nowy yor"

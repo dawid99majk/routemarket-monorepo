@@ -140,6 +140,7 @@ export class RouteBuilderRepository {
       .from('place_catalog')
       .select('id, slug, name, city, country, lat, lng, category, kind, photos, visit_minutes, opening_hours, website, description')
       .ilike('name', `%${query}%`)
+      .order('waznosc', { ascending: false, nullsFirst: false })
       .order('pin_count', { ascending: false })
       .limit(limit);
     if (city) q = q.ilike('city', `%${city}%`);
@@ -198,6 +199,7 @@ export class RouteBuilderRepository {
     const { data } = await supabase
       .from('place_catalog').select('*')
       .ilike('city', city)
+      .order('waznosc', { ascending: false, nullsFirst: false })
       .order('pin_count', { ascending: false })
       .limit(limit);
     return data ?? [];

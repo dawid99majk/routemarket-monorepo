@@ -257,7 +257,9 @@ export default function Start() {
     const t = setTimeout(async () => {
       const { data } = await supabase.from('place_catalog')
         .select('id, slug, name, city, kind, category, photos, visit_minutes')
-        .ilike('city', `%${c}%`).order('pin_count', { ascending: false }).limit(8);
+        .ilike('city', `%${c}%`)
+        .order('waznosc', { ascending: false, nullsFirst: false })
+        .order('pin_count', { ascending: false }).limit(8);
       setPodglad(data ?? []);
       setSprawdzone(c);
     }, 400);
@@ -271,7 +273,9 @@ export default function Start() {
       const d = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 12 }, { timeoutMs: 180_000 });
       const { data } = await supabase.from('place_catalog')
         .select('id, slug, name, city, kind, category, photos, visit_minutes')
-        .ilike('city', `%${d.city || city.trim()}%`).order('pin_count', { ascending: false }).limit(8);
+        .ilike('city', `%${d.city || city.trim()}%`)
+        .order('waznosc', { ascending: false, nullsFirst: false })
+        .order('pin_count', { ascending: false }).limit(8);
       setPodglad(data ?? []);
       toast.success(`Zebrałem ${d.added} miejsc w: ${d.city}`);
     } catch (e: any) {
