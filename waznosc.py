@@ -20,32 +20,22 @@ powiązanie twarde: obiekt wskazuje swój artykuł sam, bez dopasowywania nazw.
 Liczymy sitelinki Wikidanych, pomijając projekty siostrzane (Commons, Wikicytaty
 i resztę), bo to nie są wersje językowe Wikipedii.
 
-ŹRÓDŁO ZAPASOWE — wyszukiwanie po nazwie, dla miejsc bez tagu. Tu potrzebni są
-strażnicy, bo wyszukiwarka zawsze coś zwróci, a przypisanie kapliczce ważności
-katedry wypycha prawdziwe atrakcje z pierwszych miejsc:
+BEZ ŹRÓDŁA ZAPASOWEGO. Wcześniej miejsca bez tagu dostawały ważność
+z wyszukiwania po nazwie w Wikipedii. Ścieżka dała dziewięć wartości w całym
+katalogu i co najmniej dwie były błędne — a błędy lądowały na SZCZYCIE rankingu
+miasta, więc były najbardziej widoczne z możliwych:
 
-  1. wspólne znaczące słowo — odsiewa trafienia zupełnie od czapy;
-  2. artykuł musi mieć punkt na mapie i leżeć w promieniu 350 m. Punkt bierzemy
-     z Wikidanych, nie z samej Wikipedii, bo małe edycje nie wstawiają szablonu
-     współrzędnych — amfiteatr w Durrës (31 wersji językowych) dostawał zero
-     tylko dlatego, że albańska Wikipedia go nie geokoduje.
+  - „Time Travel Vienna" wzięło 241 wersji językowych artykułu o Wiedniu
+    i stanęło nad katedrą św. Szczepana;
+  - bar „Amfiteatri" w Durrës wziął 31 wersji rzymskiego amfiteatru.
 
-Skąd akurat 350 m: zmierzyłem odległość między punktem z katalogu a punktem
-artykułu dla trafień, o których wiedziałem, że są dobre i że są złe. Dobre
-mieszczą się w 9-146 m, złe zaczynają się od 553 m („Théâtre de la Tour Eiffel"
-brał 175 języków wieży, „Il Genio di Palermo" 151 języków miasta, „Musée de la
-Banque nationale" 30 języków banku — wszystkie trzy leżą obok swojego
-sławniejszego imiennika). Próg leży pośrodku tej przerwy.
+Bar stoi 53 metry od amfiteatru i nosi jego nazwę, więc ŻADEN próg odległości
+tego nie rozdzieli — a właśnie odległość rozdzielała wcześniejsze pomyłki.
+Powtórzenie zapytania o „Time Travel Vienna" nie zwróciło już nic, czyli wynik
+bywa też niepowtarzalny.
 
-Odrzuciłem po drodze regułę „pierwsze słowo nazwy musi być w tytule". Wyglądała
-sensownie i przechodziła testy, ale sprawdzenie na całym katalogu pokazało, że
-siedem z dziewięciu odrzuceń było poprawnymi trafieniami: Wikipedia nazywa te
-obiekty inaczej niż OSM — „La Monnaie" zamiast „Théatre Royal de la Monnaie",
-„Bazylika" zamiast „Kościół", „Chiesa della Martorana" zamiast „Santa Maria
-dell'Ammiraglio". Geometria rozdziela to, czego nazwa nie rozdziela.
-
-W `waznosc_zrodlo` zostaje ślad, skąd wzięta jest liczba — żeby dało się
-odróżnić powiązanie twarde od zgadywanego.
+Miejsce bez tagu w OSM dostaje zero: „brak dowodu na rozpoznawalność" jest
+uczciwszy niż domysł, który raz na pięć razy stawia bar nad katedrą.
 """
 import json
 import re
@@ -55,13 +45,17 @@ import time
 import urllib.parse
 import urllib.request
 
-JEZYK_KRAJU = {
-    'PL': 'pl', 'PT': 'pt', 'IT': 'it', 'FR': 'fr', 'ES': 'es', 'DE': 'de',
-    'AT': 'de', 'BE': 'fr', 'NL': 'nl', 'LV': 'lv', 'EE': 'et', 'RO': 'ro',
-    'AL': 'sq', 'US': 'en', 'GB': 'en',
-}
 NAGLOWKI = {'User-Agent': 'RouteMarket/1.0 (+https://routemarket.io)'}
-ILE_KANDYDATOW = 6
+# Ta sama lista, z ktorej korzysta warstwa POI aplikacji (services/poi.ts).
+# Glowny serwer Overpassa odcina adresy, ktore zadaja za duzo — a po dolozeniu
+# szesnastu miast do katalogu VPS dostal odmowe polaczenia po IPv4 i po IPv6
+# naraz, przy poprawnym DNS. Skrypt z jednym adresem na sztywno stawal wtedy
+# calkiem, choc lustro odpowiadalo normalnie.
+LUSTRA_OVERPASS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+]
 # Surowość progu idzie za tym, ile ufamy źródłu. Trafienie z wyszukiwania to
 # domysł — musi stać dokładnie tam, gdzie miejsce. Identyfikator wpisany przez
 # mapowicza to stwierdzenie — wystarczy sprawdzić, że artykuł opisuje w ogóle
@@ -119,20 +113,22 @@ def tagi_z_osm(osm_idy):
     # próby — wynik wyglądał wiarygodnie i tylko kolumna ze źródłem to zdradziła.
     # Lepiej stanąć i powtórzyć później, niż podmienić powiązania na domysły.
     ostatni = None
-    for proba in range(3):
-        try:
-            return {'%s/%s' % (e['type'], e['id']): {
-                        'wikidata': (e.get('tags') or {}).get('wikidata'),
-                        'wikipedia': (e.get('tags') or {}).get('wikipedia')}
-                    for e in pobierz('https://overpass-api.de/api/interpreter',
-                                     urllib.parse.urlencode({'data': q}).encode()
-                                     ).get('elements', [])
-                    if (e.get('tags') or {}).get('wikidata') or (e.get('tags') or {}).get('wikipedia')}
-        except Exception as e:
-            ostatni = e
-            print('  Overpass nie odpowiedział (próba %d z 3): %s' % (proba + 1, e), file=sys.stderr)
-            time.sleep(15 * (proba + 1))
-    raise RuntimeError('Overpass nie odpowiedział po trzech próbach: %s' % ostatni)
+    for runda in range(2):
+        for adres in LUSTRA_OVERPASS:
+            try:
+                return {'%s/%s' % (e['type'], e['id']): {
+                            'wikidata': (e.get('tags') or {}).get('wikidata'),
+                            'wikipedia': (e.get('tags') or {}).get('wikipedia')}
+                        for e in pobierz(adres,
+                                         urllib.parse.urlencode({'data': q}).encode()
+                                         ).get('elements', [])
+                        if (e.get('tags') or {}).get('wikidata') or (e.get('tags') or {}).get('wikipedia')}
+            except Exception as e:
+                ostatni = e
+                print('  %s nie odpowiedział: %s' % (adres.split('/')[2], e), file=sys.stderr)
+        if runda == 0:
+            time.sleep(30)
+    raise RuntimeError('Żadne lustro Overpassa nie odpowiedziało: %s' % ostatni)
 
 
 
@@ -228,16 +224,8 @@ def glowna_nazwa(nazwa):
     return (nazwa or '').split(' - ')[0].strip() or (nazwa or '')
 
 
-def kandydaci(nazwa, jezyk):
-    u = ('https://%s.wikipedia.org/w/api.php?' % jezyk) + urllib.parse.urlencode({
-        'action': 'query', 'list': 'search', 'srsearch': nazwa,
-        'srlimit': str(ILE_KANDYDATOW), 'format': 'json'})
-    return [h['title'] for h in pobierz(u).get('query', {}).get('search', [])]
 
 
-def ma_wspolne_slowo(nazwa, tytul):
-    sn, st = slowa(nazwa), slowa(tytul)
-    return bool(st) if not sn else bool(set(sn) & set(st))
 
 
 def wspolrzedne_z_wikidanych(qid):
@@ -283,22 +271,6 @@ def ile_jezykow_dla(tytul, jezyk, lat, lng, promien=None, wymagaj_punktu=True):
     return None
 
 
-def ile_jezykow(nazwa, jezyk, lat=None, lng=None):
-    glowna = glowna_nazwa(nazwa)
-    try:
-        lista = kandydaci(glowna, jezyk)
-    except Exception:
-        return None
-    for tytul in lista:
-        if not ma_wspolne_slowo(glowna, tytul):
-            continue
-        try:
-            ile = ile_jezykow_dla(tytul, jezyk, lat, lng)
-        except Exception:
-            continue
-        if ile is not None:
-            return ile
-    return None
 
 
 # --- przebieg ---------------------------------------------------------------
@@ -348,7 +320,7 @@ def main():
           % (len(liczby), len(qidy), len(punkty)))
 
     # 3. Zapis; czego OSM nie wskazał, szukamy po nazwie.
-    z_powiazania = z_nazwy = bez = 0
+    z_powiazania = bez = 0
     for i, m in enumerate(miejsca, 1):
         tag = z_osm.get(m.get('osm_id') or '')
         ile, zrodlo = None, None
@@ -391,16 +363,9 @@ def main():
         # wersji. Wtedy szukamy dalej — strażnik 350 m i tak nie przepuści
         # niczego, co nie stoi w tym samym miejscu.
         if ile is None:
-            jezyk = JEZYK_KRAJU.get((m['country'] or '').upper(), 'en')
-            ile = ile_jezykow(m['name'], jezyk, m['lat'], m['lng'])
-            if ile is None and jezyk != 'en':
-                ile = ile_jezykow(m['name'], 'en', m['lat'], m['lng'])
-            zrodlo = 'szukanie' if ile is not None else 'brak'
-            time.sleep(0.15)
+            zrodlo = 'brak'
         if zrodlo in ('osm-wikidata', 'osm-wikipedia'):
             z_powiazania += 1
-        elif zrodlo == 'szukanie':
-            z_nazwy += 1
         else:
             bez += 1
         zapisz(m['id'], ile if ile is not None else 0, zrodlo or 'brak')
@@ -409,7 +374,6 @@ def main():
 
     print()
     print('Z powiązania OSM: %d' % z_powiazania)
-    print('Z wyszukiwania:   %d' % z_nazwy)
     print('Bez artykułu:     %d' % bez)
     print()
     for w in psql("""
