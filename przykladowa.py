@@ -15,7 +15,7 @@ więc branie samej góry listy dałoby dzień, w którym turysta ogląda siedem
 świątyń pod rząd. Stąd limit na rodzaj obiektu wśród kotwic: reszta trafia do
 „być może", gdzie nie zaszkodzi, a może się przydać.
 """
-import base64, hmac, hashlib, json, subprocess, sys, time, urllib.request, urllib.error
+import base64, hmac, hashlib, json, math, subprocess, sys, time, urllib.request, urllib.error
 
 WLASCICIEL = '6f7e22c4-e159-4b68-8e29-9f41b36c0a2a'   # właściciel tablicy: konto administratora
 PLACI = '9e2a4ed3-726d-4369-8057-3cda9fa5e10a'        # konto z tokenami na wywołanie planera
@@ -38,19 +38,27 @@ UDZIAL_JEDNEGO_RODZAJU = 0.5
 # dostał przez to osiem kotwic na 780 minut przy dwóch dniach po 540: sama
 # Albertina 150 i Hofburg 180 zjadały dwie trzecie pierwszego dnia. Planer nie
 # miał jak tego zmieścić i wyrzucił CZTERY kotwice, w tym Staatsoper.
-UDZIAL_KOTWIC_W_DNIU = 0.55
 MINUT_W_DNIU = 9 * 60
-# Do budżetu liczymy czas PRZYCIĘTY, nie pełny z katalogu.
+# Ile dnia zostaje na zwiedzanie i dojścia razem. Reszta to posiłki i zapas.
+UDZIAL_ZWIEDZANIA = 0.8
+# Minut na kilometr pieszo — tyle samo, ile przyjmuje prompt planera.
+MINUT_NA_KM = 12
+# Do budżetu liczymy czas PRAWDZIWY z katalogu.
 #
-# Pierwsza wersja budżetu liczyła pełne `visit_minutes` — i wypchnęła z kotwic
-# Wiednia Staatsoper (52 języki) oraz Albertinę (46), wpuszczając w zamian
-# Prinz-Eugen-Denkmal z ważnością 1. Premiowała krótkość zamiast rozpoznawalności,
-# bo pomnik zajmuje kwadrans, a muzeum trzy godziny.
+# Stał tu przez chwilę sufit 90 minut, z rozumowania, że prompt planera ma regułę
+# „krótsza wizyta zamiast rezygnacji", więc długie wizyty i tak się skrócą.
+# POMIAR MÓWI CO INNEGO: w planie Wiednia Hofburg dostał pełne 180 minut,
+# a Albertina 150 — dokładnie tyle, ile mówi katalog. Planer skraca wizytę
+# dopiero pod ścianą godzin otwarcia, nie z własnej woli.
 #
-# Tablica przykładowa na dwa dni nie jest zwiedzaniem Hofburga w komplecie —
-# to przegląd tego, po co ludzie przyjeżdżają. Prompt planera i tak ma regułę
-# „krótsza wizyta zamiast rezygnacji", więc czas dopasuje się na miejscu.
-SUFIT_KOTWICY_MIN = 90
+# Skutek sufitu widać było na Paryżu: budżet naliczył 545 minut, gdy kotwice
+# zajmowały naprawdę 785, więc planer dostał osiem kotwic na dwa dni i zmieścił
+# PIĘĆ. Przy siedmiu i pół kilometra między Łukiem Triumfalnym a Père-Lachaise
+# nie miał z czego wykroić przejść.
+#
+# Sufit wprowadziłem, bo budżet premiował miejsca krótkie i nieznane. Ten sam
+# problem naprawiło jednak usunięcie sufitu z WAŻNOŚCI: kolejność jest teraz
+# prowadzona rozpoznawalnością, a budżet tylko ucina ogon listy.
 
 
 def psql(zapytanie, json_out=True):
@@ -68,6 +76,26 @@ def psql(zapytanie, json_out=True):
 
 def ap(s):
     return "'" + str(s).replace("'", "''") + "'"
+
+
+def dlugosc_trasy_km(miejsca):
+    """Zgrubna długość obchodu: łańcuch najbliższych sąsiadów.
+
+    Nie liczymy trasy optymalnej — chodzi o rząd wielkości, a ten wystarcza,
+    żeby odróżnić miasto zwarte od rozciągniętego.
+    """
+    pkt = [(m['lat'], m['lng']) for m in miejsca if m.get('lat') is not None]
+    if len(pkt) < 2:
+        return 0.0
+    km = lambda a, b: math.hypot((b[0] - a[0]) * 111.32,
+                                 (b[1] - a[1]) * 111.32 * math.cos(math.radians(a[0])))
+    zostalo, biezacy, suma = pkt[1:], pkt[0], 0.0
+    while zostalo:
+        nast = min(zostalo, key=lambda p: km(biezacy, p))
+        suma += km(biezacy, nast)
+        zostalo.remove(nast)
+        biezacy = nast
+    return suma
 
 
 def wybierz(katalog, ile_kotwic, ile_moze, budzet_minut=None):
@@ -128,15 +156,23 @@ def wybierz(katalog, ile_kotwic, ile_moze, budzet_minut=None):
         # doboru: dalej na liście stoją miejsca krótsze i równie rozpoznawalne.
         # Zatrzymanie się na pierwszym za długim dałoby tablicę z trzema
         # kotwicami tylko dlatego, że czwarta była muzeum na trzy godziny.
-        czas = min(m['visit_minutes'] or 60, SUFIT_KOTWICY_MIN)
-        if budzet_minut and minuty + czas > budzet_minut:
-            continue
+        # Budżet obejmuje zwiedzanie RAZEM z dojściami. Sam udział procentowy tego
+        # nie ogarnia: Lipsk mieści osiem kotwic na 500 minutach, bo wszystko stoi
+        # obok siebie, a Paryż przy tych samych 585 minutach gubi dwie, bo między
+        # Łukiem Triumfalnym a Père-Lachaise jest siedem i pół kilometra.
+        czas = m['visit_minutes'] or 60
+        if budzet_minut:
+            przejscia = dlugosc_trasy_km(kotwice + [m]) * MINUT_NA_KM
+            if minuty + czas + przejscia > budzet_minut:
+                continue
         licznik[rodzaj] = licznik.get(rodzaj, 0) + 1
         minuty += czas
         kotwice.append(m)
 
     if budzet_minut:
-        print('   kotwice zajmą %d z %d min budżetu' % (minuty, budzet_minut))
+        przejscia = dlugosc_trasy_km(kotwice) * MINUT_NA_KM
+        print('   kotwice: %d min zwiedzania + %d min dojść = %d z %d'
+              % (minuty, przejscia, minuty + przejscia, budzet_minut))
 
     if len(kotwice) < ile_kotwic:
         print('Uwaga: w katalogu jest tylko %d atrakcji, kotwic będzie %d zamiast %d.'
@@ -165,7 +201,7 @@ def main():
         sys.exit(1)
 
     kotwice, moze = wybierz(katalog, dni * KOTWIC_NA_DZIEN, dni * MOZE_NA_DZIEN,
-                            int(dni * MINUT_W_DNIU * UDZIAL_KOTWIC_W_DNIU))
+                            int(dni * MINUT_W_DNIU * UDZIAL_ZWIEDZANIA))
     print('%s: %d kotwic, %d być może (z %d w katalogu)' % (miasto, len(kotwice), len(moze), len(katalog)))
     for m in kotwice:
         print('   • %-44s %-12s ważność %s' % (m['name'][:44], m['kind'] or '', m['waznosc'] or 0))
