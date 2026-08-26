@@ -31,6 +31,26 @@ MOZE_NA_DZIEN = 3
 # „attraction", a dworzec był trzeci w kolejce. Różnorodność ma zapobiegać dniu
 # z siedmioma kościołami, a nie wypychać rzeczy, po które ludzie przyjeżdżają.
 UDZIAL_JEDNEGO_RODZAJU = 0.5
+# Ile z dnia mogą zająć same kotwice. Reszta to przejścia, posiłki i to, co agent
+# dołoży — bez tego zapasu plan nie ma jak oddychać.
+#
+# Bez tego limitu dobór patrzył wyłącznie na ważność i różnorodność. Wiedeń
+# dostał przez to osiem kotwic na 780 minut przy dwóch dniach po 540: sama
+# Albertina 150 i Hofburg 180 zjadały dwie trzecie pierwszego dnia. Planer nie
+# miał jak tego zmieścić i wyrzucił CZTERY kotwice, w tym Staatsoper.
+UDZIAL_KOTWIC_W_DNIU = 0.55
+MINUT_W_DNIU = 9 * 60
+# Do budżetu liczymy czas PRZYCIĘTY, nie pełny z katalogu.
+#
+# Pierwsza wersja budżetu liczyła pełne `visit_minutes` — i wypchnęła z kotwic
+# Wiednia Staatsoper (52 języki) oraz Albertinę (46), wpuszczając w zamian
+# Prinz-Eugen-Denkmal z ważnością 1. Premiowała krótkość zamiast rozpoznawalności,
+# bo pomnik zajmuje kwadrans, a muzeum trzy godziny.
+#
+# Tablica przykładowa na dwa dni nie jest zwiedzaniem Hofburga w komplecie —
+# to przegląd tego, po co ludzie przyjeżdżają. Prompt planera i tak ma regułę
+# „krótsza wizyta zamiast rezygnacji", więc czas dopasuje się na miejscu.
+SUFIT_KOTWICY_MIN = 90
 
 
 def psql(zapytanie, json_out=True):
@@ -50,7 +70,7 @@ def ap(s):
     return "'" + str(s).replace("'", "''") + "'"
 
 
-def wybierz(katalog, ile_kotwic, ile_moze):
+def wybierz(katalog, ile_kotwic, ile_moze, budzet_minut=None):
     """Kotwice: najlepiej opisane i najpopularniejsze, ale bez powtarzania rodzaju.
 
     Miejsce bez godzin otwarcia nie jest gorsze samo w sobie, ale planer nie ma
@@ -62,8 +82,18 @@ def wybierz(katalog, ile_kotwic, ile_moze):
         # dodatki: kompletność danych i to, czy pobyt jest na tyle długi, żeby
         # miał sens jako punkt dnia. Pierwsza wersja tego wzoru nie miała
         # ważności w ogóle i wybrała na zwiedzanie Porto kino i kapliczkę.
+        # Ważność wchodzi BEZ SUFITU. Wcześniej stało tu `min(waznosc, 30)`, przez
+        # co wszystko powyżej trzydziestu liczyło się tak samo — a Wiedeń ma
+        # siedem takich miejsc. O kolejności między Stephansdomem (59), Hofburgiem
+        # (54) i Staatsoper (52) decydowała wtedy kompletność metadanych, więc
+        # opera wypadała z kotwic na rzecz muzeum architektury z ważnością 14.
+        #
+        # Sufit miał sens, gdy ważność brała się ze zgadywania po nazwie i bywała
+        # zmyślona. Od czasu, gdy pochodzi wyłącznie z tagu `wikidata` w OSM,
+        # obcinanie jej akurat na szczycie listy wyrzuca sygnał tam, gdzie jest
+        # najpewniejszy. Reszta składników zostaje rozstrzygnięciem remisów.
         return (
-            min(m['waznosc'] or 0, 30) * 3
+            (m['waznosc'] or 0) * 3
             + (1 if m['zdjecie'] else 0)
             + (1 if m['opis'] else 0)
             + min(m['pin_count'] or 0, 3)
@@ -87,15 +117,26 @@ def wybierz(katalog, ile_kotwic, ile_moze):
         do_kotwic = znane
 
     limit = max(2, int(ile_kotwic * UDZIAL_JEDNEGO_RODZAJU))
-    kotwice, licznik = [], {}
+    kotwice, licznik, minuty = [], {}, 0
     for m in do_kotwic:
         if len(kotwice) >= ile_kotwic:
             break
         rodzaj = m['kind'] or m['category'] or 'inne'
         if licznik.get(rodzaj, 0) >= limit:
             continue
+        # Kotwica, która nie mieści się w budżecie, jest pomijana, a nie kończy
+        # doboru: dalej na liście stoją miejsca krótsze i równie rozpoznawalne.
+        # Zatrzymanie się na pierwszym za długim dałoby tablicę z trzema
+        # kotwicami tylko dlatego, że czwarta była muzeum na trzy godziny.
+        czas = min(m['visit_minutes'] or 60, SUFIT_KOTWICY_MIN)
+        if budzet_minut and minuty + czas > budzet_minut:
+            continue
         licznik[rodzaj] = licznik.get(rodzaj, 0) + 1
+        minuty += czas
         kotwice.append(m)
+
+    if budzet_minut:
+        print('   kotwice zajmą %d z %d min budżetu' % (minuty, budzet_minut))
 
     if len(kotwice) < ile_kotwic:
         print('Uwaga: w katalogu jest tylko %d atrakcji, kotwic będzie %d zamiast %d.'
@@ -123,7 +164,8 @@ def main():
         print('Za mało miejsc w katalogu dla %s: %d.' % (miasto, len(katalog)), file=sys.stderr)
         sys.exit(1)
 
-    kotwice, moze = wybierz(katalog, dni * KOTWIC_NA_DZIEN, dni * MOZE_NA_DZIEN)
+    kotwice, moze = wybierz(katalog, dni * KOTWIC_NA_DZIEN, dni * MOZE_NA_DZIEN,
+                            int(dni * MINUT_W_DNIU * UDZIAL_KOTWIC_W_DNIU))
     print('%s: %d kotwic, %d być może (z %d w katalogu)' % (miasto, len(kotwice), len(moze), len(katalog)))
     for m in kotwice:
         print('   • %-44s %-12s ważność %s' % (m['name'][:44], m['kind'] or '', m['waznosc'] or 0))
