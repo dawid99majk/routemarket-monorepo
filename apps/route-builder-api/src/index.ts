@@ -2495,16 +2495,33 @@ app.post('/places/suggest', async (c) => {
  */
 app.post('/catalog/refresh-photos', async (c) => {
   try {
-    const { city, limit = 500 } = await c.req.json().catch(() => ({})) as { city?: string; limit?: number };
-    const rows = await repo.listCatalogAll(city?.trim() || null, limit);
+    type Zadanie = { city?: string; limit?: number; tylko_braki?: boolean };
+    const { city, limit = 500, tylko_braki = false } =
+      await c.req.json().catch(() => ({})) as Zadanie;
+    const wszystkie = await repo.listCatalogAll(city?.trim() || null, limit);
+    // `tylko_braki` uzupełnia puste galerie, nie ruszając tych, które działają.
+    // Bez tego jedyny sposób na dociągnięcie zdjęć dla nowych pozycji to
+    // przepuszczenie CAŁEGO miasta — a Commons przy każdym zapytaniu może
+    // zwrócić inny zestaw, więc setki dobrych galerii zmieniłyby się bez powodu.
+    const rows = tylko_braki
+      ? wszystkie.filter((r: any) => !Array.isArray(r.photos) || r.photos.length === 0)
+      : wszystkie;
 
     const changed: { name: string; before: number; after: number }[] = [];
+    // Błędy liczone osobno od „nic nie znaleziono". Wcześniej `.catch(() => [])`
+    // zamieniał odmowę Wikimediów w pustą listę, więc po przekroczeniu ich limitu
+    // endpoint raportował „sprawdzono 50, podmieniono 0" — brzmiało jak brak zdjęć
+    // w Commons, a było odcięciem. Trzy miasta pod rząd wyszły tak w zero sekund.
+    let bledy = 0;
     const BATCH = 5;
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH);
       const sets = await Promise.all(
-        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 3, r.city).catch(() => []))
+        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 3, r.city)
+          .catch(() => { bledy += 1; return [] as string[]; }))
       );
+      // Wikimedia przycina ruch przy kilkudziesięciu zapytaniach pod rząd.
+      if (i + BATCH < rows.length) await new Promise((r) => setTimeout(r, 400));
       await Promise.all(batch.map(async (r: any, j: number) => {
         const next = sets[j];
         const prev: string[] = Array.isArray(r.photos) ? r.photos : [];
@@ -2516,8 +2533,9 @@ app.post('/catalog/refresh-photos', async (c) => {
         changed.push({ name: r.name, before: prev.length, after: next.length });
       }));
     }
-    console.log(`[catalog/refresh-photos] sprawdzono ${rows.length}, podmieniono ${changed.length}`);
-    return c.json({ checked: rows.length, updated: changed.length, changed });
+    console.log(`[catalog/refresh-photos] sprawdzono ${rows.length} z ${wszystkie.length}`
+      + `, podmieniono ${changed.length}, błędów ${bledy}`);
+    return c.json({ checked: rows.length, updated: changed.length, failed: bledy, changed });
   } catch (e: any) {
     console.error('[catalog/refresh-photos]', e);
     return c.json({ error: e.message }, 500);
