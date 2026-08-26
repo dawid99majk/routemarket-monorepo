@@ -829,6 +829,24 @@ function uzupelnijBraki(k: KontekstPlanu, dzien: DzienPlanu): void {
 
   dzien.items.forEach((item, i) => {
     item.name = String(item.name || '').trim();
+
+    // Przejście bez celu dostaje cel z następnej pozycji.
+    //
+    // Prompt żąda spaceru NAZWANEGO, bo bezimienny wypełniacz nie mówi nic i nie
+    // da się go pokazać na mapie. Model zwykle to robi („Spacer do Acquario di
+    // Genova"), ale w planie Porto wstawił „Spacer w okolicy" PIĘĆ RAZY w jednym
+    // dniu — między miejscami odległymi o trzy minuty. Cel bierzemy z sąsiada,
+    // zamiast prosić model jeszcze raz: on i tak wie, dokąd idzie, bo wstawił to
+    // przejście właśnie przed tym punktem.
+    const przejscie = /^(spacer|przej[śs]cie|dojazd|walk|transfer)\b/i.test(item.name)
+      || ['walk', 'travel', 'transport'].includes(String(item.kind || '').toLowerCase());
+    const maCel = /\b(do|na|w stronę|to|towards)\b/i.test(item.name);
+    if (przejscie && !maCel) {
+      const nastepna = dzien.items[i + 1];
+      const cel = String(nastepna?.name || '').trim();
+      if (cel) item.name = `Spacer do ${cel}`;
+    }
+
     const znane = wKatalogu.get(item.name.toLowerCase());
 
     if (item.source !== 'pinned' && item.source !== 'suggested') {

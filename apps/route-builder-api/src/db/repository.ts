@@ -121,6 +121,22 @@ export class RouteBuilderRepository {
     await supabase.from('trip_project_places').update({ image_url: url }).eq('id', id);
   }
 
+  /**
+   * Identyfikatory OSM, które nie mają wracać do katalogu.
+   *
+   * Scalanie duplikatu przez skasowanie wiersza nie jest trwałe — seed wstawia
+   * z powrotem wszystko, czego nie zna, a obiekt w OSM dalej istnieje.
+   */
+  async listCatalogExclusions(): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from('katalog_wykluczenia').select('osm_id');
+    if (error) {
+      console.warn('[katalog] Nie udało się odczytać wykluczeń:', error.message);
+      return new Set();
+    }
+    return new Set((data ?? []).map((w: any) => String(w.osm_id)));
+  }
+
   async listCatalogAll(city: string | null, limit = 500): Promise<any[]> {
     // description i description_i18n sa tu potrzebne: /catalog/enrich filtruje po nich
     // "ktore miejsca nie maja jeszcze opisu". Bez nich filtr przepuszczal wszystko

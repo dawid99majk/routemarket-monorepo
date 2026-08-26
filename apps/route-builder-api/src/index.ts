@@ -1737,7 +1737,15 @@ app.post('/catalog/seed', async (c) => {
     // i jako nightlife, i jako food. Pierwsze wystąpienie wygrywa, bo listy idą
     // w kolejności ważności dla planowania.
     const widziane = new Set<string>();
+    // Obiekty wykluczone świadomie — duplikaty scalone ręcznie i wpisy odrzucone.
+    // Bez tej listy scalenie duplikatu jest nietrwałe: seed pyta Overpassa
+    // o miasto i wstawia z powrotem wszystko, czego nie zna, więc obiekt z żywym
+    // identyfikatorem OSM wraca przy najbliższym zbieraniu. „Torre dos Clérigos"
+    // wróciła tak na tablicę przykładową Porto obok samej siebie pod pełną nazwą.
+    const wykluczone = await repo.listCatalogExclusions();
+
     const candidates = [...zwiedzanie, ...jedzenie, ...wieczory, ...noclegi].filter((p) => {
+      if (p.id && wykluczone.has(String(p.id))) return false;
       const klucz = String(p.id ?? `${p.name}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`);
       if (widziane.has(klucz)) return false;
       widziane.add(klucz);
