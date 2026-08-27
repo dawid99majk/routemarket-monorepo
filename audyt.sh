@@ -29,11 +29,24 @@ zapisz() { echo "$1" >> "$RAPORT"; }
 # Z odciskiem znalezisko trafia też do kolejki zatwierdzeń i czeka tam na
 # decyzję. Bez odcisku ląduje wyłącznie w raporcie — dla rzeczy, które warto
 # odnotować, ale nie ma o czym rozstrzygać.
+BLEDY_KOLEJKI=/root/audyt/kolejka.log
+# Ścieżka BEZWZGLĘDNA, bo audyt po drodze wchodzi do apps/frontend
+# i apps/route-builder-api, żeby sprawdzić typy. Względne `./kolejka.py` działało
+# więc tylko dla znalezisk zgłoszonych PRZED pierwszym `cd` — a wszystkie
+# zgłoszenia są po nim. Kanał do kolejki milczał od początku i nie było tego jak
+# zauważyć, bo błąd szedł do /dev/null.
+KOLEJKA="$REPO/kolejka.py"
+
 problem() {
   ZNALEZISKA=$((ZNALEZISKA+1))
   zapisz "- **$1**"
   [ -z "${2:-}" ] && return 0
-  python3 - "$1" "$2" "${3:-wazne}" "${4:-}" "${5:-}" <<'PY' | ./kolejka.py dodaj >/dev/null 2>&1 || true
+  # Wynik wpisu do kolejki JEST WIDOCZNY, a nie wyciszony. Wcześniej stało tu
+  # `>/dev/null 2>&1 || true` i przez to audyt raportował znaleziska wyłącznie
+  # do pliku: kolejka zostawała pusta, a nikt nie miał jak tego zauważyć, bo
+  # jedynym objawem był brak wpisu. Cichy `|| true` na kanale powiadomień znaczy
+  # „powiadomienie może zniknąć i nikt się nie dowie".
+  python3 - "$1" "$2" "${3:-wazne}" "${4:-}" "${5:-}" <<'PY' | "$KOLEJKA" dodaj >>"$BLEDY_KOLEJKI" 2>&1
 import json, sys
 print(json.dumps({
     'agent': 'audytor',
@@ -167,8 +180,38 @@ MYLACE=$(psql -c "
     and roles::text not like '%anon%'
     and roles::text <> '{public}'
     and policyname !~* '(zalogowan|authenticated|admin|wlascic|owner)';")
+# Sama nazwa nie wystarcza do orzeczenia, że dostępu NIE MA — o tym decyduje
+# komplet polityk na tabeli, a nie ta jedna. „Anyone reads catalog" faktycznie
+# obejmuje tylko `authenticated`, ale anonim czyta katalog przez osobną politykę
+# dodaną później. Zgłaszanie tego jako braku dostępu było fałszywym alarmem
+# powtarzanym co noc.
+#
+# Sprawdzamy więc SKUTEK: czy rola `anon` naprawdę wyjmie wiersz. Dopiero gdy
+# nie wyjmie, nazwa obiecuje coś, czego nie ma.
 if [ -n "$MYLACE" ]; then
-  while read -r L; do [ -n "$L" ] && problem "Nazwa polityki obiecuje dostęp publiczny, a nie daje: $L"; done <<< "$MYLACE"
+  while read -r L; do
+    [ -z "$L" ] && continue
+    TABELA=${L%% *}
+    # SET LOCAL działa WYŁĄCZNIE w transakcji — poza nią Postgres tylko ostrzega
+    # i zapytanie leci jako superużytkownik, czyli test zawsze mówi „widzę".
+    # Pierwsza wersja tego sprawdzenia miała dokładnie ten błąd i orzekała
+    # o dostępie anonima, nie pytając go wcale.
+    #
+    # 'tak' i 'pusto' znaczą to samo dla dostępu: polityka przepuściła zapytanie.
+    # Odmowa daje błąd, więc wynik jest wtedy pusty.
+    CZYTA=$(psql -c "
+      begin;
+      set local role anon;
+      select case when exists (select 1 from public.\"$TABELA\" limit 1) then 'tak' else 'pusto' end;
+      rollback;" 2>/dev/null | grep -E '^(tak|pusto)$' | head -1)
+    if [ "$CZYTA" = "tak" ] || [ "$CZYTA" = "pusto" ]; then
+      zapisz "- Nazwa polityki myli (dostęp mimo to działa): $L"
+    else
+      problem "Nazwa polityki obiecuje dostęp publiczny, a anonim nic nie odczyta: $L" \
+        "bezpieczenstwo:polityka-mylaca-$TABELA" "wazne" \
+        "Sprawdzić komplet polityk na tabeli $TABELA — albo dodać dostęp dla anon, albo poprawić nazwę."
+    fi
+  done <<< "$MYLACE"
 else
   zapisz "Nazwy polityk zgodne z zakresem."
 fi
@@ -204,6 +247,27 @@ else
   zapisz "Ostatnia: $(basename "$OSTATNIA"), sprzed ${WIEK_H} h, $(( ROZMIAR / 1024 / 1024 )) MB"
   [ "$WIEK_H" -gt 30 ] && problem "Kopia bazy sprzed ${WIEK_H} h — cron mógł przestać działać" "infra:kopia-stara" "pilne" "Sprawdzić log: /root/backups/routemarket/backup.log"
   [ "$ROZMIAR" -lt 1000000 ] && problem "Kopia bazy ma tylko $ROZMIAR B — podejrzanie mało" "infra:kopia-mala" "pilne" "Sprawdzić, czy pg_dump nie kończy się po cichu błędem."
+fi
+zapisz ""
+
+# ------------------------------------------------------------ 8. watchdog ---
+# Kto pilnuje pilnującego. Watchdog chodzi co pięć minut i sam siebie sprawdzić
+# nie może — milczał tak samo, gdy wszystko działało, jak wtedy, gdy przestał
+# chodzić. Zostawia więc puls, a to wolniejsze zadanie sprawdza jego świeżość.
+#
+# Piętnaście minut to trzy przebiegi: jeden pominięty przy chwilowym obciążeniu
+# nie jest jeszcze awarią, trzy z rzędu już tak.
+zapisz "## Watchdog"
+PULS=/root/monitoring/puls
+if [ ! -f "$PULS" ]; then
+  problem "Watchdog nie zostawił pulsu — prawdopodobnie nie działa" "infra:watchdog-brak-pulsu" "pilne" \
+    "Sprawdzić wpis w cronie i uruchomić ręcznie: /root/routemarket_watchdog.sh"
+else
+  WIEK_MIN=$(( ( $(date +%s) - $(cat "$PULS" 2>/dev/null || echo 0) ) / 60 ))
+  zapisz "Ostatni przebieg: sprzed ${WIEK_MIN} min"
+  [ "$WIEK_MIN" -gt 15 ] && problem "Watchdog milczy od ${WIEK_MIN} min — usługi nie są pilnowane" \
+    "infra:watchdog-milczy" "pilne" \
+    "Sprawdzić cron (*/5 * * * * /root/routemarket_watchdog.sh) i uruchomić skrypt ręcznie."
 fi
 zapisz ""
 
