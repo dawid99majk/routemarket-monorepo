@@ -1,0 +1,5 @@
+# Cache budowania Dockera rósł do 92 GB przez serię wdrożeń i zajął 63% dysku.
+# Cache jest odtwarzalny — jego jedyny koszt to dłuższy pierwszy build po czyszczeniu.
+# Limit 10 GB trzyma równowagę: kolejne wdrożenie tego samego dnia jest szybkie,
+# a tydzień wdrożeń nie zjada dysku.
+17 4 * * * root /usr/bin/docker builder prune -f --keep-storage 10GB >/dev/null 2>&1
