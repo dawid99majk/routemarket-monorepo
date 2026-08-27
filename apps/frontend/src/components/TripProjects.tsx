@@ -242,6 +242,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
   const [planDay, setPlanDay] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  // Publikacja bez podpisu daje w galerii „Tablica od podróżnika" — dwadzieścia
+  // razy to samo. Nie da się tego wypełnić za użytkownika: w profilu siedzi
+  // adres e-mail, a `nazwaUzytkownika` słusznie odrzuca wszystko z małpą, żeby
+  // adres nie wyciekł pod tablicę. Zostaje zapytać, i to raz — odpowiedź ląduje
+  // w profilu, więc kolejne tablice mają podpis od razu.
+  const [pytanieOPodpis, setPytanieOPodpis] = useState(false);
+  const [podpisRoboczy, setPodpisRoboczy] = useState('');
   /**
    * Podgląd wszystkich tablic: kilka zdjęć i liczba miejsc na wyjazd. `places`
    * trzyma wyłącznie aktywny wyjazd, więc kafelki pozostałych nie miały skąd wziąć
@@ -404,11 +411,26 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    * użytkownik zna własne imię — widok publiczny nie musi wtedy w ogóle sięgać
    * do tabeli kont, a adres e-mail nigdzie nie wycieka.
    */
-  const togglePublic = async () => {
+  // `togglePublic` jest podpięte wprost pod onClick, więc NIE MOŻE brać argumentu:
+  // React przekazałby tam obiekt zdarzenia i wylądowałby on w podpisie tablicy.
+  // Stąd rozdzielenie — publikuje `opublikuj`, a przycisk woła wariant bez
+  // argumentów. Wyłapał to kompilator, nie ja.
+  const togglePublic = () => opublikuj();
+
+  const opublikuj = async (podpisZPytania?: string) => {
     if (!active) return;
-    setPublishing(true);
     const nowe = !active.is_public;
-    const autor = nowe ? await podpisPubliczny() : null;
+
+    // Przy publikowaniu pytamy o podpis, jeśli nie mamy skąd go wziąć.
+    // Przy cofaniu publikacji nie pytamy — podpis i tak jest wtedy czyszczony.
+    let autor: string | null = podpisZPytania?.trim() || null;
+    if (nowe && !autor) {
+      autor = await podpisPubliczny();
+      if (!autor) { setPodpisRoboczy(''); setPytanieOPodpis(true); return; }
+    }
+    if (!nowe) autor = null;
+
+    setPublishing(true);
     const { error } = await supabase.from('trip_projects').update({
       is_public: nowe,
       published_at: nowe ? new Date().toISOString() : null,
@@ -419,6 +441,23 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setProjects((prev) => prev.map((p) =>
       p.id === active.id ? { ...p, is_public: nowe, copy_count: (p as any).copy_count ?? 0 } as any : p));
     toast.success(nowe ? 'Tablica jest teraz publiczna' : 'Tablica znów jest prywatna');
+  };
+
+  /** Zapisuje podpis w profilu i wraca do publikacji, która o niego poprosiła. */
+  const zatwierdzPodpis = async () => {
+    const podpis = podpisRoboczy.trim();
+    if (!podpis) return;
+    if (podpis.includes('@')) {
+      toast.error('To wygląda na adres e-mail — pod tablicą zobaczą go wszyscy.');
+      return;
+    }
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      await supabase.from('profiles')
+        .update({ display_name: podpis }).eq('user_id', data.user.id);
+    }
+    setPytanieOPodpis(false);
+    await opublikuj(podpis);
   };
 
   /**
@@ -2596,6 +2635,33 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
             {/* Okno karty miejsca zostaje poza podziałem: otwiera je zarówno kafelek
                 na tablicy, jak i punkt na osi dnia w planie. */}
+            <Dialog open={pytanieOPodpis} onOpenChange={setPytanieOPodpis}>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle className="text-left leading-snug">Jak Cię podpisać?</DialogTitle>
+                </DialogHeader>
+                <p className="text-[13px] text-muted-foreground leading-relaxed">
+                  Ten podpis zobaczą wszyscy, którzy trafią na Twoją tablicę.
+                  Imię wystarczy — zapiszemy je w profilu, więc pytamy tylko raz.
+                </p>
+                <input
+                  autoFocus
+                  value={podpisRoboczy}
+                  onChange={(e) => setPodpisRoboczy(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') zatwierdzPodpis(); }}
+                  placeholder="np. Dawid"
+                  maxLength={40}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-[14px]"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setPytanieOPodpis(false)}>Anuluj</Button>
+                  <Button onClick={zatwierdzPodpis} disabled={!podpisRoboczy.trim()}>
+                    Opublikuj
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={!!placeCard} onOpenChange={(open) => !open && setPlaceCard(null)}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
