@@ -10,6 +10,7 @@ import { zakresDat } from '@/lib/daty';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { useTranslation } from 'react-i18next';
 import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import SEO from '@/components/SEO';
 
 const KUBELKI = [
   { id: 'must', label: 'Na pewno', kolor: 'bg-primary' },
@@ -163,6 +164,10 @@ export default function TablicaPubliczna() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title={`${tablica.name}${tablica.destination ? ` · ${tablica.destination}` : ''}`}
+        url={`/tablica/${tablica.id}`}
+      />
       <PlannerHeader initials={inicjaly} />
 
       <main className="max-w-[1400px] mx-auto px-6 py-8">

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_UI_LANGUAGES } from '@/i18n';
@@ -19,7 +20,12 @@ export interface SEOProps {
 
 export default function SEO({
   title,
-  description = 'Buy and sell curated adventure travel routes with GPX files, trail guides, and interactive maps.',
+  // Domyślny opis został po sklepie z trasami GPX i mówił „buy and sell curated
+  // adventure travel routes" — o biznesie, którego już nie ma, po angielsku,
+  // na stronie prowadzonej po polsku. Trafiał wszędzie, gdzie strona nie podała
+  // własnego opisu. Teraz brzmi tak samo jak index.html i karta odnośnika
+  // generowana przez serwer, żeby te trzy źródła nie mówiły trzech rzeczy.
+  description = 'Tablica na miejsca, które chcesz zobaczyć. Z niej powstaje plan dni i trasa — z godzinami otwarcia, dystansem i plikiem GPX.',
   image = DEFAULT_IMAGE,
   url,
   type = 'website',
@@ -28,7 +34,13 @@ export default function SEO({
   hreflang,
 }: SEOProps) {
   const { i18n } = useTranslation();
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - Adventure Travel Routes Marketplace`;
+  // Nazwa serwisu dopisywana tylko wtedy, gdy tytul jej jeszcze nie zawiera.
+  // Tlumaczenie `seo.contact.title` ma ja juz w srodku, wiec doklejanie dawalo
+  // „Kontakt — RouteMarket | RouteMarket". Widac to bylo dopiero od kiedy tytul
+  // faktycznie trafia do karty przegladarki.
+  const fullTitle = !title
+    ? `${SITE_NAME} — planer wyjazdów`
+    : title.includes(SITE_NAME) ? title : `${title} | ${SITE_NAME}`;
   const canonical = url ? `${SITE_URL}${url}` : undefined;
   const structuredDataArray = structuredData
     ? Array.isArray(structuredData) ? structuredData : [structuredData]
@@ -39,6 +51,23 @@ export default function SEO({
     lang: l.code,
     href: url || '/',
   }));
+
+  // Tytul karty ustawiamy TAKZE wprost, nie tylko przez Helmet.
+  //
+  // Sprawdzone w przegladarce na wdrozonej stronie: `react-helmet-async` nie
+  // nanosi niczego na <head> — w dokumencie nie ma ani jednego elementu
+  // z `data-rh`, a tytul zostaje domyslny. Dotyczy to rowniez strony kontaktu,
+  // ktora uzywala tego komponentu na dlugo przed ta zmiana, wiec nie jest to
+  // skutek niczego, co tu dopisano. Biblioteka jest w buildzie, w jednej kopii,
+  // dostawca opakowuje trasy, wersja Reacta sie zgadza — przyczyny nie ustalono.
+  //
+  // Zamiast walczyc z biblioteka: tytul to jedna linia i dziala od razu. Gdy
+  // Helmet zacznie dzialac, ustawi te sama wartosc i nic sie nie zmieni.
+  // Znaczniki OpenGraph dla robotow generuje i tak serwer (`wizytowki.ts`),
+  // wiec bez pokrycia zostaje wylacznie `description` przy nawigacji w kliencie.
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.title = fullTitle;
+  }, [fullTitle]);
 
   return (
     <Helmet>

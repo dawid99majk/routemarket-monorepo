@@ -10,6 +10,7 @@ import { opisMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
 import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import SEO from '@/components/SEO';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -238,6 +239,16 @@ export default function PlacePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Tytuł karty przeglądarki i opis muszą zmieniać się przy nawigacji.
+          Serwer generuje własne znaczniki dla robotów społecznościowych, ale
+          użytkownik chodzący po serwisie dostawał wszędzie ten sam domyślny
+          tytuł — z „/odkrywaj" na stronę Wawelu wchodziło się bez śladu w karcie. */}
+      <SEO
+        title={`${place.name}${place.city ? ` · ${place.city}` : ''}`}
+        description={opisMiejsca(place) || undefined}
+        image={place.photos?.[0] ? miniatura(place.photos[0], SZEROKOSC.bohater) : undefined}
+        url={`/miejsce/${place.slug}`}
+      />
       {/* Strona miejsca nie miała paska w ogóle: jedynym wyjściem był przycisk
           "wróć do odkrywania", więc z karty miejsca nie dało się przejść na
           tablicę ani do planu bez cofania się. */}
