@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "build": "tsc --noEmit -p tsconfig.app.json && npm run lint:zdjecia && vite build",
+    "lint:zdjecia": "eslint -c eslint.zdjecia.config.js src",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
