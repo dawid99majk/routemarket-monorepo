@@ -1718,32 +1718,50 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 zamiast dwóch dużych kart, które trzeba było przeczytać osobno.
                 Edycja została -- to wciąż te same pola i te same handlery,
                 przeniesione do modala pod "Zmień ustawienia". */}
-            <div className="rounded-md bg-surface border-b border-border/40 px-4 py-2.5
-                            flex flex-wrap items-center gap-x-2 gap-y-1
-                            font-mono text-[12px] text-secondary">
-              <span>
-                {active.start_name
-                  ? <>Start: {active.start_name}</>
-                  : <span className="text-muted-foreground">{t('tablica.skad_zaczynacie')}</span>}
+            <div className="rounded-md bg-muted/70 border border-border/50 px-4 py-3
+                            flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[12px]">
+              {/* Oba pola stoją zawsze. Wcześniej termin pojawiał się dopiero,
+                  gdy już był ustawiony — więc nie dało się zgadnąć, że można go
+                  podać. Puste pole pyta i samo prowadzi do ustawień. */}
+              <span className="flex items-baseline gap-2 min-w-0">
+                <span className="text-muted-foreground shrink-0">Skąd wyruszacie</span>
+                {active.start_name ? (
+                  <span className="text-foreground truncate">{active.start_name}</span>
+                ) : (
+                  <button onClick={() => setPokazUstawienia(true)}
+                    className="text-foreground underline underline-offset-2 decoration-hairline
+                               hover:decoration-foreground transition-colors">
+                    ustaw punkt startowy
+                  </button>
+                )}
               </span>
-              {active.start_date && (
-                <>
-                  <span className="text-hairline">·</span>
-                  <span>
+
+              <span className="flex items-baseline gap-2 min-w-0">
+                <span className="text-muted-foreground shrink-0">Kiedy jedziecie</span>
+                {active.start_date ? (
+                  <span className="text-foreground truncate">
                     {zakresDat(active.start_date, active.end_date)}
                     {active.days ? ` · ${active.days} ${active.days === 1 ? 'dzień' : 'dni'}` : ''}
                   </span>
-                </>
-              )}
+                ) : (
+                  <button onClick={() => setPokazUstawienia(true)}
+                    className="text-foreground underline underline-offset-2 decoration-hairline
+                               hover:decoration-foreground transition-colors">
+                    {active.days ? `${active.days} ${active.days === 1 ? 'dzień' : 'dni'} · ustaw termin` : 'ustaw termin'}
+                  </button>
+                )}
+              </span>
+
               {active.trip_type && (
-                <>
-                  <span className="text-hairline">·</span>
-                  <span>{active.trip_type}</span>
-                </>
+                <span className="flex items-baseline gap-2 min-w-0">
+                  <span className="text-muted-foreground shrink-0">Charakter</span>
+                  <span className="text-foreground truncate">{active.trip_type}</span>
+                </span>
               )}
+
               <button onClick={() => setPokazUstawienia(true)}
-                className="ml-auto text-secondary hover:text-foreground transition-colors underline underline-offset-2
-                           decoration-hairline">
+                className="ml-auto text-secondary hover:text-foreground transition-colors
+                           underline underline-offset-2 decoration-hairline shrink-0">
                 Zmień ustawienia
               </button>
             </div>
