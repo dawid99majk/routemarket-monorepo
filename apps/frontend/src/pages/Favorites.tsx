@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import Zdjecie from '@/components/Zdjecie';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -88,7 +88,7 @@ export default function Favorites() {
                 <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="text-left">
                   <div className="h-40 bg-muted relative">
                     {p.photos?.[0] ? (
-                      <img src={miniatura(p.photos[0], SZEROKOSC.kafelek)} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                      <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
                         <MapPin className="w-7 h-7" />

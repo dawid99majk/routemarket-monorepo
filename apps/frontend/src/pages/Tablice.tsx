@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -210,7 +210,7 @@ export default function Tablice() {
                     <div className="relative bg-placeholder-photo"
                          style={{ height: wysokoscKafelka(tab.id) }}>
                       {tab.photos?.[0] && (
-                        <img src={miniatura(tab.photos[0], SZEROKOSC.kafelek)} alt="" loading="lazy"
+                        <Zdjecie src={tab.photos[0]} gdzie="kafelek" alt=""
                              className="w-full h-full object-cover" />
                       )}
                       {/* Etykieta w lewym górnym rogu zdjęcia, na półprzezroczystym kremie. */}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Copy, Heart, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,7 +10,6 @@ import DiscoverMap from '@/components/DiscoverMap';
 import { zakresDat } from '@/lib/daty';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { useTranslation } from 'react-i18next';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import SEO from '@/components/SEO';
 
 const KUBELKI = [
@@ -295,7 +295,7 @@ export default function TablicaPubliczna() {
                     <div key={m.id} className="px-4 py-3 flex gap-3">
                       <div className="w-11 h-11 rounded-sm overflow-hidden bg-muted shrink-0">
                         {m.image_url
-                          ? <img src={miniatura(m.image_url, SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                          ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover" />
                           : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
                               <MapPin className="w-4 h-4" />
                             </div>}

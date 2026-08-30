@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PunktStartowy from '@/components/PunktStartowy';
+import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { opisMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 
 interface CatalogPlace {
   id: string;
@@ -129,9 +130,6 @@ export default function Discover() {
   const [aktywne, setAktywne] = useState<string | null>(null);
   const [obszar, setObszar] = useState<{ pn: number; pd: number; wsch: number; zach: number } | null>(null);
   const [tylkoZObszaru, setTylkoZObszaru] = useState(true);
-  const [startQuery, setStartQuery] = useState('');
-  const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
-  const [lokalizowanie, setLokalizowanie] = useState(false);
   const kartyRef = useRef<Record<string, HTMLElement | null>>({});
   const wartownik = useRef<HTMLDivElement | null>(null);
   /** Miasta, dla których zbieranie już ruszyło — żeby nie powtórzyć go w kółko. */
@@ -449,51 +447,13 @@ export default function Discover() {
     return () => clearInterval(t);
   }, [szukaAgent]);
 
-  useEffect(() => {
-    const q = startQuery.trim();
-    if (q.length < 2 || !board?.destination) { setStartPodpowiedzi([]); return; }
-    let aktualne = true;
-    const t = setTimeout(async () => {
-      try {
-        const d = await apiPost<any>('/places/suggest',
-          { query: q, city: board.destination, limit: 5 }, { timeoutMs: 12_000 });
-        if (aktualne) setStartPodpowiedzi(d.suggestions ?? []);
-      } catch { if (aktualne) setStartPodpowiedzi([]); }
-    }, 300);
-    return () => { aktualne = false; clearTimeout(t); };
-  }, [startQuery, board?.destination]);
-
   const zapiszStart = async (nazwa: string, lat: number | null, lng: number | null) => {
     if (!board) return;
     const { error } = await supabase.from('trip_projects')
       .update({ start_name: nazwa, start_lat: lat, start_lng: lng }).eq('id', board.id);
     if (error) return toast.error(error.message);
     setBoards((prev) => prev.map((b) => (b.id === board.id ? { ...b, start_name: nazwa, start_lat: lat, start_lng: lng } as any : b)));
-    setStartQuery('');
-    setStartPodpowiedzi([]);
     toast.success(`Start: ${nazwa}`);
-  };
-
-  /**
-   * Położenie z urządzenia. Przeglądarka pyta o zgodę sama i bez niej nic nie
-   * dostajemy — dlatego to osobny przycisk, a nie coś, co dzieje się przy wejściu.
-   */
-  const zUrzadzenia = () => {
-    if (!navigator.geolocation) return toast.error(t('odkrywaj.ta_przegladarka_nie_udostepnia_po'));
-    setLokalizowanie(true);
-    navigator.geolocation.getCurrentPosition(
-      (poz) => {
-        setLokalizowanie(false);
-        zapiszStart('Moje położenie', poz.coords.latitude, poz.coords.longitude);
-      },
-      (err) => {
-        setLokalizowanie(false);
-        toast.error(err.code === err.PERMISSION_DENIED
-          ? 'Bez zgody na położenie nie odczytam lokalizacji'
-          : 'Nie udało się odczytać położenia');
-      },
-      { timeout: 10_000 }
-    );
   };
 
   const zPinezki = (id: string) => {
@@ -866,7 +826,7 @@ export default function Discover() {
                   <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block w-full text-left">
                     <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
                       {p.photos?.[0] && (
-                        <img src={miniatura(p.photos[0], SZEROKOSC.kafelek)} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                        <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover" />
                       )}
                       {pokazMape && (
                         <span className="absolute left-2.5 top-2.5 w-6 h-6 rounded-full bg-foreground text-background
@@ -990,57 +950,14 @@ export default function Discover() {
               {/* Punkt startowy nad mapą: patrząc na pinezki najczęściej chce się
                   wiedzieć, jak daleko to od miejsca, w którym się nocuje. */}
               <div className="rounded-md border border-border bg-card px-3.5 py-3">
-                {(board as any)?.start_name ? (
-                  <div className="flex items-center gap-2.5">
-                    <MapPin className="w-4 h-4 text-primary shrink-0" />
-                    <span className="text-sm truncate flex-1">
-                      {(board as any).start_name}
-                      {(board as any).start_lat == null && (
-                        <span className="text-[12px] text-muted-foreground"> {t('odkrywaj.bez_po_ozenia_nie_ma')}</span>
-                      )}
-                    </span>
-                    <button onClick={() => zapiszStart('', null, null)}
-                      className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                      zmień
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <div className="flex gap-2">
-                      <div className="relative flex-1 min-w-0">
-                        <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input value={startQuery} onChange={(e) => setStartQuery(e.target.value)}
-                          placeholder={t('odkrywaj.twoj_hotel_parking_dworzec')} className="pl-8 h-9 text-sm" />
-                      </div>
-                      <Button variant="outline" size="sm" onClick={zUrzadzenia} disabled={lokalizowanie}
-                        className="shrink-0 h-9">
-                        {lokalizowanie ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Moje położenie'}
-                      </Button>
-                    </div>
-                    {startPodpowiedzi.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
-                                      bg-popover shadow-token-lg overflow-hidden">
-                        {startPodpowiedzi.map((sug, i) => (
-                          <button key={`${sug.name}-${i}`}
-                            onClick={() => zapiszStart(sug.name, sug.lat ?? null, sug.lng ?? null)}
-                            className="w-full text-left px-3 py-2 hover:bg-muted transition-colors
-                                       border-b border-border last:border-b-0">
-                            <div className="text-sm truncate">{sug.name}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground truncate">
-                              {[sug.city, sug.country].filter(Boolean).join(' / ')}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {startQuery.trim().length >= 3 && (
-                      <button onClick={() => zapiszStart(startQuery.trim(), null, null)}
-                        className="mt-2 text-[12px] text-primary hover:underline">
-                        Użyj „{startQuery.trim()}" jako nazwy własnej
-                      </button>
-                    )}
-                  </div>
-                )}
+                <PunktStartowy
+                  nazwa={(board as any)?.start_name}
+                  bezPolozenia={!!(board as any)?.start_name && (board as any)?.start_lat == null}
+                  destination={board?.destination}
+                  wariant="zwiezly"
+                  onZapisz={(n, lat, lng) => zapiszStart(n, lat, lng)}
+                  onUsun={() => zapiszStart('', null, null)}
+                />
               </div>
 
               <label className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3.5 py-2.5

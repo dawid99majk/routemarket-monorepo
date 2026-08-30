@@ -181,7 +181,7 @@ export function AtlasInterviewWizard({
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
-              <Youtube className="h-4 w-4 text-red-500" />
+              <Youtube className="h-4 w-4 text-danger" />
               Opcjonalny link YouTube
             </label>
             <Input
@@ -288,7 +288,7 @@ export function AtlasInterviewWizard({
                   <div className="space-y-2 mb-8">
                     {p.highlights.map((h, i) => (
                       <div key={i} className="flex items-center gap-2.5 text-xs font-semibold">
-                        <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
                         <span className="truncate">{h}</span>
                       </div>
                     ))}

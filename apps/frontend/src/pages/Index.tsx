@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import Zdjecie from '@/components/Zdjecie';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Heart, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import Logo from '@/components/Logo';
 import contour from '@/assets/patterns/contour.svg';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import { useTranslation } from 'react-i18next';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
@@ -202,13 +202,13 @@ export default function Index() {
           <div aria-hidden className="hidden xl:block absolute left-[56px] top-[58px] w-[132px] rotate-[5deg]
                           rounded-[9px] bg-card p-[7px] shadow-token-sm">
             <div className="h-[84px] rounded-[6px] overflow-hidden bg-placeholder-photo">
-              {zdjeciaHero[0] && <img src={miniatura(zdjeciaHero[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+              {zdjeciaHero[0] && <Zdjecie src={zdjeciaHero[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
             </div>
           </div>
           <div aria-hidden className="hidden xl:block absolute right-[250px] top-[74px] w-[140px] rotate-[-5deg]
                           rounded-[9px] bg-card p-[7px] shadow-token-sm">
             <div className="h-[90px] rounded-[6px] overflow-hidden bg-placeholder-photo">
-              {zdjeciaHero[1] && <img src={miniatura(zdjeciaHero[1], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+              {zdjeciaHero[1] && <Zdjecie src={zdjeciaHero[1]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
             </div>
           </div>
 
@@ -216,7 +216,7 @@ export default function Index() {
           <div aria-hidden className="hidden xl:block absolute left-[198px] top-[150px] w-[172px] rotate-[-4deg]
                           rounded-[10px] bg-card p-[9px] shadow-token-md">
             <div className="h-[112px] rounded-[7px] overflow-hidden bg-placeholder-photo">
-              {zdjeciaHero[2] && <img src={miniatura(zdjeciaHero[2], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+              {zdjeciaHero[2] && <Zdjecie src={zdjeciaHero[2]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="text-[13px] leading-[1.3] font-medium mt-[9px] mx-[2px]">Wieża Wenecka</div>
           </div>
@@ -225,7 +225,7 @@ export default function Index() {
           <div aria-hidden className="hidden xl:block absolute left-[-58px] top-[238px] w-[272px] rotate-[-6deg]
                           rounded-[10px] bg-card p-[11px] shadow-token-lg">
             <div className="h-[178px] rounded-[7px] overflow-hidden bg-placeholder-photo">
-              {zdjeciaHero[3] && <img src={miniatura(zdjeciaHero[3], SZEROKOSC.karta)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+              {zdjeciaHero[3] && <Zdjecie src={zdjeciaHero[3]} gdzie="karta" alt="" className="w-full h-full object-cover" />}
             </div>
             <div className="text-[17px] leading-[1.3] font-medium mt-[13px] mx-[3px]">Amfiteatr w Durrës</div>
             <div className="font-mono text-[11px] leading-[1.3] text-muted-foreground mt-[7px] mx-[3px]">
@@ -499,7 +499,7 @@ export default function Index() {
                     <div className="rounded-[7px] overflow-hidden bg-placeholder-photo"
                          style={{ height: hFoto }}>
                       {tb.photos?.[0] && (
-                        <img src={miniatura(tb.photos[0], SZEROKOSC.kafelek)} alt="" loading="lazy"
+                        <Zdjecie src={tb.photos[0]} gdzie="kafelek" alt=""
                              className="w-full h-full object-cover" />
                       )}
                     </div>

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import PunktStartowy from '@/components/PunktStartowy';
+import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
@@ -235,9 +236,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    */
   const [grouped, setGrouped] = useState(false);
   const [grupowanieRuszone, setGrupowanieRuszone] = useState(false);
-  const [startQuery, setStartQuery] = useState('');
-  const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
-  const [pokazStart, setPokazStart] = useState(false);
   const [pokazUstawienia, setPokazUstawienia] = useState(false);
   const [podpowiedzi, setPodpowiedzi] = useState<any[]>([]);
   const [pokazPodpowiedzi, setPokazPodpowiedzi] = useState(false);
@@ -557,26 +555,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     } as any, priority);
   };
 
-  useEffect(() => {
-    const q = startQuery.trim();
-    if (q.length < 2 || !active?.destination) { setStartPodpowiedzi([]); return; }
-    let aktualne = true;
-    const t = setTimeout(async () => {
-      try {
-        const d = await apiPost<any>('/places/suggest',
-          { query: q, city: active.destination, limit: 6 }, { timeoutMs: 12_000 });
-        if (aktualne) setStartPodpowiedzi(d.suggestions ?? []);
-      } catch { if (aktualne) setStartPodpowiedzi([]); }
-    }, 300);
-    return () => { aktualne = false; clearTimeout(t); };
-  }, [startQuery, active?.destination]);
-
   /**
    * Punkt startowy trafia na projekt, nie na tablicę miejsc. To nie jest atrakcja
    * do zwiedzania, tylko adres, z którego wychodzicie — planer dostaje go jako bazę
    * i zaczyna oraz kończy tam każdy dzień.
    */
-  const [lokalizowanie, setLokalizowanie] = useState(false);
   const [pokazTermin, setPokazTermin] = useState(false);
   const [terminOd, setTerminOd] = useState('');
   const [terminDo, setTerminDo] = useState('');
@@ -606,28 +589,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     toast.success(od ? `Termin: ${zakresDat(od, doDnia)}` : 'Termin usunięty');
   };
 
-  /**
-   * Położenie z urządzenia — to samo, co przycisk „Moje położenie" w Odkrywaj.
-   * Przeglądarka pyta o zgodę sama i bez niej nic nie dostajemy, dlatego to
-   * osobne kliknięcie, a nie coś, co dzieje się przy wejściu na tablicę.
-   */
-  const startZUrzadzenia = () => {
-    if (!navigator.geolocation) return toast.error(t('tablica.ta_przegladarka_nie_udostepnia_po'));
-    setLokalizowanie(true);
-    navigator.geolocation.getCurrentPosition(
-      (poz) => {
-        setLokalizowanie(false);
-        ustawStart({ name: 'Moje położenie', lat: poz.coords.latitude, lng: poz.coords.longitude });
-      },
-      (err) => {
-        setLokalizowanie(false);
-        toast.error(err.code === err.PERMISSION_DENIED
-          ? 'Bez zgody na położenie nie odczytam lokalizacji'
-          : 'Nie udało się odczytać położenia');
-      },
-      { timeout: 10_000 }
-    );
-  };
 
   const ustawStart = async (sug: any | null) => {
     if (!active) return;
@@ -637,8 +598,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const { error } = await supabase.from('trip_projects').update(patch).eq('id', active.id);
     if (error) return toast.error(error.message);
     setProjects((prev) => prev.map((p) => (p.id === active.id ? { ...p, ...patch } as any : p)));
-    setStartQuery('');
-    setPokazStart(false);
     toast.success(sug ? `Start: ${sug.name}` : 'Punkt startowy usunięty');
   };
 
@@ -1777,75 +1736,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                       Punkt startowy
                     </p>
-                    {active.start_name ? (
-                      <>
-                        <p className="text-[15px] mt-1.5 break-words">{active.start_name}</p>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          <Button size="sm" variant="outline" onClick={() => { setPokazStart(true); setStartQuery(''); }}>
-                            Zmień
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
-                            {lokalizowanie
-                              ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
-                              : <><Crosshair className="w-4 h-4 mr-1.5" /> {t('tablica.moje_po_ozenie')}</>}
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => ustawStart(null)}
-                            className="text-muted-foreground hover:text-destructive">
-                            Usuń
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-[13px] text-muted-foreground mt-1.5 text-pretty">
-                          Hotel, parking, dworzec — planer zacznie i skończy tam każdy dzień.
-                        </p>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
-                            Ustaw punkt startowy
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
-                            {lokalizowanie
-                              ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
-                              : <><Crosshair className="w-4 h-4 mr-1.5" /> {t('tablica.moje_po_ozenie')}</>}
-                          </Button>
-                        </div>
-                      </>
-                    )}
-
-                    {pokazStart && (
-                      <div className="relative mt-3">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input autoFocus value={startQuery}
-                          onChange={(e) => setStartQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Escape' && setPokazStart(false)}
-                          placeholder={`Hotel, parking albo dworzec w: ${active.destination}`}
-                          className="pl-9" />
-                        {startPodpowiedzi.length > 0 && (
-                          <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
-                                          bg-popover shadow-token-lg overflow-hidden max-h-[220px] overflow-y-auto">
-                            {startPodpowiedzi.map((sug, i) => (
-                              <button key={`${sug.name}-${i}`} onClick={() => ustawStart(sug)}
-                                className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors
-                                           border-b border-border last:border-b-0">
-                                <div className="text-sm truncate">{sug.name}</div>
-                                <div className="font-mono text-[11px] text-muted-foreground truncate">
-                                  {[sug.kind, [sug.city, sug.country].filter(Boolean).join(' / ')]
-                                    .filter(Boolean).join(' · ')}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {startQuery.trim().length >= 3 && (
-                          <button
-                            onClick={() => ustawStart({ name: startQuery.trim(), lat: null, lng: null })}
-                            className="mt-2 text-[13px] text-accent hover:underline">
-                            Użyj „{startQuery.trim()}" jako nazwy własnej
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    <PunktStartowy
+                      nazwa={active.start_name}
+                      bezPolozenia={!!active.start_name && (active as any).start_lat == null}
+                      destination={active.destination}
+                      onZapisz={(n, lat, lng) => ustawStart({ name: n, lat, lng })}
+                      onUsun={() => ustawStart(null)}
+                    />
                   </div>
 
                   {/* Termin */}
@@ -1957,7 +1854,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${
-                                  budget.ratio > 1.05 ? 'bg-red-500' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
+                                  budget.ratio > 1.05 ? 'bg-danger' : budget.ratio > 0.85 ? 'bg-warning' : 'bg-primary'
                                 }`}
                                 style={{ width: `${Math.min(100, budget.ratio * 100)}%` }}
                               />
@@ -1967,7 +1864,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
                               {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
                               {' '}(okno {(budget.windowMin / 60).toFixed(0)} h, w tym przejścia po {TRANSFER_MIN} min)
-                              {budget.ratio > 1.05 && <span className="text-red-600 font-medium"> {t('tablica.wiecej_niz_da_sie_przejsc')}</span>}
+                              {budget.ratio > 1.05 && <span className="text-danger font-medium"> {t('tablica.wiecej_niz_da_sie_przejsc')}</span>}
                             </p>
                           </div>
                         )}
@@ -2051,7 +1948,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                        border-b border-border last:border-b-0">
                             <div className="w-9 h-9 rounded-sm bg-muted shrink-0 overflow-hidden">
                               {sug.photos?.[0] && (
-                                <img src={miniatura(sug.photos[0], 120)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                <Zdjecie src={sug.photos[0]} gdzie={120} alt="" className="w-full h-full object-cover" />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -2193,7 +2090,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       return (
                         <div key={r.name} className="rounded-md border overflow-hidden bg-background flex flex-col">
                           {r.image_url && (
-                            <img src={miniatura(r.image_url, 120)} alt="" loading="lazy"
+                            <Zdjecie src={r.image_url} gdzie={120} alt=""
                               className="w-full h-32 object-cover bg-muted" />
                           )}
                           <div className="p-3 space-y-2 flex-1 flex flex-col">
@@ -2425,7 +2322,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           <Users className="w-3.5 h-3.5 text-muted-foreground" />
                           <span className="flex-1 truncate">{sh.shared_with_email}</span>
                           <span className="text-muted-foreground">{sh.role === 'editor' ? 'może edytować' : 'podgląd'}</span>
-                          <button onClick={() => revokeShare(sh.id)} className="text-muted-foreground hover:text-red-500">
+                          <button onClick={() => revokeShare(sh.id)} className="text-muted-foreground hover:text-danger">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -2558,7 +2455,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   <div className="w-[84px] h-[84px] rounded-sm bg-muted shrink-0 overflow-hidden
                                                   flex items-center justify-center">
                                     {p.image_url
-                                      ? <img src={miniatura(p.image_url, 120)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                      ? <Zdjecie src={p.image_url} gdzie={120} alt="" className="w-full h-full object-cover" />
                                       : <Icon className="w-5 h-5 text-muted-foreground/60" />}
                                   </div>
                                   <div className="min-w-0 flex-1">
@@ -2812,12 +2709,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         <div aria-hidden
                           className="absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-45"
                           style={{ backgroundImage: `url("${placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}")` }} />
-                        <img
-                          src={miniatura(placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)], SZEROKOSC.karta)}
-                          alt={placeCard.name}
+                        <Zdjecie src={placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]} gdzie="karta" alt={placeCard.name}
                           className="relative w-full h-56 object-contain"
-                          onError={() => setPlaceCard((prev: any) => ({ ...prev, photos: [] }))}
-                        />
+                          onError={() => setPlaceCard((prev: any) => ({ ...prev, photos: [] }))} />
                         {/* Same kropki po 6 px były jedynym sposobem na zmianę zdjęcia:
                             nie wyglądały na klikalne i trudno było w nie trafić. Strzałki
                             mówią wprost, że zdjęć jest więcej, licznik ile ich zostało,
@@ -3305,7 +3199,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         {new Date(sp.created_at).toLocaleDateString('pl-PL')}
                       </span>
                     </button>
-                    <button onClick={() => deletePlan(sp.id)} className="text-muted-foreground hover:text-red-500">
+                    <button onClick={() => deletePlan(sp.id)} className="text-muted-foreground hover:text-danger">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>

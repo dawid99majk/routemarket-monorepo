@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import Zdjecie from '@/components/Zdjecie';
 import { zakresDat } from '@/lib/daty';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Plus } from 'lucide-react';
@@ -193,6 +193,7 @@ export default function TripPlans() {
             const [wTrakcie, ...reszta] = posortowane;
             const p = podglad[wTrakcie.id];
             const dniGotowe = dniPlanu[wTrakcie.id] ?? 0;
+            const ileW = p?.ile ?? 0;
             const dniCel = wTrakcie.days ?? 0;
             const postep = dniCel > 0 ? Math.min(100, Math.round((dniGotowe / dniCel) * 100)) : 0;
             return (
@@ -204,7 +205,7 @@ export default function TripPlans() {
                              flex flex-col sm:flex-row shadow-token-sm hover:shadow-token-md transition-shadow">
                   <div className="w-full sm:w-[300px] h-[224px] shrink-0 bg-placeholder-photo overflow-hidden">
                     {p?.zdjecia?.[0] && (
-                      <img src={miniatura(p.zdjecia[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                      <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0 p-6 flex flex-col">
@@ -214,10 +215,18 @@ export default function TripPlans() {
                     <h2 className="font-display font-light text-[30px] leading-[1.1] tracking-[-0.02em] mt-2 truncate">
                       {wTrakcie.name}
                     </h2>
+                    {/* Meta niesie to, czego NIE MA w tytule. Nazwa wyjazdu zwykle
+                        zawiera już miasto i liczbę dni („Bukareszt w dwa dni"),
+                        więc powtarzanie ich pod spodem zajmuje wiersz i nic nie
+                        dodaje. Zostaje termin, liczba miejsc i charakter. */}
                     <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-2">
-                      {[wTrakcie.destination,
-                        dniCel ? `${dniCel} ${odmiana(dniCel, 'dzień', 'dni', 'dni')}` : null,
-                        wTrakcie.trip_type].filter(Boolean).join(' · ')}
+                      {[
+                        (wTrakcie as any).start_date
+                          ? zakresDat((wTrakcie as any).start_date, (wTrakcie as any).end_date)
+                          : null,
+                        ileW > 0 ? `${ileW} ${odmiana(ileW, 'miejsce', 'miejsca', 'miejsc')}` : 'pusta tablica',
+                        wTrakcie.trip_type,
+                      ].filter(Boolean).join(' · ')}
                     </p>
 
                     {/* Trzy liczby w kolorach decyzji: szałwia „na pewno",
@@ -240,10 +249,16 @@ export default function TripPlans() {
                     {/* Pasek mówi o PLANIE, nie o tablicy — zebranie miejsc to
                         jeszcze nie jest wyjazd, który da się przejść. */}
                     <div className="mt-auto pt-5">
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-[width]"
-                             style={{ width: `${postep}%` }} />
-                      </div>
+                      {dniCel > 0 ? (
+                        <div className="flex gap-1">
+                          {Array.from({ length: dniCel }).map((_, i) => (
+                            <span key={i} className={`h-1.5 flex-1 rounded-full ${
+                              i < dniGotowe ? 'bg-primary' : 'bg-muted'}`} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="h-1.5 rounded-full bg-muted" />
+                      )}
                       <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-2">
                         {dniCel === 0
                           ? 'Bez ustawionej długości wyjazdu'
@@ -313,7 +328,7 @@ export default function TripPlans() {
                             <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-full">
                               {zdjeciaW.slice(0, 3).map((z, i) => (
                                 <div key={i} className={`relative overflow-hidden bg-placeholder-photo ${i === 0 ? 'row-span-2' : ''}`}>
-                                  <img src={miniatura(z, SZEROKOSC.kafelek)} alt="" loading="lazy"
+                                  <Zdjecie src={z} gdzie="kafelek" alt=""
                                     className="w-full h-full object-cover" />
                                   {i === 2 && ile > 3 && (
                                     <span className="absolute right-1.5 bottom-1.5 rounded-sm bg-ink/70 px-1.5 py-0.5
@@ -326,7 +341,7 @@ export default function TripPlans() {
                             </div>
                           ) : (
                             zdjeciaW[0] && (
-                              <img src={miniatura(zdjeciaW[0], SZEROKOSC.kafelek)} alt="" loading="lazy"
+                              <Zdjecie src={zdjeciaW[0]} gdzie="kafelek" alt=""
                                 className="w-full h-full object-cover" />
                             )
                           )}

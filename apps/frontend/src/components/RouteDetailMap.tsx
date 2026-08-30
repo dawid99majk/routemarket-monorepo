@@ -31,29 +31,53 @@ function createCircleIcon(color: string, label: string) {
   });
 }
 
-function createPoiIcon(name: string, color: string = '#6366f1') {
-  let emoji = '';
-  const lowercase = name.toLowerCase();
-  if (lowercase.includes('start')) emoji = '';
-  else if (lowercase.includes('meta') || lowercase.includes('koniec') || lowercase.includes('end')) emoji = '';
-  else if (lowercase.includes('schronisko')) emoji = '';
-  else if (lowercase.includes('szczyt') || lowercase.includes('góra') || lowercase.includes('giewont') || lowercase.includes('kasprowy')) emoji = '🏔️';
-  else if (lowercase.includes('parking')) emoji = '🅿️';
-  else if (lowercase.includes('widok') || lowercase.includes('punkt widokowy')) emoji = '📷';
-  else if (lowercase.includes('restauracja') || lowercase.includes('karczma') || lowercase.includes('bar')) emoji = '🍽️';
+/** Kolor z tokenu — Leaflet dostaje wartość, nie klasę, więc czytamy zmienną. */
+function tokenKoloru(nazwa: string, zapas: string) {
+  if (typeof window === 'undefined') return zapas;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(nazwa).trim();
+  return v ? `hsl(${v})` : zapas;
+}
+
+/**
+ * Kontury z lucide, wstawiane jako SVG. Leaflet składa ikonę z surowego HTML-a,
+ * więc komponentu Reacta nie da się tu podać — ale to te same kształty, których
+ * używa reszta interfejsu, a nie emoji rysowane przez system.
+ */
+const GLIFY: Record<string, string> = {
+  szczyt: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+  parking: '<path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
+  widok: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  jedzenie: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  nocleg: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  meta: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
+  punkt: '<circle cx="12" cy="12" r="4"/>',
+};
+
+function createPoiIcon(name: string, color?: string) {
+  const n = name.toLowerCase();
+  let glif = GLIFY.punkt;
+  if (n.includes('meta') || n.includes('koniec') || n.includes('end')) glif = GLIFY.meta;
+  else if (n.includes('schronisko') || n.includes('nocleg') || n.includes('hotel')) glif = GLIFY.nocleg;
+  else if (n.includes('szczyt') || n.includes('góra') || n.includes('giewont') || n.includes('kasprowy')) glif = GLIFY.szczyt;
+  else if (n.includes('parking')) glif = GLIFY.parking;
+  else if (n.includes('widok')) glif = GLIFY.widok;
+  else if (n.includes('restauracja') || n.includes('karczma') || n.includes('bar')) glif = GLIFY.jedzenie;
+
+  const tlo = color || tokenKoloru('--primary', 'hsl(158 28% 32%)');
+  const napis = tokenKoloru('--card', 'hsl(40 100% 99%)');
 
   return L.divIcon({
     className: 'route-poi-marker',
     html: `<div style="
-      background:${color};
-      color:white;
+      background:${tlo};
       border-radius:50%;
       width:30px;height:30px;
       display:flex;align-items:center;justify-content:center;
-      font-size:14px;
-      border:2px solid white;
-      box-shadow:0 2px 6px rgba(0,0,0,0.3);
-    ">${emoji}</div>`,
+      border:2px solid ${napis};
+      box-shadow:0 2px 6px rgba(58,42,34,.3);
+    "><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+        fill="none" stroke="${napis}" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round">${glif}</svg></div>`,
     iconSize: [30, 30],
     iconAnchor: [15, 15],
   });

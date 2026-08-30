@@ -129,7 +129,7 @@ export default function MyRoutes() {
               <Button variant="outline" size="sm" onClick={() => downloadGpx(project)} disabled={!reqs.gpxData}>
                 <Download className="w-4 h-4 mr-1.5" /> GPX
               </Button>
-              <button onClick={() => remove(project.id)} className="text-muted-foreground hover:text-red-500">
+              <button onClick={() => remove(project.id)} className="text-muted-foreground hover:text-danger">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
