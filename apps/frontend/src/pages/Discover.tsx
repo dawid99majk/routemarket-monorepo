@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import KartaMiejsca from '@/components/KartaMiejsca';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -101,6 +102,8 @@ export default function Discover() {
   const [query, setQuery] = useState('');
   /** Propozycje agenta — spoza katalogu, więc trzymane osobno od `places`. */
   const [wynikiAgenta, setWynikiAgenta] = useState<any[]>([]);
+  /** Miejsce otwarte w oknie. Strona `/miejsce/:slug` zostaje dla odnośników. */
+  const [karta, setKarta] = useState<CatalogPlace | null>(null);
   const [szukaAgent, setSzukaAgent] = useState(false);
   /** Sekundy od startu szukania. Zapytanie do agenta trwa ~50 s i bez
    *  licznika nie da się odróżnić długiego czekania od zawieszenia. */
@@ -462,7 +465,7 @@ export default function Discover() {
     // Pinezka prowadzi tam, co kafelek: do karty miejsca ze zdjęciami i opisem.
     // Samo przewinięcie pokazywało tylko to, co i tak było widać na kafelku.
     const p = places.find((x) => x.id === id);
-    if (p?.slug) navigate(`/miejsce/${p.slug}`);
+    if (p) setKarta(p);
   };
 
   const seedCity = async () => {
@@ -666,6 +669,20 @@ export default function Discover() {
           </div>
         </div>
 
+        <KartaMiejsca
+          miejsce={karta ? {
+            name: karta.name,
+            slug: karta.slug,
+            photos: karta.photos,
+            description: opisMiejsca(karta),
+            opening_hours: karta.opening_hours,
+            visit_minutes: karta.visit_minutes,
+          } : null}
+          decyzja={karta ? (marks[karta.id] as any) ?? null : null}
+          onDecyzja={(d) => { if (karta) mark(karta, d as Bucket); }}
+          onZamknij={() => setKarta(null)}
+        />
+
         {/* Znalezione przez agenta: propozycje spoza katalogu, na konkretne
             pytanie. Osobny pasek, żeby nie udawały części zbioru miasta. */}
         {wynikiAgenta.length > 0 && (
@@ -823,7 +840,7 @@ export default function Discover() {
                     aktywne === p.id ? 'border-primary shadow-token-md' : 'border-border hover:border-foreground/25'
                   }`}
                 >
-                  <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="block w-full text-left">
+                  <button onClick={() => setKarta(p)} className="block w-full text-left">
                     <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
                       {p.photos?.[0] && (
                         <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover" />

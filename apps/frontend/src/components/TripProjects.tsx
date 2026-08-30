@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import KartaMiejsca from '@/components/KartaMiejsca';
 import { Skeleton } from '@/components/ui/skeleton';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
@@ -1041,7 +1042,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     // pokazać pełną galerię zamiast pojedynczej, czasem przeterminowanej miniatury.
     if (pinned?.catalog_id) {
       (supabase as any).from('place_catalog')
-        .select('photos, description, opening_hours, website')
+        .select('photos, description, opening_hours, website, slug')
         .eq('id', pinned.catalog_id).maybeSingle()
         .then(({ data: kat }: any) => {
           if (!kat) return;
@@ -1049,6 +1050,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           setPlaceCard((prev: any) => prev && prev.name === item.name ? {
             ...prev,
             photos: zKatalogu.length ? zKatalogu : prev.photos,
+            slug: prev.slug ?? kat.slug ?? null,
             description: prev.description || kat.description || '',
             opening_hours: prev.opening_hours || kat.opening_hours || null,
             website: prev.website || kat.website || null,
@@ -2707,124 +2709,31 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </DialogContent>
             </Dialog>
 
-            <Dialog open={!!placeCard} onOpenChange={(open) => !open && setPlaceCard(null)}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="pr-6 text-left leading-snug flex items-start gap-2">
-                    {placeCard?.nr != null && (
-                      <span className="w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
-                                       text-[12px] font-medium bg-foreground text-background font-sans">
-                        {placeCard.nr}
-                      </span>
-                    )}
-                    <span className="min-w-0">{placeCard?.name}</span>
-                  </DialogTitle>
-                </DialogHeader>
-                {placeCard && (
-                  <div className="space-y-3">
-                    {placeCard.photos?.length > 0 && (
-                      <div className="relative rounded-md overflow-hidden bg-muted">
-                        {/* Zdjęcia z Commons bywają pionowe, a ramka jest pozioma.
-                            object-cover ucinał wtedy wszystko poza środkiem kadru — z całej
-                            wieży zostawał kawałek muru. Teraz zdjęcie mieści się w całości,
-                            a tło robi jego rozmyta kopia, żeby boki nie świeciły pustką. */}
-                        <div aria-hidden
-                          className="absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-45"
-                          style={{ backgroundImage: `url("${placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}")` }} />
-                        <Zdjecie src={placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]} gdzie="karta" alt={placeCard.name}
-                          className="relative w-full h-56 object-contain"
-                          onError={() => setPlaceCard((prev: any) => ({ ...prev, photos: [] }))} />
-                        {/* Same kropki po 6 px były jedynym sposobem na zmianę zdjęcia:
-                            nie wyglądały na klikalne i trudno było w nie trafić. Strzałki
-                            mówią wprost, że zdjęć jest więcej, licznik ile ich zostało,
-                            a kropki zostają jako wskaźnik miejsca w zestawie — z polem
-                            kliknięcia większym niż sama kropka. */}
-                        {placeCard.photos.length > 1 && (() => {
-                          const ile = placeCard.photos.length;
-                          const teraz = Math.min(cardPhoto, ile - 1);
-                          const przesun = (o: number) => setCardPhoto((teraz + o + ile) % ile);
-                          const strzalka = `absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full
-                            bg-background/85 text-foreground shadow-token-sm backdrop-blur-[2px]
-                            flex items-center justify-center hover:bg-background transition-colors`;
-                          return (
-                            <>
-                              <button type="button" aria-label={t('tablica.poprzednie_zdjecie')}
-                                onClick={() => przesun(-1)} className={`${strzalka} left-2`}>
-                                <ChevronLeft className="w-4 h-4" />
-                              </button>
-                              <button type="button" aria-label={t('tablica.nastepne_zdjecie')}
-                                onClick={() => przesun(1)} className={`${strzalka} right-2`}>
-                                <ChevronRight className="w-4 h-4" />
-                              </button>
-                              <span className="absolute top-2 right-2 rounded-full bg-ink/55 text-background
-                                               font-mono tabular-nums text-[11px] px-2 py-0.5">
-                                {teraz + 1}/{ile}
-                              </span>
-                              <div className="absolute bottom-0 left-0 right-0 flex justify-center">
-                                {placeCard.photos.map((_: string, i: number) => (
-                                  <button key={i} type="button" onClick={() => setCardPhoto(i)}
-                                    aria-label={`Zdjęcie ${i + 1} z ${ile}`}
-                                    aria-current={i === teraz}
-                                    className="px-1 py-2.5">
-                                    <span className={`block w-1.5 h-1.5 rounded-full transition-colors ${
-                                      i === teraz ? 'bg-card' : 'bg-card/50'}`} />
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {/* Przypinanie było wyłącznie ikonką na liście. Kto otworzył kartę,
-                        żeby zdecydować, musiał ją zamknąć i trafić w pinezkę 14 px
-                        obok — decyzja zapadała tu, a przycisk był gdzie indziej. */}
-                    {placeCard.source === 'suggested' && (
-                      places.some((p) => p.name === placeCard.name) ? (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Pin className="w-3 h-3" /> jest już na Twojej tablicy
-                        </span>
-                      ) : (
-                        <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-                          <span className="text-[11px] text-muted-foreground">
-                            propozycja agenta — nie ma jej jeszcze na Twojej tablicy
-                          </span>
-                          <Button size="sm" variant="outline" className="shrink-0"
-                            onClick={() => pinSuggestion({ name: placeCard.name, minutes: placeCard.minutesRaw, note: placeCard.note })}>
-                            <Pin className="w-3.5 h-3.5 mr-1.5" /> Dodaj do tablicy
-                          </Button>
-                        </div>
-                      )
-                    )}
-
-                    {cardLoading && !placeCard.description && (
-                      <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Sprawdzam, co to za miejsce…
-                      </p>
-                    )}
-                    {opisMiejsca(placeCard) && <p className="text-sm leading-relaxed">{opisMiejsca(placeCard)}</p>}
-                    {placeCard.recommendation && (
-                      <p className="text-xs bg-primary/10/70 border border-primary/30 rounded-md p-2.5 leading-relaxed">
-                        <strong className="block text-[10px] uppercase tracking-wider text-primary mb-0.5">{t('tablica.wskazowka')}</strong>
-                        {placeCard.recommendation}
-                      </p>
-                    )}
-                    {placeCard.note && <p className="text-xs text-muted-foreground italic">{placeCard.note}</p>}
-
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground border-t pt-2.5">
-                      {placeCard.minutes && <span>Czas: <strong className="text-foreground">{placeCard.minutes} min</strong></span>}
-                      {placeCard.opening_hours && <span>Godziny: <strong className="text-foreground">{placeCard.opening_hours}</strong></span>}
-                      {placeCard.website && (
-                        <a href={placeCard.website} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                          strona miejsca
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
+            <KartaMiejsca
+              miejsce={placeCard ? {
+                name: placeCard.name,
+                slug: placeCard.slug ?? null,
+                photos: placeCard.photos,
+                description: placeCard.description,
+                opening_hours: placeCard.opening_hours,
+                visit_minutes: placeCard.minutes,
+                website: placeCard.website,
+                note: placeCard.recommendation || placeCard.note || null,
+                nr: placeCard.nr ?? null,
+              } : null}
+              ladowanie={cardLoading}
+              decyzja={(() => {
+                if (!placeCard) return null;
+                const m = places.find((x) => x.name === placeCard.name);
+                return (m?.priority as any) ?? null;
+              })()}
+              onDecyzja={(d) => {
+                if (!placeCard) return;
+                const m = places.find((x) => x.name === placeCard.name);
+                if (m) movePlace(m.id, d as Priority);
+              }}
+              onZamknij={() => setPlaceCard(null)}
+            />
 
             {view === 'tablica' && (<>
             {/* Wydarzenia: pokazujemy je przy tablicy, bo tam zapada decyzja
