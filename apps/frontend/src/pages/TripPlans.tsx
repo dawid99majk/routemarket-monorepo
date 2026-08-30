@@ -257,6 +257,9 @@ export default function TripPlans() {
 
                 {/* Reszta: spokojna siatka trzech. Ostatnia komórka to kreska —
                     założenie wyjazdu jest częścią tej listy, nie osobnym ekranem. */}
+                {/* Własne pole dla siatki: bez niego „pozostałe" zlewały się
+                    z kartą wyjazdu w trakcie stojącą wyżej. */}
+                <div className="mt-10 rounded-md bg-surface/70 border border-border/40 p-6 sm:p-8">
                 {reszta.length > 0 && (() => {
                   // Rozkład etapów liczony raz, dla nagłówka. Ta sama reguła co
                   // na kartach, więc liczby nad siatką zgadzają się z etykietami w niej.
@@ -275,7 +278,7 @@ export default function TripPlans() {
                     miejsca ? `${miejsca} ${odmiana(miejsca, 'bez planu', 'bez planu', 'bez planu')}` : null,
                   ].filter(Boolean);
                   return (
-                    <div className="flex flex-wrap items-baseline justify-between gap-3 mt-8">
+                    <div className="flex flex-wrap items-baseline justify-between gap-3">
                       <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
                         Pozostałe · {reszta.length}
                       </span>
@@ -285,7 +288,7 @@ export default function TripPlans() {
                     </div>
                   );
                 })()}
-                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-5 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
                   {reszta.map((w) => {
                     const q = podglad[w.id];
                     const ile = q?.ile ?? 0;
@@ -305,7 +308,7 @@ export default function TripPlans() {
                                    shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
                         {/* Mozaika tylko wtedy, gdy ma z czego: poniżej trzech zdjęć
                             małe pola robią się skrawkami przy karcie ~300 px. */}
-                        <div className="relative h-[132px] bg-placeholder-photo">
+                        <div className="relative h-[248px] bg-placeholder-photo">
                           {zdjeciaW.length >= 3 ? (
                             <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-full">
                               {zdjeciaW.slice(0, 3).map((z, i) => (
@@ -336,8 +339,8 @@ export default function TripPlans() {
                           </span>
                         </div>
 
-                        <div className="p-4 flex-1 flex flex-col">
-                          <div className="font-display text-[17px] leading-snug truncate">{w.name}</div>
+                        <div className="p-5 flex-1 flex flex-col">
+                          <div className="font-display text-[20px] leading-snug truncate">{w.name}</div>
                           <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1.5 truncate">
                             {[w.destination, terminW,
                               ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
@@ -389,12 +392,13 @@ export default function TripPlans() {
                   })}
 
                   <button onClick={() => navigate('/start')}
-                    className="rounded-md border border-dashed border-border min-h-[248px]
+                    className="rounded-md border border-dashed border-border min-h-[420px]
                                flex flex-col items-center justify-center gap-2 text-muted-foreground
                                hover:border-foreground/30 hover:text-foreground transition-colors">
                     <Plus className="w-5 h-5" />
                     <span className="text-sm">Zacznij nowy wyjazd</span>
                   </button>
+                </div>
                 </div>
               </>
             );
