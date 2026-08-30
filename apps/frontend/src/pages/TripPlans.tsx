@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import Zdjecie from '@/components/Zdjecie';
 import { zakresDat } from '@/lib/daty';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -168,9 +169,29 @@ export default function TripPlans() {
         </div>
 
         {ladowanie ? (
-          <p className="flex items-center gap-2 text-muted-foreground py-16">
-            <Loader2 className="w-4 h-4 animate-spin" /> Wczytuję wyjazdy…
-          </p>
+          /* Szkielet w kształcie treści: duża karta wyjazdu w trakcie, pod nią
+             siatka. Dzięki temu układ nie skacze, gdy dane dojdą. */
+          <div className="mt-8" aria-busy="true" aria-label="Wczytuję wyjazdy">
+            <Skeleton className="h-[242px] w-full rounded-md" />
+            <div className="mt-10 rounded-md bg-surface/70 border border-border/40 p-6 sm:p-8">
+              <div className="flex items-baseline justify-between gap-3">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+              <div className="mt-5 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="rounded-md border border-border bg-card overflow-hidden">
+                    <Skeleton className="h-[248px] w-full rounded-none" />
+                    <div className="p-5 space-y-3">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                      <Skeleton className="h-1 w-full mt-4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         ) : wyjazdy.length === 0 ? (
           <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
             <h2 className="font-display font-light text-[24px]">Nie masz jeszcze żadnego wyjazdu</h2>

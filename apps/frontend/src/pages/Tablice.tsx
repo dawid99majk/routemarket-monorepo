@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, Loader2, Search } from 'lucide-react';
@@ -150,9 +151,20 @@ export default function Tablice() {
         </div>
 
         {ladowanie ? (
-          <p className="flex items-center gap-2 text-muted-foreground py-16">
-            <Loader2 className="w-4 h-4 animate-spin" /> Wczytuję tablice…
-          </p>
+          /* Szkielet w kształcie potoku kolumnowego — kafelki różnej wysokości,
+             tak jak wygląda gotowa galeria. */
+          <div className="mt-6 [column-gap:18px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4"
+            aria-busy="true" aria-label="Wczytuję tablice">
+            {[196, 150, 224, 168, 208, 144, 186, 162].map((h, i) => (
+              <div key={i} className="break-inside-avoid mb-[18px] rounded-[10px] border border-border bg-card overflow-hidden">
+                <Skeleton className="w-full rounded-none" style={{ height: h }} />
+                <div className="p-3.5 space-y-2">
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-3 w-2/5" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : widoczne.length === 0 ? (
           <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
             <h2 className="font-display font-light text-[24px]">

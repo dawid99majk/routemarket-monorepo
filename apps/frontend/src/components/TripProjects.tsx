@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -1428,8 +1429,29 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Wczytuję projekty…
+      /* Szkielet w kształcie tablicy: pasek ustawień i dwie kolumny decyzji.
+         Kółko na środku pustego ekranu nie mówi nic poza „czekaj" — układ
+         nie skacze, gdy dane dojdą, i widać z góry, że idą kolumny. */
+      <div className="space-y-5" aria-busy="true" aria-label="Wczytuję tablicę">
+        <Skeleton className="h-12 w-full rounded-md" />
+        <div className="grid gap-3 md:grid-cols-2">
+          {[0, 1].map((k) => (
+            <div key={k} className="rounded-md border border-border bg-card overflow-hidden">
+              <Skeleton className="h-12 w-full rounded-none" />
+              <div className="p-3 space-y-3">
+                {[0, 1, 2].map((j) => (
+                  <div key={j} className="flex gap-3.5">
+                    <Skeleton className="w-[84px] h-[84px] rounded-sm shrink-0" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
