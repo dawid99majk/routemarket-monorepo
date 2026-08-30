@@ -14,7 +14,7 @@ server {
 }
 
 server {
-    listen 443 ssl;
+    listen 443 ssl http2;
     server_name routemarket.io www.routemarket.io;
 
     ssl_certificate /etc/letsencrypt/live/routemarket.io/fullchain.pem;
@@ -34,6 +34,13 @@ server {
     # Zwraca ten sam index.html co front, tylko z podmienionym tytułem, opisem
     # i obrazkiem — aplikacja startuje normalnie, a robot i podgląd odnośnika
     # dostają to, co opisuje konkretną tablicę albo miejsce, a nie stronę główną.
+    # /tablica bez numeru to nie tablica, tylko galeria. Blok ponizej kieruje
+    # /tablica/ do API po znaczniki dla robotow, a bez identyfikatora API nie ma
+    # czego opisac i zwracalo 404. Dopasowanie dokladne (=) ma wyzszy priorytet
+    # niz prefiks (^~), wiec musi stac przed nim.
+    location = /tablica/ { return 301 /tablice; }
+    location = /tablica  { return 301 /tablice; }
+
     location ^~ /tablica/ {
         proxy_pass http://127.0.0.1:8081;
         proxy_set_header Host $host;
@@ -103,7 +110,7 @@ server {
 }
 
 server {
-    listen 443 ssl;
+    listen 443 ssl http2;
     server_name supabase.routemarket.io;
 
     ssl_certificate /etc/letsencrypt/live/routemarket.io/fullchain.pem;
@@ -119,7 +126,27 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
+    # Kompresja odpowiedzi API. Zmierzone: zapytanie o sto pozycji katalogu
+    # z opisami w szesciu jezykach wazy 105 kB, a po gzipie 37,7 kB — 64% mniej.
+    # Zasoby statyczne frontu kompresuje juz nginx w swoim kontenerze; API nie
+    # kompresowalo nic, a to ono zwraca najwiecej tekstu.
+    #
+    # gzip_proxied any jest tu konieczne: bez niego nginx pomija odpowiedzi
+    # przychodzace z proxy, czyli akurat wszystkie tutaj.
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/json application/javascript text/plain text/css
+               application/xml text/xml image/svg+xml application/geo+json;
+
     location / {
+        # burst pozwala na naturalne serie: wejscie na strone wysyla kilkanascie
+        # zapytan naraz i nie moze dostac 429. nodelay przepuszcza je od razu,
+        # zamiast rozkladac w czasie i spowalniac zwyklego uzytkownika.
+        limit_req zone=api burst=50 nodelay;
+
         proxy_pass http://127.0.0.1:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

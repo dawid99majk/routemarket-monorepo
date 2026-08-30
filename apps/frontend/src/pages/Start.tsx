@@ -29,6 +29,7 @@ interface SavedPlan { project_id: string; start_date: string | null; plan: any; 
 interface PublicBoard {
   id: string; name: string; destination: string | null; days: number | null;
   author_display: string | null; copy_count: number; place_count: number;
+  is_example?: boolean | null;
   photos?: string[];
 }
 
@@ -136,7 +137,7 @@ export default function Start() {
     // pokazujemy najczęściej kopiowane.
     const cel = (pr ?? [])[0]?.destination as string | undefined;
     let q = supabase.from('trip_projects')
-      .select('id, name, destination, days, author_display, copy_count')
+      .select('id, name, destination, days, author_display, copy_count, is_example')
       .eq('is_public', true).neq('user_id', u.id)
       .order('copy_count', { ascending: false }).limit(3);
     if (cel) q = q.ilike('destination', `%${cel}%`);
@@ -652,7 +653,7 @@ export default function Start() {
                         ? `${b.copy_count} ${plural(b.copy_count, 'kopia', 'kopie', 'kopii')}`
                         : null].filter(Boolean).join(' · ')}
                     zdjecia={b.photos ?? []}
-                    autor={b.author_display || 'Podróżnik'}
+                    autor={b.is_example ? 'Przykładowa tablica' : (b.author_display || 'Podróżnik')}
                     akcja={
                       <Button size="sm" variant="outline" disabled={copying === b.id}
                         onClick={() => copyBoard(b)}>

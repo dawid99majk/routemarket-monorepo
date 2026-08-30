@@ -51,7 +51,7 @@ export default function TablicaPubliczna() {
     if (!id) return;
     setLadowanie(true);
     const { data: t } = await (supabase as any).from('trip_projects')
-      .select('id, name, destination, days, trip_type, author_display, copy_count, like_count, start_date, end_date, is_public, user_id, updated_at')
+      .select('id, name, destination, days, trip_type, author_display, copy_count, like_count, start_date, end_date, is_public, user_id, updated_at, is_example')
       .eq('id', id).maybeSingle();
 
     // Polityka odsiewa nieopublikowane, więc brak wiersza znaczy „nie dla ciebie".
@@ -199,7 +199,9 @@ export default function TablicaPubliczna() {
         <div className="flex flex-wrap items-end justify-between gap-4 mt-4">
           <div className="max-w-[620px]">
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
-              Tablica od {tablica.author_display || 'podróżnika'}
+              {tablica.is_example
+                ? 'Przykładowa tablica'
+                : `Tablica od ${tablica.author_display || 'podróżnika'}`}
             </p>
             <h1 className="font-display font-light text-[40px] leading-[1.05] tracking-[-0.02em] mt-2">
               {tablica.name}

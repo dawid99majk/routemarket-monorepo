@@ -135,6 +135,9 @@ const App = () => (
                       opublikowana tablica mogła kogokolwiek z zewnątrz zaprosić. */}
                   <Route path="/tablice" element={<Tablice />} />
                   <Route path="/marketing" element={<ProtectedAdminRoute><Marketing /></ProtectedAdminRoute>} />
+                  {/* /tablica bez numeru to nie tablica, tylko galeria — dotad
+                      konczylo sie 404 zamiast pokazac, po co sie tu weszlo. */}
+                  <Route path="/tablica" element={<Navigate to="/tablice" replace />} />
                   <Route path="/tablica/:id" element={<TablicaPubliczna />} />
                   {/* Ulubione i kolekcje były osobnymi ekranami dla tej samej intencji.
                       Stare adresy zostają jako przekierowania — mogą wisieć w zakładkach
