@@ -98,6 +98,13 @@ export default function Discover() {
   const navigate = useNavigate();
   const [city, setCity] = useState('');
   const [query, setQuery] = useState('');
+  /** Propozycje agenta — spoza katalogu, więc trzymane osobno od `places`. */
+  const [wynikiAgenta, setWynikiAgenta] = useState<any[]>([]);
+  const [szukaAgent, setSzukaAgent] = useState(false);
+  /** Sekundy od startu szukania. Zapytanie do agenta trwa ~50 s i bez
+   *  licznika nie da się odróżnić długiego czekania od zawieszenia. */
+  const [szukaSekundy, setSzukaSekundy] = useState(0);
+  const [dopinane, setDopinane] = useState<Record<string, Bucket>>({});
   const [filter, setFilter] = useState<FilterId>('all');
   const [places, setPlaces] = useState<CatalogPlace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -294,6 +301,54 @@ export default function Discover() {
    * Kliknięcie oznacza, ponowne kliknięcie tego samego kubełka usuwa oznaczenie,
    * kliknięcie innego przenosi. Bez potwierdzeń i bez okien — tak mówi projekt.
    */
+  /** Drugi krok szukania: filtr nad katalogiem nie znajduje rzeczy opisanych
+   *  zdaniem, więc pytamy agenta — tak samo jak wyszukiwarka na tablicy. */
+  const szukajAgentem = async () => {
+    const q = query.trim();
+    if (!q || szukaAgent) return;
+    const miasto = city.trim() || board?.destination;
+    if (!miasto) return toast.info('Najpierw wpisz miasto.');
+    setSzukaAgent(true);
+    setWynikiAgenta([]);
+    try {
+      const d = await apiPost<any>('/discover-places',
+        { query: q, destination: miasto }, { timeoutMs: 90_000 });
+      const zn = d.places || [];
+      setWynikiAgenta(zn);
+      if (zn.length === 0) toast.info(`Agent nic nie znalazł dla: „${q}".`);
+    } catch (e: any) {
+      toast.error(e.message || 'Nie udało się wyszukać');
+    } finally {
+      setSzukaAgent(false);
+    }
+  };
+
+  /** Propozycja agenta nie ma wpisu w katalogu, więc idzie na tablicę bez
+   *  `catalog_id` — tą samą drogą co propozycje w wyszukiwarce tablicy. */
+  const dopnijZAgenta = async (p: any, bucket: Bucket) => {
+    if (!activeBoard) return toast.error(t('odkrywaj.najpierw_wybierz_wyjazd_do_ktorego'));
+    const klucz = String(p.name);
+    if (dopinane[klucz]) return;
+    setDopinane((prev) => ({ ...prev, [klucz]: bucket }));
+    const { error } = await supabase.from('trip_project_places').insert({
+      project_id: activeBoard,
+      name: p.name,
+      category: p.category || 'attraction',
+      priority: bucket,
+      lat: p.lat ?? null,
+      lng: p.lng ?? null,
+      description: p.description || '',
+      visit_minutes: p.visit_minutes ?? null,
+      image_url: p.photos?.[0] ?? p.image_url ?? null,
+      source: 'discover',
+    });
+    if (error) {
+      setDopinane((prev) => { const n = { ...prev }; delete n[klucz]; return n; });
+      return toast.error(error.message);
+    }
+    toast.success(`Dodane: ${p.name}`);
+  };
+
   const mark = async (place: CatalogPlace, bucket: Bucket) => {
     if (!activeBoard) return toast.error(t('odkrywaj.najpierw_wybierz_wyjazd_do_ktorego'));
     const current = marks[place.id];
@@ -386,6 +441,13 @@ export default function Discover() {
 
   // Zmiana miasta albo filtra zaczyna oglądanie od początku.
   useEffect(() => { setIleWidocznych(24); }, [city, filter, query]);
+
+  useEffect(() => {
+    if (!szukaAgent) return;
+    setSzukaSekundy(0);
+    const t = setInterval(() => setSzukaSekundy((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [szukaAgent]);
 
   useEffect(() => {
     const q = startQuery.trim();
@@ -559,12 +621,27 @@ export default function Discover() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') szukajAgentem(); }}
                 placeholder={t('odkrywaj.szukaj_plaza_ruiny_deszczowy_dzien')}
-                className="w-full h-12 rounded-full bg-muted/60 border border-border pl-12 pr-4
+                className="w-full h-12 rounded-full bg-muted/60 border border-border pl-12 pr-[124px]
                            text-[15px] outline-none transition-colors
                            placeholder:text-muted-foreground
                            focus:border-foreground/40 focus:bg-card"
               />
+              {/* Wpisanie frazy zawęża listę od razu; przycisk to drugi krok —
+                  pyta agenta o rzeczy, których w katalogu jeszcze nie ma. */}
+              <button onClick={szukajAgentem} disabled={!query.trim() || szukaAgent}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 rounded-full
+                           bg-foreground text-background px-4 text-sm
+                           hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed
+                           transition-colors">
+                {szukaAgent
+                  ? <span className="inline-flex items-center gap-1.5">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="font-mono tabular-nums text-[13px]">{szukaSekundy}s</span>
+                    </span>
+                  : 'Szukaj'}
+              </button>
             </div>
             <div className="relative sm:w-56 shrink-0">
               <MapPin className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -574,6 +651,12 @@ export default function Discover() {
               <datalist id="miasta">{cities.map((c) => <option key={c} value={c} />)}</datalist>
             </div>
           </div>
+
+          {szukaAgent && (
+            <p className="font-mono text-[12px] text-muted-foreground mt-3">
+              Agent przegląda miasto — to trwa do minuty. Lista niżej działa przez ten czas normalnie.
+            </p>
+          )}
 
           {/* Filtry pod kreską: doprecyzowanie tego, co wyżej, a nie konkurencja
               dla szukania. Kategorie przed klimatem — najpierw „czego szukam",
@@ -622,6 +705,66 @@ export default function Discover() {
             </button>
           </div>
         </div>
+
+        {/* Znalezione przez agenta: propozycje spoza katalogu, na konkretne
+            pytanie. Osobny pasek, żeby nie udawały części zbioru miasta. */}
+        {wynikiAgenta.length > 0 && (
+          <div className="mt-4 rounded-md border border-accent/30 bg-accent/5 p-4 sm:p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-accent">
+                Agent znalazł · {wynikiAgenta.length}
+              </span>
+              <button onClick={() => setWynikiAgenta([])}
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                ukryj
+              </button>
+            </div>
+
+            <div className="mt-3.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {wynikiAgenta.map((p: any, i: number) => {
+                const stan = dopinane[String(p.name)];
+                return (
+                  <div key={`${p.name}-${i}`}
+                    className="rounded-md border border-border bg-card p-3.5 flex flex-col">
+                    <div className="font-display text-[15px] leading-snug">{p.name}</div>
+                    {(p.visit_minutes || p.category) && (
+                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
+                        {[p.category, p.visit_minutes ? `${p.visit_minutes} min` : null]
+                          .filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    {p.description && (
+                      <p className="text-[13px] text-muted-foreground mt-2 line-clamp-3 text-pretty">
+                        {p.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60 text-[12px]">
+                      {stan ? (
+                        <span className={`rounded-full px-3 py-1 font-medium ${
+                          stan === 'must' ? 'bg-primary text-primary-foreground'
+                                          : 'bg-accent text-accent-foreground'}`}>
+                          {stan === 'must' ? 'Na pewno' : 'Być może'}
+                        </span>
+                      ) : (
+                        <>
+                          <button onClick={() => dopnijZAgenta(p, 'must' as Bucket)}
+                            className="rounded-full bg-muted px-3 py-1 font-medium
+                                       hover:bg-border transition-colors">
+                            Na pewno
+                          </button>
+                          <button onClick={() => dopnijZAgenta(p, 'nice' as Bucket)}
+                            className="text-muted-foreground hover:text-foreground transition-colors">
+                            Może
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Pasek agenta */}
         {board && places.length > 0 && (
