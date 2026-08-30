@@ -473,7 +473,7 @@ export default function Start() {
 
               <div className="flex flex-wrap gap-2.5 mt-auto pt-6">
                 <Button onClick={() => navigate(`/plany/${active.id}${activePlan ? '?widok=plan' : ''}`)}
-                  className="bg-primary hover:bg-primary/90">
+                  className="bg-foreground text-background hover:bg-foreground/90">
                   {activePlan ? 'Otwórz plan ↗' : 'Ułóż plan ↗'}
                 </Button>
                 <Button variant="outline" onClick={() => navigate('/odkrywaj')}>{t('start.dodaj_wiecej_miejsc')}</Button>
@@ -529,7 +529,7 @@ export default function Start() {
                   Nie mamy jeszcze miejsc dla tej destynacji. Mogę je zebrać — zajmie to kilkadziesiąt sekund.
                 </p>
                 <Button size="sm" onClick={zbierzMiejsca} disabled={zbieram}
-                  className="bg-primary hover:bg-primary/90">
+                  className="bg-foreground text-background hover:bg-foreground/90">
                   {zbieram
                     ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Zbieram…</>
                     : 'Zbierz miejsca'}

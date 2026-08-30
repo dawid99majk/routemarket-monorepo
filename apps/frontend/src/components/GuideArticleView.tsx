@@ -93,7 +93,7 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
         <div className="px-4 sm:px-6 py-3 flex items-center gap-2">
           <button
             onClick={onBack}
-            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Wróć do pomocy"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -112,14 +112,14 @@ export default function GuideArticleView({ article, onBack, onNavigate, isRead, 
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleCopyLink}
-              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
               aria-label="Copy link"
             >
               <Link2 className="w-4 h-4" />
             </button>
             <button
               onClick={handleShare}
-              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
               aria-label="Share guide"
             >
               <Share2 className="w-4 h-4" />

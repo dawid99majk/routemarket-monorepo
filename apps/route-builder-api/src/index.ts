@@ -1113,7 +1113,11 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
     .filter((p) => !PHOTO_JUNK.test(p.title || '') && !CAMERA_DUMP.test(p.title || ''))
     .filter((p) => {
       const c = p.coordinates?.[0];
-      if (c) return !origin || kmApart(origin, { lat: c.lat, lng: c.lon }) < 25;
+      // 25 km wpuszczało cały ośrodek miasta: wyszukiwanie "Arc de Triomphe"
+      // dawało też geotagowane zdjęcia Łuku Karuzelowego, bo ten stoi 3 km dalej
+      // i tylko odległość decydowała -- tytuł pliku nikt nie sprawdzał. 2 km
+      // to margines na niedokładność GPS aparatu, nie na sąsiedni zabytek.
+      if (c) return !origin || kmApart(origin, { lat: c.lat, lng: c.lon }) < 2;
       // Plik bez geotagu przyjmujemy tylko wtedy, gdy w tytule siedzi wyróżniające
       // słowo z nazwy miejsca — inaczej "Sandy beach" zwracało pirogę na Karaibach,
       // a dobre zdjęcia zamku w Durrës geotagu po prostu nie mają.
@@ -1918,14 +1922,14 @@ app.post('/catalog/enrich', async (c) => {
     const doOpisania = wszystkie.filter(bezOpisu).slice(0, limit);
     if (doOpisania.length === 0) return c.json({ city, enriched: 0 });
 
-    const prompt = `Opisujesz miejsca w mieście ${city} dla serwisu planowania wyjazdów.
+    const prompt = `Opisujesz PO POLSKU miejsca w mieście ${city} dla serwisu planowania wyjazdów. Piszesz w języku polskim niezależnie od tego, w jakim kraju leży miasto -- nawet gdy nazwa miejsca jest obcojęzyczna.
 
 Miejsca (nazwy skopiuj DOKŁADNIE):
 ${doOpisania.map((p: any, i: number) => `${i + 1}. ${p.name}${p.kind ? ` (${p.kind})` : ''}`).join('\n')}
 
 Dla każdego zwróć:
 - "name": nazwa dokładnie jak wyżej
-- "description": 1-2 zdania, czym to miejsce jest i co w nim ciekawego. Konkret, nie ogólnik. Bez zwrotów typu "warto zobaczyć".
+- "description": 4-6 zdań w jednym akapicie: czym to miejsce jest, kiedy powstało albo z czym się wiąże, co konkretnie w nim zobaczyć. Liczby i fakty (rok, wysokość, styl, wydarzenie) zamiast przymiotników typu "niesamowity" czy "wyjątkowy". Bez zwrotów typu "warto zobaczyć".
 - "vibe_tags": 2-4 znaczniki WYŁĄCZNIE z tej listy: ${VIBE_TAGS.join(', ')}
 - "visit_minutes": ile realnie zajmuje pobyt
 
@@ -1957,7 +1961,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
             },
             required: ['places']
           },
-          maxOutputTokens: 16384
+          maxOutputTokens: 32768
         }
       },
       { operation: 'catalog-enrich', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
@@ -1977,7 +1981,15 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
     const wgNazwy = new Map(opisane.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
     let zmienione = 0;
     for (const m of doOpisania) {
-      const d = wgNazwy.get(String(m.name).trim().toLowerCase());
+      const klucz = String(m.name).trim().toLowerCase();
+      // Dopasowanie dokładne najpierw. Model czasem doklejał adnotację rodzaju
+      // z listy z powrotem do nazwy -- "Aereo Lockheed F104-S (Starfighter)"
+      // (rodzaj: monument) wracało jako "Aereo Lockheed F104-S (Starfighter)
+      // (monument)", więc dokładny klucz nie trafiał mimo poprawnego opisu.
+      // Nazwa źródłowa jest zawsze prefiksem takiej pomyłki, więc to bezpieczny
+      // fallback -- nie zgadujemy, tylko akceptujemy dopisek na końcu.
+      const d = wgNazwy.get(klucz)
+        ?? opisane.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
       if (!d?.description) continue;
       const tags = Array.isArray(d.vibe_tags)
         ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)

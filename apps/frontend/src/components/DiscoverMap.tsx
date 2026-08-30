@@ -33,17 +33,25 @@ interface DiscoverMapProps {
   className?: string;
 }
 
-/** Te same trzy kolory, którymi opisane są kubełki na tablicy. */
-const KOLOR_KUBELKA: Record<string, string> = {
-  must: 'hsl(158 28% 32%)',
-  nice: 'hsl(200 30% 48%)',
-  rejected: 'hsl(60 4% 58%)',
+/**
+ * Kolory znaczników pochodzą z tokenów motywu, nie z wartości wpisanych tutaj.
+ * Leaflet składa ikony z surowego HTML-a, więc klasy Tailwinda do nich nie
+ * docierają — zmienna CSS jest jedyną drogą, żeby mapa szła za motywem.
+ * `--primary` to „na pewno", `--accent` to „być może", `--foreground` to
+ * miejsce bez decyzji.
+ */
+const token = (nazwa: string, zapas: string) => {
+  if (typeof window === 'undefined') return zapas;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(nazwa).trim();
+  return v ? `hsl(${v})` : zapas;
 };
 
 const kolorTla = (wyroznione: boolean, kubelek?: string | null) => {
-  if (wyroznione) return 'hsl(158 28% 32%)';
-  if (kubelek && KOLOR_KUBELKA[kubelek]) return KOLOR_KUBELKA[kubelek];
-  return 'hsl(60 6% 14%)';
+  if (wyroznione) return token('--primary', 'hsl(158 28% 32%)');
+  if (kubelek === 'must') return token('--primary', 'hsl(158 28% 32%)');
+  if (kubelek === 'nice') return token('--accent', 'hsl(17 42% 52%)');
+  if (kubelek === 'rejected') return token('--muted-foreground', 'hsl(27 13% 48%)');
+  return token('--foreground', 'hsl(20 26% 18%)');
 };
 
 function pinIcon(numer: number, wyroznione: boolean, kubelek?: string | null) {
@@ -51,10 +59,10 @@ function pinIcon(numer: number, wyroznione: boolean, kubelek?: string | null) {
   return L.divIcon({
     className: '',
     html: `<div style="width:${rozmiar}px;height:${rozmiar}px;border-radius:50%;
-      background:${kolorTla(wyroznione, kubelek)};color:hsl(60 12% 97%);
+      background:${kolorTla(wyroznione, kubelek)};color:${token('--card', 'hsl(40 100% 99%)')};
       display:flex;align-items:center;justify-content:center;
       font:500 ${wyroznione ? 13 : 11}px/1 ui-sans-serif,system-ui;
-      border:2px solid hsl(60 12% 97%);
+      border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
       box-shadow:0 ${wyroznione ? 3 : 1}px ${wyroznione ? 10 : 4}px rgba(0,0,0,.3);
       transition:all .15s">${numer}</div>`,
     iconSize: [rozmiar, rozmiar],
@@ -131,10 +139,10 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
           className: '',
           html: `<div style="position:relative;width:30px;height:38px">
             <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-              background:hsl(22 60% 58%);border:2px solid hsl(60 12% 97%);
+              background:${token('--accent', 'hsl(17 42% 52%)')};border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
               box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>
             <div style="position:absolute;top:7px;left:9px;width:12px;height:12px;border-radius:50%;
-              background:hsl(60 12% 97%)"></div>
+              background:${token('--card', 'hsl(40 100% 99%)')}"></div>
           </div>`,
           iconSize: [30, 38],
           iconAnchor: [15, 34],

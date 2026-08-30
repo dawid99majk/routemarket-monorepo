@@ -14,6 +14,9 @@ export default {
       },
     },
     extend: {
+      textColor: {
+        secondary: "hsl(var(--text-secondary))",
+      },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Fraunces', 'Georgia', 'serif'],
@@ -127,6 +130,18 @@ export default {
           DEFAULT: "hsl(var(--surface))",
           card: "hsl(var(--surface-card))",
         },
+        // Kierunek „Wyprawa". `paper` zostaje dla starego kodu, ale handoff mówi
+        // o `--surface` po nazwie, więc `bg-surface` musi istnieć -- inaczej klasa
+        // przechodzi przez build po cichu i element zostaje bez tła.
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          top: "hsl(var(--surface-top))",
+          bottom: "hsl(var(--surface-bottom))",
+          card: "hsl(var(--surface-card))",
+        },
+        hairline: "hsl(var(--hairline))",
+        strikethrough: "hsl(var(--strikethrough))",
+        "placeholder-photo": "hsl(var(--placeholder-photo))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

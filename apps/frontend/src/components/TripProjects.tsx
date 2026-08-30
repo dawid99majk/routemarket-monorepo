@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
@@ -224,6 +224,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [startQuery, setStartQuery] = useState('');
   const [startPodpowiedzi, setStartPodpowiedzi] = useState<any[]>([]);
   const [pokazStart, setPokazStart] = useState(false);
+  const [pokazUstawienia, setPokazUstawienia] = useState(false);
   const [podpowiedzi, setPodpowiedzi] = useState<any[]>([]);
   const [pokazPodpowiedzi, setPokazPodpowiedzi] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -1454,6 +1455,22 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    * nie da się przejść. Do wizyt doliczamy przejścia, bo one też zjadają dzień.
    */
   const TRANSFER_MIN = 12;
+
+  /** Odległość w metrach po prostej (haversine). Do przejścia w mieście
+   *  dokładamy 30% na to, że ulice nie biegną po linii prostej. */
+  const metryMiedzy = (a: any, b: any): number | null => {
+    if (a?.lat == null || a?.lng == null || b?.lat == null || b?.lng == null) return null;
+    const R = 6371000, rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+    const s = Math.sin(dLat / 2) ** 2
+      + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+    return Math.round(R * 2 * Math.asin(Math.sqrt(s)) * 1.3);
+  };
+
+  /** Dystans po polsku: przecinek dziesiętny, metry poniżej kilometra. */
+  const opisDystansu = (m: number) =>
+    m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${m} m`;
+
   const budget = (() => {
     if (!active?.days || !active?.hours_per_day) return null;
     const windowMin = Number(active.days) * Number(active.hours_per_day) * 60;
@@ -1510,8 +1527,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
             {!active ? 'Plany wyjazdów' : view === 'plan' ? 'Plan wyjazdu' : 'Tablica wyjazdu'}
           </p>
+          {/* Nagłówek tablicy to LICZBA, nie nazwa (Z3). Nazwa wyjazdu stoi już
+              w nadtytule i w przełączniku w pasku nawigacji, więc powtórzona tutaj
+              zajmowała najmocniejsze miejsce na ekranie, nie wnosząc nic nowego.
+              Liczba zebranych miejsc mówi, na czym się stoi. */}
           <h1 className="font-display font-light text-[40px] leading-[1.05] tracking-[-0.02em] mt-2">
-            {active ? active.name : 'Twoje wyjazdy'}
+            {!active
+              ? 'Twoje wyjazdy'
+              : view === 'tablica'
+                ? `${places.length} ${places.length === 1 ? 'zebrane miejsce' : 'zebranych miejsc'}`
+                : active.name}
           </h1>
           {!active && (
             <p className="text-sm text-muted-foreground mt-2">
@@ -1554,7 +1579,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 ))}
               </div>
             </div>
-            <Button onClick={createProject} className="sm:col-span-4 bg-primary hover:bg-primary/90">
+            <Button onClick={createProject} className="sm:col-span-4 bg-foreground text-background hover:bg-foreground/90">
               Utwórz plan
             </Button>
           </div>
@@ -1587,7 +1612,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         <div className="flex flex-wrap items-center justify-between gap-4">
           <button onClick={() => navigate('/plany')}
             className="inline-flex items-center gap-2 h-10 rounded-full
-                       bg-primary hover:bg-primary/90 text-primary-foreground px-4 text-sm
+                       bg-foreground text-background hover:bg-foreground/90 text-primary-foreground px-4 text-sm
                        transition-colors">
             <ArrowLeft className="w-4 h-4" />
             Wszystkie tablice
@@ -1644,7 +1669,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             )}
             {active && mustCount > 0 && view === 'tablica' && (
               <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
-                className="bg-primary hover:bg-primary/90">
+                className="bg-foreground text-background hover:bg-foreground/90">
                 Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
               </Button>
             )}
@@ -1658,8 +1683,47 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 bloków — dane wyjazdu, suwak proporcji, wyszukiwarka, wydarzenia
                 i ostrzeżenia — więc tablica zaczynała się poniżej ekranu. Reszta
                 zeszła pod spód: to narzędzia do tablicy, nie sama tablica. */}
-            {/* Punkt startowy nad kubełkami: zanim ktoś zacznie zbierać miejsca,
-                warto wiedzieć, skąd wychodzi — od tego zależy, co w ogóle ma sens. */}
+            {/* Sześć kontenerów sterujących przed treścią (punkt 04 audytu) zwinięte
+                w jeden pasek: start, termin i kontekst wyjazdu jednym spojrzeniem,
+                zamiast dwóch dużych kart, które trzeba było przeczytać osobno.
+                Edycja została -- to wciąż te same pola i te same handlery,
+                przeniesione do modala pod "Zmień ustawienia". */}
+            <div className="rounded-md bg-surface border-b border-border/40 px-4 py-2.5
+                            flex flex-wrap items-center gap-x-2 gap-y-1
+                            font-mono text-[12px] text-secondary">
+              <span>
+                {active.start_name
+                  ? <>Start: {active.start_name}</>
+                  : <span className="text-muted-foreground">{t('tablica.skad_zaczynacie')}</span>}
+              </span>
+              {active.start_date && (
+                <>
+                  <span className="text-hairline">·</span>
+                  <span>
+                    {zakresDat(active.start_date, active.end_date)}
+                    {active.days ? ` · ${active.days} ${active.days === 1 ? 'dzień' : 'dni'}` : ''}
+                  </span>
+                </>
+              )}
+              {active.trip_type && (
+                <>
+                  <span className="text-hairline">·</span>
+                  <span>{active.trip_type}</span>
+                </>
+              )}
+              <button onClick={() => setPokazUstawienia(true)}
+                className="ml-auto text-secondary hover:text-foreground transition-colors underline underline-offset-2
+                           decoration-hairline">
+                Zmień ustawienia
+              </button>
+            </div>
+
+            <Dialog open={pokazUstawienia} onOpenChange={setPokazUstawienia}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Ustawienia wyjazdu</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
             <div className="rounded-md border border-border bg-card px-4 py-3.5">
               {active.start_name ? (
                 <div className="flex flex-wrap items-center gap-3">
@@ -1807,7 +1871,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   </label>
                   <Button size="sm" disabled={!terminOd}
                     onClick={() => zapiszTermin(terminOd, terminDo || terminOd)}
-                    className="bg-primary hover:bg-primary/90">
+                    className="bg-foreground text-background hover:bg-foreground/90">
                     Zapisz
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setPokazTermin(false)}>
@@ -1816,6 +1880,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 </div>
               )}
             </div>
+
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Pasek narzędzi w miejsce trzech luźnych kart i osobnego okna
                 preferencji. Kafel jest teraz zakładką: aktywny ma wypełnienie
@@ -1943,7 +2011,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     />
                     <Button size="sm" onClick={() => { setPokazPodpowiedzi(false); search(query); }}
                       disabled={searching || !query.trim()}
-                      className="absolute right-1 bg-primary hover:bg-primary/90">
+                      className="absolute right-1 bg-foreground text-background hover:bg-foreground/90">
                       {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Szukaj'}
                     </Button>
 
@@ -2280,7 +2348,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     </div>
                     <Button size="sm" variant={active?.is_public ? 'outline' : 'default'}
                       disabled={publishing} onClick={togglePublic}
-                      className={active?.is_public ? 'shrink-0' : 'shrink-0 bg-primary hover:bg-primary/90'}>
+                      className={active?.is_public ? 'shrink-0' : 'shrink-0 bg-foreground text-background hover:bg-foreground/90'}>
                       {publishing
                         ? <Loader2 className="w-4 h-4 animate-spin" />
                         : active?.is_public ? 'Cofnij publikację' : 'Opublikuj'}
@@ -2391,12 +2459,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           zone.id === 'rejected' ? 'bg-muted/30' : 'bg-card'
                         }`}
                       >
-                        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border">
+                        {/* Podkreślenie 2 px w kolorze decyzji zamiast kropki (Z3).
+                            "Być może" jest terakotą, nie dusty-blue: w kierunku
+                            „Wyprawa" --accent znaczy dokładnie dwie rzeczy --
+                            „być może" i głos agenta -- więc trzeci niebieski
+                            odcień rozbijałby ten sygnał. */}
+                        <div className={`flex items-center justify-between px-4 py-3.5 border-b-2 ${
+                          zone.id === 'must' ? 'border-primary'
+                            : zone.id === 'nice' ? 'border-accent' : 'border-border'
+                        }`}>
                           <span className="flex items-center gap-2.5">
-                            <span className={`w-2 h-2 rounded-full ${
-                              zone.id === 'must' ? 'bg-primary'
-                                : zone.id === 'nice' ? 'bg-dusty-blue' : 'bg-clay'
-                            }`} />
                             <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
                               {zone.label}
                             </span>
@@ -2952,8 +3024,24 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           ? (day.items || []).slice(0, i + 1)
                               .filter((x: any) => x.lat != null && x.lng != null).length
                           : null;
+                        // Przerwa między tym punktem a poprzednim — własny wiersz,
+                        // nie dopisek pod nazwą i nie tooltip.
+                        const poprzedni = i > 0 ? (day.items || [])[i - 1] : null;
+                        const metry = poprzedni ? metryMiedzy(poprzedni, it) : null;
   return (
-                          <div key={i} className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
+                          <Fragment key={`poz-${i}`}>
+                          {metry != null && metry > 0 && (
+                            <div className="flex gap-3 px-4 items-center text-muted-foreground">
+                              <span className="w-14 shrink-0" />
+                              <span className="w-6 shrink-0 flex justify-center">
+                                <span className="w-px h-[22px] bg-border" />
+                              </span>
+                              <span className="font-mono text-[11px] tabular-nums">
+                                {Math.max(1, Math.round(metry / 80))} min pieszo · {opisDystansu(metry)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
                             <span className="w-14 shrink-0 pt-0.5">
                               <span className="font-mono text-[13px] tabular-nums block">{it.time}</span>
                               {it.minutes && (
@@ -2970,7 +3058,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               <span className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
                                                 text-[12px] font-medium ${
                                 suggested
-                                  ? 'bg-dusty-blue text-dusty-blue-foreground'
+                                  ? 'bg-accent text-accent-foreground'
                                   : 'bg-primary text-primary-foreground'
                               }`}>
                                 {nrNaMapie}
@@ -2988,7 +3076,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   {it.name}
                                 </button>
                                 {suggested && (
-                                  <span className="text-[10px] font-normal text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                                  <span className="text-[10px] font-normal text-accent bg-accent/10 rounded-full px-1.5 py-0.5">
                                     propozycja agenta
                                   </span>
                                 )}
@@ -3006,6 +3094,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             )}
 
                           </div>
+                          </Fragment>
                         );
                       })}
                     </div>
@@ -3127,7 +3216,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
                 </p>
                 <Button
-                  className="mt-6 bg-primary hover:bg-primary/90"
+                  className="mt-6 bg-foreground text-background hover:bg-foreground/90"
                   disabled={mustCount === 0 || planning}
                   onClick={() => navigate(mustCount > 0 ? '/plany?widok=plan' : '/plany')}
                 >
@@ -3240,7 +3329,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       onChange={(e) => setPlanForm({ ...planForm, dinner: e.target.value })} className="mt-1" />
                   </label>
                   <Button onClick={buildPlan} disabled={planning}
-                    className="self-end bg-primary hover:bg-primary/90">
+                    className="self-end bg-foreground text-background hover:bg-foreground/90">
                     {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Zaplanuj'}
                   </Button>
                 </div>

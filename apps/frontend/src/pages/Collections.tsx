@@ -156,7 +156,7 @@ export default function Collections() {
           {places.length === 0 ? (
             <div className="text-center py-16 space-y-3">
               <p className="text-muted-foreground">{t('kolekcje.ta_kolekcja_jest_jeszcze_pusta')}</p>
-              <Button onClick={() => navigate('/odkrywaj')} className="bg-primary hover:bg-primary/90">
+              <Button onClick={() => navigate('/odkrywaj')} className="bg-foreground text-background hover:bg-foreground/90">
                 Znajdź miejsca
               </Button>
             </div>
@@ -212,7 +212,7 @@ export default function Collections() {
               Moje kolekcje
             </h1>
           </div>
-          <Button className="bg-primary hover:bg-primary/90" onClick={() => setCreating(true)}>
+          <Button className="bg-foreground text-background hover:bg-foreground/90" onClick={() => setCreating(true)}>
             <Plus className="w-4 h-4 mr-1.5" /> Nowa kolekcja
           </Button>
         </div>
@@ -225,7 +225,7 @@ export default function Collections() {
               onKeyDown={(e) => e.key === 'Enter' && create()}
               placeholder={t('kolekcje.nazwa_np_modernizm_w_polsce')}
             />
-            <Button onClick={create} className="bg-primary hover:bg-primary/90">{t('kolekcje.utworz')}</Button>
+            <Button onClick={create} className="bg-foreground text-background hover:bg-foreground/90">{t('kolekcje.utworz')}</Button>
             <Button variant="ghost" onClick={() => { setCreating(false); setNewName(''); }}>{t('kolekcje.anuluj')}</Button>
           </div>
         )}
@@ -236,7 +236,7 @@ export default function Collections() {
               Kolekcja nie wymaga decyzji, dokąd i kiedy jedziesz. To zbiór miejsc odkładanych latami —
               „kawiarnie, do których chcę kiedyś trafić”, „modernizm w Polsce”.
             </p>
-            <Button onClick={() => setCreating(true)} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => setCreating(true)} className="bg-foreground text-background hover:bg-foreground/90">
               Załóż pierwszą kolekcję
             </Button>
           </div>

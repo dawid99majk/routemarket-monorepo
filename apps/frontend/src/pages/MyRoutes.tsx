@@ -84,7 +84,7 @@ export default function MyRoutes() {
             wyłącznie tego ekranu. */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display font-light text-[32px] leading-tight">Moje trasy</h1>
-          <Button size="sm" onClick={() => navigate('/plany')} className="bg-primary hover:bg-primary/90">
+          <Button size="sm" onClick={() => navigate('/plany')} className="bg-foreground text-background hover:bg-foreground/90">
             <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
           </Button>
         </div>
@@ -101,7 +101,7 @@ export default function MyRoutes() {
             <p className="text-muted-foreground max-w-md mx-auto">
               Trasy powstają teraz z planu wyjazdu: zbierasz miejsca na tablicy, układasz dzień, a przebieg wyznaczamy z tego, co wybrałeś.
             </p>
-            <Button onClick={() => navigate('/plany')} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => navigate('/plany')} className="bg-foreground text-background hover:bg-foreground/90">
               Zacznij od tablicy
             </Button>
           </div>

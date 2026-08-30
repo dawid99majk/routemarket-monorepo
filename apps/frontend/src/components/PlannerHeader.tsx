@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Heart } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '@/integrations/supabase/client';
+import Logo from '@/components/Logo';
 
 interface PlannerHeaderProps {
   /** Kontekst aktywnego wyjazdu po prawej, np. "Durrës · 3 dni · z dziećmi". */
@@ -19,30 +22,48 @@ function ostatniaTablica(): string | null {
   try { return localStorage.getItem('rm_ostatnia_tablica'); } catch { return null; }
 }
 
-function zakladki(admin: boolean) {
-  const id = ostatniaTablica();
+/**
+ * Zakładki zależą od tego, czy jest wybrany wyjazd (punkt 20 audytu). Bez tego
+ * "Tablica" i "Plan dni" prowadziłyby donikąd -- obie spadały na `/plany`
+ * i dawały identyczny, mylący wynik. Rozwiązanie: nie pokazują się w ogóle,
+ * dopóki nie ma czego pokazać, a ich miejsce zajmują "Twoje wyjazdy".
+ */
+function zakladki(tripId: string | null) {
+  if (!tripId) {
+    return [
+      { klucz: 'naglowek.odkrywaj', path: '/odkrywaj' },
+      { klucz: 'naglowek.wyjazdy', path: '/plany' },
+      { klucz: 'naglowek.inspiracje', path: '/tablice' },
+    ];
+  }
   return [
-    { klucz: 'naglowek.start', path: '/start' },
     { klucz: 'naglowek.odkrywaj', path: '/odkrywaj' },
-    { klucz: 'naglowek.tablica', path: id ? `/plany/${id}` : '/plany' },
-    { klucz: 'naglowek.plan', path: id ? `/plany/${id}?widok=plan` : '/plany' },
-    // Warsztat to narzędzie właściciela, nie funkcja serwisu — stąd osobny
-    // warunek zamiast stałej pozycji dla wszystkich.
-    ...(admin ? [{ klucz: 'naglowek.warsztat', path: '/marketing' }] : []),
+    { klucz: 'naglowek.tablica', path: `/plany/${tripId}` },
+    { klucz: 'naglowek.plan_dni', path: `/plany/${tripId}?widok=plan` },
   ];
 }
 
 /**
  * Wspólny pasek planera. Wcześniej każdy ekran miał własny nagłówek z przyciskiem
  * "wstecz", przez co przejście między odkrywaniem, tablicą a planem wyglądało jak
- * skok do innej aplikacji. Projekt zakłada jeden pasek i trzy zakładki.
+ * skok do innej aplikacji. Projekt zakłada jeden pasek i zakładki zależne od
+ * kontekstu (kierunek „Wyprawa", zadanie Z2).
  */
 export default function PlannerHeader({ context, initials }: PlannerHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { pathname, search } = useLocation();
-  const here = pathname + search;
+  const tripId = ostatniaTablica();
+  const [tripName, setTripName] = useState<string | null>(null);
+
+  useEffect(() => {
+    let aktualne = true;
+    if (!tripId) { setTripName(null); return; }
+    (supabase as any).from('trip_projects').select('name').eq('id', tripId).maybeSingle()
+      .then(({ data }: any) => { if (aktualne) setTripName(data?.name ?? null); });
+    return () => { aktualne = false; };
+  }, [tripId]);
 
   /**
    * Zakładka świeci się także na ekranach, które do niej należą, choć mają własny
@@ -52,7 +73,8 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
    */
   const isActive = (path: string) => {
     if (path.includes('?')) return pathname.startsWith('/plany') && search.includes('widok=plan');
-    if (path.startsWith('/plany')) return pathname.startsWith('/plany') && !search.includes('widok=plan');
+    if (path.startsWith('/plany/')) return pathname.startsWith('/plany') && !search.includes('widok=plan');
+    if (path === '/plany') return pathname.startsWith('/plany') && !tripId;
     if (path === '/odkrywaj') {
       return pathname === '/odkrywaj' || pathname.startsWith('/miejsce/') || pathname === '/ulubione';
     }
@@ -60,29 +82,47 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
   };
 
   return (
-    <header className="sticky top-0 z-20 h-16 border-b border-border bg-background/85 backdrop-blur-[8px]">
-      <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-6 flex items-center gap-3 sm:gap-6">
+    <header className="sticky top-0 z-20 h-[66px] border-b border-border bg-background/85 backdrop-blur-[8px]">
+      <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-6 flex items-center gap-3 sm:gap-5">
         {/* Logotyp prowadzi na stronę główną — tak działa wszędzie i tego się po nim
-            spodziewamy. Wejście do planera ma własną zakładkę „Start". */}
-        <button onClick={() => navigate('/')} className="flex items-center gap-2 shrink-0">
-          <span className="font-display text-[19px] tracking-tight">Routemarket</span>
-          <span className="hidden sm:inline font-narrow uppercase tracking-[0.18em] text-[9px] text-muted-foreground
-                           border border-border rounded-full px-2 py-0.5">
-            Planner
-          </span>
-        </button>
+            spodziewamy. Bez sygnatury: w aplikacji miejsce obok zajmuje przełącznik
+            wyjazdu i zakładki produktu, nie hasło marketingowe. */}
+        <Logo showName signature={false} size="sm" />
+
+        {tripId && (
+          <button onClick={() => navigate('/plany')}
+            className="hidden md:inline-flex items-center gap-1.5 h-8 rounded-full bg-muted px-3.5
+                       text-[13px] font-medium max-w-[220px] hover:bg-border transition-colors">
+            <span className="truncate">{tripName || '…'}</span>
+            <span className="text-muted-foreground">▾</span>
+          </button>
+        )}
 
         <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Zmienna nazywa się `zakladka`, nie `t` — inaczej przesłoniłaby funkcję
               tłumaczenia i wewnątrz mapy nie dałoby się wywołać t(). */}
-          {zakladki(isAdmin).map((zakladka) => (
+          {zakladki(tripId).map((zakladka) => (
             <button key={zakladka.klucz} onClick={() => navigate(zakladka.path)}
-              className={`px-3.5 py-1.5 text-sm rounded-sm transition-colors ${
-                isActive(zakladka.path) ? 'bg-muted font-medium' : 'text-foreground/70 hover:bg-muted/60'
+              className={`px-3.5 py-1.5 text-sm rounded-full transition-colors ${
+                isActive(zakladka.path)
+                  ? 'bg-foreground text-background font-medium'
+                  : 'text-foreground/70 hover:bg-muted/60'
               }`}>
               {t(zakladka.klucz)}
             </button>
           ))}
+          {/* Warsztat to narzędzie właściciela, nie funkcja serwisu — stąd osobny
+              warunek zamiast stałej pozycji dla wszystkich. */}
+          {isAdmin && (
+            <button onClick={() => navigate('/marketing')}
+              className={`px-3.5 py-1.5 text-sm rounded-full transition-colors ${
+                pathname === '/marketing'
+                  ? 'bg-foreground text-background font-medium'
+                  : 'text-foreground/70 hover:bg-muted/60'
+              }`}>
+              {t('naglowek.warsztat')}
+            </button>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-4">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Heart, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,8 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { utworzWyjazd } from '@/lib/newTrip';
 import PlannerHeader from '@/components/PlannerHeader';
+import Logo from '@/components/Logo';
+import contour from '@/assets/patterns/contour.svg';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import { useTranslation } from 'react-i18next';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
@@ -48,10 +51,10 @@ const KANALY = ['zegarek', 'mapy', 'nawigacja'];
 const FAQ = ['zrodla', 'przeciazenie', 'poza_europa', 'aplikacja'];
 
 const NAWIGACJA = [
+  ['naglowek.odkrywaj', '/odkrywaj'],
   ['landing.nav.jak', '#jak-to-dziala'],
-  ['landing.nav.przyklad', '#przyklad'],
+  ['naglowek.inspiracje', '/tablice'],
   ['landing.nav.gpx', '#gpx'],
-  ['landing.nav.tablice', '#tablice'],
 ];
 
 interface Tablica {
@@ -68,6 +71,15 @@ export default function Index() {
   const [tablice, setTablice] = useState<Tablica[]>([]);
   const [zakladam, setZakladam] = useState(false);
   const [szukajTablic, setSzukajTablic] = useState('');
+  const [ileWKatalogu, setIleWKatalogu] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { count } = await supabase.from('place_catalog')
+        .select('id', { count: 'exact', head: true });
+      if (typeof count === 'number') setIleWKatalogu(count);
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -118,6 +130,11 @@ export default function Index() {
     }
   };
 
+  /** Zdjęcia do kart pływających w hero — z tablic, które strona i tak wczytuje. */
+  const zdjeciaHero = useMemo(
+    () => tablice.flatMap((tb) => tb.photos ?? []).filter(Boolean).slice(0, 4),
+    [tablice]);
+
   const poleDestynacji = (
     <div className="flex gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
       <input value={cel} onChange={(e) => setCel(e.target.value)}
@@ -125,7 +142,7 @@ export default function Index() {
         placeholder={t('landing.dokad')}
         className="flex-1 min-w-0 bg-transparent px-3 h-11 text-[16px] outline-none placeholder:text-muted-foreground" />
       <Button onClick={zacznij} disabled={zakladam}
-        className="bg-primary hover:bg-primary/90 shrink-0 h-11 px-5">
+        className="bg-foreground text-background hover:bg-foreground/90 shrink-0 h-11 px-5">
         {zakladam ? t('landing.zakladam') : t('landing.cta_glowne')}
       </Button>
     </div>
@@ -141,18 +158,21 @@ export default function Index() {
       {user && <PlannerHeader />}
 
       {!user && (
-      <header className="sticky top-0 z-30 h-[68px] border-b border-border bg-background/85 backdrop-blur-[8px]">
+      <header className="sticky top-0 z-30 h-[74px] border-b border-border bg-surface/90 backdrop-blur-[8px]">
         <div className="max-w-[1280px] mx-auto h-full px-5 sm:px-10 flex items-center gap-4 sm:gap-8">
-          <a href="#gora" className="font-display text-[20px] font-medium shrink-0">Routemarket</a>
+          <Logo size="md" />
           <nav className="hidden lg:flex items-center gap-6">
             {NAWIGACJA.map(([label, href]) => (
-              <a key={href} href={href}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t(label)}</a>
+              href.startsWith('/')
+                ? <button key={href} onClick={() => navigate(href)}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t(label)}</button>
+                : <a key={href} href={href}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t(label)}</a>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" variant="ghost" className="hidden sm:inline-flex" onClick={() => navigate('/auth')}>{t('common.login')}</Button>
-            <Button size="sm" onClick={() => navigate('/auth')} className="bg-primary hover:bg-primary/90">
+            <Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={() => navigate('/auth')}>{t('common.login')}</Button>
+            <Button size="sm" onClick={() => navigate('/auth')} className="bg-foreground text-background hover:bg-foreground/90">
               {t('landing.cta_naglowek')}
             </Button>
           </div>
@@ -160,72 +180,162 @@ export default function Index() {
       </header>
       )}
 
-      <main id="gora" className="max-w-[1280px] mx-auto px-5 sm:px-10">
-        {/* 1. Hero */}
-        <section className="pt-[88px] pb-[72px] grid gap-10 [grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr))] items-start">
-          <div>
-            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary">{t('landing.nadtytul')}</p>
-            <h1 className="font-display font-light mt-4 text-balance leading-[1.04] tracking-[-0.03em]
-                           text-[clamp(38px,4.4vw,62px)]">
-              {t('landing.hero.tytul')}
-            </h1>
-            <p className="text-[18px] leading-relaxed text-foreground/80 mt-6 max-w-[52ch] text-pretty">
-              {t('landing.hero.opis')}
-            </p>
+      {/* 1. Hero — kompozycja wyśrodkowana (wariant 3c).
+          Pole wyszukiwania stoi w środku, treść produktu pływa dookoła. Cztery
+          reguły z kierunek.md, bez których układ rozjeżdża się w równą rozsypkę:
+          trzy plany głębi (rozmiar i cień zmieniają się RAZEM), dwie–trzy karty
+          przycięte krawędzią, najwyżej jedna karta z pełnym zdaniem, dokładnie
+          dwa kolorowe wypełnienia (orzech i terakota).
 
-            <div className="mt-8">{poleDestynacji}</div>
+          Karty pływające pokazujemy dopiero od xl: pakiet jest desktopowy (1300 px),
+          a niżej nie ma ich gdzie przyciąć, żeby nie zasłoniły nagłówka. Poniżej
+          zostaje sam środek, który niesie całą funkcję. */}
+      <main id="gora">
+        <section className="relative overflow-hidden bg-background flex flex-col items-center justify-center
+                            px-5 py-[72px] xl:py-0 xl:h-[660px]">
+          <div aria-hidden
+            className="pointer-events-none absolute left-1/2 -top-[180px] w-[1120px] h-[1120px] -ml-[560px]
+                       opacity-[0.14] bg-no-repeat"
+            style={{ backgroundImage: `url(${contour})`, backgroundSize: '1120px auto' }} />
 
-            <div className="flex flex-wrap items-center gap-2 mt-5">
-              <span className="text-sm text-muted-foreground mr-1">{t('landing.jade')}</span>
-              {KLIMATY.map((k) => (
-                <button key={k.id} onClick={() => setKlimat(k.id)}
-                  className={`rounded-full px-3.5 py-1.5 text-[13px] border transition-colors ${
-                    klimat === k.id
-                      ? 'bg-primary border-primary text-primary-foreground'
-                      : 'border-border hover:bg-muted'
-                  }`}>
-                  {t(k.klucz)}
-                </button>
-              ))}
+          {/* ── plan daleki: samo zdjęcie, bez tytułu, shadow-sm ── */}
+          <div aria-hidden className="hidden xl:block absolute left-[56px] top-[58px] w-[132px] rotate-[5deg]
+                          rounded-[9px] bg-card p-[7px] shadow-token-sm">
+            <div className="h-[84px] rounded-[6px] overflow-hidden bg-placeholder-photo">
+              {zdjeciaHero[0] && <img src={miniatura(zdjeciaHero[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
             </div>
-
-            <p className="font-mono text-[12px] text-muted-foreground mt-6">
-              {t('landing.hero.zapewnienia')}
-            </p>
+          </div>
+          <div aria-hidden className="hidden xl:block absolute right-[250px] top-[74px] w-[140px] rotate-[-5deg]
+                          rounded-[9px] bg-card p-[7px] shadow-token-sm">
+            <div className="h-[90px] rounded-[6px] overflow-hidden bg-placeholder-photo">
+              {zdjeciaHero[1] && <img src={miniatura(zdjeciaHero[1], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+            </div>
           </div>
 
-          {/* Podgląd planu — to jest cały argument produktu, nie ozdoba */}
-          <div className="w-full max-w-[520px] justify-self-end rounded-md bg-card border border-border shadow-token-lg overflow-hidden">
-            <div className="px-6 pt-5 pb-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-muted-foreground">
-                  Plan wygenerowany
-                </p>
-                <h2 className="font-display text-[20px] mt-1.5">Durrës · dzień 1</h2>
-              </div>
-              <span className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1">3 g 25 min</span>
+          {/* ── plan środkowy ── */}
+          <div aria-hidden className="hidden xl:block absolute left-[198px] top-[150px] w-[172px] rotate-[-4deg]
+                          rounded-[10px] bg-card p-[9px] shadow-token-md">
+            <div className="h-[112px] rounded-[7px] overflow-hidden bg-placeholder-photo">
+              {zdjeciaHero[2] && <img src={miniatura(zdjeciaHero[2], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
             </div>
-            <div className="px-6 pb-5 space-y-3.5">
-              {PLAN_DEMO.map(([godz, nazwa, meta], i) => (
-                <div key={nazwa} className="grid grid-cols-[62px_1fr] gap-3 items-start">
-                  <span className="font-mono text-[12px] tabular-nums text-muted-foreground pt-1">{godz}</span>
-                  <div className="flex items-start gap-3">
-                    <span className="w-[22px] h-[22px] rounded-full bg-primary text-primary-foreground shrink-0
-                                     flex items-center justify-center text-[11px] font-medium mt-0.5">{i + 1}</span>
-                    <div className="min-w-0">
-                      <div className="font-display text-[15px] leading-snug">{nazwa}</div>
-                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-0.5">{t(meta)}</div>
-                    </div>
-                  </div>
-                </div>
+            <div className="text-[13px] leading-[1.3] font-medium mt-[9px] mx-[2px]">Wieża Wenecka</div>
+          </div>
+
+          {/* ── plan bliski, przycięty lewą krawędzią ── */}
+          <div aria-hidden className="hidden xl:block absolute left-[-58px] top-[238px] w-[272px] rotate-[-6deg]
+                          rounded-[10px] bg-card p-[11px] shadow-token-lg">
+            <div className="h-[178px] rounded-[7px] overflow-hidden bg-placeholder-photo">
+              {zdjeciaHero[3] && <img src={miniatura(zdjeciaHero[3], SZEROKOSC.karta)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+            </div>
+            <div className="text-[17px] leading-[1.3] font-medium mt-[13px] mx-[3px]">Amfiteatr w Durrës</div>
+            <div className="font-mono text-[11px] leading-[1.3] text-muted-foreground mt-[7px] mx-[3px]">
+              1 g 30 min · rzymski · cień po 15:00
+            </div>
+          </div>
+
+          {/* ── wypełnienie 1 z 2: orzech ── */}
+          <div aria-hidden className="hidden xl:block absolute left-[238px] top-[404px] w-[158px] rotate-[6deg]
+                          rounded-[9px] bg-foreground text-background px-[14px] py-[13px] shadow-token-md">
+            <div className="font-narrow uppercase tracking-[0.26em] text-[9px] text-background/50">Tablica</div>
+            <div className="flex items-baseline gap-[7px] mt-[10px]">
+              <span className="font-display font-light text-[30px] leading-none tabular-nums">12</span>
+              <span className="text-[11px] text-background/50">na pewno</span>
+            </div>
+            <div className="h-[3px] rounded-full bg-background/15 mt-[12px] overflow-hidden">
+              <div className="w-[70%] h-full bg-accent" />
+            </div>
+          </div>
+
+          {/* ── przycięta dolną krawędzią ── */}
+          <div aria-hidden className="hidden xl:flex absolute left-[126px] top-[606px] w-[210px] rotate-[-3deg]
+                          rounded-[9px] bg-card px-[14px] py-[11px] items-center gap-[11px] shadow-token-lg">
+            <span className="w-[30px] h-[30px] rounded-[7px] bg-muted flex items-center justify-center
+                             text-[13px] text-secondary shrink-0">↓</span>
+            <span className="min-w-0">
+              <span className="block font-mono text-[12px] leading-[1.2] truncate">durres-dzien-1.gpx</span>
+              <span className="block font-mono text-[10px] leading-[1.2] text-muted-foreground mt-[3px]">3,8 km · +46 m</span>
+            </span>
+          </div>
+
+          {/* ── plan dnia, przycięty prawą krawędzią ── */}
+          <div aria-hidden className="hidden xl:block absolute right-[-62px] top-[158px] w-[268px] rotate-[6deg]
+                          rounded-[10px] bg-card px-[19px] py-[17px] shadow-token-lg">
+            <div className="flex items-baseline justify-between">
+              <span className="font-narrow uppercase tracking-[0.26em] text-[9px] text-muted-foreground">Dzień 1</span>
+              <span className="font-mono text-[10px] text-accent">3 g 25</span>
+            </div>
+            <div className="grid grid-cols-[44px_1fr] gap-x-3 gap-y-[7px] mt-[14px] items-baseline">
+              {PLAN_DEMO.map(([godz, nazwa]) => (
+                <Fragment key={nazwa}>
+                  <span className="font-mono text-[11px] leading-[1.5] tabular-nums text-muted-foreground">{godz}</span>
+                  <span className="text-[14px] leading-[1.5] truncate">{nazwa.replace(' w Durrës', '').replace(' Durrës', '')}</span>
+                </Fragment>
               ))}
             </div>
-            <div className="bg-muted px-6 py-3.5 flex items-center justify-between gap-3 border-t border-border">
-              <span className="font-mono text-[12px] tabular-nums text-muted-foreground">3,8 km pieszo · +46 m</span>
-              <span className="font-mono text-[11px] rounded-full bg-primary text-primary-foreground px-3 py-1">
-                durres-dzien-1.gpx
-              </span>
+          </div>
+
+          <div aria-hidden className="hidden xl:block absolute right-[242px] top-[368px] w-[126px] rotate-[7deg]
+                          rounded-full bg-card px-[14px] py-[8px] shadow-token-sm
+                          font-mono text-[11px] text-secondary text-center">870 m pieszo</div>
+
+          {/* ── wypełnienie 2 z 2: terakota, i jedyna karta z pełnym zdaniem ── */}
+          <div aria-hidden className="hidden xl:block absolute right-[88px] top-[454px] w-[214px] rotate-[-4deg]
+                          rounded-[10px] bg-accent px-[17px] py-[16px] shadow-token-lg">
+            <div className="font-narrow uppercase tracking-[0.26em] text-[9px] text-accent-foreground/70">Agent zauważa</div>
+            <div className="text-[14px] leading-[1.45] text-accent-foreground mt-[9px] text-pretty">
+              Czwarty punkt by się zmieścił, ale to dużo schodów jak na jedno popołudnie.
             </div>
+          </div>
+
+          {/* ── kolumna środkowa: nad kartami, ona niesie funkcję ── */}
+          <div className="relative z-10 w-full flex flex-col items-center">
+            {ileWKatalogu != null && (
+              <div className="flex items-center gap-[9px] rounded-full bg-card/70 border border-border
+                              px-[15px] py-[7px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                <span className="text-[12px] text-secondary">
+                  {ileWKatalogu.toLocaleString('pl-PL')} miejsc z OpenStreetMap
+                </span>
+              </div>
+            )}
+
+            <h1 className="font-display font-normal text-center text-balance mt-[26px]
+                           tracking-[-0.04em] leading-[0.98] max-w-[14ch]
+                           text-[clamp(42px,6vw,76px)]">
+              {t('landing.hero.tytul')}
+            </h1>
+
+            <div className="w-full max-w-[560px] mt-[34px] rounded-[12px] bg-card border border-border
+                            shadow-token-lg p-[18px] pb-[14px]">
+              <div className="flex gap-2">
+                <input value={cel} onChange={(e) => setCel(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && zacznij()}
+                  placeholder={t('landing.dokad')}
+                  className="flex-1 min-w-0 bg-transparent px-1 h-11 text-[17px] outline-none
+                             placeholder:text-muted-foreground" />
+                <Button onClick={zacznij} disabled={zakladam}
+                  className="bg-foreground text-background hover:bg-foreground/90 shrink-0 h-11 px-5">
+                  {zakladam ? t('landing.zakladam') : t('landing.cta_glowne')}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
+                <span className="text-[13px] text-muted-foreground mr-1">{t('landing.jade')}</span>
+                {KLIMATY.map((k) => (
+                  <button key={k.id} onClick={() => setKlimat(k.id)}
+                    className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
+                      klimat === k.id
+                        ? 'bg-foreground text-background'
+                        : 'text-secondary hover:bg-muted'
+                    }`}>
+                    {t(k.klucz)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <p className="font-mono text-[12px] text-muted-foreground mt-5 text-center">
+              {t('landing.hero.zapewnienia')}
+            </p>
           </div>
         </section>
       </main>
@@ -370,6 +480,41 @@ export default function Index() {
             </div>
           </div>
 
+          {/* Pas nachodzących kart — tylko desktop. Rozmiar, odsunięcie i cień
+              maleją razem w prawo, ostatnia karta wychodzi poza prawą krawędź. */}
+          <div className="hidden xl:block mt-10 -mr-10 overflow-hidden">
+            <div className="flex items-start">
+              {tablice.slice(0, 5).map((tb, i) => {
+                const w = [250, 236, 220, 204, 190][i];
+                const hFoto = [156, 146, 134, 124, 116][i];
+                const ml = [0, -22, -18, -16, -14][i];
+                const mt = [0, 26, 52, 78, 104][i];
+                const cien = ['shadow-token-lg', 'shadow-token-md', 'shadow-token-md', 'shadow-token-sm', 'shadow-token-sm'][i];
+                const obrot = ['-rotate-3', 'rotate-2', '-rotate-2', 'rotate-3', '-rotate-3'][i];
+                return (
+                  <button key={tb.id} onClick={() => navigate(`/tablica/${tb.id}`)}
+                    style={{ width: w, marginLeft: ml, marginTop: mt, zIndex: 5 - i }}
+                    className={`relative shrink-0 text-left rounded-[10px] bg-card p-2.5 ${cien} ${obrot}
+                                transition-transform hover:-translate-y-1`}>
+                    <div className="rounded-[7px] overflow-hidden bg-placeholder-photo"
+                         style={{ height: hFoto }}>
+                      {tb.photos?.[0] && (
+                        <img src={miniatura(tb.photos[0], SZEROKOSC.kafelek)} alt="" loading="lazy"
+                             className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <div className="text-[15px] leading-[1.3] font-medium mt-3 mx-0.5 truncate">{tb.name}</div>
+                    <div className="font-mono text-[11px] leading-[1.3] text-muted-foreground mt-1.5 mx-0.5 truncate">
+                      {[`${tb.place_count} miejsc`, tb.author_display || 'Podróżnik'].join(' · ')}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Poniżej xl: pas przewijany poziomo, bez nachodzenia. */}
+          <div className="xl:hidden">
           <div className="mt-10 -mx-5 px-5 sm:-mx-10 sm:px-10 overflow-x-auto
                           [scrollbar-width:thin] snap-x snap-mandatory">
             <div className="flex gap-5 pb-2">
@@ -393,6 +538,7 @@ export default function Index() {
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </section>
       )}

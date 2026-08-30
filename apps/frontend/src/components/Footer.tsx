@@ -80,7 +80,7 @@ export default function Footer() {
                     <DropdownMenuItem
                       key={lang.code}
                       onClick={() => i18n.changeLanguage(lang.code)}
-                      className={i18n.language === lang.code ? 'bg-accent' : ''}
+                      className={i18n.language === lang.code ? 'bg-muted' : ''}
                     >
                       <span className="mr-2">{lang.flag}</span>
                       {lang.label}

@@ -4,7 +4,6 @@ import { Heart, Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import PlannerHeader from '@/components/PlannerHeader';
-import TablicaKafelek from '@/components/TablicaKafelek';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +21,14 @@ const PORZADKI = [
   { id: 'najwieksze', klucz: 'galeria.porzadek.najwieksze' },
 ] as const;
 type Porzadek = typeof PORZADKI[number]['id'];
+
+/** Wysokość kafelka 144–230 px, liczona z identyfikatora — stała między
+ *  przerysowaniami, a jednocześnie różna dla sąsiadów, co daje rytm potoku. */
+function wysokoscKafelka(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return 144 + (h % 87);
+}
 
 /**
  * Publiczne tablice do przeglądania.
@@ -155,26 +162,100 @@ export default function Tablice() {
             </p>
           </div>
         ) : (
-          <div className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,248px),1fr))]">
-            {widoczne.map((tab) => (
-              <TablicaKafelek
-                key={tab.id}
-                nazwa={tab.name}
-                meta={[tab.destination, `${tab.place_count} ${t('galeria.miejsc')}`].filter(Boolean).join(' · ')}
-                zdjecia={tab.photos}
-                przyklad={!!tab.is_example}
-                autor={tab.is_example ? null : (tab.author_display || t('galeria.autor'))}
-                odznaka={
-                  <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5
-                                    text-[11px] font-mono tabular-nums ${
-                    moje.has(tab.id) ? 'bg-accent/10 text-accent' : 'bg-muted text-muted-foreground'}`}>
-                    <Heart className={`w-3 h-3 ${moje.has(tab.id) ? 'fill-accent' : ''}`} />
-                    {tab.like_count ?? 0}
-                  </span>
+          <div className="mt-6 [column-gap:18px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4">
+            {(() => {
+              // „Tablica tygodnia" to najczęściej kopiowana pozycja — kopia kosztuje
+              // decyzję o własnym wyjeździe, więc jest mocniejszym sygnałem niż
+              // polubienie. Wchodzi do potoku jako kafelek bez zdjęcia.
+              const ranga = (x: Publiczna) => (x.like_count ?? 0) + (x.copy_count ?? 0) * 2;
+              const tygodnia = [...widoczne].sort((a, b) => ranga(b) - ranga(a))[0];
+              const pokazTygodnia = !!tygodnia && widoczne.length >= 4;
+              const elementy: JSX.Element[] = [];
+
+              widoczne.forEach((tab, i) => {
+                if (pokazTygodnia && i === 2) {
+                  elementy.push(
+                    <button key="tygodnia" onClick={() => navigate(`/tablica/${tygodnia.id}`)}
+                      className="w-full text-left break-inside-avoid mb-[18px] rounded-[10px]
+                                 bg-foreground text-background p-5 shadow-token-md
+                                 hover:shadow-token-lg transition-shadow">
+                      <p className="font-narrow uppercase tracking-[0.26em] text-[10px] text-background/55">
+                        Tablica tygodnia
+                      </p>
+                      <div className="font-display font-light text-[24px] leading-[1.15] mt-3 text-balance">
+                        {tygodnia.name}
+                      </div>
+                      <p className="font-mono text-[11px] tabular-nums text-background/55 mt-3">
+                        {[tygodnia.destination, `${tygodnia.place_count} ${t('galeria.miejsc')}`]
+                          .filter(Boolean).join(' · ')}
+                      </p>
+                      <p className="font-mono text-[12px] tabular-nums text-accent mt-4">
+                        {(tygodnia.copy_count ?? 0) > 0
+                          ? `skopiowana ${tygodnia.copy_count} razy`
+                          : (tygodnia.like_count ?? 0) > 0
+                            ? `${tygodnia.like_count} polubień`
+                            : 'zobacz, co ktoś już zebrał'}
+                      </p>
+                    </button>
+                  );
                 }
-                onClick={() => navigate(`/tablica/${tab.id}`)}
-              />
-            ))}
+
+                const autor = tab.is_example ? null : (tab.author_display || t('galeria.autor'));
+                elementy.push(
+                  <button key={tab.id} onClick={() => navigate(`/tablica/${tab.id}`)}
+                    className="w-full text-left break-inside-avoid mb-[18px] rounded-[10px] bg-card
+                               border border-border overflow-hidden shadow-token-sm
+                               hover:shadow-token-md transition-shadow">
+                    <div className="relative bg-placeholder-photo"
+                         style={{ height: wysokoscKafelka(tab.id) }}>
+                      {tab.photos?.[0] && (
+                        <img src={tab.photos[0]} alt="" loading="lazy"
+                             className="w-full h-full object-cover" />
+                      )}
+                      {/* Etykieta w lewym górnym rogu zdjęcia, na półprzezroczystym kremie. */}
+                      {(tab.is_example || tab.destination) && (
+                        <span className="absolute left-2.5 top-2.5 rounded-sm bg-card/85 backdrop-blur-sm
+                                         px-2 py-1 font-narrow uppercase tracking-[0.18em] text-[10px]">
+                          {tab.is_example ? 'Przykład' : tab.destination}
+                        </span>
+                      )}
+                      <span className={`absolute right-2.5 top-2.5 inline-flex items-center gap-1
+                                        rounded-full px-2 py-0.5 text-[11px] font-mono tabular-nums
+                                        backdrop-blur-sm ${
+                        moje.has(tab.id) ? 'bg-accent/15 text-accent' : 'bg-card/85 text-muted-foreground'}`}>
+                        <Heart className={`w-3 h-3 ${moje.has(tab.id) ? 'fill-accent' : ''}`} />
+                        {tab.like_count ?? 0}
+                      </span>
+                    </div>
+                    <div className="p-3.5">
+                      <div className="font-display text-[16px] leading-snug">{tab.name}</div>
+                      {/* Autor POD tytułem, nie w rogu zdjęcia — w rogu ginął na
+                          jasnych fotografiach i konkurował z etykietą. */}
+                      <div className="flex items-center gap-2 mt-2.5">
+                        {autor ? (
+                          <>
+                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center
+                                             text-[10px] font-medium text-muted-foreground shrink-0">
+                              {autor.slice(0, 1).toUpperCase()}
+                            </span>
+                            <span className="text-[12px] text-muted-foreground truncate">{autor}</span>
+                          </>
+                        ) : (
+                          <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-accent">
+                            RouteMarket
+                          </span>
+                        )}
+                        <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground shrink-0">
+                          {tab.place_count}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              });
+
+              return elementy;
+            })()}
           </div>
         )}
       </main>

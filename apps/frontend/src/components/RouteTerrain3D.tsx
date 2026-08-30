@@ -508,7 +508,7 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
             onClick={handleToggleFlythrough}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
               flythroughActive
-                ? 'bg-accent hover:bg-accent text-white border-rose-500 shadow-rose-900/30 shadow-token-md animate-pulse'
+                ? 'bg-foreground hover:bg-foreground text-background border-foreground shadow-token-md animate-pulse'
                 : 'bg-ink hover:bg-ink text-slate-100 border-border shadow-token-sm'
             }`}
           >

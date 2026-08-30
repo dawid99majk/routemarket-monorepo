@@ -2,6 +2,10 @@ import { Link } from 'react-router-dom';
 
 interface LogoProps {
   showName?: boolean;
+  /** Sygnatura "zbieraj · układaj · jedź" pod nazwą. Tylko nagłówek marketingowy
+   *  (`/` dla niezalogowanego) ją pokazuje -- w aplikacji zajmuje miejsce, które
+   *  potrzebuje przełącznik wyjazdu i zakładki produktu. */
+  signature?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
@@ -63,7 +67,7 @@ function RMMark({ size }: { size: number }) {
   );
 }
 
-export default function Logo({ showName = true, size = 'md', className = '' }: LogoProps) {
+export default function Logo({ showName = true, signature = true, size = 'md', className = '' }: LogoProps) {
   const s = SIZES[size];
 
   return (
@@ -77,12 +81,14 @@ export default function Logo({ showName = true, size = 'md', className = '' }: L
           >
             Route<span className="text-accent">/</span>Market
           </span>
-          <span
-            className={`font-mono ${s.sub} text-muted-foreground/80 mt-1 uppercase`}
-            style={{ letterSpacing: '0.32em' }}
-          >
-            zbieraj · układaj · jedź
-          </span>
+          {signature && (
+            <span
+              className={`font-mono ${s.sub} text-muted-foreground/80 mt-1 uppercase`}
+              style={{ letterSpacing: '0.32em' }}
+            >
+              zbieraj · układaj · jedź
+            </span>
+          )}
         </span>
       )}
     </Link>

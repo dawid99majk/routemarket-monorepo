@@ -3,9 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
-import TablicaKafelek from '@/components/TablicaKafelek';
 import TripProjects from '@/components/TripProjects';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 
@@ -51,7 +49,10 @@ export default function TripPlans() {
   const [context, setContext] = useState<string | null>(null);
 
   const [wyjazdy, setWyjazdy] = useState<Wyjazd[]>([]);
-  const [podglad, setPodglad] = useState<Record<string, { zdjecia: string[]; ile: number }>>({});
+  const [podglad, setPodglad] = useState<Record<string,
+    { zdjecia: string[]; ile: number; must: number; nice: number; rejected: number }>>({});
+  /** Ile dni ma już gotowy plan — klucz to projekt. */
+  const [dniPlanu, setDniPlanu] = useState<Record<string, number>>({});
   const [ladowanie, setLadowanie] = useState(true);
   const [porzadek, setPorzadek] = useState<Porzadek>(() => {
     try { return (localStorage.getItem('rm_porzadek_tablic') as Porzadek) || 'ostatnie'; }
@@ -79,15 +80,33 @@ export default function TripPlans() {
     if (data?.length) {
       const { data: miejsca } = await supabase
         .from('trip_project_places')
-        .select('project_id, image_url')
+        .select('project_id, image_url, priority')
         .in('project_id', data.map((p: any) => p.id));
-      const wg: Record<string, { zdjecia: string[]; ile: number }> = {};
+      const wg: Record<string,
+        { zdjecia: string[]; ile: number; must: number; nice: number; rejected: number }> = {};
       for (const m of miejsca ?? []) {
-        const w = (wg[m.project_id] ??= { zdjecia: [], ile: 0 });
+        const w = (wg[m.project_id] ??= { zdjecia: [], ile: 0, must: 0, nice: 0, rejected: 0 });
         w.ile++;
+        if (m.priority === 'must') w.must++;
+        else if (m.priority === 'nice') w.nice++;
+        else if (m.priority === 'rejected') w.rejected++;
         if (m.image_url && w.zdjecia.length < 3) w.zdjecia.push(m.image_url);
       }
       setPodglad(wg);
+
+      // Gotowość planu: liczba dni w NAJŚWIEŻSZYM zapisanym planie wyjazdu.
+      const { data: plany } = await supabase
+        .from('trip_plans')
+        .select('project_id, plan, created_at')
+        .in('project_id', data.map((p: any) => p.id))
+        .order('created_at', { ascending: false });
+      const wgPlanu: Record<string, number> = {};
+      for (const pl of (plany ?? []) as any[]) {
+        if (wgPlanu[pl.project_id] != null) continue;   // pierwszy = najświeższy
+        const dni = Array.isArray(pl.plan?.days) ? pl.plan.days.length : 0;
+        wgPlanu[pl.project_id] = dni;
+      }
+      setDniPlanu(wgPlanu);
     }
     setLadowanie(false);
   }, []);
@@ -114,10 +133,10 @@ export default function TripPlans() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
-              Twoje wyjazdy
+              Planowanie
             </p>
             <h1 className="font-display font-light text-[40px] leading-[1.05] tracking-[-0.02em] mt-2">
-              Wszystkie tablice
+              Twoje wyjazdy
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
               Otwórz wyjazd, żeby zobaczyć jego tablicę i plan.
@@ -139,7 +158,8 @@ export default function TripPlans() {
                 </button>
               ))}
             </div>
-            <Button onClick={() => navigate('/start')} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => navigate('/start')}
+              className="bg-foreground text-background hover:bg-foreground/90">
               <Plus className="w-4 h-4 mr-1.5" /> Nowy wyjazd
             </Button>
           </div>
@@ -155,35 +175,130 @@ export default function TripPlans() {
             <p className="text-sm text-muted-foreground mt-2 max-w-[44ch] mx-auto text-pretty">
               Zacznij od miasta — resztę, łącznie z pierwszymi miejscami, podsunie agent.
             </p>
-            <Button className="mt-6 bg-primary hover:bg-primary/90" onClick={() => navigate('/start')}>
+            <Button className="mt-6 bg-foreground text-background hover:bg-foreground/90" onClick={() => navigate('/start')}>
               Zaplanuj pierwszy wyjazd ↗
             </Button>
           </div>
         ) : (
-          <div className="mt-8 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,248px),1fr))]">
-            {[...wyjazdy].sort((a, b) => {
+          <>
+          {(() => {
+            const posortowane = [...wyjazdy].sort((a, b) => {
               if (porzadek === 'nazwa') return a.name.localeCompare(b.name, 'pl');
               if (porzadek === 'nowe') return b.created_at.localeCompare(a.created_at);
               if (porzadek === 'miejsca') return (podglad[b.id]?.ile ?? 0) - (podglad[a.id]?.ile ?? 0);
               return b.updated_at.localeCompare(a.updated_at);
-            }).map((w) => {
-              const p = podglad[w.id];
-              const ile = p?.ile ?? 0;
-              return (
-                <TablicaKafelek
-                  key={w.id}
-                  nazwa={w.name}
-                  meta={[w.destination, ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : null]
-                    .filter(Boolean).join(' · ') || 'szkic'}
-                  zdjecia={p?.zdjecia ?? []}
-                  odznaka={ile === 0
-                    ? <Badge variant="outline" className="shrink-0">Pusta</Badge>
-                    : undefined}
-                  onClick={() => navigate(`/plany/${w.id}`)}
-                />
-              );
-            })}
-          </div>
+            });
+            const [wTrakcie, ...reszta] = posortowane;
+            const p = podglad[wTrakcie.id];
+            const dniGotowe = dniPlanu[wTrakcie.id] ?? 0;
+            const dniCel = wTrakcie.days ?? 0;
+            const postep = dniCel > 0 ? Math.min(100, Math.round((dniGotowe / dniCel) * 100)) : 0;
+            return (
+              <>
+                {/* Wyjazd w trakcie: osobno i wyraźnie większy. To on odróżnia ten
+                    ekran od galerii — reszta idzie w spokojną siatkę poniżej. */}
+                <button onClick={() => navigate(`/plany/${wTrakcie.id}`)}
+                  className="mt-8 w-full text-left rounded-md border border-border bg-card overflow-hidden
+                             flex flex-col sm:flex-row shadow-token-sm hover:shadow-token-md transition-shadow">
+                  <div className="w-full sm:w-[300px] h-[224px] shrink-0 bg-placeholder-photo overflow-hidden">
+                    {p?.zdjecia?.[0] && (
+                      <img src={p.zdjecia[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 p-6 flex flex-col">
+                    <p className="font-narrow uppercase tracking-[0.26em] text-[10px] text-accent">
+                      W trakcie układania
+                    </p>
+                    <h2 className="font-display font-light text-[30px] leading-[1.1] tracking-[-0.02em] mt-2 truncate">
+                      {wTrakcie.name}
+                    </h2>
+                    <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-2">
+                      {[wTrakcie.destination,
+                        dniCel ? `${dniCel} ${odmiana(dniCel, 'dzień', 'dni', 'dni')}` : null,
+                        wTrakcie.trip_type].filter(Boolean).join(' · ')}
+                    </p>
+
+                    {/* Trzy liczby w kolorach decyzji: szałwia „na pewno",
+                        terakota „być może", wyszarzone odrzucone. */}
+                    <div className="flex items-baseline gap-6 mt-5">
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="font-display font-light text-[26px] tabular-nums text-primary">{p?.must ?? 0}</span>
+                        <span className="text-[12px] text-muted-foreground">na pewno</span>
+                      </span>
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="font-display font-light text-[26px] tabular-nums text-accent">{p?.nice ?? 0}</span>
+                        <span className="text-[12px] text-muted-foreground">być może</span>
+                      </span>
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="font-display font-light text-[26px] tabular-nums text-muted-foreground">{p?.rejected ?? 0}</span>
+                        <span className="text-[12px] text-muted-foreground">odrzucone</span>
+                      </span>
+                    </div>
+
+                    {/* Pasek mówi o PLANIE, nie o tablicy — zebranie miejsc to
+                        jeszcze nie jest wyjazd, który da się przejść. */}
+                    <div className="mt-auto pt-5">
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-primary transition-[width]"
+                             style={{ width: `${postep}%` }} />
+                      </div>
+                      <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-2">
+                        {dniCel === 0
+                          ? 'Bez ustawionej długości wyjazdu'
+                          : dniGotowe === 0
+                            ? `Planu jeszcze nie ma · ${dniCel} ${odmiana(dniCel, 'dzień', 'dni', 'dni')} do ułożenia`
+                            : `Plan gotowy na dzień ${dniGotowe} z ${dniCel}`}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Reszta: spokojna siatka trzech. Ostatnia komórka to kreska —
+                    założenie wyjazdu jest częścią tej listy, nie osobnym ekranem. */}
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {reszta.map((w) => {
+                    const q = podglad[w.id];
+                    const ile = q?.ile ?? 0;
+                    const dniW = dniPlanu[w.id] ?? 0;
+                    const celW = w.days ?? 0;
+                    const postepW = celW > 0 ? Math.min(100, Math.round((dniW / celW) * 100)) : 0;
+                    return (
+                      <button key={w.id} onClick={() => navigate(`/plany/${w.id}`)}
+                        className="text-left rounded-md border border-border bg-card overflow-hidden
+                                   shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
+                        <div className="h-[132px] bg-placeholder-photo overflow-hidden">
+                          {q?.zdjecia?.[0] && (
+                            <img src={q.zdjecia[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                        <div className="p-4 flex-1 flex flex-col">
+                          <div className="font-display text-[17px] leading-snug truncate">{w.name}</div>
+                          <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1.5 truncate">
+                            {[w.destination, ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
+                              .filter(Boolean).join(' · ')}
+                          </div>
+                          <div className="mt-auto pt-4">
+                            <div className="h-1 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${postepW}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+
+                  <button onClick={() => navigate('/start')}
+                    className="rounded-md border border-dashed border-border min-h-[248px]
+                               flex flex-col items-center justify-center gap-2 text-muted-foreground
+                               hover:border-foreground/30 hover:text-foreground transition-colors">
+                    <Plus className="w-5 h-5" />
+                    <span className="text-sm">Zacznij nowy wyjazd</span>
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+          </>
         )}
       </main>
     </div>

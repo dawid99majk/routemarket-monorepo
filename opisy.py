@@ -16,7 +16,13 @@ zapytań, nie 492. Idziemy miastami, aż w mieście nie zostanie nic bez opisu.
 import base64, hashlib, hmac, json, subprocess, sys, time, urllib.error, urllib.request
 
 API = 'http://127.0.0.1:8081'
-NA_RAZ = 40
+# Dłuższy format opisu (4-6 zdań) podniósł koszt tokenów na miejsce ~3x
+# względem poprzednich 1-2 zdań. Przy 40 na raz i limicie 16384 tokenów
+# odpowiedzi (myślenie modelu + schemat JSON + treść) niektóre paczki
+# przycinały się w połowie i dawały niesparsowalny JSON -- serwer zwracał
+# "opisano 0" bez błędu. Wiedeń: 23 miejsca = 8903 tokenów i obcięty JSON,
+# choć jedno miejsce osobno kosztuje już ~1000-1200 tokenów samego narzutu.
+NA_RAZ = 20
 JEZYKI = ['en', 'de', 'fr', 'es', 'it']
 
 

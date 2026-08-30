@@ -13,8 +13,8 @@ import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import SEO from '@/components/SEO';
 
 const KUBELKI = [
-  { id: 'must', label: 'Na pewno', kolor: 'bg-primary' },
-  { id: 'nice', label: 'Być może', kolor: 'bg-dusty-blue' },
+  { id: 'must', label: 'Na pewno', kolor: 'border-primary' },
+  { id: 'nice', label: 'Być może', kolor: 'border-accent' },
 ] as const;
 
 /**
@@ -150,7 +150,7 @@ export default function TablicaPubliczna() {
           <p className="text-sm text-muted-foreground mt-2 max-w-[44ch] mx-auto text-pretty">
             {t('publiczna.brak_opis')}
           </p>
-          <Button className="mt-6 bg-primary hover:bg-primary/90" onClick={() => navigate('/')}>
+          <Button className="mt-6 bg-foreground text-background hover:bg-foreground/90" onClick={() => navigate('/')}>
             {t('publiczna.wroc')}
           </Button>
         </div>
@@ -210,7 +210,7 @@ export default function TablicaPubliczna() {
                   {tablica.like_count ?? 0}
                 </button>
                 <Button onClick={skopiujDoSiebie} disabled={kopiuje}
-                  className="h-10 bg-primary hover:bg-primary/90">
+                  className="h-10 bg-foreground text-background hover:bg-foreground/90">
                   {kopiuje
                     ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('publiczna.kopiuje')}</>
                     : <><Copy className="w-4 h-4 mr-1.5" /> {t('publiczna.skopiuj')}</>}
@@ -223,7 +223,7 @@ export default function TablicaPubliczna() {
                   <Heart className="w-4 h-4" /> {tablica.like_count ?? 0}
                 </span>
                 <Button onClick={() => navigate(`/auth?redirect=/tablica/${id}`)}
-                  className="h-10 bg-primary hover:bg-primary/90">
+                  className="h-10 bg-foreground text-background hover:bg-foreground/90">
                   Załóż konto, żeby skopiować ↗
                 </Button>
               </>
@@ -237,10 +237,9 @@ export default function TablicaPubliczna() {
             if (swoje.length === 0) return null;
             return (
               <div key={k.id} className="rounded-md border border-border bg-card overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground
-                                   flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${k.kolor}`} /> {k.label}
+                <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor}`}>
+                  <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                    {k.label}
                   </span>
                   <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
                     {swoje.length}

@@ -52,8 +52,8 @@ export function ElevationProfile({ coordinates }: { coordinates: number[][] }) {
           <polygon points={polygonData.replace(/M|L/g, '')} className="fill-primary/50" />
           <path d={pathData} fill="none" className="stroke-primary" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
         </svg>
-        <div className="absolute top-0 left-0 text-[10px] font-semibold text-muted-foreground -translate-y-4 bg-white/80 px-1 rounded">{Math.round(maxEle)} m</div>
-        <div className="absolute bottom-0 left-0 text-[10px] font-semibold text-muted-foreground translate-y-4 bg-white/80 px-1 rounded">{Math.round(minEle)} m</div>
+        <div className="absolute top-0 left-0 text-[10px] font-semibold text-muted-foreground -translate-y-4 bg-card/80 px-1 rounded">{Math.round(maxEle)} m</div>
+        <div className="absolute bottom-0 left-0 text-[10px] font-semibold text-muted-foreground translate-y-4 bg-card/80 px-1 rounded">{Math.round(minEle)} m</div>
       </div>
       <div className="flex justify-between text-[10px] font-medium text-muted-foreground mt-3 pt-2 border-t border-border/50">
         <span>Przewyższenie: <strong className="text-foreground/80">{Math.round(maxEle - minEle)}m</strong></span>

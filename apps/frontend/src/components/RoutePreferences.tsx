@@ -151,7 +151,7 @@ export default function RoutePreferences() {
           <Button variant="ghost" onClick={() => setValues(DEFAULT_PREFERENCES)} disabled={saving}>
             Wyzeruj
           </Button>
-          <Button onClick={save} disabled={saving} className="bg-primary hover:bg-primary/90">
+          <Button onClick={save} disabled={saving} className="bg-foreground text-background hover:bg-foreground/90">
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Zapisz preferencje
           </Button>

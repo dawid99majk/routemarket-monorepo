@@ -538,7 +538,7 @@ export default function Discover() {
                   najczęściej chce się sprawdzić, co już się uzbierało. */}
               <Button variant="outline"
                 onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>{t('odkrywaj.tablica')}</Button>
-              <Button className="bg-primary hover:bg-primary/90"
+              <Button className="bg-foreground text-background hover:bg-foreground/90"
                 onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}>
                 Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
               </Button>
@@ -584,7 +584,7 @@ export default function Discover() {
                 onClick={() => setFilter(f.id)}
                 className={`rounded-full px-3 py-1 text-xs border transition-colors ${
                   filter === f.id
-                    ? 'bg-primary border-primary text-primary-foreground'
+                    ? 'bg-foreground border-foreground text-background'
                     : 'bg-background border-border hover:bg-muted'
                 }`}
               >
@@ -670,7 +670,7 @@ export default function Discover() {
                     : 'Wpisz miasto, żeby zobaczyć, co w nim jest.'}
                 </p>
                 {city.trim() && (
-                  <Button onClick={seedCity} className="bg-primary hover:bg-primary/90">
+                  <Button onClick={seedCity} className="bg-foreground text-background hover:bg-foreground/90">
                     Zbierz miejsca dla: {city}
                   </Button>
                 )}
@@ -764,23 +764,60 @@ export default function Discover() {
                     </div>
                   </button>
 
-                  {/* Stopka: trzy kubełki w równym podziale, rozdzielone cienkimi liniami */}
-                  <div className="grid grid-cols-3 border-t border-border text-[12px]">
-                    {([
-                      ['must', 'Na pewno', 'bg-primary text-primary-foreground'],
-                      ['nice', 'Może', 'bg-dusty-blue text-dusty-blue-foreground'],
-                      ['rejected', 'Nie', 'bg-clay text-clay-foreground'],
-                    ] as const).map(([b, label, active], i) => (
-                      <button
-                        key={b}
-                        onClick={(e) => { e.stopPropagation(); mark(p, b as Bucket); }}
-                        className={`py-2 transition-colors ${i > 0 ? 'border-l border-border' : ''} ${
-                          mk === b ? active : 'text-muted-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {label}
+                  {/* Stopka: jedna akcja główna jako pigułka, reszta jako tekst.
+                      Podjęta decyzja jest widoczna kolorem — szałwia „na pewno",
+                      terakota „być może" — więc widać ją bez czytania etykiet. */}
+                  <div className="flex items-center gap-2 border-t border-border px-3 py-2.5 text-[12px]">
+                    {mk === 'must' ? (
+                      <>
+                        <span className="rounded-full bg-primary text-primary-foreground px-3 py-1 font-medium">
+                          Na pewno
+                        </span>
+                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'nice' as Bucket); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors">
+                          Może
+                        </button>
+                      </>
+                    ) : mk === 'nice' ? (
+                      <>
+                        <span className="rounded-full bg-accent text-accent-foreground px-3 py-1 font-medium">
+                          Być może
+                        </span>
+                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors">
+                          Na pewno
+                        </button>
+                      </>
+                    ) : mk === 'rejected' ? (
+                      <>
+                        <span className="rounded-full bg-muted text-muted-foreground px-3 py-1 line-through">
+                          Nie tym razem
+                        </span>
+                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors">
+                          Przywróć
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
+                          className="rounded-full bg-muted px-3 py-1 font-medium hover:bg-border transition-colors">
+                          Na pewno
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'nice' as Bucket); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors">
+                          Może
+                        </button>
+                      </>
+                    )}
+                    {mk !== 'rejected' && (
+                      <button onClick={(e) => { e.stopPropagation(); mark(p, 'rejected' as Bucket); }}
+                        aria-label="Nie tym razem"
+                        className="ml-auto w-6 h-6 rounded-full text-muted-foreground
+                                   hover:bg-muted hover:text-foreground transition-colors">
+                        ×
                       </button>
-                    ))}
+                    )}
                   </div>
                 </article>
               );

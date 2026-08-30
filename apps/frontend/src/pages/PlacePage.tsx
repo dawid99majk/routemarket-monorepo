@@ -266,7 +266,12 @@ export default function PlacePage() {
           <div>
             {photos.length > 0 && (
               <>
-                <div className="rounded-md overflow-hidden bg-muted h-[380px]">
+                {/* Wysokość na sztywno (380px) w kolumnie ~740px dawała proporcję
+                    prawie 2:1 -- portretowe zdjęcie traciło wtedy ponad połowę
+                    wysokości, a na wąskim telefonie box robił się WYŻSZY niż
+                    szerszy i ucinał boki. Proporcja skaluje się z realną
+                    szerokością zamiast trzymać sztywny piksel. */}
+                <div className="rounded-md overflow-hidden bg-muted aspect-[4/3]">
                   <img src={miniatura(photos[Math.min(photoIdx, photos.length - 1)], SZEROKOSC.karta)} alt={place.name}
                     className="w-full h-full object-cover"
                     onError={(e) => setBroken((p) => new Set(p).add((e.target as HTMLImageElement).src))} />

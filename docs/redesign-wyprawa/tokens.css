@@ -1,0 +1,69 @@
+/* RouteMarket — kierunek „Wyprawa”
+   Nadpisanie warstwy kolorystycznej w :root. Wszystko poza kolorem
+   (radius, shadow, aliasy markowe, sidebar) zostaje z obecnego motywu.
+
+   Zmiana polega na przejściu z chłodnego, prawie białego papieru
+   (--background: 158 8% 97%) na ciepły papier piaskowy i na wprowadzeniu
+   orzecha jako koloru tekstu i akcji głównych. Szałwia (--primary)
+   NIE zmienia wartości — zmienia się jej rola: przestaje być kolorem
+   każdego przycisku, zostaje tylko przy stanie „na pewno”.
+*/
+
+:root {
+  /* --- papier ------------------------------------------------------ */
+  --background: 33 53% 90%;      /* #F3E7D8  tło strony */
+  --surface: 37 57% 94%;         /* #F8F1E6  nagłówki, pasma, stopka */
+  --surface-top: 40 100% 99%;    /* #FFFDF9  karta uniesiona */
+  --surface-bottom: 33 53% 90%;
+  --card: 40 100% 99%;           /* #FFFDF9 */
+  --popover: 40 100% 99%;
+  --surface-card: 40 100% 99%;
+  --muted: 34 45% 87%;           /* #EDE0CF  tło zapadnięte, pigułki nieaktywne */
+  --secondary: 34 45% 87%;
+
+  /* --- tekst ------------------------------------------------------- */
+  --foreground: 20 26% 18%;      /* #3A2A22  orzech — tekst podstawowy */
+  --ink: 20 26% 18%;
+  --card-foreground: 20 26% 18%;
+  --popover-foreground: 20 26% 18%;
+  --secondary-foreground: 20 26% 18%;
+  --text-primary: 20 26% 18%;
+  --text-secondary: 25 16% 36%;  /* #6B5A4E */
+  --text-muted: 27 13% 48%;      /* #8C7A6B */
+  --muted-foreground: 27 13% 48%;
+  --neutral: 27 13% 48%;
+
+  /* --- akcent ------------------------------------------------------ */
+  --accent: 17 42% 52%;          /* #B86F52  terakota — mocniejsza niż dotychczasowy tan */
+  --tan: 17 42% 52%;
+  --burnt-orange: 17 42% 52%;
+  --accent-foreground: 40 100% 99%;
+  --tan-foreground: 40 100% 99%;
+
+  /* --- linie i pola ------------------------------------------------ */
+  --border: 20 26% 18%;          /* używane z alfą: hsl(var(--border) / .1) */
+  --input: 20 26% 18%;
+  --ring: 17 42% 52%;
+
+  /* --- bez zmian --------------------------------------------------- */
+  /* --primary: 158 28% 32%   szałwia #3B6655 — tylko „na pewno” */
+  /* --sage, --forest, --forest-deep, --moss, --dusty-blue */
+  /* --radius* , --shadow* , --destructive, --success, --warning, --danger */
+}
+
+/* Cienie w prototypie są cieplejsze niż obecne --shadow-*.
+   Jeżeli implementacja ma je odwzorować, podmienić trzy poziomy: */
+:root {
+  --shadow-sm: 0 8px 16px -10px rgba(58, 42, 34, .2);
+  --shadow-md: 0 14px 28px -18px rgba(58, 42, 34, .32);
+  --shadow-lg: 0 28px 48px -18px rgba(58, 42, 34, .34);
+  --shadow-xl: 0 30px 60px -22px rgba(58, 42, 34, .28);
+}
+
+/* Wartości pomocnicze użyte w prototypie, które nie mają jeszcze tokenu.
+   Do dodania, jeżeli implementacja ich potrzebuje. */
+:root {
+  --placeholder-photo: 34 39% 83%;  /* #E4D5C1  tło slotu na zdjęcie */
+  --strikethrough: 24 15% 60%;      /* #A8968A  pozycja odrzucona */
+  --hairline: 32 20% 71%;           /* #C3B5A5  separator „·” */
+}

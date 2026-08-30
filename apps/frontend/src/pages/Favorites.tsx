@@ -76,7 +76,7 @@ export default function Favorites() {
               Nic tu jeszcze nie ma. Ulubione to miejsca odłożone na później — bez decydowania,
               kiedy i czy w ogóle tam pojedziesz.
             </p>
-            <Button onClick={() => navigate('/odkrywaj')} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => navigate('/odkrywaj')} className="bg-foreground text-background hover:bg-foreground/90">
               Zacznij odkrywać
             </Button>
           </div>

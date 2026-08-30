@@ -193,7 +193,7 @@ export default function Zapisane() {
               Zapisane to miejsca odłożone na później — bez decydowania, kiedy i czy w ogóle
               tam pojedziesz. Klikaj serce wszędzie, gdzie coś Ci się spodoba.
             </p>
-            <Button className="mt-6 bg-primary hover:bg-primary/90" onClick={() => navigate('/odkrywaj')}>
+            <Button className="mt-6 bg-foreground text-background hover:bg-foreground/90" onClick={() => navigate('/odkrywaj')}>
               Zacznij odkrywać ↗
             </Button>
           </div>
