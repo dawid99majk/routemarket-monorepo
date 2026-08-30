@@ -238,7 +238,8 @@ export default function TablicaPubliczna() {
             return (
               <div key={k.id} className="rounded-md border border-border bg-card overflow-hidden">
                 <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor}`}>
-                  <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                  <span className={`font-narrow uppercase tracking-[0.18em] text-[10px] font-semibold ${
+                    k.id === 'must' ? 'text-primary' : 'text-accent'}`}>
                     {k.label}
                   </span>
                   <span className="font-mono text-[12px] tabular-nums text-muted-foreground">

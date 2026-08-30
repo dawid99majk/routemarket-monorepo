@@ -137,19 +137,24 @@
     --secondary-foreground: 20 26% 18%;
     --text-primary: 20 26% 18%;
     --text-secondary: 25 16% 36%;  /* #6B5A4E */
-    --text-muted: 27 13% 48%;      /* #8C7A6B */
-    --muted-foreground: 27 13% 48%;
-    --neutral: 27 13% 48%;
+    /* 39%, nie 48%: przy 48% napis pomocniczy na tle `muted` (czyli po
+       najechaniu) dawał kontrast 3,22 przy normie 4,5 — a mowa najczęściej
+       o tekście 10–11 px, który przy takim kontraście znika. */
+    --text-muted: 27 13% 39%;      /* #6E5F53 */
+    --muted-foreground: 27 13% 39%;
+    --neutral: 27 13% 39%;
 
-    --accent: 17 42% 52%;          /* #B86F52  terakota — mocniejsza niż dotychczasowy tan */
-    --tan: 17 42% 52%;
-    --burnt-orange: 17 42% 52%;
+    /* 47%, nie 52%: prawie biały napis na terakocie dawał 3,84 przy normie
+       4,5 — a to kolor przycisków, które mają być najlepiej widoczne. */
+    --accent: 17 42% 47%;          /* #A96448  terakota — mocniejsza niż dotychczasowy tan */
+    --tan: 17 42% 47%;
+    --burnt-orange: 17 42% 47%;
     --accent-foreground: 40 100% 99%;
     --tan-foreground: 40 100% 99%;
 
     --border: 20 26% 18%;          /* używane z alfą: hsl(var(--border) / .1) */
     --input: 20 26% 18%;
-    --ring: 17 42% 52%;
+    --ring: 17 42% 47%;
 
     --shadow-sm: 0 8px 16px -10px rgba(58, 42, 34, .2);
     --shadow-md: 0 14px 28px -18px rgba(58, 42, 34, .32);

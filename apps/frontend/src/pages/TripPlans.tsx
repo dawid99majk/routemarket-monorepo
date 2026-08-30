@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -202,7 +203,7 @@ export default function TripPlans() {
                              flex flex-col sm:flex-row shadow-token-sm hover:shadow-token-md transition-shadow">
                   <div className="w-full sm:w-[300px] h-[224px] shrink-0 bg-placeholder-photo overflow-hidden">
                     {p?.zdjecia?.[0] && (
-                      <img src={p.zdjecia[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                      <img src={miniatura(p.zdjecia[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0 p-6 flex flex-col">
@@ -268,7 +269,7 @@ export default function TripPlans() {
                                    shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
                         <div className="h-[132px] bg-placeholder-photo overflow-hidden">
                           {q?.zdjecia?.[0] && (
-                            <img src={q.zdjecia[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                            <img src={miniatura(q.zdjecia[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />
                           )}
                         </div>
                         <div className="p-4 flex-1 flex flex-col">

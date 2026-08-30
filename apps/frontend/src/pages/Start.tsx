@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -455,7 +456,7 @@ export default function Start() {
                   {must.slice(0, 6).map((p) => (
                     <div key={p.id} title={p.name}
                       className="flex-1 h-14 rounded-sm bg-muted overflow-hidden">
-                      {p.image_url && <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                      {p.image_url && <img src={miniatura(p.image_url, SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
                     </div>
                   ))}
                 </div>
@@ -509,7 +510,7 @@ export default function Start() {
                                hover:shadow-token-md transition-shadow">
                     <div className="h-[92px] bg-muted">
                       {m.photos?.[0] && (
-                        <img src={m.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                        <img src={miniatura(m.photos[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />
                       )}
                     </div>
                     <div className="p-2.5">
@@ -570,7 +571,7 @@ export default function Start() {
                   <div key={p.id} className={`px-6 py-5 ${i > 0 ? 'lg:border-l border-border' : ''}`}>
                     <div className="flex items-start gap-3.5">
                       <div className="w-[52px] h-[52px] rounded-sm bg-muted shrink-0 overflow-hidden">
-                        {p.image_url && <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                        {p.image_url && <img src={miniatura(p.image_url, SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />}
                       </div>
                       <div className="min-w-0">
                         <h3 className="font-display text-[16px] leading-snug">{p.name}</h3>

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
@@ -2033,7 +2034,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                        border-b border-border last:border-b-0">
                             <div className="w-9 h-9 rounded-sm bg-muted shrink-0 overflow-hidden">
                               {sug.photos?.[0] && (
-                                <img src={sug.photos[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                <img src={miniatura(sug.photos[0], 120)} alt="" loading="lazy" className="w-full h-full object-cover" />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -2175,7 +2176,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       return (
                         <div key={r.name} className="rounded-md border overflow-hidden bg-background flex flex-col">
                           {r.image_url && (
-                            <img src={r.image_url} alt="" loading="lazy"
+                            <img src={miniatura(r.image_url, 120)} alt="" loading="lazy"
                               className="w-full h-32 object-cover bg-muted" />
                           )}
                           <div className="p-3 space-y-2 flex-1 flex flex-col">
@@ -2478,7 +2479,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             : zone.id === 'nice' ? 'border-accent' : 'border-border'
                         }`}>
                           <span className="flex items-center gap-2.5">
-                            <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+                            <span className={`font-narrow uppercase tracking-[0.18em] text-[11px] font-semibold ${
+                              zone.id === 'must' ? 'text-primary'
+                                : zone.id === 'nice' ? 'text-accent' : 'text-muted-foreground'
+                            }`}>
                               {zone.label}
                             </span>
                           </span>
@@ -2519,7 +2523,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   <div className="w-[84px] h-[84px] rounded-sm bg-muted shrink-0 overflow-hidden
                                                   flex items-center justify-center">
                                     {p.image_url
-                                      ? <img src={p.image_url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                      ? <img src={miniatura(p.image_url, 120)} alt="" loading="lazy" className="w-full h-full object-cover" />
                                       : <Icon className="w-5 h-5 text-muted-foreground/60" />}
                                   </div>
                                   <div className="min-w-0 flex-1">
@@ -2774,7 +2778,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           className="absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-45"
                           style={{ backgroundImage: `url("${placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}")` }} />
                         <img
-                          src={placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)]}
+                          src={miniatura(placeCard.photos[Math.min(cardPhoto, placeCard.photos.length - 1)], SZEROKOSC.karta)}
                           alt={placeCard.name}
                           className="relative w-full h-56 object-contain"
                           onError={() => setPlaceCard((prev: any) => ({ ...prev, photos: [] }))}
