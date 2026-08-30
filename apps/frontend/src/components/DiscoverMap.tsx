@@ -49,8 +49,8 @@ const token = (nazwa: string, zapas: string) => {
 const kolorTla = (wyroznione: boolean, kubelek?: string | null) => {
   if (wyroznione) return token('--primary', 'hsl(158 28% 32%)');
   if (kubelek === 'must') return token('--primary', 'hsl(158 28% 32%)');
-  if (kubelek === 'nice') return token('--accent', 'hsl(17 42% 52%)');
-  if (kubelek === 'rejected') return token('--muted-foreground', 'hsl(27 13% 48%)');
+  if (kubelek === 'nice') return token('--accent', 'hsl(17 42% 47%)');
+  if (kubelek === 'rejected') return token('--muted-foreground', 'hsl(27 13% 39%)');
   return token('--foreground', 'hsl(20 26% 18%)');
 };
 
@@ -140,7 +140,7 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
           className: '',
           html: `<div style="position:relative;width:30px;height:38px">
             <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-              background:${token('--accent', 'hsl(17 42% 52%)')};border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
+              background:${token('--accent', 'hsl(17 42% 47%)')};border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
               box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>
             <div style="position:absolute;top:7px;left:9px;width:12px;height:12px;border-radius:50%;
               background:${token('--card', 'hsl(40 100% 99%)')}"></div>
