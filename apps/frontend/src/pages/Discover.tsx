@@ -437,6 +437,10 @@ export default function Discover() {
   const zPinezki = (id: string) => {
     setAktywne(id);
     kartyRef.current[id]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    // Pinezka prowadzi tam, co kafelek: do karty miejsca ze zdjęciami i opisem.
+    // Samo przewinięcie pokazywało tylko to, co i tak było widać na kafelku.
+    const p = places.find((x) => x.id === id);
+    if (p?.slug) navigate(`/miejsce/${p.slug}`);
   };
 
   const seedCity = async () => {

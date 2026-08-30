@@ -398,7 +398,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     (async () => {
       const { data } = await supabase
         .from('trip_project_places')
-        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id')
         .eq('project_id', activeId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
@@ -1076,6 +1076,26 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     });
     setCardPhoto(0);
 
+    // Galeria ze źródła. Tablica trzyma jedno zdjęcie — kopię z chwili przypięcia —
+    // a katalog ma ich do trzech i jest aktualny. Powiązanie `catalog_id` pozwala
+    // pokazać pełną galerię zamiast pojedynczej, czasem przeterminowanej miniatury.
+    if (pinned?.catalog_id) {
+      (supabase as any).from('place_catalog')
+        .select('photos, description, opening_hours, website')
+        .eq('id', pinned.catalog_id).maybeSingle()
+        .then(({ data: kat }: any) => {
+          if (!kat) return;
+          const zKatalogu: string[] = Array.isArray(kat.photos) ? kat.photos.filter(Boolean) : [];
+          setPlaceCard((prev: any) => prev && prev.name === item.name ? {
+            ...prev,
+            photos: zKatalogu.length ? zKatalogu : prev.photos,
+            description: prev.description || kat.description || '',
+            opening_hours: prev.opening_hours || kat.opening_hours || null,
+            website: prev.website || kat.website || null,
+          } : prev);
+        });
+    }
+
     // Przypięte miejsce zwykle ma już opis z wyszukiwarki; propozycję agenta
     // trzeba dociągnąć, bo w planie jest tylko jej nazwa.
     if (pinned?.description && pinned?.image_url) return;
@@ -1312,7 +1332,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         description: item.note || '',
         source: 'plan'
       })
-      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract')
+      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id')
       .single();
     if (error) return toast.error(error.message);
     setPlaces((prev) => [...prev, jakoMiejsce(data)]);
