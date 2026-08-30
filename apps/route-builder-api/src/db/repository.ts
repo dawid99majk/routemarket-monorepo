@@ -142,7 +142,7 @@ export class RouteBuilderRepository {
     // "ktore miejsca nie maja jeszcze opisu". Bez nich filtr przepuszczal wszystko
     // i endpoint nadpisywal gotowe opisy.
     let q = supabase.from('place_catalog')
-      .select('id, name, kind, city, lat, lng, photos, description, description_i18n, visit_minutes')
+      .select('id, name, kind, city, lat, lng, photos, description, description_i18n, visit_minutes, wikipedia')
       .limit(limit);
     if (city) q = q.ilike('city', city);
     const { data, error } = await q;

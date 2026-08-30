@@ -2515,10 +2515,15 @@ app.post('/places/suggest', async (c) => {
  */
 app.post('/catalog/refresh-photos', async (c) => {
   try {
-    type Zadanie = { city?: string; limit?: number; tylko_braki?: boolean };
-    const { city, limit = 500, tylko_braki = false } =
+    type Zadanie = { city?: string; limit?: number; tylko_braki?: boolean; tylko_z_tagiem?: boolean };
+    const { city, limit = 500, tylko_braki = false, tylko_z_tagiem = false } =
       await c.req.json().catch(() => ({})) as Zadanie;
-    const wszystkie = await repo.listCatalogAll(city?.trim() || null, limit);
+    const pelna = await repo.listCatalogAll(city?.trim() || null, limit);
+    // `tylko_z_tagiem` ogranicza przebieg do pozycji, które mają twarde
+    // powiązanie z artykułem — tylko tam podmiana jest pewna, a nie losowa.
+    const wszystkie = tylko_z_tagiem
+      ? pelna.filter((r: any) => !!r.wikipedia)
+      : pelna;
     // `tylko_braki` uzupełnia puste galerie, nie ruszając tych, które działają.
     // Bez tego jedyny sposób na dociągnięcie zdjęć dla nowych pozycji to
     // przepuszczenie CAŁEGO miasta — a Commons przy każdym zapytaniu może
@@ -2537,7 +2542,11 @@ app.post('/catalog/refresh-photos', async (c) => {
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH);
       const sets = await Promise.all(
-        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 3, r.city)
+        // `r.wikipedia` to powiązanie twarde z OSM: obiekt sam wskazuje swój
+        // artykuł, a artykuł ma zdjęcie wiodące wybrane przez człowieka.
+        // Bez tego argumentu zostawało wyszukiwanie po nazwie i po okolicy,
+        // które potrafi wziąć zdjęcie sąsiedniego budynku.
+        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 3, r.city, r.wikipedia)
           .catch(() => { bledy += 1; return [] as string[]; }))
       );
       // Wikimedia przycina ruch przy kilkudziesięciu zapytaniach pod rząd.

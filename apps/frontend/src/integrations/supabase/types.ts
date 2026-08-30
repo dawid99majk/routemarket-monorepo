@@ -283,6 +283,30 @@ export type Database = {
         }
         Relationships: []
       }
+      katalog_wykluczenia: {
+        Row: {
+          created_at: string
+          nazwa: string
+          osm_id: string
+          powod: string
+          scalono_z: string | null
+        }
+        Insert: {
+          created_at?: string
+          nazwa: string
+          osm_id: string
+          powod: string
+          scalono_z?: string | null
+        }
+        Update: {
+          created_at?: string
+          nazwa?: string
+          osm_id?: string
+          powod?: string
+          scalono_z?: string | null
+        }
+        Relationships: []
+      }
       kolejka_zatwierdzen: {
         Row: {
           agent: string
@@ -1025,6 +1049,8 @@ export type Database = {
       trip_projects: {
         Row: {
           author_display: string | null
+          copied_at: string | null
+          copied_from: string | null
           copy_count: number
           created_at: string
           crowds: number | null
@@ -1057,6 +1083,8 @@ export type Database = {
         }
         Insert: {
           author_display?: string | null
+          copied_at?: string | null
+          copied_from?: string | null
           copy_count?: number
           created_at?: string
           crowds?: number | null
@@ -1089,6 +1117,8 @@ export type Database = {
         }
         Update: {
           author_display?: string | null
+          copied_at?: string | null
+          copied_from?: string | null
           copy_count?: number
           created_at?: string
           crowds?: number | null
@@ -1119,7 +1149,15 @@ export type Database = {
           user_id?: string
           wandering?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trip_projects_copied_from_fkey"
+            columns: ["copied_from"]
+            isOneToOne: false
+            referencedRelation: "trip_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

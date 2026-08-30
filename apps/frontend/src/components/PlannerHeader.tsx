@@ -38,7 +38,7 @@ function zakladki(tripId: string | null) {
   }
   return [
     { klucz: 'naglowek.odkrywaj', path: '/odkrywaj' },
-    { klucz: 'naglowek.tablica', path: `/plany/${tripId}` },
+    { klucz: 'naglowek.tablica', path: '/plany' },
     { klucz: 'naglowek.plan_dni', path: `/plany/${tripId}?widok=plan` },
     { klucz: 'naglowek.inspiracje', path: '/tablice' },
   ];
@@ -74,8 +74,9 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
    */
   const isActive = (path: string) => {
     if (path.includes('?')) return pathname.startsWith('/plany') && search.includes('widok=plan');
-    if (path.startsWith('/plany/')) return pathname.startsWith('/plany') && !search.includes('widok=plan');
-    if (path === '/plany') return pathname.startsWith('/plany') && !tripId;
+    // „Tablica" obejmuje i listę, i otwartą tablicę — to jedna część aplikacji,
+    // a nie dwa miejsca, między którymi trzeba się domyślać, gdzie się jest.
+    if (path === '/plany') return pathname.startsWith('/plany') && !search.includes('widok=plan');
     if (path === '/odkrywaj') {
       return pathname === '/odkrywaj' || pathname.startsWith('/miejsce/') || pathname === '/ulubione';
     }

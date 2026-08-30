@@ -42,6 +42,8 @@ export default function TablicaPubliczna() {
   const [kopiuje, setKopiuje] = useState(false);
   const [inicjaly, setInicjaly] = useState<string | null>(null);
   const [jaId, setJaId] = useState<string | null>(null);
+  /** Moja kopia tej tablicy, jeśli już ją zrobiłem. */
+  const [mojaKopia, setMojaKopia] = useState<{ id: string; copied_at: string | null } | null>(null);
 
   useEffect(() => { (async () => setInicjaly(await inicjalyUzytkownika()))(); }, []);
 
@@ -49,7 +51,7 @@ export default function TablicaPubliczna() {
     if (!id) return;
     setLadowanie(true);
     const { data: t } = await (supabase as any).from('trip_projects')
-      .select('id, name, destination, days, trip_type, author_display, copy_count, like_count, start_date, end_date, is_public, user_id')
+      .select('id, name, destination, days, trip_type, author_display, copy_count, like_count, start_date, end_date, is_public, user_id, updated_at')
       .eq('id', id).maybeSingle();
 
     // Polityka odsiewa nieopublikowane, więc brak wiersza znaczy „nie dla ciebie".
@@ -67,6 +69,11 @@ export default function TablicaPubliczna() {
       const { data: lk } = await (supabase as any).from('board_likes')
         .select('project_id').eq('user_id', u.user.id).eq('project_id', id).maybeSingle();
       setPolubiona(!!lk);
+
+      const { data: kop } = await (supabase as any).from('trip_projects')
+        .select('id, copied_at').eq('user_id', u.user.id).eq('copied_from', id)
+        .order('copied_at', { ascending: false }).limit(1).maybeSingle();
+      setMojaKopia(kop ?? null);
     }
     setLadowanie(false);
   }, [id]);
@@ -98,7 +105,8 @@ export default function TablicaPubliczna() {
   const skopiujDoSiebie = async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return navigate(`/auth?redirect=/tablica/${id}`);
-    if (u.user.id === tablica.user_id) return toast.info(t('publiczna.twoja'));
+    if (u.user.id === tablica.user_id) return navigate(`/plany/${tablica.id}`);
+    if (mojaKopia) return navigate(`/plany/${mojaKopia.id}`);
     setKopiuje(true);
     try {
       const { data: kopia, error } = await (supabase as any).from('trip_projects').insert({
@@ -107,7 +115,9 @@ export default function TablicaPubliczna() {
         destination: tablica.destination,
         days: tablica.days,
         trip_type: tablica.trip_type,
-      }).select('id').single();
+        copied_from: id,
+        copied_at: new Date().toISOString(),
+      }).select('id, copied_at').single();
       if (error) throw new Error(error.message);
 
       if (miejsca.length) {
@@ -121,6 +131,7 @@ export default function TablicaPubliczna() {
       // Licznik kopii utrzymuje właściciel oryginału; podbijamy go przez RPC,
       // bo polityka nie pozwala obcemu pisać po cudzym wierszu.
       await (supabase as any).rpc('rm_podbij_kopie', { p_project: id });
+      setMojaKopia({ id: kopia.id, copied_at: kopia.copied_at ?? new Date().toISOString() });
       toast.success(t('publiczna.skopiowana'));
       navigate(`/plany/${kopia.id}`);
     } catch (e: any) {
@@ -157,6 +168,14 @@ export default function TablicaPubliczna() {
       </div>
     );
   }
+
+  /* Autor mógł tablicę zmienić już po tym, jak ją skopiowałem. Mówimy o tym
+     wprost, ale NIE wciągamy zmian do kopii: to od tego momentu Twój wyjazd,
+     w którym mogłeś poprzestawiać decyzje i ułożyć plan. Scalanie musiałoby
+     albo nadpisać Twoją pracę, albo zgadywać — jedno i drugie gorsze niż
+     uczciwa informacja. */
+  const zrodloZmienione = !!(mojaKopia?.copied_at && (tablica as any)?.updated_at
+    && new Date((tablica as any).updated_at) > new Date(mojaKopia.copied_at));
 
   const naMapie = miejsca
     .filter((m) => m.lat != null && m.lng != null && m.priority !== 'rejected')
@@ -209,12 +228,35 @@ export default function TablicaPubliczna() {
                   <Heart className={`w-4 h-4 ${polubiona ? 'fill-accent' : ''}`} />
                   {tablica.like_count ?? 0}
                 </button>
-                <Button onClick={skopiujDoSiebie} disabled={kopiuje}
-                  className="h-10 bg-foreground text-background hover:bg-foreground/90">
-                  {kopiuje
-                    ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('publiczna.kopiuje')}</>
-                    : <><Copy className="w-4 h-4 mr-1.5" /> {t('publiczna.skopiuj')}</>}
-                </Button>
+                {jaId === tablica.user_id ? (
+                  /* Własna tablica: dymek „to Twoja" wyglądał na działający przycisk,
+                     który nic nie robi. Teraz prowadzi tam, gdzie się ją edytuje. */
+                  <Button onClick={() => navigate(`/plany/${tablica.id}`)}
+                    className="h-10 bg-foreground text-background hover:bg-foreground/90">
+                    Otwórz swoją tablicę ↗
+                  </Button>
+                ) : mojaKopia ? (
+                  /* Już skopiowana — druga identyczna kopia nikomu nie służy. */
+                  <div className="flex flex-col items-end gap-1">
+                    <Button onClick={() => navigate(`/plany/${mojaKopia.id}`)}
+                      className="h-10 bg-foreground text-background hover:bg-foreground/90">
+                      Otwórz swoją kopię ↗
+                    </Button>
+                    <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {mojaKopia.copied_at
+                        ? `skopiowana ${new Date(mojaKopia.copied_at).toLocaleDateString('pl-PL')}`
+                        : 'masz już swoją kopię'}
+                      {zrodloZmienione && ' · autor coś od tego czasu zmienił'}
+                    </span>
+                  </div>
+                ) : (
+                  <Button onClick={skopiujDoSiebie} disabled={kopiuje}
+                    className="h-10 bg-foreground text-background hover:bg-foreground/90">
+                    {kopiuje
+                      ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('publiczna.kopiuje')}</>
+                      : <><Copy className="w-4 h-4 mr-1.5" /> {t('publiczna.skopiuj')}</>}
+                  </Button>
+                )}
               </>
             ) : (
               <>

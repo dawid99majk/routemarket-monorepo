@@ -1734,163 +1734,142 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   <DialogTitle>Ustawienia wyjazdu</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
-            <div className="rounded-md border border-border bg-card px-4 py-3.5">
-              {active.start_name ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <MapPin className="w-4 h-4 text-primary shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                  {/* Start */}
+                  <div className="rounded-md border border-border bg-card p-4">
+                    <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                       Punkt startowy
-                    </div>
-                    <div className="text-sm truncate">{active.start_name}</div>
-                  </div>
-                  {/* Przycisk położenia był tylko w gałęzi bez ustawionego startu,
-                      więc kto raz wpisał hotel, nie mógł go już podmienić na swoje
-                      położenie bez wcześniejszego kasowania punktu. */}
-                  <button onClick={startZUrzadzenia} disabled={lokalizowanie}
-                    className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground
-                               hover:text-primary transition-colors disabled:opacity-60">
-                    {lokalizowanie
-                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Szukam…</>
-                      : <><Crosshair className="w-3.5 h-3.5" /> {t('tablica.moje_po_ozenie')}</>}
-                  </button>
-                  <button onClick={() => { setPokazStart(true); setStartQuery(''); }}
-                    className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-                    Zmień
-                  </button>
-                  <button onClick={() => ustawStart(null)}
-                    className="text-[13px] text-muted-foreground hover:text-destructive transition-colors">
-                    Usuń
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm">{t('tablica.skad_zaczynacie')}</div>
-                    <div className="text-[13px] text-muted-foreground">
-                      Hotel, parking, dworzec — planer zacznie i skończy tam każdy dzień.
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
-                      {lokalizowanie
-                        ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
-                        : <><Crosshair className="w-4 h-4 mr-1.5" /> {t('tablica.moje_po_ozenie')}</>}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
-                      Ustaw punkt startowy
-                    </Button>
-                  </div>
-                </div>
-              )}
+                    </p>
+                    {active.start_name ? (
+                      <>
+                        <p className="text-[15px] mt-1.5 break-words">{active.start_name}</p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button size="sm" variant="outline" onClick={() => { setPokazStart(true); setStartQuery(''); }}>
+                            Zmień
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
+                            {lokalizowanie
+                              ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
+                              : <><Crosshair className="w-4 h-4 mr-1.5" /> {t('tablica.moje_po_ozenie')}</>}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => ustawStart(null)}
+                            className="text-muted-foreground hover:text-destructive">
+                            Usuń
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[13px] text-muted-foreground mt-1.5 text-pretty">
+                          Hotel, parking, dworzec — planer zacznie i skończy tam każdy dzień.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button size="sm" variant="outline" onClick={() => setPokazStart(true)}>
+                            Ustaw punkt startowy
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={startZUrzadzenia} disabled={lokalizowanie}>
+                            {lokalizowanie
+                              ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Szukam…</>
+                              : <><Crosshair className="w-4 h-4 mr-1.5" /> {t('tablica.moje_po_ozenie')}</>}
+                          </Button>
+                        </div>
+                      </>
+                    )}
 
-              {pokazStart && (
-                <div className="relative mt-3">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input autoFocus value={startQuery}
-                    onChange={(e) => setStartQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Escape' && setPokazStart(false)}
-                    placeholder={`Nazwa hotelu, parkingu albo dworca w: ${active.destination}`}
-                    className="pl-9" />
-                  {startPodpowiedzi.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
-                                    bg-popover shadow-token-lg overflow-hidden">
-                      {startPodpowiedzi.map((sug, i) => (
-                        <button key={`${sug.name}-${i}`} onClick={() => ustawStart(sug)}
-                          className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors
-                                     border-b border-border last:border-b-0">
-                          <div className="text-sm truncate">{sug.name}</div>
-                          <div className="font-mono text-[11px] text-muted-foreground truncate">
-                            {[sug.kind, [sug.city, sug.country].filter(Boolean).join(' / ')]
-                              .filter(Boolean).join(' · ')}
+                    {pokazStart && (
+                      <div className="relative mt-3">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input autoFocus value={startQuery}
+                          onChange={(e) => setStartQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Escape' && setPokazStart(false)}
+                          placeholder={`Hotel, parking albo dworzec w: ${active.destination}`}
+                          className="pl-9" />
+                        {startPodpowiedzi.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-20 rounded-md border border-border
+                                          bg-popover shadow-token-lg overflow-hidden max-h-[220px] overflow-y-auto">
+                            {startPodpowiedzi.map((sug, i) => (
+                              <button key={`${sug.name}-${i}`} onClick={() => ustawStart(sug)}
+                                className="w-full text-left px-3 py-2.5 hover:bg-muted transition-colors
+                                           border-b border-border last:border-b-0">
+                                <div className="text-sm truncate">{sug.name}</div>
+                                <div className="font-mono text-[11px] text-muted-foreground truncate">
+                                  {[sug.kind, [sug.city, sug.country].filter(Boolean).join(' / ')]
+                                    .filter(Boolean).join(' · ')}
+                                </div>
+                              </button>
+                            ))}
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {/* Nie każdy nocleg jest w OpenStreetMap — nazwa własna wystarczy,
-                      planer i tak dostanie ją jako bazę. */}
-                  {startQuery.trim().length >= 3 && (
-                    <button
-                      onClick={() => ustawStart({ name: startQuery.trim(), lat: null, lng: null })}
-                      className="mt-2 text-[13px] text-primary hover:underline">
-                      Użyj „{startQuery.trim()}" jako nazwy własnej
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+                        )}
+                        {startQuery.trim().length >= 3 && (
+                          <button
+                            onClick={() => ustawStart({ name: startQuery.trim(), lat: null, lng: null })}
+                            className="mt-2 text-[13px] text-accent hover:underline">
+                            Użyj „{startQuery.trim()}" jako nazwy własnej
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-            {/* Termin obok punktu startowego, bo to dwie odpowiedzi na to samo
-                pytanie: kiedy i skąd. Wcześniej termin dawało się wpisać tylko przy
-                zakładaniu wyjazdu i nigdzie potem nie było go widać ani jak dodać. */}
-            <div className="rounded-md border border-border bg-card px-4 py-3.5">
-              {active.start_date ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <CalendarDays className="w-4 h-4 text-primary shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                  {/* Termin */}
+                  <div className="rounded-md border border-border bg-card p-4">
+                    <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                       Termin
-                    </div>
-                    <div className="text-sm truncate">
-                      {zakresDat(active.start_date, active.end_date)}
-                      {active.days ? ` · ${active.days} ${active.days === 1 ? 'dzień' : 'dni'}` : ''}
-                    </div>
-                  </div>
-                  <button onClick={() => {
-                      setTerminOd(active.start_date ?? '');
-                      setTerminDo(active.end_date ?? '');
-                      setPokazTermin(true);
-                    }}
-                    className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
-                    Zmień
-                  </button>
-                  <button onClick={() => zapiszTermin(null, null)}
-                    className="text-[13px] text-muted-foreground hover:text-destructive transition-colors">
-                    Usuń
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm">{t('tablica.kiedy_jedziecie')}</div>
-                    <div className="text-[13px] text-muted-foreground">
-                      Bez terminu wszystko działa — z terminem godziny otwarcia liczą się dla
-                      właściwej pory roku, a wydarzenia z Twoich dni idą na górę.
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => setPokazTermin(true)}>
-                    Ustaw termin
-                  </Button>
-                </div>
-              )}
+                    </p>
+                    {active.start_date ? (
+                      <>
+                        <p className="text-[15px] mt-1.5">
+                          {zakresDat(active.start_date, active.end_date)}
+                          {active.days ? ` · ${active.days} ${active.days === 1 ? 'dzień' : 'dni'}` : ''}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <Button size="sm" variant="outline" onClick={() => {
+                              setTerminOd(active.start_date ?? '');
+                              setTerminDo(active.end_date ?? '');
+                              setPokazTermin(true);
+                            }}>
+                            Zmień
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => zapiszTermin(null, null)}
+                            className="text-muted-foreground hover:text-destructive">
+                            Usuń
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[13px] text-muted-foreground mt-1.5 text-pretty">
+                          Bez terminu wszystko działa — z terminem godziny otwarcia liczą się dla
+                          właściwej pory roku, a wydarzenia z Twoich dni idą na górę.
+                        </p>
+                        <Button size="sm" variant="outline" className="mt-3" onClick={() => setPokazTermin(true)}>
+                          Ustaw termin
+                        </Button>
+                      </>
+                    )}
 
-              {pokazTermin && (
-                <div className="flex flex-wrap items-end gap-3 mt-3">
-                  <label className="text-[13px] text-muted-foreground">
-                    Od
-                    <Input type="date" value={terminOd} autoFocus
-                      onChange={(e) => setTerminOd(e.target.value)} className="mt-1" />
-                  </label>
-                  <label className="text-[13px] text-muted-foreground">
-                    Do
-                    <Input type="date" value={terminDo} min={terminOd || undefined}
-                      onChange={(e) => setTerminDo(e.target.value)} className="mt-1" />
-                  </label>
-                  <Button size="sm" disabled={!terminOd}
-                    onClick={() => zapiszTermin(terminOd, terminDo || terminOd)}
-                    className="bg-foreground text-background hover:bg-foreground/90">
-                    Zapisz
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setPokazTermin(false)}>
-                    Anuluj
-                  </Button>
-                </div>
-              )}
-            </div>
-
+                    {pokazTermin && (
+                      <div className="flex flex-wrap items-end gap-3 mt-3">
+                        <label className="text-[13px] text-muted-foreground">
+                          Od
+                          <Input type="date" value={terminOd} autoFocus
+                            onChange={(e) => setTerminOd(e.target.value)} className="mt-1" />
+                        </label>
+                        <label className="text-[13px] text-muted-foreground">
+                          Do
+                          <Input type="date" value={terminDo} min={terminOd || undefined}
+                            onChange={(e) => setTerminDo(e.target.value)} className="mt-1" />
+                        </label>
+                        <Button size="sm" disabled={!terminOd}
+                          onClick={() => zapiszTermin(terminOd, terminDo || terminOd)}
+                          className="bg-foreground text-background hover:bg-foreground/90">
+                          Zapisz
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setPokazTermin(false)}>
+                          Anuluj
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -2343,32 +2322,50 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   tresc: (
                     <>
 
-                {/* Publikacja tablicy. Osobno od udostępniania imiennego, bo to inna
-                    decyzja: tam wpuszczasz konkretną osobę, tutaj każdego zalogowanego. */}
-                <div className="border-t pt-4">
-                  <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-4">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold">{t('tablica.tablica_publiczna')}</h3>
-                      <p className="text-[13px] text-muted-foreground mt-1 text-pretty">
-                        {active?.is_public
-                          ? `Tablica jest w internecie: obejrzy ją każdy, kto dostanie odnośnik, także bez konta. Skopiować albo polubić może ją tylko osoba zalogowana. Widoczna jest też nazwa, którą się podpisujesz.${
-                              active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
-                          : 'Widzisz ją tylko Ty i osoby, którym ją udostępniłeś imiennie. Po opublikowaniu obejrzy ją każdy, kto dostanie odnośnik — także bez konta — a zalogowani będą mogli ją skopiować do siebie.'}
-                      </p>
-                    </div>
-                    <Button size="sm" variant={active?.is_public ? 'outline' : 'default'}
-                      disabled={publishing} onClick={togglePublic}
-                      className={active?.is_public ? 'shrink-0' : 'shrink-0 bg-foreground text-background hover:bg-foreground/90'}>
-                      {publishing
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : active?.is_public ? 'Cofnij publikację' : 'Opublikuj'}
-                    </Button>
+                {/* Przełącznik zamiast przycisku nazywającego czynność: pokazuje
+                    STAN tablicy i pozwala go zmienić w jednym miejscu. */}
+                <div className="rounded-md border border-border bg-card p-4">
+                  <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                    Kto widzi tę tablicę
+                  </p>
+
+                  <div role="group" aria-label="Dostęp do tablicy"
+                    className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
+                    {([
+                      [true, 'Publiczna'],
+                      [false, 'Prywatna'],
+                    ] as const).map(([publiczna, etykieta]) => {
+                      const wybrana = !!active?.is_public === publiczna;
+                      return (
+                        <button key={etykieta} type="button"
+                          aria-pressed={wybrana}
+                          disabled={publishing || wybrana}
+                          onClick={() => { if (!wybrana) togglePublic(); }}
+                          className={`h-9 rounded-full text-[13px] transition-colors disabled:cursor-default ${
+                            wybrana
+                              ? 'bg-foreground text-background font-medium'
+                              : 'text-secondary hover:bg-card'
+                          }`}>
+                          {publishing && !wybrana
+                            ? <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                            : etykieta}
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  <p className="text-[13px] text-muted-foreground mt-3 text-pretty">
+                    {active?.is_public
+                      ? `Obejrzy ją każdy, kto dostanie odnośnik — także bez konta. Skopiować albo polubić może tylko osoba zalogowana. Widoczna jest nazwa, którą się podpisujesz.${
+                          active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
+                      : 'Widzisz ją tylko Ty i osoby, które dopiszesz poniżej.'}
+                  </p>
                 </div>
 
-                <div className="border-t pt-4 space-y-2">
+                <div className={`border-t pt-4 space-y-2 ${
+                  active?.is_public && shares.length === 0 ? 'hidden' : ''}`}>
                   <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Share2 className="w-4 h-4 text-primary" /> Udostępnij imiennie
+                    <Share2 className="w-4 h-4 text-accent" /> Udostępnij imiennie
                   </h3>
                   <div className="flex gap-2">
                     <Input

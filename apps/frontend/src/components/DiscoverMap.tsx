@@ -87,8 +87,9 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
 
   useEffect(() => {
     if (!boxRef.current || mapRef.current) return;
-    const map = L.map(boxRef.current, { zoomControl: true, attributionControl: false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+    const map = L.map(boxRef.current, { zoomControl: true, attributionControl: true });
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, attribution: '&copy; Esri, HERE, Garmin, OpenStreetMap' }).addTo(map);
     mapRef.current = map;
     warstwa.current = L.layerGroup().addTo(map);
 
