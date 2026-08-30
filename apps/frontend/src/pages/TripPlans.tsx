@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import { zakresDat } from '@/lib/daty';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -74,7 +75,7 @@ export default function TripPlans() {
     setLadowanie(true);
     const { data } = await supabase
       .from('trip_projects')
-      .select('id, name, destination, days, trip_type, updated_at, created_at')
+      .select('id, name, destination, days, trip_type, updated_at, created_at, start_date, end_date')
       .order('updated_at', { ascending: false });
     setWyjazdy(data ?? []);
 
@@ -256,32 +257,131 @@ export default function TripPlans() {
 
                 {/* Reszta: spokojna siatka trzech. Ostatnia komórka to kreska —
                     założenie wyjazdu jest częścią tej listy, nie osobnym ekranem. */}
+                {reszta.length > 0 && (() => {
+                  // Rozkład etapów liczony raz, dla nagłówka. Ta sama reguła co
+                  // na kartach, więc liczby nad siatką zgadzają się z etykietami w niej.
+                  const etap = (w: any) => {
+                    const cel = w.days ?? 0;
+                    const dni = dniPlanu[w.id] ?? 0;
+                    if (cel === 0 || dni === 0) return 'miejsca';
+                    return dni >= cel ? 'gotowy' : 'uklada';
+                  };
+                  const gotowe = reszta.filter((w) => etap(w) === 'gotowy').length;
+                  const ukladane = reszta.filter((w) => etap(w) === 'uklada').length;
+                  const miejsca = reszta.filter((w) => etap(w) === 'miejsca').length;
+                  const czesci = [
+                    gotowe ? `${gotowe} ${odmiana(gotowe, 'gotowy', 'gotowe', 'gotowych')}` : null,
+                    ukladane ? `${ukladane} w układaniu` : null,
+                    miejsca ? `${miejsca} ${odmiana(miejsca, 'bez planu', 'bez planu', 'bez planu')}` : null,
+                  ].filter(Boolean);
+                  return (
+                    <div className="flex flex-wrap items-baseline justify-between gap-3 mt-8">
+                      <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+                        Pozostałe · {reszta.length}
+                      </span>
+                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                        {czesci.join(' · ')}
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {reszta.map((w) => {
                     const q = podglad[w.id];
                     const ile = q?.ile ?? 0;
                     const dniW = dniPlanu[w.id] ?? 0;
                     const celW = w.days ?? 0;
-                    const postepW = celW > 0 ? Math.min(100, Math.round((dniW / celW) * 100)) : 0;
+                    const zdjeciaW = (q?.zdjecia ?? []).filter(Boolean);
+                    const terminW = (w as any).start_date
+                      ? zakresDat((w as any).start_date, (w as any).end_date)
+                      : celW > 0 ? `${celW} ${odmiana(celW, 'dzień', 'dni', 'dni')}` : 'bez dat';
+                    const etapW = celW === 0
+                      ? 'Same miejsca'
+                      : dniW === 0 ? 'Same miejsca'
+                        : dniW >= celW ? 'Plan gotowy' : 'W układaniu';
                     return (
                       <button key={w.id} onClick={() => navigate(`/plany/${w.id}`)}
                         className="text-left rounded-md border border-border bg-card overflow-hidden
                                    shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
-                        <div className="h-[132px] bg-placeholder-photo overflow-hidden">
-                          {q?.zdjecia?.[0] && (
-                            <img src={miniatura(q.zdjecia[0], SZEROKOSC.kafelek)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                        {/* Mozaika tylko wtedy, gdy ma z czego: poniżej trzech zdjęć
+                            małe pola robią się skrawkami przy karcie ~300 px. */}
+                        <div className="relative h-[132px] bg-placeholder-photo">
+                          {zdjeciaW.length >= 3 ? (
+                            <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-full">
+                              {zdjeciaW.slice(0, 3).map((z, i) => (
+                                <div key={i} className={`relative overflow-hidden bg-placeholder-photo ${i === 0 ? 'row-span-2' : ''}`}>
+                                  <img src={miniatura(z, SZEROKOSC.kafelek)} alt="" loading="lazy"
+                                    className="w-full h-full object-cover" />
+                                  {i === 2 && ile > 3 && (
+                                    <span className="absolute right-1.5 bottom-1.5 rounded-sm bg-ink/70 px-1.5 py-0.5
+                                                     font-mono text-[11px] tabular-nums text-background">
+                                      +{ile - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            zdjeciaW[0] && (
+                              <img src={miniatura(zdjeciaW[0], SZEROKOSC.kafelek)} alt="" loading="lazy"
+                                className="w-full h-full object-cover" />
+                            )
                           )}
+                          {/* Etap wyjazdu na zdjęciu — z listy widać, gdzie się skończyło,
+                              bez wchodzenia w każdą tablicę po kolei. */}
+                          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent
+                                           px-3 pt-6 pb-2 font-narrow uppercase tracking-[0.18em]
+                                           text-[10px] text-background">
+                            {etapW}
+                          </span>
                         </div>
+
                         <div className="p-4 flex-1 flex flex-col">
                           <div className="font-display text-[17px] leading-snug truncate">{w.name}</div>
                           <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1.5 truncate">
-                            {[w.destination, ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
+                            {[w.destination, terminW,
+                              ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
                               .filter(Boolean).join(' · ')}
                           </div>
-                          <div className="mt-auto pt-4">
-                            <div className="h-1 rounded-full bg-muted overflow-hidden">
-                              <div className="h-full rounded-full bg-primary" style={{ width: `${postepW}%` }} />
+
+                          <div className="border-t border-border/60 mt-3.5 pt-3.5">
+                            <div className="flex items-baseline gap-4">
+                              <span className="flex items-baseline gap-1.5">
+                                <span className="font-display text-[22px] text-primary tabular-nums">{q?.must ?? 0}</span>
+                                <span className="text-[12px] text-muted-foreground">na pewno</span>
+                              </span>
+                              <span className="flex items-baseline gap-1.5">
+                                <span className="font-display text-[22px] text-accent tabular-nums">{q?.nice ?? 0}</span>
+                                <span className="text-[12px] text-muted-foreground">być może</span>
+                              </span>
                             </div>
+                          </div>
+
+                          <div className="mt-auto pt-3.5">
+                            {celW > 0 ? (
+                              <>
+                                {/* Pasek dzielony na dni, nie ciągły procent: „dzień 1 z 2"
+                                    to jednostka, w której plan naprawdę powstaje. */}
+                                <div className="flex gap-1">
+                                  {Array.from({ length: celW }).map((_, i) => (
+                                    <span key={i} className={`h-1 flex-1 rounded-full ${
+                                      i < dniW ? 'bg-primary' : 'bg-muted'}`} />
+                                  ))}
+                                </div>
+                                <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-2">
+                                  {dniW === 0
+                                    ? 'Plan jeszcze nie ułożony'
+                                    : dniW >= celW
+                                      ? `Plan gotowy na ${celW === 2 ? 'oba dni' : `wszystkie ${celW} dni`}`
+                                      : `Plan gotowy na dzień ${dniW} z ${celW}`}
+                                </p>
+                              </>
+                            ) : (
+                              <span className="font-mono text-[11px] text-primary underline underline-offset-4
+                                               decoration-primary/40">
+                                Ułóż plan dni
+                              </span>
+                            )}
                           </div>
                         </div>
                       </button>
