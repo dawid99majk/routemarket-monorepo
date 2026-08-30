@@ -550,20 +550,36 @@ export default function Discover() {
           </div>
         </div>
 
-        {/* Pasek wyszukiwania z pigułkami filtrów */}
-        <div className="mt-8 rounded-md border border-border bg-card px-4 py-3 flex flex-wrap items-center gap-3">
-          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('odkrywaj.szukaj_plaza_ruiny_deszczowy_dzien')}
-            className="flex-1 min-w-[180px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
-          />
-          <div className="w-px self-stretch bg-border hidden sm:block" />
-          {/* Kategorie przed filtrami klimatu: najpierw „czego szukam", potem
-              „jakie ma być". Pokazujemy tylko te, które w tym mieście istnieją —
-              pusta pigułka „Nocleg" byłaby obietnicą bez pokrycia. */}
-          <div className="flex flex-wrap gap-1.5">
+        {/* Szukanie w osobnym wierszu, nie wciśnięte między pigułki: to
+            pierwsza rzecz, po którą się tu sięga, więc ma wyglądać jak ona. */}
+        <div className="mt-8 rounded-md border border-border bg-card p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('odkrywaj.szukaj_plaza_ruiny_deszczowy_dzien')}
+                className="w-full h-12 rounded-full bg-muted/60 border border-border pl-12 pr-4
+                           text-[15px] outline-none transition-colors
+                           placeholder:text-muted-foreground
+                           focus:border-foreground/40 focus:bg-card"
+              />
+            </div>
+            <div className="relative sm:w-56 shrink-0">
+              <MapPin className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <Input list="miasta" value={city} onChange={(e) => setCity(e.target.value)}
+                placeholder={t('odkrywaj.miasto')}
+                className="pl-10 h-12 rounded-full text-[15px]" />
+              <datalist id="miasta">{cities.map((c) => <option key={c} value={c} />)}</datalist>
+            </div>
+          </div>
+
+          {/* Filtry pod kreską: doprecyzowanie tego, co wyżej, a nie konkurencja
+              dla szukania. Kategorie przed klimatem — najpierw „czego szukam",
+              potem „jakie ma być". Pokazujemy tylko te kategorie, które w tym
+              mieście istnieją: pusta pigułka „Nocleg" byłaby obietnicą bez pokrycia. */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-4 pt-4 border-t border-border/50">
             {KATEGORIE.filter((k) => k.id === 'wszystkie'
                 || places.some((p) => (p.category ?? 'attraction') === k.id)).map((k) => (
               <button
@@ -579,13 +595,14 @@ export default function Discover() {
                 {k.label}
               </button>
             ))}
-          </div>
-          <div className="w-px self-stretch bg-border hidden sm:block" />
-          <div className="flex flex-wrap gap-1.5">
+
+            <span className="w-px h-4 bg-border mx-1.5 hidden sm:block" />
+
             {FILTERS.map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
+                aria-pressed={filter === f.id}
                 className={`rounded-full px-3 py-1 text-xs border transition-colors ${
                   filter === f.id
                     ? 'bg-foreground border-foreground text-background'
@@ -595,18 +612,14 @@ export default function Discover() {
                 {f.label}
               </button>
             ))}
-          </div>
-          <button onClick={() => setPokazMape((v) => !v)}
-            className={`rounded-full px-3 py-1 text-xs border transition-colors ${
-              pokazMape ? 'bg-foreground text-background border-foreground' : 'bg-background border-border hover:bg-muted'
-            }`}>
-            {pokazMape ? 'Ukryj mapę' : 'Pokaż mapę'}
-          </button>
-          <div className="relative">
-            <MapPin className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input list="miasta" value={city} onChange={(e) => setCity(e.target.value)}
-              placeholder={t('odkrywaj.miasto')} className="pl-8 h-8 w-36 text-sm" />
-            <datalist id="miasta">{cities.map((c) => <option key={c} value={c} />)}</datalist>
+
+            <button onClick={() => setPokazMape((v) => !v)}
+              aria-pressed={pokazMape}
+              className={`ml-auto rounded-full px-3 py-1 text-xs border transition-colors ${
+                pokazMape ? 'bg-foreground text-background border-foreground' : 'bg-background border-border hover:bg-muted'
+              }`}>
+              {pokazMape ? 'Ukryj mapę' : 'Pokaż mapę'}
+            </button>
           </div>
         </div>
 
