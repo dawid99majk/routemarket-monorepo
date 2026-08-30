@@ -144,7 +144,7 @@ export default function GuideHub() {
       {/* Expandable FAB — icon-only, expands on hover/focus */}
       <button
         onClick={() => setOpen(true)}
-        className="group fixed right-4 bottom-[5.5rem] md:bottom-4 z-[1300] flex items-center h-14 rounded-full bg-primary text-primary-foreground shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="group fixed right-4 bottom-[5.5rem] md:bottom-4 z-[1300] flex items-center h-14 rounded-full bg-foreground text-background shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label="Otwórz pomoc"
       >
         <HelpCircle className="w-5 h-5 shrink-0" />

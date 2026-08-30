@@ -509,12 +509,12 @@ export default function RouteTerrain3D({ track, className = '' }: RouteTerrain3D
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
               flythroughActive
                 ? 'bg-foreground hover:bg-foreground text-background border-foreground shadow-token-md animate-pulse'
-                : 'bg-ink hover:bg-ink text-slate-100 border-border shadow-token-sm'
+                : 'bg-ink hover:bg-ink text-background border-border shadow-token-sm'
             }`}
           >
             <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${flythroughActive ? 'bg-white' : 'bg-red-400'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${flythroughActive ? 'bg-white' : 'bg-red-500'}`}></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${flythroughActive ? 'bg-background' : 'bg-destructive/70'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${flythroughActive ? 'bg-background' : 'bg-destructive'}`}></span>
             </span>
             {flythroughActive ? 'Zatrzymaj Przelot' : 'Wirtualny Przelot'}
           </button>

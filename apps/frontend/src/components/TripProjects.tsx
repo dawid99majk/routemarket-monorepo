@@ -186,6 +186,19 @@ interface TripProjectsProps {
   projectId?: string | null;
 }
 
+/**
+ * Pozycja organizacyjna planu — przejście, przerwa, posiłek, nocleg. Nie jest
+ * przystankiem: nie idzie do geokodera i nie dostaje wiersza z dystansem, bo
+ * sama JEST tym, co dzieje się między przystankami.
+ */
+const POZYCJA_ORGANIZACYJNA =
+  /^(przejazd|przej[śs]cie|przerwa|czas wolny|wolny czas|powr[óo]t|dojazd|transfer|lunch|obiad|kolacja|śniadanie|odpoczynek|spacer(\s|$)|nocleg)/i;
+
+function czyPrzystanek(it: any): boolean {
+  if (['walk', 'transit', 'break', 'meal'].includes(it?.kind)) return false;
+  return !POZYCJA_ORGANIZACYJNA.test(String(it?.name || '').trim());
+}
+
 export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -1039,6 +1052,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   const [placeCard, setPlaceCard] = useState<any | null>(null);
+  /** Pinezka pod kursorem — wyróżniona na mapie, żeby było widać, że da się w nią kliknąć. */
+  const [pinezkaPodKursorem, setPinezkaPodKursorem] = useState<string | null>(null);
   const [cardLoading, setCardLoading] = useState(false);
   const [cardPhoto, setCardPhoto] = useState(0);
 
@@ -1173,15 +1188,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const buildRouteFrom = async (items: any[], label: string) => {
     if (!active) return;
     // Pozycje organizacyjne nie są przystankami trasy
-    const isVenue = (it: any) => {
-      const name = String(it.name || '');
-      if (['walk', 'transit', 'break', 'meal'].includes(it.kind)) return false;
-      // Lista musi obejmować też "Przejazd" i posiłki — bez tego pozycja
-      // organizacyjna szła do geokodera i lądowała w przypadkowym mieście.
-      return !/^(przejazd|przej[śs]cie|przerwa|czas wolny|wolny czas|powr[óo]t|dojazd|transfer|lunch|obiad|kolacja|śniadanie|odpoczynek|spacer(\s|$)|nocleg)/i.test(
-        name.trim()
-      );
-    };
+    // Jedna definicja dla całego pliku: bez tego pozycja organizacyjna szła do
+    // geokodera i lądowała w przypadkowym mieście.
+    const isVenue = czyPrzystanek;
 
     const venues = items.filter(isVenue);
     const resolved: { lat: number; lng: number; name: string; type: string }[] = [];
@@ -2538,7 +2547,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                           className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
                                             p.priority === z.id
                                               ? z.id === 'must' ? 'bg-primary text-primary-foreground'
-                                                : z.id === 'nice' ? 'bg-dusty-blue text-dusty-blue-foreground'
+                                                : z.id === 'nice' ? 'bg-accent text-accent-foreground'
                                                 : 'bg-clay text-clay-foreground'
                                               : 'text-muted-foreground hover:bg-muted'
                                           }`}>
@@ -2597,12 +2606,18 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     {naMapie.length > 0 ? (
                       <>
                         <DiscoverMap places={naMapie} doKadru={kadrZeStartem}
-                          start={startNaMapie} className="h-[480px]" />
+                          start={startNaMapie} className="h-[480px]"
+                          aktywne={pinezkaPodKursorem}
+                          onPinHover={setPinezkaPodKursorem}
+                          onPinClick={(id) => {
+                            const m = places.find((x) => x.id === id);
+                            if (m) openPlaceCard(m);
+                          }} />
                         <div className="flex items-center gap-4 px-3 py-2 border-t border-border">
                           {[['must', 'na pewno'], ['nice', 'być może']].map(([id, etykieta]) => (
                             <span key={id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               <span className={`w-2.5 h-2.5 rounded-full ${
-                                id === 'must' ? 'bg-primary' : 'bg-dusty-blue'}`} />
+                                id === 'must' ? 'bg-primary' : 'bg-accent'}`} />
                               {etykieta}
                             </span>
                           ))}
@@ -2797,7 +2812,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                     aria-current={i === teraz}
                                     className="px-1 py-2.5">
                                     <span className={`block w-1.5 h-1.5 rounded-full transition-colors ${
-                                      i === teraz ? 'bg-white' : 'bg-white/50'}`} />
+                                      i === teraz ? 'bg-card' : 'bg-card/50'}`} />
                                   </button>
                                 ))}
                               </div>
@@ -3027,7 +3042,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         // Przerwa między tym punktem a poprzednim — własny wiersz,
                         // nie dopisek pod nazwą i nie tooltip.
                         const poprzedni = i > 0 ? (day.items || [])[i - 1] : null;
-                        const metry = poprzedni ? metryMiedzy(poprzedni, it) : null;
+                        // Dystans tylko między dwoma PRZYSTANKAMI. Przy pozycji
+                        // organizacyjnej plan i tak mówi już o przerwie wprost.
+                        const metry = poprzedni && czyPrzystanek(poprzedni) && czyPrzystanek(it)
+                          ? metryMiedzy(poprzedni, it)
+                          : null;
   return (
                           <Fragment key={`poz-${i}`}>
                           {metry != null && metry > 0 && (

@@ -80,8 +80,8 @@ export default function ZgodaCookies() {
           </button>
           <button
             onClick={() => zdecyduj('przyjete')}
-            className="flex-1 sm:flex-none h-10 rounded-full bg-primary text-primary-foreground px-4 text-sm
-                       hover:bg-primary/90 transition-colors"
+            className="flex-1 sm:flex-none h-10 rounded-full bg-foreground text-background px-4 text-sm
+                       hover:bg-foreground/90 transition-colors"
           >
             {t('cookies.zgoda')}
           </button>

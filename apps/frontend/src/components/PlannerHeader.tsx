@@ -40,6 +40,7 @@ function zakladki(tripId: string | null) {
     { klucz: 'naglowek.odkrywaj', path: '/odkrywaj' },
     { klucz: 'naglowek.tablica', path: `/plany/${tripId}` },
     { klucz: 'naglowek.plan_dni', path: `/plany/${tripId}?widok=plan` },
+    { klucz: 'naglowek.inspiracje', path: '/tablice' },
   ];
 }
 
