@@ -1701,7 +1701,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 zamiast dwóch dużych kart, które trzeba było przeczytać osobno.
                 Edycja została -- to wciąż te same pola i te same handlery,
                 przeniesione do modala pod "Zmień ustawienia". */}
-            <div className="rounded-md bg-muted/70 border border-border/50 px-4 py-3
+            <div className="rounded-md bg-card border border-border px-4 py-3
                             flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[12px]">
               {/* Oba pola stoją zawsze. Wcześniej termin pojawiał się dopiero,
                   gdy już był ustawiony — więc nie dało się zgadnąć, że można go
