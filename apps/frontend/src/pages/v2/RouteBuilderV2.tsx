@@ -50,6 +50,18 @@ L.Icon.Default.mergeOptions({
  * siedzi w kolejności [lat, lng], poznamy to po tym, że pierwszy punkt leży
  * bliżej odwróconej pary niż prostej.
  */
+/**
+ * Kolor z tokenu dla Leaflet, który przyjmuje wartość, a nie klasę CSS.
+ * Wartości zapasowe muszą nadążać za `:root` — ślad trasy jechał w szałwii
+ * i tanie ze starej, chłodnej palety, więc na ciepłym papierze rysował się
+ * w kolorach, których nie ma już nigdzie indziej w aplikacji.
+ */
+const kolorTokena = (nazwa: string, zapas: string) => {
+  if (typeof window === 'undefined') return zapas;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(nazwa).trim();
+  return v ? `hsl(${v})` : zapas;
+};
+
 const toGeoJsonCoords = (stored: any[], waypoints?: any[]): number[][] => {
   const coords = stored.map((p: any) => [p[0], p[1], p[2] || 0]);
   const wp = waypoints?.[0];
@@ -712,7 +724,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     
     // Tworzymy kopię elementu, by PDF nie miał tła i szarych ramek (chcemy "czysty" styl druku)
     const printElement = element.cloneNode(true) as HTMLElement;
-    printElement.className = 'prose prose-sm prose-neutral max-w-none p-8 bg-white';
+    printElement.className = 'prose prose-sm prose-neutral max-w-none p-8 bg-card';
     
     const wrapper = document.createElement('div');
     wrapper.appendChild(printElement);
@@ -778,10 +790,10 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       )}
       
       {/* Left Panel - Control & Chat */}
-      <div className={`${panelOpen ? 'flex' : 'hidden'} md:flex absolute md:static inset-x-0 bottom-0 z-[1100] md:z-10 max-h-[78dvh] md:max-h-none w-full md:w-[400px] flex-col bg-white border-t md:border-t-0 md:border-r border-border shadow-token-xl md:shrink-0 rounded-t-md md:rounded-none`}>
+      <div className={`${panelOpen ? 'flex' : 'hidden'} md:flex absolute md:static inset-x-0 bottom-0 z-[1100] md:z-10 max-h-[78dvh] md:max-h-none w-full md:w-[400px] flex-col bg-card border-t md:border-t-0 md:border-r border-border shadow-token-xl md:shrink-0 rounded-t-md md:rounded-none`}>
         
         {/* Header */}
-        <div className="p-5 border-b border-border bg-white">
+        <div className="p-5 border-b border-border bg-card">
           {onBack && (
             <button onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground/80 flex items-center mb-3">
               ← Zmień tryb
@@ -818,7 +830,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             onClick={() => setActiveTab('chat')}
             className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 ${
               activeTab === 'chat'
-                ? 'bg-white text-primary shadow-token-sm border border-border/50'
+                ? 'bg-card text-primary shadow-token-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -828,7 +840,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             onClick={() => setActiveTab('details')}
             className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 ${
               activeTab === 'details'
-                ? 'bg-white text-primary shadow-token-sm border border-border/50'
+                ? 'bg-card text-primary shadow-token-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -843,7 +855,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             onClick={() => setActiveTab('saved')}
             className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 ${
               activeTab === 'saved'
-                ? 'bg-white text-primary shadow-token-sm border border-border/50'
+                ? 'bg-card text-primary shadow-token-sm border border-border/50'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
@@ -869,7 +881,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 <div className="px-5 pb-4 pt-1 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
                   <Textarea 
                     placeholder="Napisz gdzie jedziesz i na czym, np. 50km w Karkonoszach pieszo..." 
-                    className="min-h-[70px] bg-white resize-none text-sm border-border focus-visible:ring-ring/30"
+                    className="min-h-[70px] bg-card resize-none text-sm border-border focus-visible:ring-ring/30"
                     value={inputNotes}
                     onChange={e => setField('inputNotes', e.target.value)}
                   />
@@ -880,7 +892,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                       send({ type: 'SEND_MESSAGE', text: inputNotes });
                       setOverlayDismissed(false);
                     }}
-                    className="w-full bg-primary hover:bg-primary/90 text-white"
+                    className="w-full bg-foreground hover:bg-foreground/90 text-background"
                   >
                     <Sparkles className="w-4 h-4 mr-2" />
                     {chatMessages.length > 0 ? 'Przelicz z tymi założeniami' : 'Zacznij od tych założeń'}
@@ -888,7 +900,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   {waypoints.length > 0 && (
                     <div className="flex justify-between items-center bg-primary/10 text-primary px-3 py-2 rounded-md text-xs font-medium">
                       <span>Punkty na mapie: {waypoints.length}</span>
-                      <button onClick={clearRoute} className="text-red-500 hover:text-red-700 flex items-center gap-1 font-semibold">
+                      <button onClick={clearRoute} className="text-danger hover:text-danger/80 flex items-center gap-1 font-semibold">
                         <Trash2 className="w-3.5 h-3.5" /> Wyczyść
                       </button>
                     </div>
@@ -903,7 +915,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                         className={`py-3 px-2 text-xs font-medium rounded-md border transition-all duration-200 flex flex-col items-center justify-center gap-2 ${
                           routingPreference === 'popular'
                             ? 'bg-primary/5 border-primary text-primary shadow-token-sm ring-1 ring-primary/20'
-                            : 'bg-white border-border text-foreground/80 hover:bg-muted hover:border-border'
+                            : 'bg-card border-border text-foreground/80 hover:bg-muted hover:border-border'
                         }`}
                       >
                         <Sparkles className={`w-5 h-5 ${routingPreference === 'popular' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -914,7 +926,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                         className={`py-3 px-2 text-xs font-medium rounded-md border transition-all duration-200 flex flex-col items-center justify-center gap-2 ${
                           routingPreference === 'wild'
                             ? 'bg-primary/5 border-primary text-primary shadow-token-sm ring-1 ring-primary/20'
-                            : 'bg-white border-border text-foreground/80 hover:bg-muted hover:border-border'
+                            : 'bg-card border-border text-foreground/80 hover:bg-muted hover:border-border'
                         }`}
                       >
                         <MapPin className={`w-5 h-5 ${routingPreference === 'wild' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -939,8 +951,8 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'w-full'}`}>
                     <div className={`rounded-md p-3 text-sm leading-relaxed shadow-token-sm ${
                       msg.role === 'user'
-                        ? 'bg-primary text-white rounded-br-sm'
-                        : 'bg-white text-foreground rounded-bl-sm border border-border/50'
+                        ? 'bg-foreground text-background rounded-br-sm'
+                        : 'bg-card text-foreground rounded-bl-sm border border-border/50'
                     }`}>
                       {msg.text.replace(/\s*\[[^\]]+\]/g, '')}
                     </div>
@@ -956,7 +968,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 </div>
               ))}
               {hasError && (
-                <div className="rounded-md border border-rose-200 bg-accent p-3.5 space-y-2.5">
+                <div className="rounded-md border border-accent-foreground/30 bg-accent p-3.5 space-y-2.5">
                   <div className="text-sm font-semibold text-accent-foreground">Nie udało się dokończyć operacji</div>
                   <p className="text-xs text-accent-foreground leading-relaxed">
                     {context.errorMessage || 'Nieznany błąd.'}
@@ -972,7 +984,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               )}
               {busyLabel && (
                 <div className="flex justify-start">
-                  <div className="bg-white text-foreground rounded-md rounded-bl-sm border border-border/50 p-4 shadow-token-sm flex items-center gap-2">
+                  <div className="bg-card text-foreground rounded-md rounded-bl-sm border border-border/50 p-4 shadow-token-sm flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">{busyLabel}</span>
                     <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"></span>
                     <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce delay-75"></span>
@@ -984,7 +996,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             </div>
 
             {/* Chat Input */}
-            <div className="p-4 bg-white border-t border-border">
+            <div className="p-4 bg-card border-t border-border">
               <form onSubmit={handleChatSubmit} className="relative flex items-center">
                 <Input 
                   value={inputValue}
@@ -992,7 +1004,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   placeholder={isGenerating || isSaving ? "Możesz napisać, co zmienić…" : "Zapytaj agenta o poradę..."}
                   className="w-full bg-muted border-border rounded-full pl-4 pr-12 py-5 text-foreground focus-visible:ring-ring/50"
                 />
-                <Button type="submit" size="icon" className="absolute right-1 rounded-full bg-primary hover:bg-primary/90 w-8 h-8 text-white">
+                <Button type="submit" size="icon" className="absolute right-1 rounded-full bg-foreground hover:bg-foreground/90 w-8 h-8 text-white">
                   <Send className="w-3.5 h-3.5 ml-0.5" />
                 </Button>
               </form>
@@ -1034,11 +1046,11 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
                 {/* Actions Card */}
                 {gpxData && (
-                  <Card className="p-4 border-border/60 bg-white shadow-token-sm flex flex-col gap-2.5">
+                  <Card className="p-4 border-border/60 bg-card shadow-token-sm flex flex-col gap-2.5">
                     <h4 className="font-bold text-muted-foreground text-[10px] uppercase tracking-wider">Pobierz trasę</h4>
                     <div className="flex gap-2">
                       <Button 
-                        className="flex-1 bg-primary hover:bg-primary/90 text-white font-semibold text-xs py-2 h-9"
+                        className="flex-1 bg-foreground hover:bg-foreground/90 text-background font-semibold text-xs py-2 h-9"
                         onClick={() => {
                           const blob = new Blob([gpxData], { type: 'application/gpx+xml' });
                           const url = URL.createObjectURL(blob);
@@ -1086,7 +1098,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                 {guideText && (
                   <div className="space-y-3 mt-4">
                     <h3 className="font-bold text-muted-foreground text-[10px] uppercase tracking-wider">Przewodnik po trasie</h3>
-                    <div id="guidebook-content" className="bg-white border border-border/60 shadow-token-sm rounded-md p-6 sm:p-8 text-foreground prose prose-slate prose-sm sm:prose-base max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-primary hover:prose-a:text-primary prose-img:rounded-md prose-p:leading-relaxed prose-strong:text-foreground prose-li:marker:text-primary">
+                    <div id="guidebook-content" className="bg-card border border-border/60 shadow-token-sm rounded-md p-6 sm:p-8 text-foreground prose prose-slate prose-sm sm:prose-base max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-primary hover:prose-a:text-primary prose-img:rounded-md prose-p:leading-relaxed prose-strong:text-foreground prose-li:marker:text-primary">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {guideText}
                       </ReactMarkdown>
@@ -1113,11 +1125,11 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   const reqs = project.requirements || {};
                   const isCurrent = project.id === projectId;
                   let vehicleIcon = <RouteIcon className="w-4 h-4 text-primary" />;
-                  if (reqs.vehicleType === 'car') vehicleIcon = <Car className="w-4 h-4 text-purple-500" />;
-                  else if (reqs.vehicleType === 'city') vehicleIcon = <Building2 className="w-4 h-4 text-yellow-500" />;
+                  if (reqs.vehicleType === 'car') vehicleIcon = <Car className="w-4 h-4 text-muted-foreground" />;
+                  else if (reqs.vehicleType === 'city') vehicleIcon = <Building2 className="w-4 h-4 text-muted-foreground" />;
                   else if (reqs.vehicleType === 'hiking') vehicleIcon = <Navigation className="w-4 h-4 text-accent" />;
-                  else if (reqs.vehicleType === 'bicycle') vehicleIcon = <Bike className="w-4 h-4 text-orange-500" />;
-                  else if (reqs.vehicleType === 'motorcycle') vehicleIcon = <Navigation className="w-4 h-4 text-blue-500" />;
+                  else if (reqs.vehicleType === 'bicycle') vehicleIcon = <Bike className="w-4 h-4 text-muted-foreground" />;
+                  else if (reqs.vehicleType === 'motorcycle') vehicleIcon = <Navigation className="w-4 h-4 text-muted-foreground" />;
                   
                   return (
                     <div 
@@ -1125,8 +1137,8 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                       onClick={() => handleLoadProject(project)}
                       className={`p-3.5 rounded-md border text-left cursor-pointer transition-all duration-200 hover:shadow-token-md flex items-start justify-between gap-3 ${
                         isCurrent 
-                          ? 'border-primary bg-primary/10/20' 
-                          : 'border-border/60 bg-white hover:border-border'
+                          ? 'border-primary bg-primary/20' 
+                          : 'border-border/60 bg-card hover:border-border'
                       }`}
                     >
                       <div className="space-y-1.5 min-w-0 flex-1">
@@ -1152,7 +1164,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                       </div>
                       <button 
                         onClick={(e) => handleDeleteProject(project.id, e)}
-                        className="text-muted-foreground hover:text-red-500 p-1 rounded hover:bg-muted shrink-0 self-center transition-colors"
+                        className="text-muted-foreground hover:text-danger p-1 rounded hover:bg-muted shrink-0 self-center transition-colors"
                         title="Usuń trasę"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1176,35 +1188,35 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           <div className="bg-white/90 backdrop-blur-md rounded-full shadow-token-lg p-1.5 flex gap-1 border border-border/50 max-w-[95vw] overflow-x-auto scrollbar-none">
             <Button 
               variant={vehicleType === 'motorcycle' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-primary text-white' : 'text-foreground/80 hover:text-foreground'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-foreground text-background' : 'text-foreground/80 hover:text-foreground'}`}
               onClick={() => handleVehicleChange('motorcycle')}
             >
               <Navigation className="w-4 h-4 mr-2" /> Motocykl
             </Button>
             <Button 
               variant={vehicleType === 'bicycle' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'bicycle' ? 'bg-primary text-white' : 'text-foreground/80 hover:text-foreground'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'bicycle' ? 'bg-foreground text-background' : 'text-foreground/80 hover:text-foreground'}`}
               onClick={() => handleVehicleChange('bicycle')}
             >
               <Bike className="w-4 h-4 mr-2" /> Rower
             </Button>
             <Button 
               variant={vehicleType === 'hiking' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'hiking' ? 'bg-primary text-white' : 'text-foreground/80 hover:text-foreground'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'hiking' ? 'bg-foreground text-background' : 'text-foreground/80 hover:text-foreground'}`}
               onClick={() => handleVehicleChange('hiking')}
             >
               <RouteIcon className="w-4 h-4 mr-2" /> Pieszo
             </Button>
             <Button 
               variant={vehicleType === 'city' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'city' ? 'bg-primary text-white' : 'text-foreground/80 hover:text-foreground'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'city' ? 'bg-foreground text-background' : 'text-foreground/80 hover:text-foreground'}`}
               onClick={() => handleVehicleChange('city')}
             >
               <Building2 className="w-4 h-4 mr-2" /> Miasto
             </Button>
             <Button 
               variant={vehicleType === 'car' ? 'default' : 'ghost'} 
-              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'car' ? 'bg-primary text-white' : 'text-foreground/80 hover:text-foreground'}`}
+              className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'car' ? 'bg-foreground text-background' : 'text-foreground/80 hover:text-foreground'}`}
               onClick={() => handleVehicleChange('car')}
             >
               <Car className="w-4 h-4 mr-2" /> Samochód
@@ -1272,7 +1284,10 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               positions={geometry.coordinates.map((c: any) => [c[1], c[0]])} 
               pathOptions={{ 
                 // Ślad trasy w kolorach marki: tan dla pieszych, szałwia dla reszty
-                color: (vehicleType === 'hiking' || vehicleType === 'city') ? '#D4925A' : '#8FA376', 
+                color: (vehicleType === 'hiking' || vehicleType === 'city')
+                  ? kolorTokena('--accent', 'hsl(17 42% 47%)')
+                  : kolorTokena('--primary', 'hsl(158 28% 32%)'),
+                
                 weight: 5, 
                 opacity: 0.9,
                 lineCap: 'round',
@@ -1357,7 +1372,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                                 type="button"
                                 aria-label={`Zdjęcie ${pi + 1}`}
                                 onClick={(e) => { e.stopPropagation(); setPhotoIndex((prev) => ({ ...prev, [key]: pi })); }}
-                                className={`w-1.5 h-1.5 rounded-full transition-colors ${pi === idx ? 'bg-white' : 'bg-white/45'}`}
+                                className={`w-1.5 h-1.5 rounded-full transition-colors ${pi === idx ? 'bg-card' : 'bg-white/45'}`}
                               />
                             ))}
                           </div>
@@ -1388,7 +1403,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                           </button>
                         )}
                         {expanded && details.recommendation && (
-                          <div className="bg-primary/10/50 border border-primary/30/70 rounded-md p-2 flex items-start gap-1.5">
+                          <div className="bg-primary/10 border border-primary/30 rounded-md p-2 flex items-start gap-1.5">
                             <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
                             <div className="text-[11px] text-primary font-medium leading-normal m-0">
                               <strong className="text-primary block text-[10px] uppercase tracking-wider mb-0.5 font-bold">Wskazówka AI</strong>
@@ -1434,13 +1449,13 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               <div ref={disablePropagation} className="flex flex-col gap-2 min-w-[140px] p-1">
                 <p className="text-xs font-bold text-foreground/80 mb-1 text-center">Nowy punkt w tym miejscu</p>
                 <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('start')}>
-                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2" /> Ustaw jako Start
+                  <div className="w-2 h-2 rounded-full bg-success mr-2" /> Ustaw jako Start
                 </Button>
                 <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('end')}>
-                  <div className="w-2 h-2 rounded-full bg-red-500 mr-2" /> Ustaw jako Metę
+                  <div className="w-2 h-2 rounded-full bg-danger mr-2" /> Ustaw jako Metę
                 </Button>
                 <Button size="sm" variant="outline" className="h-8 text-xs justify-start" onClick={() => handleAddPointFromTemp('waypoint')}>
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mr-2" /> Dodaj do trasy
+                  <div className="w-2 h-2 rounded-full bg-neutral mr-2" /> Dodaj do trasy
                 </Button>
               </div>
             </Popup>
@@ -1460,7 +1475,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         {!panelOpen && (
           <Button
             onClick={() => setPanelOpen(true)}
-            className="md:hidden absolute bottom-6 right-6 z-[1050] rounded-full bg-white text-foreground hover:bg-muted shadow-token-lg h-12 px-5 font-bold border border-border"
+            className="md:hidden absolute bottom-6 right-6 z-[1050] rounded-full bg-card text-foreground hover:bg-muted shadow-token-lg h-12 px-5 font-bold border border-border"
           >
             <Bot className="w-4 h-4 mr-2 text-primary" /> Kreator
           </Button>
@@ -1470,7 +1485,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
           {waypoints.length >= 2 && (
             <Button 
               onClick={() => send({ type: 'CALCULATE_ROUTE' })} 
-              className="bg-primary hover:bg-primary/90 text-white shadow-token-lg rounded-full px-5 h-10 font-bold"
+              className="bg-foreground hover:bg-foreground/90 text-background shadow-token-lg rounded-full px-5 h-10 font-bold"
             >
               <RefreshCw className="w-4 h-4 mr-2" /> Przelicz trasę
             </Button>

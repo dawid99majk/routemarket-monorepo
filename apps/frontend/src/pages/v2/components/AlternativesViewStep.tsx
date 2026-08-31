@@ -43,17 +43,17 @@ export default function AlternativesViewStep({
       
       {/* Alternatives Sidebar */}
       <div className="lg:col-span-4 space-y-6 flex flex-col">
-        <Card className="bg-zinc-950 border-zinc-800 shadow-token-xl flex-grow">
-          <CardHeader className="border-b border-zinc-800 pb-4">
+        <Card className="bg-card border-border shadow-token-xl flex-grow">
+          <CardHeader className="border-b border-border pb-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="text-cyan-400 animate-pulse h-5 w-5" /> Wybierz wariant trasy
+                <Sparkles className="text-accent animate-pulse h-5 w-5" /> Wybierz wariant trasy
               </CardTitle>
-              <Badge className="bg-cyan-950 text-cyan-400 border border-cyan-800/40 text-[10px] flex items-center gap-1 font-mono">
+              <Badge className="bg-accent/10 text-accent border border-accent/40 text-[10px] flex items-center gap-1 font-mono">
                 <BadgeAlert className="h-3 w-3" /> Warianty trasy
               </Badge>
             </div>
-            <CardDescription className="text-zinc-400">
+            <CardDescription className="text-muted-foreground">
               AI przygotowało 3 warianty zmian. Wybierz najlepszy:
             </CardDescription>
           </CardHeader>
@@ -69,8 +69,8 @@ export default function AlternativesViewStep({
                     onClick={() => onSelectAlternative(alt.id)}
                     className={`p-4 rounded-md border cursor-pointer transition-all ${
                       isSelected 
-                        ? 'border-cyan-500 bg-cyan-500/10 shadow-token-lg shadow-cyan-950/10' 
-                        : 'border-zinc-800/80 bg-zinc-900/10 hover:bg-zinc-900/40 text-zinc-400'
+                        ? 'border-foreground bg-foreground/5 shadow-token-lg ' 
+                        : 'border-border bg-muted hover:bg-muted text-muted-foreground'
                     }`}
                   >
                     <div className="flex items-center gap-2 justify-between">
@@ -79,27 +79,27 @@ export default function AlternativesViewStep({
                           className="h-3.5 w-3.5 rounded-full inline-block" 
                           style={{ backgroundColor: alt.color }} 
                         />
-                        <h4 className={`font-bold text-sm ${isSelected ? 'text-cyan-300' : 'text-zinc-200'}`}>
+                        <h4 className={`font-bold text-sm ${isSelected ? 'text-foreground' : 'text-foreground'}`}>
                           {alt.name}
                         </h4>
                       </div>
-                      {isSelected && <CheckCircle2 className="h-4.5 w-4.5 text-cyan-400 flex-shrink-0" />}
+                      {isSelected && <CheckCircle2 className="h-4.5 w-4.5 text-accent flex-shrink-0" />}
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2 mt-3 text-[11px] leading-tight">
-                      <div className="bg-zinc-900/80 p-2 rounded">
-                        <span className="text-zinc-500 block">Dystans</span>
-                        <span className="font-bold text-zinc-300 text-xs">{alt.distance_km} km</span>
+                      <div className="bg-muted p-2 rounded">
+                        <span className="text-muted-foreground block">Dystans</span>
+                        <span className="font-bold text-foreground text-xs">{alt.distance_km} km</span>
                       </div>
-                      <div className="bg-zinc-900/80 p-2 rounded">
-                        <span className="text-zinc-500 block">Czas szac.</span>
-                        <span className="font-bold text-zinc-300 text-xs">{alt.duration_h} h</span>
+                      <div className="bg-muted p-2 rounded">
+                        <span className="text-muted-foreground block">Czas szac.</span>
+                        <span className="font-bold text-foreground text-xs">{alt.duration_h} h</span>
                       </div>
                     </div>
 
                     {alt.pois && alt.pois.length > 0 && (
-                      <div className="mt-2 text-[10px] text-zinc-500 flex items-center gap-1">
-                        <CornerDownRight className="h-3 w-3 text-cyan-500" />
+                      <div className="mt-2 text-[10px] text-muted-foreground flex items-center gap-1">
+                        <CornerDownRight className="h-3 w-3 text-muted-foreground" />
                         Dodano {alt.pois.length} punkty POI (widoki, punkty stop)
                       </div>
                     )}
@@ -108,16 +108,16 @@ export default function AlternativesViewStep({
               })}
             </div>
 
-            <div className="pt-4 space-y-2 border-t border-zinc-900">
+            <div className="pt-4 space-y-2 border-t border-border">
               <Button 
                 onClick={onApproveAlternative} 
                 disabled={loading || !selectedAlternativeId}
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold flex items-center justify-center gap-2 py-5"
+                className="w-full bg-foreground hover:bg-foreground/90 text-background font-semibold flex items-center justify-center gap-2 py-5"
               >
                 {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <Check className="h-4.5 w-4.5" />}
                 Zatwierdź wybrany wariant
               </Button>
-              <Button onClick={onReset} variant="outline" className="w-full border-zinc-800 text-zinc-400" disabled={loading}>
+              <Button onClick={onReset} variant="outline" className="w-full border-border text-muted-foreground" disabled={loading}>
                 Stwórz od nowa
               </Button>
             </div>
@@ -128,9 +128,9 @@ export default function AlternativesViewStep({
 
       {/* Leaflet Map Preview */}
       <div className="lg:col-span-8 flex flex-col h-[500px]">
-        <Card className="h-full overflow-hidden border border-zinc-800 shadow-token-xl relative rounded-md">
+        <Card className="h-full overflow-hidden border border-border shadow-token-xl relative rounded-md">
           {showMap && trackPoints ? (
-            <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-zinc-950"><Loader2 className="animate-spin text-cyan-400" /></div>}>
+            <Suspense fallback={<div className="w-full h-full flex items-center justify-center bg-card"><Loader2 className="animate-spin text-accent" /></div>}>
               <RouteDetailMap 
                 track={trackPoints} 
                 places={places} 
@@ -141,7 +141,7 @@ export default function AlternativesViewStep({
               />
             </Suspense>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 text-zinc-500 space-y-4">
+            <div className="w-full h-full flex flex-col items-center justify-center bg-card text-muted-foreground space-y-4">
               <MapIcon className="h-12 w-12 opacity-20 animate-pulse" />
               <p className="text-sm font-semibold uppercase tracking-widest">Podgląd mapy wczytuje się...</p>
             </div>

@@ -136,7 +136,7 @@ export default function InterviewOverlay({
                   title={done ? 'Wróć do tego kroku i wybierz inaczej' : undefined}
                   className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm transition-colors ${
                     active
-                      ? 'bg-primary text-white font-medium'
+                      ? 'bg-background text-foreground font-medium'
                       : done
                         ? 'bg-white/15 text-white/80 hover:bg-white/30 cursor-pointer'
                         : 'bg-white/5 text-white/40 cursor-default'
@@ -292,7 +292,7 @@ export default function InterviewOverlay({
           )}
 
           {!busyLabel && errorMessage && (
-            <div className="mb-6 rounded-md border border-rose-400/40 bg-accent backdrop-blur-md p-4 max-w-3xl">
+            <div className="mb-6 rounded-md border border-accent-foreground/30 bg-accent backdrop-blur-md p-4 max-w-3xl">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
