@@ -77,12 +77,12 @@ export default function PasekNarzedziTablicy({
               }}
               className={`relative text-left rounded-md border px-4 py-3 transition-colors ${
                 czyAktywne
-                  ? 'bg-primary border-primary text-primary-foreground'
-                  : 'bg-card border-border hover:border-primary'
+                  ? 'bg-foreground border-foreground text-background'
+                  : 'bg-card border-border hover:border-foreground/30'
               }`}
             >
               <span className={`block font-narrow uppercase tracking-[0.22em] text-[10px] ${
-                czyAktywne ? 'text-primary-foreground/75' : 'text-muted-foreground'
+                czyAktywne ? 'text-background/75' : 'text-muted-foreground'
               }`}>
                 {n.etykieta}
               </span>
@@ -91,7 +91,7 @@ export default function PasekNarzedziTablicy({
               {/* Dziobek pokazuje, z którego kafla wyszedł panel. Tylko tam, gdzie
                   panel faktycznie jest pod paskiem — na telefonie to arkusz. */}
               {czyAktywne && (
-                <span className="hidden lg:block absolute -bottom-[6px] left-1/2 -ml-[5px] w-[11px] h-[11px] rotate-45 bg-primary" />
+                <span className="hidden lg:block absolute -bottom-[6px] left-1/2 -ml-[5px] w-[11px] h-[11px] rotate-45 bg-foreground" />
               )}
             </button>
           );
@@ -108,7 +108,7 @@ export default function PasekNarzedziTablicy({
           <div
             id={`narzedzie-${aktywne.id}`}
             role="tabpanel"
-            className="fixed inset-x-0 bottom-0 z-[1460] max-h-[76vh] overflow-auto rounded-t-md border-t border-primary bg-card
+            className="fixed inset-x-0 bottom-0 z-[1460] max-h-[76vh] overflow-auto rounded-t-md border-t border-foreground bg-card
                        lg:static lg:mt-4 lg:max-h-none lg:overflow-visible lg:rounded-md lg:border lg:shadow-token-sm"
           >
             <div className="lg:hidden flex justify-center pt-2.5">
@@ -120,7 +120,7 @@ export default function PasekNarzedziTablicy({
                 onClick={() => onZmiana(null)}
                 aria-label={t('narzedzia.zamknij_narzedzie')}
                 className="absolute top-4 right-4 w-8 h-8 rounded-full border border-border bg-card
-                           flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                           flex items-center justify-center text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>

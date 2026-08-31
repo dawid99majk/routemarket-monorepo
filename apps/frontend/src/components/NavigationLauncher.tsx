@@ -93,7 +93,7 @@ export default function NavigationLauncher() {
       <button
         onClick={openPicker}
         aria-label="Nawigacja"
-        className="fixed bottom-5 right-5 z-[1400] w-14 h-14 rounded-full bg-foreground text-background hover:bg-foreground/90 text-white shadow-token-lg flex items-center justify-center transition-colors"
+        className="fixed bottom-5 right-5 z-[1400] w-14 h-14 rounded-full bg-foreground text-background hover:bg-foreground/90 shadow-token-lg flex items-center justify-center transition-colors"
       >
         <Navigation className="w-6 h-6" />
       </button>

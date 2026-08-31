@@ -1583,7 +1583,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     onClick={() => setForm({ ...form, tripType: form.tripType === preset.id ? '' : preset.id })}
                     className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
                       form.tripType === preset.id
-                        ? 'bg-primary border-primary text-white'
+                        ? 'bg-foreground border-foreground text-background'
                         : 'bg-background hover:bg-muted'
                     }`}
                   >
@@ -2663,7 +2663,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     <button key={preset.id} title={preset.hint} onClick={() => changeTripType(preset.id)}
                       className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
                         active.trip_type === preset.id
-                          ? 'bg-primary border-primary text-white'
+                          ? 'bg-foreground border-foreground text-background'
                           : 'bg-background hover:bg-muted'
                       }`}>
                       {preset.label}
@@ -3159,7 +3159,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         onClick={() => setPlanForm({ ...planForm, start: od, end: doG })}
                         className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           wybrany
-                            ? 'bg-primary border-primary text-primary-foreground'
+                            ? 'bg-foreground border-foreground text-background'
                             : 'border-border hover:bg-muted'
                         }`}>
                         {etykieta}
