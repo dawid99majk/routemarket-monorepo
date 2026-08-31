@@ -726,7 +726,7 @@ export default function Discover() {
                         <>
                           <button onClick={() => dopnijZAgenta(p, 'must' as Bucket)}
                             className="rounded-full bg-muted px-3 py-1 font-medium
-                                       hover:bg-border transition-colors">
+                                       hover:bg-tan/25 transition-colors">
                             Na pewno
                           </button>
                           <button onClick={() => dopnijZAgenta(p, 'nice' as Bucket)}
@@ -938,7 +938,7 @@ export default function Discover() {
                     ) : (
                       <>
                         <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
-                          className="rounded-full bg-muted px-3 py-1 font-medium hover:bg-border transition-colors">
+                          className="rounded-full bg-muted px-3 py-1 font-medium hover:bg-tan/25 transition-colors">
                           Na pewno
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); mark(p, 'nice' as Bucket); }}

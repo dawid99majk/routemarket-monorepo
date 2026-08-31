@@ -94,7 +94,7 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
         {tripId && (
           <button onClick={() => navigate('/plany')}
             className="hidden md:inline-flex items-center gap-1.5 h-8 rounded-full bg-muted px-3.5
-                       text-[13px] font-medium max-w-[220px] hover:bg-border transition-colors">
+                       text-[13px] font-medium max-w-[220px] hover:bg-tan/25 transition-colors">
             <span className="truncate">{tripName || '…'}</span>
             <span className="text-muted-foreground">▾</span>
           </button>
@@ -138,7 +138,7 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
               której nie ma. */}
           <button onClick={() => navigate('/zapisane')} title={t('naglowek.zapisane_miejsca')} aria-label={t('naglowek.zapisane')}
             className="h-8 inline-flex items-center gap-1.5 rounded-full bg-muted px-3
-                       hover:bg-border transition-colors">
+                       hover:bg-tan/25 transition-colors">
             <Heart className="w-4 h-4 text-muted-foreground" />
             <span className="text-[13px] text-muted-foreground hidden sm:inline">{t('naglowek.zapisane')}</span>
           </button>
