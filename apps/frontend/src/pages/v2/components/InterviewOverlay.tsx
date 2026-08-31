@@ -106,7 +106,7 @@ export default function InterviewOverlay({
     options.length >= 3 ? 'md:grid-cols-3' : options.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
 
   return (
-    <div className="absolute inset-0 z-[1200] flex flex-col bg-ink/45 backdrop-blur-xl animate-in fade-in duration-300">
+    <div className="absolute inset-0 z-[1200] flex flex-col bg-ink/80 backdrop-blur-xl animate-in fade-in duration-300">
       {/* Pasek kroków */}
       <div className={`shrink-0 px-8 pt-6 ${started ? 'pb-4' : 'pb-2'}`}>
         <div className="flex items-center justify-between gap-4">
@@ -117,7 +117,7 @@ export default function InterviewOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors flex items-center gap-1.5 text-sm"
+            className="text-white/75 hover:text-white transition-colors flex items-center gap-1.5 text-sm"
           >
             Podejrzyj mapę <X className="w-4 h-4" />
           </button>
@@ -139,7 +139,7 @@ export default function InterviewOverlay({
                       ? 'bg-background text-foreground font-medium'
                       : done
                         ? 'bg-white/15 text-white/80 hover:bg-white/30 cursor-pointer'
-                        : 'bg-white/5 text-white/40 cursor-default'
+                        : 'bg-white/15 text-white/65 cursor-default'
                   }`}
                 >
                   {done ? (
@@ -149,7 +149,7 @@ export default function InterviewOverlay({
                   )}
                   {step.label}
                 </button>
-                {i < STEPS.length - 1 && <ChevronRight className="w-4 h-4 text-white/20 shrink-0" />}
+                {i < STEPS.length - 1 && <ChevronRight className="w-4 h-4 text-white/55 shrink-0" />}
               </div>
             );
           })}
@@ -160,7 +160,7 @@ export default function InterviewOverlay({
             {decided.map(([key, value]) => (
               <span
                 key={key}
-                className="text-[11px] bg-white/10 text-white/70 rounded-full px-2.5 py-1 backdrop-blur"
+                className="text-[11px] bg-white/15 text-white/70 rounded-full px-2.5 py-1 backdrop-blur"
               >
                 {String(value)}
               </span>
@@ -175,7 +175,7 @@ export default function InterviewOverlay({
           {!started && (
             <div className="pt-6 pb-2">
               <h1 className="text-white text-3xl font-semibold tracking-tight">Zaplanujmy Twoją trasę</h1>
-              <p className="text-white/60 mt-2 max-w-2xl">
+              <p className="text-white/75 mt-2 max-w-2xl">
                 Powiedz, dokąd się wybierasz i ile masz czasu — resztę ustalimy po kolei. Najpierw wybierz, czym się poruszasz.
               </p>
 
@@ -188,7 +188,7 @@ export default function InterviewOverlay({
                     className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition-all border ${
                       vehicleType === id
                         ? 'bg-primary border-primary-light text-white font-medium'
-                        : 'bg-white/10 border-white/15 text-white/80 hover:bg-white/20'
+                        : 'bg-white/15 border-white/15 text-white/80 hover:bg-white/20'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -209,7 +209,7 @@ export default function InterviewOverlay({
                     className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition-all border ${
                       routingPreference === id
                         ? 'bg-white/25 border-white/40 text-white font-medium'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/15'
+                        : 'bg-white/15 border-white/20 text-white/75 hover:bg-white/15'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -220,7 +220,7 @@ export default function InterviewOverlay({
 
               {/* Charakter wyjazdu jak w planach — delegacja potrzebuje czego innego
                   niż weekend z dziećmi, a agent bez tego pyta o to samo od zera. */}
-              <p className="mt-7 text-white/50 text-xs uppercase tracking-wider font-semibold">Charakter wyjazdu</p>
+              <p className="mt-7 text-white/75 text-xs uppercase tracking-wider font-semibold">Charakter wyjazdu</p>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {TRIP_PRESETS.map((preset) => (
                   <button
@@ -231,7 +231,7 @@ export default function InterviewOverlay({
                     className={`rounded-full px-4 py-2.5 text-sm transition-all border ${
                       tripProfile?.charakter === preset.label
                         ? 'bg-white/25 border-white/40 text-white font-medium'
-                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/15'
+                        : 'bg-white/15 border-white/20 text-white/75 hover:bg-white/15'
                     }`}
                   >
                     {preset.label}
@@ -245,7 +245,7 @@ export default function InterviewOverlay({
               w miejscu. Bez tego wszystko lądowało na liście jako "Nowa Trasa AI". */}
           {started && (
             <div className="pt-6 pb-5 max-w-2xl">
-              <label className="text-white/50 text-xs uppercase tracking-wider font-semibold">
+              <label className="text-white/75 text-xs uppercase tracking-wider font-semibold">
                 Jak nazwać tę trasę?
               </label>
               {/* Domyślne "Nowa Trasa AI" to wartość techniczna, nie propozycja —
@@ -254,8 +254,8 @@ export default function InterviewOverlay({
                 value={title === 'Nowa Trasa AI' ? '' : title}
                 onChange={(e) => onTitleChange(e.target.value)}
                 placeholder="np. Durrës z dziećmi"
-                className="mt-2 w-full bg-white/10 border border-white/15 rounded-md px-4 py-3
-                           text-white text-lg font-medium placeholder:text-white/30
+                className="mt-2 w-full bg-white/15 border border-white/15 rounded-md px-4 py-3
+                           text-white text-lg font-medium placeholder:text-white/75
                            focus:outline-none focus:border-primary-light/60 focus:bg-white/15 transition-colors"
               />
             </div>
@@ -313,7 +313,7 @@ export default function InterviewOverlay({
           )}
 
           {!busyLabel && inputCard && (
-            <form onSubmit={submitCardValue} className="mb-4 rounded-md border border-primary-light/50 bg-white/10 backdrop-blur-md p-4">
+            <form onSubmit={submitCardValue} className="mb-4 rounded-md border border-primary-light/50 bg-white/15 backdrop-blur-md p-4">
               <div className="text-white font-medium mb-2">{inputCard.title}</div>
               <div className="flex gap-2">
                 <Input
@@ -321,12 +321,12 @@ export default function InterviewOverlay({
                   value={cardValue}
                   onChange={(e) => setCardValue(e.target.value)}
                   placeholder={inputCard.inputPlaceholder || 'Wpisz miejsce…'}
-                  className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full px-5 py-5"
+                  className="flex-1 bg-white/15 border-white/20 text-white placeholder:text-white/65 rounded-full px-5 py-5"
                 />
                 <Button type="submit" disabled={!cardValue.trim()} className="rounded-full bg-primary hover:bg-primary-light text-white px-5">
                   Zatwierdź
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => setInputCard(null)} className="rounded-full text-white/60 hover:text-white">
+                <Button type="button" variant="ghost" onClick={() => setInputCard(null)} className="rounded-full text-white/75 hover:text-white">
                   Anuluj
                 </Button>
               </div>
@@ -340,7 +340,7 @@ export default function InterviewOverlay({
                   key={option.id || option.title}
                   type="button"
                   onClick={() => pickCard(option)}
-                  className="text-left rounded-md border border-white/15 bg-white/10 hover:bg-white/20 hover:border-primary-light/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
+                  className="text-left rounded-md border border-white/15 bg-white/15 hover:bg-white/20 hover:border-primary-light/60 backdrop-blur-md p-4 transition-all hover:-translate-y-0.5 flex flex-col"
                 >
                   <div className="font-semibold text-white leading-snug">{option.title}</div>
                   {option.subtitle && (
@@ -352,7 +352,7 @@ export default function InterviewOverlay({
                   {option.highlights && option.highlights.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
                       {option.highlights.map((h) => (
-                        <span key={h} className="text-[11px] bg-white/10 text-white/60 rounded-full px-2 py-0.5">
+                        <span key={h} className="text-[11px] bg-white/15 text-white/75 rounded-full px-2 py-0.5">
                           {h}
                         </span>
                       ))}
@@ -372,7 +372,7 @@ export default function InterviewOverlay({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={started ? 'Napisz coś od siebie albo „generuj”, żeby pominąć pytania…' : 'np. Tirana, kilka godzin, miejsca związane ze sztuką…'}
-            className="w-full bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-full pl-5 pr-12 py-6 backdrop-blur-md focus-visible:ring-ring/50"
+            className="w-full bg-white/15 border-white/20 text-white placeholder:text-white/65 rounded-full pl-5 pr-12 py-6 backdrop-blur-md focus-visible:ring-ring/50"
           />
           <Button
             type="submit"
