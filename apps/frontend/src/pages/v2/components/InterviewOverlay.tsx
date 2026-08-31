@@ -209,7 +209,7 @@ export default function InterviewOverlay({
                     className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm transition-all border ${
                       routingPreference === id
                         ? 'bg-white/25 border-white/40 text-white font-medium'
-                        : 'bg-white/15 border-white/20 text-white/75 hover:bg-white/15'
+                        : 'bg-white/15 border-white/20 text-white/90 hover:bg-white/15'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -231,7 +231,7 @@ export default function InterviewOverlay({
                     className={`rounded-full px-4 py-2.5 text-sm transition-all border ${
                       tripProfile?.charakter === preset.label
                         ? 'bg-white/25 border-white/40 text-white font-medium'
-                        : 'bg-white/15 border-white/20 text-white/75 hover:bg-white/15'
+                        : 'bg-white/15 border-white/20 text-white/90 hover:bg-white/15'
                     }`}
                   >
                     {preset.label}
