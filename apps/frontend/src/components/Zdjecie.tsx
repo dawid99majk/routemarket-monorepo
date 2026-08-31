@@ -20,10 +20,12 @@ interface ZdjecieProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, '
  *
  * Komponent sam dobiera szerokość do miejsca wyświetlenia, więc wywołujący podaje
  * `gdzie`, a nie adres. `loading="lazy"` jest domyślne — zdjęcie miejsca nigdy nie
- * jest tym, na co czeka pierwsze malowanie strony.
+ * jest tym, na co czeka pierwsze malowanie strony. `decoding="async"` z tego samego
+ * powodu: dekodowanie kilkunastu kafelków nie ma prawa blokować wątku, na którym
+ * użytkownik przeciąga miejsca między kubełkami.
  */
 export default function Zdjecie({ src, gdzie = 'kafelek', alt = '', ...reszta }: ZdjecieProps) {
   if (!src) return null;
   const szerokosc = typeof gdzie === 'number' ? gdzie : SZEROKOSC[gdzie];
-  return <img src={miniatura(src, szerokosc)} alt={alt} loading="lazy" {...reszta} />;
+  return <img src={miniatura(src, szerokosc)} alt={alt} loading="lazy" decoding="async" {...reszta} />;
 }

@@ -249,7 +249,9 @@ export default function Zapisane() {
                       </option>
                       {kolekcje.map((k) => (
                         <option key={k.id} value={k.id}>
-                          {(przypisania[p.id] ?? []).includes(k.id) ? '✓ ' : ''}{k.name}
+                          {/* Znacznik wyboru nie jest na liście dozwolonych znaków typograficznych,
+                              a w <option> nie da się wstawić ikony — zostaje słowo. */}
+                          {k.name}{(przypisania[p.id] ?? []).includes(k.id) ? ` · ${t("zapisane.juz_w_kolekcji")}` : ""}
                         </option>
                       ))}
                     </select>

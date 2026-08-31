@@ -226,7 +226,9 @@ Cała treść tekstowa jest w prototypie i **nie należy jej przepisywać**. Kil
 zasad, które w niej obowiązują i które łatwo zgubić przy tłumaczeniu na `t()`:
 
 - Zdania zaczynają się wielką literą, reszta małą — także przyciski i zakładki.
-- Wersaliki tylko w nadtytułach, `Archivo Narrow`, `tracking` ≥ `0.24em`, ≤ 11 px.
+- Wersaliki tylko w nadtytułach, `Archivo Narrow`, ≤ 11 px.
+- Odstęp liter: `0.18em` przy 11 px, `0.24em` przy 9 px (prototypy). Liczy się
+  odstęp optyczny ~2 px, nie sama wartość `em` — rośnie, gdy stopień maleje.
 - Separator `·` w metadanych, ze spacjami: `1 g 30 min · rzymski · cień po 15:00`.
 - Czas po polsku: `1 g 30 min`, nie `1h 30m`. Przecinek dziesiętny: `3,8 km`.
 - Głos agenta jest **obserwacją, nie poradą**: „Czwarty punkt by się zmieścił,
