@@ -515,6 +515,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (error) return toast.error(error.message);
     setProjects((prev) => [data, ...prev]);
     setActiveId(data.id);
+    toast.success(t('tablica.utworzono_tablice', { nazwa: data.name }));
     setCreating(false);
     setForm({ name: '', destination: '', days: '', hours: '', tripType: '' });
   };
@@ -1593,7 +1594,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </div>
             </div>
             <Button onClick={createProject} className="sm:col-span-4 bg-foreground text-background hover:bg-foreground/90">
-              Utwórz plan
+              {t('tablica.utworz_tablice')}
             </Button>
           </div>
         )}
@@ -1657,7 +1658,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </div>
             )}
             <Button variant="outline" onClick={() => setCreating((v) => !v)}>
-              <Plus className="w-4 h-4 mr-1" /> Nowy plan
+              <Plus className="w-4 h-4 mr-1" /> {t('tablica.nowa_tablica')}
             </Button>
             {active && view === 'plan' && plan && savedPlans.length > 0 && (
               <Button variant="outline" onClick={pokazWszystkiePlany}>
