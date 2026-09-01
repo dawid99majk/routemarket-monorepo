@@ -11,6 +11,8 @@ interface PlannerHeaderProps {
   context?: string | null;
   /** Inicjały do awatara. Bez nich kółko się nie pokazuje. */
   initials?: string | null;
+  /** Odkrywaj ma własny, większy przełącznik -- pigułka obok logo dublowałaby go. */
+  ukryjPigulke?: boolean;
 }
 
 /**
@@ -50,7 +52,7 @@ function zakladki(tripId: string | null) {
  * skok do innej aplikacji. Projekt zakłada jeden pasek i zakładki zależne od
  * kontekstu (kierunek „Wyprawa", zadanie Z2).
  */
-export default function PlannerHeader({ context, initials }: PlannerHeaderProps) {
+export default function PlannerHeader({ context, initials, ukryjPigulke }: PlannerHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -91,7 +93,7 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
             wyjazdu i zakładki produktu, nie hasło marketingowe. */}
         <Logo showName signature={false} size="sm" />
 
-        {tripId && (
+        {tripId && !ukryjPigulke && (
           <button onClick={() => navigate('/plany')}
             className="hidden md:inline-flex items-center gap-1.5 h-8 rounded-full bg-muted px-3.5
                        text-[13px] font-medium max-w-[220px] hover:bg-tan/25 transition-colors">

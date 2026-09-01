@@ -10,6 +10,7 @@ import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import SzukanieMiejsc from '@/components/SzukanieMiejsc';
 import SzukamOdpowiedzi from '@/components/SzukamOdpowiedzi';
+import PrzelacznikWyjazdu from '@/components/PrzelacznikWyjazdu';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -88,13 +89,6 @@ function photoHeight(id: string): number {
   return 160 + (h % 5) * 25;
 }
 
-/** Odmiana po liczbie: 1 popołudnie, 2-4 popołudnia, 5+ i „kilka" popołudni. */
-function popoludnia(n: number | null | undefined): string {
-  if (n == null) return 'popołudni';
-  if (n === 1) return 'popołudnie';
-  const j = n % 10, d = n % 100;
-  return j >= 2 && j <= 4 && (d < 12 || d > 14) ? 'popołudnia' : 'popołudni';
-}
 
 export default function Discover() {
   const { t } = useTranslation();
@@ -118,7 +112,12 @@ export default function Discover() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [boards, setBoards] = useState<{ id: string; name: string; destination: string; days: number | null }[]>([]);
+  const [boards, setBoards] = useState<{
+    id: string; name: string; destination: string; days: number | null;
+    start_date?: string | null; end_date?: string | null;
+    /** Dociągane osobnym zapytaniem -- trip_projects samo tego nie ma. */
+    liczba_miejsc?: number; miniatura?: string | null;
+  }[]>([]);
   const [activeBoard, setActiveBoard] = useState<string | null>(null);
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
@@ -243,13 +242,34 @@ export default function Discover() {
       if (!userData.user) return;
       const [{ data: favs }, { data: projs }, { data: allCities }] = await Promise.all([
         supabase.from('place_favorites').select('place_id').eq('user_id', userData.user.id),
-        supabase.from('trip_projects').select('id, name, destination, days, start_name, start_lat, start_lng').order('updated_at', { ascending: false }),
+        supabase.from('trip_projects')
+          .select('id, name, destination, days, start_name, start_lat, start_lng, start_date, end_date')
+          .order('updated_at', { ascending: false }),
         // DISTINCT robi baza — wcześniej szło tu 500 surowych wierszy
         // i deduplikacja w przeglądarce, a miast powyżej limitu nie było wcale.
         supabase.rpc('catalog_cities'),
       ]);
       setFavorites(new Set((favs ?? []).map((f: any) => f.place_id)));
-      setBoards(projs ?? []);
+
+      // Liczba miejsc i pierwsza miniatura na tablicę -- ten sam wzorzec co
+      // galeria publicznych tablic (Tablice.tsx): jedno zapytanie wsadowe,
+      // a nie N osobnych przy każdym otwarciu przełącznika.
+      const listaProjs = projs ?? [];
+      let wgTablicy: Record<string, { ile: number; miniatura: string | null }> = {};
+      if (listaProjs.length) {
+        const { data: miejscaTablic } = await supabase.from('trip_project_places')
+          .select('project_id, image_url').in('project_id', listaProjs.map((b: any) => b.id));
+        for (const m of miejscaTablic ?? []) {
+          const w = (wgTablicy[m.project_id] ??= { ile: 0, miniatura: null });
+          w.ile++;
+          if (!w.miniatura && m.image_url) w.miniatura = m.image_url;
+        }
+      }
+      setBoards(listaProjs.map((b: any) => ({
+        ...b,
+        liczba_miejsc: wgTablicy[b.id]?.ile ?? 0,
+        miniatura: wgTablicy[b.id]?.miniatura ?? null,
+      })));
       setCities(((allCities ?? []) as { city: string }[]).map((r) => r.city));
       if ((projs ?? []).length > 0) {
         const wybrany = (wskazanyWyjazd && projs.find((p: any) => p.id === wskazanyWyjazd)) || projs[0];
@@ -543,48 +563,32 @@ export default function Discover() {
       <PlannerHeader
         context={board ? [board.destination, board.days ? `${board.days} dni` : null].filter(Boolean).join(' · ') : null}
         initials={initials}
+        ukryjPigulke
       />
 
       <main className="max-w-[1280px] mx-auto px-10 pb-24">
         {/* Nagłówek dwukolumnowy */}
         <div className="pt-12 flex flex-wrap items-start justify-between gap-8">
-          <div className="max-w-[560px]">
-            {/* Dotąd stał tu zwykły napis „Wyjazd · Paryż", a wyjazd wybierał się sam.
-                Teraz to lista: widać, do czego trafiają zapisy, i można to zmienić
-                bez opuszczania strony. */}
-            {boards.length > 0 ? (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
-                  Wyjazd
-                </span>
-                <select
-                  value={activeBoard ?? ''}
-                  onChange={(e) => przelaczWyjazd(e.target.value)}
-                  aria-label={t('odkrywaj.wyjazd_do_ktorego_zapisujesz_miejsca')}
-                  className="rounded-full border border-border bg-card px-3 py-1 text-[13px]
-                             hover:border-primary transition-colors max-w-[320px] truncate"
-                >
-                  {boards.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}{b.destination ? ` · ${b.destination}` : ''}
-                    </option>
-                  ))}
-                </select>
-                <button onClick={() => navigate('/start')}
-                  className="text-[13px] text-muted-foreground hover:text-primary transition-colors">
-                  + nowy
-                </button>
-              </div>
+          <div className="max-w-[560px] w-full">
+            {board && boards.length > 0 ? (
+              <PrzelacznikWyjazdu
+                aktywny={board}
+                wszystkie={boards}
+                onZmien={przelaczWyjazd}
+                onNowy={() => navigate('/start')}
+              />
             ) : (
               <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
                 Odkrywanie miejsc
               </p>
             )}
-            <h1 className="font-display font-light text-[40px] leading-[1.1] tracking-[-0.02em] mt-3">
-              {board ? `Atrakcje na ${board.days ?? 'kilka'} ${popoludnia(board.days)}` : 'Miejsca warte rozważenia'}
-            </h1>
-            <p className="text-[15px] text-muted-foreground mt-3 leading-relaxed text-pretty">
-              Zapisuj, co Cię interesuje. Kiedy tablica będzie pełna, agent ułoży z niej realny plan.
+            {/* Nazwa ekranu przy opisie, nie nad nim -- "Odkrywaj" jest już
+                podświetlone w nawigacji, więc nie musi krzyczeć drugi raz. */}
+            <p className="mt-6 leading-snug">
+              <span className="font-display text-[22px]">{t('naglowek.odkrywaj')}</span>
+              <span className="text-[15px] text-muted-foreground ml-2">
+                — {t('odkrywaj.zapisuj_co_cie_interesuje')}
+              </span>
             </p>
           </div>
 
