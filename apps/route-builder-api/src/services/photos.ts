@@ -111,6 +111,15 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
                       nameTokens: string[] | null, inneMiasta: string[] | null = null): string[] {
   return pages
     .sort((a, b) => (a.index ?? 99) - (b.index ?? 99))
+    // Skan zeskanowanej książki albo dokumentu bierzemy TYLKO po tytule oryginału
+    // ("...pdf", "...djvu"), nie po adresie miniatury: MediaWiki renderuje stronę
+    // PDF-u jako "page1-960px-Cokolwiek.pdf.jpg" -- kończy się na .jpg, więc test
+    // rozszerzenia niżej i tak by to przepuścił. Kawiarnia "Vienna" w Hadze nie
+    // miała zdjęcia z geotagiem i dopasowanie spadło na sam tytuł pliku -- trafiło
+    // w zeskanowaną stronę XVII-wiecznego dziennika podróży, bo w tytule było
+    // "...to Vienna...". "Vienna" jest zbyt pospolitym słowem, żeby to złapać
+    // regułą dopasowania; ten filtr łapie to niezależnie od słowa.
+    .filter((p) => !/\.(pdf|djvu)$/i.test(String(p.title || '').trim()))
     .filter((p) => !PHOTO_JUNK.test(p.title || '') && !CAMERA_DUMP.test(p.title || ''))
     .filter((p) => {
       const c = p.coordinates?.[0];

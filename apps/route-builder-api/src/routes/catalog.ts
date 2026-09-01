@@ -341,8 +341,9 @@ catalogRouter.post('/catalog/enrich', async (c) => {
     // liczy sie dopiero wtedy, gdy nie ma go w zadnym z tych miejsc.
     const bezOpisu = (m: any) =>
       !String(m.description ?? '').trim() && !String(m.description_i18n?.pl ?? '').trim();
-    const doOpisania = wszystkie.filter(bezOpisu).slice(0, limit);
-    if (doOpisania.length === 0) return c.json({ city, enriched: 0 });
+    const brakujace = wszystkie.filter(bezOpisu);
+    const doOpisania = brakujace.slice(0, limit);
+    if (doOpisania.length === 0) return c.json({ city, enriched: 0, remaining: 0 });
 
     const prompt = `Opisujesz PO POLSKU miejsca w mieście ${city} dla serwisu planowania wyjazdów. Piszesz w języku polskim niezależnie od tego, w jakim kraju leży miasto -- nawet gdy nazwa miejsca jest obcojęzyczna.
 
@@ -429,8 +430,13 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
       zmienione++;
     }
 
-    console.log(`[catalog/enrich] ${city}: opisano ${zmienione} z ${doOpisania.length}`);
-    return c.json({ city, enriched: zmienione });
+    // `remaining` mówi wołającemu, że jedno wywołanie NIE WYSTARCZYŁO. Bez tego
+    // pola front pytał raz i uznawał sprawę za zamkniętą -- Haga (42 miejsca)
+    // dostawała opisy dla dwudziestu czterech i ani jednego więcej, bo nic nie
+    // powiedziało, że osiemnaście wciąż czeka.
+    const pozostalo = Math.max(0, brakujace.length - zmienione);
+    console.log(`[catalog/enrich] ${city}: opisano ${zmienione} z ${doOpisania.length}, zostaje ${pozostalo}`);
+    return c.json({ city, enriched: zmienione, remaining: pozostalo });
   } catch (e: any) {
     console.error('[catalog/enrich]', e);
     return c.json({ error: e.message }, 500);
