@@ -13,6 +13,8 @@ export interface MiejsceKarty {
   description?: string | null;
   opening_hours?: string | null;
   visit_minutes?: number | null;
+  /** Orientacyjny koszt wstępu -- tylko dla propozycji agenta, katalog tego nie ma. */
+  price_hint?: string | null;
   website?: string | null;
   /** Wskazówka agenta przy pozycji planu. */
   note?: string | null;
@@ -60,7 +62,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
   const zdjecia = (miejsce.photos ?? []).filter(Boolean) as string[];
   const ile = zdjecia.length;
   const teraz = Math.min(foto, Math.max(0, ile - 1));
-  const meta = [czas(miejsce.visit_minutes), miejsce.opening_hours].filter(Boolean);
+  const meta = [czas(miejsce.visit_minutes), miejsce.opening_hours, miejsce.price_hint].filter(Boolean);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onZamknij()}>
@@ -134,6 +136,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                           text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
             {czas(miejsce.visit_minutes) && <span>Czas: {czas(miejsce.visit_minutes)}</span>}
             {miejsce.opening_hours && <span className="min-w-0 truncate">Godziny: {miejsce.opening_hours}</span>}
+            {miejsce.price_hint && <span className="min-w-0 truncate">Koszt: {miejsce.price_hint}</span>}
           </div>
         )}
 

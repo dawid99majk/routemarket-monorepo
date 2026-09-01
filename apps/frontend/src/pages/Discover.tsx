@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import SzukanieMiejsc from '@/components/SzukanieMiejsc';
+import SzukamOdpowiedzi from '@/components/SzukamOdpowiedzi';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -105,6 +106,9 @@ export default function Discover() {
   /** Miejsce otwarte w oknie. Strona `/miejsce/:slug` zostaje dla odnośników. */
   const [karta, setKarta] = useState<CatalogPlace | null>(null);
   const [szukaAgent, setSzukaAgent] = useState(false);
+  // Osobny stan od `karta` (podgląd z katalogu): propozycja agenta nie ma
+  // id ani sluga, więc nie może dzielić typu z prawdziwym CatalogPlace.
+  const [kartaAgenta, setKartaAgenta] = useState<any | null>(null);
   /** Sekundy od startu szukania. Zapytanie do agenta trwa ~50 s i bez
    *  licznika nie da się odróżnić długiego czekania od zawieszenia. */
   const [szukaSekundy, setSzukaSekundy] = useState(0);
@@ -329,6 +333,7 @@ export default function Discover() {
       const zn = d.places || [];
       setWynikiAgenta(zn);
       if (zn.length === 0) toast.info(`Agent nic nie znalazł dla: „${q}".`);
+      else toast.success(`Agent znalazł ${zn.length} ${zn.length === 1 ? 'miejsce' : 'miejsc'} dla: „${q}".`);
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się wyszukać');
     } finally {
@@ -498,10 +503,23 @@ export default function Discover() {
       // się do nich w tle, bez blokowania ekranu.
       if (data.needs_enrich) {
         setOpisyWToku(true);
-        apiPost<any>('/catalog/enrich', { city: data.city || city.trim() }, { timeoutMs: 180_000 })
-          .then(() => load(data.city || city, true))
-          .catch((e) => console.warn('Nie udało się dociągnąć opisów:', e))
-          .finally(() => setOpisyWToku(false));
+        const miasto = data.city || city.trim();
+        // Jedno wywołanie opisuje najwyżej dwadzieścia cztery miejsca. Haga miała
+        // ich czterdzieści dwa -- bez pętli osiemnaście zostawało bez opisu na
+        // zawsze, bo nic nie mówiło frontowi, że trzeba spytać drugi raz.
+        // Limit dziesięciu rund to zabezpieczenie przed nieskończoną pętlą, gdyby
+        // `remaining` z jakiegoś powodu nigdy nie doszło do zera -- w praktyce
+        // miasto z pobierania ma kilkadziesiąt miejsc, więc dwie-trzy rundy
+        // wystarczają.
+        (async () => {
+          for (let runda = 0; runda < 10; runda++) {
+            const odp = await apiPost<any>('/catalog/enrich', { city: miasto }, { timeoutMs: 180_000 })
+              .catch((e) => { console.warn('Nie udało się dociągnąć opisów:', e); return null; });
+            if (!odp) break;
+            await load(miasto, true);
+            if (!odp.remaining) break;
+          }
+        })().finally(() => setOpisyWToku(false));
       }
       toast.success(
         data.added > 0
@@ -695,6 +713,22 @@ export default function Discover() {
           onZamknij={() => setKarta(null)}
         />
 
+        {/* Ten sam komponent co wyżej, dla propozycji spoza katalogu. Bez sluga
+            i zdjęć (agent ich nie pobiera), za to z `note` -- polem "why", które
+            API zwraca od początku, a nigdzie się nie pokazywało. */}
+        <KartaMiejsca
+          miejsce={kartaAgenta ? {
+            name: kartaAgenta.name,
+            description: kartaAgenta.description,
+            visit_minutes: kartaAgenta.visit_minutes,
+            price_hint: kartaAgenta.price_hint,
+            note: kartaAgenta.why,
+          } : null}
+          decyzja={kartaAgenta ? (dopinane[String(kartaAgenta.name)] as any) ?? null : null}
+          onDecyzja={(d) => { if (kartaAgenta) dopnijZAgenta(kartaAgenta, d as Bucket); }}
+          onZamknij={() => setKartaAgenta(null)}
+        />
+
         {/* Znalezione przez agenta: propozycje spoza katalogu, na konkretne
             pytanie. Osobny pasek, żeby nie udawały części zbioru miasta. */}
         {wynikiAgenta.length > 0 && (
@@ -715,18 +749,22 @@ export default function Discover() {
                 return (
                   <div key={`${p.name}-${i}`}
                     className="rounded-md border border-border bg-card p-3.5 flex flex-col">
-                    <div className="font-display text-[15px] leading-snug">{p.name}</div>
-                    {(p.visit_minutes || p.category) && (
-                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
-                        {[p.category, p.visit_minutes ? `${p.visit_minutes} min` : null]
-                          .filter(Boolean).join(' · ')}
-                      </div>
-                    )}
-                    {p.description && (
-                      <p className="text-[13px] text-muted-foreground mt-2 line-clamp-3 text-pretty">
-                        {p.description}
-                      </p>
-                    )}
+                    {/* Klikalna treść, przyciski decyzji jako rodzeństwo pod spodem --
+                        ten sam układ co karty katalogu, żeby jedno nie blokowało drugiego. */}
+                    <button onClick={() => setKartaAgenta(p)} className="text-left">
+                      <div className="font-display text-[15px] leading-snug">{p.name}</div>
+                      {(p.visit_minutes || p.category) && (
+                        <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
+                          {[p.category, p.visit_minutes ? `${p.visit_minutes} min` : null]
+                            .filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                      {p.description && (
+                        <p className="text-[13px] text-muted-foreground mt-2 line-clamp-3 text-pretty">
+                          {p.description}
+                        </p>
+                      )}
+                    </button>
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60 text-[12px]">
                       {stan ? (
                         <span className={`rounded-full px-3 py-1 font-medium ${
@@ -780,6 +818,8 @@ export default function Discover() {
           <div className="text-center py-20 space-y-4">
             {seeding ? (
               <SzukanieMiejsc miasto={city.trim()} sekundy={zbieraneSekundy} />
+            ) : szukaAgent ? (
+              <SzukamOdpowiedzi fraza={query.trim()} sekundy={szukaSekundy} />
             ) : (
               <>
             <Sparkles className="w-9 h-9 text-muted-foreground/40 mx-auto" />
