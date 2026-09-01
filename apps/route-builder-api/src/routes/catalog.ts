@@ -329,6 +329,178 @@ catalogRouter.post('/catalog/backfill-country', async (c) => {
  * ma powodu, żeby użytkownik patrzył przez ten czas na pustą stronę — karty mogą
  * już stać, a opisy dochodzą do nich w tle.
  */
+/**
+ * Wyróżnik: jedno zdanie o tym, czym miejsce różni się od sąsiadów.
+ *
+ * Pasek podobnych miejsc postawił pytanie, na które karta nie odpowiadała:
+ * skoro obok Mauritshuis stoi Ridderzaal, Vredespaleis i Paleis Noordeinde,
+ * to czemu miałbym wybrać akurat to? Opis mówi, CZYM miejsce jest — nie mówi,
+ * czym jest INNE.
+ *
+ * Rusza wyłącznie pozycje, które mają już opis, a nie mają wyróżnika. Opisów
+ * nie dotyka.
+ */
+catalogRouter.post('/catalog/wyrozniki', async (c) => {
+  try {
+    const { city, limit = 20 } = await c.req.json() as { city: string; limit?: number };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+
+    const wszystkie = await repo.listCatalogAll(city.trim(), 200);
+    const opis = (m: any) => String(m.description_i18n?.pl ?? m.description ?? '').trim();
+    const maWyroznik = (m: any) =>
+      !!String(m.wyroznik_i18n?.pl ?? m.wyroznik ?? '').trim();
+    // Bez opisu nie ma z czym kontrastować — takie miejsca idą najpierw przez
+    // /catalog/enrich, nie tędy.
+    const brakujace = wszystkie.filter((m: any) => opis(m) && !maWyroznik(m));
+    const doOpisania = brakujace.slice(0, limit);
+    if (doOpisania.length === 0) return c.json({ city, opisane: 0, pozostalo: 0 });
+
+    // Sąsiedzi liczą się tą samą funkcją, która zasila pasek na karcie —
+    // model kontrastuje z tym, co użytkownik naprawdę zobaczy pod spodem.
+    const sasiedzi = await Promise.all(
+      doOpisania.map((m: any) => repo.podobneNazwy(m.id, 4).catch(() => [] as string[]))
+    );
+
+    const lista = doOpisania.map((p: any, i: number) => {
+      const obok = sasiedzi[i].length ? sasiedzi[i].join(', ') : 'brak podobnych w katalogu';
+      return `${i + 1}. ${p.name}\n   podobne obok: ${obok}\n   opis: ${opis(p).slice(0, 400)}`;
+    }).join('\n\n');
+
+    const prompt = `Piszesz PO POLSKU dla serwisu planowania wyjazdów. Miasto: ${city}.
+
+Dla każdego miejsca napisz JEDNO zdanie z faktem, który ODRÓŻNIA je od podobnych
+miejsc wymienionych obok.
+
+Lista podobnych służy Tobie do wyboru faktu, nie do zacytowania. Użytkownik
+NIE WIDZI żadnej listy — czyta samo zdanie pod nazwą miejsca.
+
+Zasady:
+- Nazwę sąsiada wstaw TYLKO wtedy, gdy porównanie jest mierzalne i coś znaczy:
+  "wieża 91 m, o 15 m wyższa od wież Katedry Marii Magdaleny" — tak.
+  "w odróżnieniu od Muzeum Narodowego" doklejone na końcu — nie, to puste.
+- ZAKAZANE zwroty: "wśród wymienionych", "z wymienionych", "spośród podobnych".
+  Użytkownik nie wie, o jakiej liście mowa.
+- NIE ZACZYNAJ od nazwy tego miejsca. Nazwa stoi na karcie tuż nad tym zdaniem,
+  więc jej powtórzenie marnuje pół zdania. Zacznij od faktu.
+- Konkret zamiast przymiotnika: liczba, data, materiał, nazwisko, funkcja, rozmiar.
+- ZAKAZANE słowa: wyjątkowy, niesamowity, magiczny, klejnot, perła, must-see,
+  "warto zobaczyć", "nie do przegapienia".
+- NIE POWTARZAJ faktów z opisu. Opis dostajesz po to, żeby wiedzieć, czego NIE
+  pisać. Zdanie powtarzające opis zostanie odrzucone.
+- Jeśli NIE MASZ czym rzetelnie odróżnić tego miejsca, zwróć pusty string.
+  Puste pole jest lepsze od zmyślonej różnicy i od pustego porównania.
+- Jedno zdanie, najwyżej 25 słów. Nie zaczynaj od "Wybierz", "Odwiedź", "Zobacz".
+
+Dobre zdania:
+  "Kopuła o średnicy 67 metrów była w 1913 roku największą żelbetową na świecie."
+  "Wieża ma 91 metrów, około 15 więcej niż wieże Katedry Marii Magdaleny."
+  "Różni się od pozostałych kościołów w okolicy głównie wiekiem — jest o sto lat młodszy"
+
+Miejsca:
+${lista}
+
+Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [{"name": "...", "wyroznik": "..."}]}`;
+
+    const data = await callGeminiTracked(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              places: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { name: { type: 'string' }, wyroznik: { type: 'string' } },
+                  required: ['name', 'wyroznik']
+                }
+              }
+            },
+            required: ['places']
+          },
+          // Tyle samo co /catalog/enrich. Przy 8192 partia dwudziestu miejsc
+          // potrafiła urwać się w środku JSON-a: model liczy do tego limitu
+          // także tokeny rozumowania, nie samą odpowiedź.
+          maxOutputTokens: 32768
+        }
+      },
+      { operation: 'catalog-wyrozniki', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
+    );
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let wynik: any[] = [];
+    try {
+      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const first = cleaned.indexOf('{');
+      const last = cleaned.lastIndexOf('}');
+      if (first >= 0 && last > first) wynik = JSON.parse(cleaned.slice(first, last + 1)).places || [];
+    } catch {
+      console.warn('[catalog/wyrozniki] Nie udało się sparsować odpowiedzi');
+    }
+
+    /* Czy zdanie to przebranie opisu. Liczymy tylko słowa 6+ znaków, bo krótkie
+       to spójniki i przyimki, które siedzą wszędzie. Próg 70% wyszedł z pomiaru
+       pierwszego przebiegu: przy tej wartości odpadają streszczenia, a zostają
+       zdania niosące nowy fakt. */
+    const przebranieOpisu = (zdanie: string, tekstOpisu: string) => {
+      const slowa = zdanie.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 6);
+      if (slowa.length === 0) return false;
+      const opisMaly = tekstOpisu.toLowerCase();
+      return slowa.filter((w) => opisMaly.includes(w)).length / slowa.length >= 0.7;
+    };
+
+    const wgNazwy = new Map(wynik.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
+    let zmienione = 0;
+    let odrzucone = 0;
+    for (const m of doOpisania) {
+      const klucz = String(m.name).trim().toLowerCase();
+      // Ten sam zapas co przy opisach: model potrafi dokleić adnotację do nazwy,
+      // a nazwa źródłowa jest wtedy przedrostkiem.
+      const d = wgNazwy.get(klucz)
+        ?? wynik.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
+      const zdanie = String(d?.wyroznik ?? '').trim();
+      // Puste pole jest dozwoloną odpowiedzią: nie każde miejsce ma czym się
+      // różnić i wolimy nie pokazać wiersza, niż pokazać pusty komunał.
+      if (!zdanie) continue;
+      if (przebranieOpisu(zdanie, opis(m))) {
+        // Treść, nie tylko licznik: bez niej nie da się ocenić, czy próg wycina
+        // streszczenia, czy dobre zdania.
+        console.log(`[catalog/wyrozniki] odrzucone (powtarza opis) "${m.name}": ${zdanie.slice(0, 90)}`);
+        odrzucone++; continue;
+      }
+      /* Zdanie zdradzające konstrukcję promptu. Użytkownik nie widzi żadnej listy
+         "wymienionych", więc takie odniesienie jest dla niego bez sensu. Instrukcja
+         w prompcie to za mało — w poprzednim przebiegu przeszło sześć takich. */
+      if (/w[śs]r[óo]d wymienionych|z wymienionych|spo[śs]r[óo]d podobnych|wymienionych (obok|powy[żz]ej)/i.test(zdanie)) {
+        odrzucone++; continue;
+      }
+      await repo.updateCatalogPlace(m.id, {
+        wyroznik: zdanie,
+        wyroznik_i18n: { ...(m.wyroznik_i18n ?? {}), pl: zdanie },
+        updated_at: new Date().toISOString()
+      });
+      zmienione++;
+    }
+
+    /* `pozostalo` liczy się od zapisanych, nie od przetworzonych. Odrzucone
+       zostają w puli i trafią do kolejnej partii — to celowe, bo przy następnym
+       losowaniu model bywa trafniejszy. Przed zapętleniem chroni warunek po
+       stronie wołającego: partia, która nie zapisała NICZEGO, kończy przebieg. */
+    const pozostalo = Math.max(0, brakujace.length - zmienione);
+    console.log(`[catalog/wyrozniki] ${city}: zapisano ${zmienione}, odrzucono ${odrzucone} `
+      + `(powtórzenie opisu) z ${doOpisania.length}, zostaje ${pozostalo}`);
+    return c.json({ city, opisane: zmienione, odrzucone, pozostalo });
+  } catch (e: any) {
+    console.error('[catalog/wyrozniki]', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 catalogRouter.post('/catalog/enrich', async (c) => {
   try {
     const { city, limit = 24 } = await c.req.json() as { city: string; limit?: number };

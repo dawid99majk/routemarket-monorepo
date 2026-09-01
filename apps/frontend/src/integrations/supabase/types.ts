@@ -424,6 +424,8 @@ export type Database = {
           visit_minutes: number | null
           waznosc: number | null
           waznosc_zrodlo: string | null
+          wyroznik: string | null
+          wyroznik_i18n: Json | null
           website: string | null
           wiki_extract: string | null
         }
@@ -453,6 +455,8 @@ export type Database = {
           visit_minutes?: number | null
           waznosc?: number | null
           waznosc_zrodlo?: string | null
+          wyroznik?: string | null
+          wyroznik_i18n?: Json | null
           website?: string | null
           wiki_extract?: string | null
         }
@@ -482,6 +486,8 @@ export type Database = {
           visit_minutes?: number | null
           waznosc?: number | null
           waznosc_zrodlo?: string | null
+          wyroznik?: string | null
+          wyroznik_i18n?: Json | null
           website?: string | null
           wiki_extract?: string | null
         }

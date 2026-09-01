@@ -41,8 +41,8 @@ CREATE FUNCTION public.podobne_miejsca(
 )
 -- Zwracamy PEŁNY kształt miejsca, nie sam podgląd. Kafelek w pasku prowadzi
 -- do otwarcia karty i do dopięcia na tablicę, a jedno i drugie potrzebuje
--- współrzędnych, godzin i opisu. Bez nich front musiałby po każdym kliknięciu
--- dociągać ten sam wiersz drugi raz.
+-- współrzędnych, godzin, opisu i wyróżnika. Bez nich front musiałby po każdym
+-- kliknięciu dociągać ten sam wiersz drugi raz.
 RETURNS TABLE (
   id uuid,
   slug text,
@@ -54,6 +54,7 @@ RETURNS TABLE (
   category text,
   kind text,
   description text,
+  wyroznik text,
   photos jsonb,
   opening_hours text,
   website text,
@@ -86,6 +87,7 @@ AS $$
   kandydaci AS (
     SELECT p.id, p.slug, p.name, p.city, p.country, p.lat, p.lng, p.category, p.kind,
            coalesce(p.description_i18n->>p_jezyk, p.description_i18n->>'pl', p.description) AS description,
+           coalesce(p.wyroznik_i18n->>p_jezyk, p.wyroznik_i18n->>'pl', p.wyroznik) AS wyroznik,
            p.photos, p.opening_hours, p.website, p.vibe_tags, p.visit_minutes,
            p.pin_count, p.waznosc,
            cardinality(ARRAY(SELECT unnest(p.vibe_tags) INTERSECT SELECT unnest(z.vibe_tags)))::int AS wspolne,
@@ -102,7 +104,7 @@ AS $$
           >= LEAST(2, cardinality(z.vibe_tags))
   )
   SELECT k.id, k.slug, k.name, k.city, k.country, k.lat, k.lng, k.category, k.kind,
-         k.description, k.photos, k.opening_hours, k.website, k.vibe_tags,
+         k.description, k.wyroznik, k.photos, k.opening_hours, k.website, k.vibe_tags,
          k.visit_minutes, k.pin_count, k.waznosc, k.wspolne, k.trafnosc
   FROM kandydaci k
   -- Rodzaj przed trafnością: restauracja obok katedry byłaby poprawna tagowo

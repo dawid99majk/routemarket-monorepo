@@ -151,14 +151,33 @@ export class RouteBuilderRepository {
   async listCatalogAll(city: string | null, limit = 500): Promise<any[]> {
     // description i description_i18n sa tu potrzebne: /catalog/enrich filtruje po nich
     // "ktore miejsca nie maja jeszcze opisu". Bez nich filtr przepuszczal wszystko
-    // i endpoint nadpisywal gotowe opisy.
+    // i endpoint nadpisywal gotowe opisy. Wyroznik dochodzi z tego samego powodu:
+    // uzupelnianie wyroznikow musi wiedziec, ktore miejsca juz go maja.
     let q = supabase.from('place_catalog')
-      .select('id, name, kind, city, lat, lng, photos, description, description_i18n, visit_minutes, wikipedia')
+      .select('id, name, kind, city, lat, lng, photos, description, description_i18n, visit_minutes, wikipedia, wyroznik, wyroznik_i18n')
       .limit(limit);
     if (city) q = q.ilike('city', city);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     return data ?? [];
+  }
+
+  /**
+   * Nazwy miejsc podobnych do danego — do promptu, nie do wyświetlenia.
+   *
+   * Model ma napisać, czym miejsce różni się od sąsiadów. Bez podania ich nazw
+   * kontrastowałby z wyobrażeniem, a nie z tym, co użytkownik zobaczy pod spodem
+   * na pasku „Jeśli to Ci się podoba" — czyli z tą samą funkcją bazy.
+   */
+  async podobneNazwy(placeId: string, limit = 4): Promise<string[]> {
+    const { data, error } = await (supabase as any).rpc('podobne_miejsca', {
+      p_place: placeId, p_limit: limit, p_pomin: [], p_jezyk: 'pl',
+    });
+    if (error) {
+      console.warn('[katalog] podobne_miejsca:', error.message);
+      return [];
+    }
+    return ((data ?? []) as any[]).map((m) => String(m.name)).filter(Boolean);
   }
 
   /** Podpowiedzi z katalogu: dopasowanie po fragmencie nazwy, opcjonalnie w mieście. */

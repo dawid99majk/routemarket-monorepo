@@ -17,7 +17,7 @@ import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { opisMiejsca } from '@/lib/opis';
+import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
 
@@ -205,7 +205,7 @@ export default function Discover() {
     // odłożone: 01.09.2026 najzasobniejsze miasto (Rzym) miało 70 miejsc, więc
     // 500 to zapas z dużym marginesem, nie prowizorka na już pękającą granicę.
     let q = supabase.from('place_catalog')
-      .select('id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, opening_hours, visit_minutes, vibe_tags, pin_count, waznosc, created_at')
+      .select('id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, opening_hours, visit_minutes, vibe_tags, pin_count, waznosc, wyroznik, wyroznik_i18n, created_at')
       .limit(500);
     if (c) q = q.ilike('city', `%${c}%`);
     // Ważność przed przypięciami: przy braku użytkowników pin_count jest zerem
@@ -723,6 +723,7 @@ export default function Discover() {
             slug: karta.slug,
             photos: karta.photos,
             description: opisMiejsca(karta),
+            wyroznik: wyroznikMiejsca(karta),
             opening_hours: karta.opening_hours,
             visit_minutes: karta.visit_minutes,
           } : null}

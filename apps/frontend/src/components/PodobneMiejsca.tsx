@@ -17,6 +17,7 @@ export interface PodobneMiejsce {
   category: string | null;
   kind: string | null;
   description: string | null;
+  wyroznik: string | null;
   photos: (string | null)[] | null;
   opening_hours: string | null;
   website: string | null;

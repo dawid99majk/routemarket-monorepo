@@ -13,6 +13,13 @@ import i18n from '@/i18n';
  * angielski opis niż polski. Polska wchodzi dopiero na końcu, bo to jedyna,
  * o której wiemy na pewno, że istnieje dla starych wpisów.
  */
+export function wyroznikMiejsca(miejsce: any): string {
+  if (!miejsce) return '';
+  const jezyk = i18n.language?.split('-')[0] || 'pl';
+  const wersje = miejsce.wyroznik_i18n as Record<string, string> | undefined;
+  return wersje?.[jezyk] || wersje?.en || wersje?.pl || miejsce.wyroznik || '';
+}
+
 export function opisMiejsca(miejsce: any): string {
   if (!miejsce) return '';
   const jezyk = i18n.language?.split('-')[0] || 'pl';

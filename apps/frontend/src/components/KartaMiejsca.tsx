@@ -12,6 +12,8 @@ export interface MiejsceKarty {
   slug?: string | null;
   photos?: (string | null | undefined)[];
   description?: string | null;
+  /** Jedno zdanie: czym to miejsce różni się od podobnych w tym mieście. */
+  wyroznik?: string | null;
   opening_hours?: string | null;
   visit_minutes?: number | null;
   /** Orientacyjny koszt wstępu -- tylko dla propozycji agenta, katalog tego nie ma. */
@@ -120,6 +122,13 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
         {ladowanie && !miejsce.description && (
           <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Dociągam opis…
+          </p>
+        )}
+
+        {miejsce.wyroznik && (
+          <p className="border-l-2 border-foreground/25 pl-3 text-[14px] leading-relaxed
+                        text-foreground/90 text-pretty">
+            {miejsce.wyroznik}
           </p>
         )}
 

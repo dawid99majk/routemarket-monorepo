@@ -28,7 +28,7 @@ import { zakresDat, wTerminie } from '@/lib/daty';
 import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/lib/tripPresets';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { opisMiejsca } from '@/lib/opis';
+import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -927,7 +927,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     // pokazać pełną galerię zamiast pojedynczej, czasem przeterminowanej miniatury.
     if (pinned?.catalog_id) {
       (supabase as any).from('place_catalog')
-        .select('photos, description, opening_hours, website, slug')
+        .select('photos, description, opening_hours, website, slug, wyroznik, wyroznik_i18n')
         .eq('id', pinned.catalog_id).maybeSingle()
         .then(({ data: kat }: any) => {
           if (!kat) return;
@@ -936,6 +936,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             ...prev,
             photos: zKatalogu.length ? zKatalogu : prev.photos,
             slug: prev.slug ?? kat.slug ?? null,
+            wyroznik: prev.wyroznik || wyroznikMiejsca(kat) || null,
             description: prev.description || kat.description || '',
             opening_hours: prev.opening_hours || kat.opening_hours || null,
             website: prev.website || kat.website || null,
@@ -2629,6 +2630,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 slug: placeCard.slug ?? null,
                 photos: placeCard.photos,
                 description: placeCard.description,
+                wyroznik: placeCard.wyroznik ?? null,
                 opening_hours: placeCard.opening_hours,
                 visit_minutes: placeCard.minutes,
                 website: placeCard.website,

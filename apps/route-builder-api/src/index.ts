@@ -86,6 +86,7 @@ const ENDPOINTY_SERWISOWE = [
   '/catalog/enrich',
   '/catalog/refresh-photos',
   '/catalog/translate-descriptions',
+  '/catalog/wyrozniki',
 ];
 
 const tylkoAdministrator: MiddlewareHandler = async (c, next) => {
