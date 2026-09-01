@@ -193,9 +193,16 @@ export default function Discover() {
     // co już jest w pamięci.
     // Jawna lista kolumn: karta feedu nie potrzebuje wiki_extract (bywa dłuższy
     // niż cała reszta wiersza razem wzięta) ani pól redakcyjnych.
+    //
+    // Limit to twarda ściana, nie paginacja — filtr mapy/wyszukiwarka/kategorie
+    // działają w pamięci nad tym, co się zmieści. Prawdziwa keyset paginacja
+    // wymagałaby przeniesienia tych filtrów na serwer (inaczej wyszukiwanie
+    // "widziałoby" tylko załadowaną stronę, nie cały katalog miasta) — świadomie
+    // odłożone: 01.09.2026 najzasobniejsze miasto (Rzym) miało 70 miejsc, więc
+    // 500 to zapas z dużym marginesem, nie prowizorka na już pękającą granicę.
     let q = supabase.from('place_catalog')
       .select('id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, opening_hours, visit_minutes, vibe_tags, pin_count, waznosc, created_at')
-      .limit(200);
+      .limit(500);
     if (c) q = q.ilike('city', `%${c}%`);
     // Ważność przed przypięciami: przy braku użytkowników pin_count jest zerem
     // dla wszystkiego, więc sam z siebie niczego nie porządkuje.
@@ -209,6 +216,11 @@ export default function Discover() {
     // potrafił dotrzeć po wyniku dla pełnej nazwy i wyczyścić listę. Odświeżenie
     // strony pomagało, bo puszczało jedno zapytanie zamiast dziewięciu.
     if (seq !== loadSeq.current) return;
+    // Osiągnięcie limitu znaczy, że miasto mogło urosnąć ponad to, co się mieści —
+    // bez tego ściana obcina wyniki po cichu, dopóki ktoś przypadkiem nie zauważy.
+    if ((data ?? []).length >= 500) {
+      console.warn(`[Discover] "${c || '(wszystkie miasta)'}" osiągnęło limit 500 miejsc — część katalogu może być ucięta.`);
+    }
     setPlaces((data ?? []).map((r) => ({ ...r, photos: jakoZdjecia(r.photos) })) as CatalogPlace[]);
     if (!ciche) setLoading(false);
   }, [city]);
