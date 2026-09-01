@@ -80,7 +80,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
         {ile > 0 && (
           <div>
             <div className="relative rounded-md overflow-hidden bg-placeholder-photo aspect-[4/3]">
-              <Zdjecie src={zdjecia[teraz]} gdzie="karta" alt={miejsce.name}
+              <Zdjecie src={zdjecia[teraz]} gdzie="bohater" alt={miejsce.name}
                 className="w-full h-full object-cover" />
               {ile > 1 && (
                 <span className="absolute top-2 right-2 rounded-full bg-ink/60 text-background
@@ -90,15 +90,15 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
               )}
             </div>
             {ile > 1 && (
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {zdjecia.slice(0, 4).map((z, i) => (
+              <div className="grid grid-cols-5 gap-2 mt-2">
+                {zdjecia.slice(0, 5).map((z, i) => (
                   <button key={z} onClick={() => setFoto(i)}
                     aria-label={`Zdjęcie ${i + 1} z ${ile}`}
                     aria-current={i === teraz}
                     className={`h-16 rounded-sm overflow-hidden border transition-colors ${
                       i === teraz ? 'border-foreground/45' : 'border-border'
                     }`}>
-                    <Zdjecie src={z} gdzie={120} alt="" className="w-full h-full object-cover" />
+                    <Zdjecie src={z} gdzie={250} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>

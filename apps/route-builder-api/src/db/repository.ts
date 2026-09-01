@@ -137,6 +137,17 @@ export class RouteBuilderRepository {
     return new Set((data ?? []).map((w: any) => String(w.osm_id)));
   }
 
+  /** Wszystkie miasta obecne w katalogu — do odsiewania zdjęć spoza miasta. */
+  async listCities(): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('place_catalog').select('city');
+    if (error) {
+      console.warn('[katalog] Nie udało się odczytać listy miast:', error.message);
+      return [];
+    }
+    return [...new Set((data ?? []).map((w: any) => String(w.city || '')).filter(Boolean))];
+  }
+
   async listCatalogAll(city: string | null, limit = 500): Promise<any[]> {
     // description i description_i18n sa tu potrzebne: /catalog/enrich filtruje po nich
     // "ktore miejsca nie maja jeszcze opisu". Bez nich filtr przepuszczal wszystko
