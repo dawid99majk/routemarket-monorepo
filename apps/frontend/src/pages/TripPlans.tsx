@@ -247,9 +247,9 @@ export default function TripPlans() {
                 {!wTrakcie.is_example && (
                   <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(wTrakcie); }}
                     aria-label="Usuń wyjazd"
-                    className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm
-                               flex items-center justify-center text-muted-foreground opacity-0
-                               group-hover:opacity-100 hover:text-destructive transition-opacity">
+                    className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm
+                               flex items-center justify-center text-muted-foreground opacity-70
+                               hover:opacity-100 hover:text-destructive transition-opacity">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
@@ -376,9 +376,9 @@ export default function TripPlans() {
                       {!w.is_example && (
                         <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(w); }}
                           aria-label="Usuń wyjazd"
-                          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm
-                                     flex items-center justify-center text-muted-foreground opacity-0
-                                     group-hover:opacity-100 hover:text-destructive transition-opacity">
+                          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm
+                                     flex items-center justify-center text-muted-foreground opacity-70
+                                     hover:opacity-100 hover:text-destructive transition-opacity">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}

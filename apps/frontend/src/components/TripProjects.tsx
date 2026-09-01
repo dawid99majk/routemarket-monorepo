@@ -29,6 +29,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { opisMiejsca } from '@/lib/opis';
 import { format, parse, isValid } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import type { AktualizacjaProjektu, TripProject, Priority, PinnedPlace, DiscoveredPlace, TripProjectsProps } from './tripProjects/types';
@@ -1617,16 +1618,36 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
                     {pokazTermin && (
                       <div className="flex flex-wrap items-end gap-3 mt-3">
-                        <label className="text-[13px] text-muted-foreground">
-                          Od
-                          <Input type="date" value={terminOd} autoFocus
-                            onChange={(e) => setTerminOd(e.target.value)} className="mt-1" />
-                        </label>
-                        <label className="text-[13px] text-muted-foreground">
-                          Do
-                          <Input type="date" value={terminDo} min={terminOd || undefined}
-                            onChange={(e) => setTerminDo(e.target.value)} className="mt-1" />
-                        </label>
+                        <Popover defaultOpen>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="justify-start font-normal text-sm h-10 min-w-[220px]">
+                              <CalendarDays className="w-4 h-4 mr-2 text-primary shrink-0" />
+                              {terminOd
+                                ? (terminDo && terminDo !== terminOd
+                                    ? `${format(parse(terminOd, 'yyyy-MM-dd', new Date()), 'd MMM', { locale: pl })} – ${format(parse(terminDo, 'yyyy-MM-dd', new Date()), 'd MMM yyyy', { locale: pl })}`
+                                    : format(parse(terminOd, 'yyyy-MM-dd', new Date()), 'd MMMM yyyy', { locale: pl }))
+                                : 'Wybierz termin'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start" collisionPadding={16}>
+                            <Calendar
+                              mode="range"
+                              locale={pl}
+                              weekStartsOn={1}
+                              numberOfMonths={2}
+                              defaultMonth={terminOd ? parse(terminOd, 'yyyy-MM-dd', new Date()) : undefined}
+                              selected={{
+                                from: terminOd ? parse(terminOd, 'yyyy-MM-dd', new Date()) : undefined,
+                                to: terminDo ? parse(terminDo, 'yyyy-MM-dd', new Date()) : undefined,
+                              }}
+                              onSelect={(zakres: DateRange | undefined) => {
+                                setTerminOd(zakres?.from ? format(zakres.from, 'yyyy-MM-dd') : '');
+                                setTerminDo(zakres?.to ? format(zakres.to, 'yyyy-MM-dd') : '');
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                         <Button size="sm" disabled={!terminOd}
                           onClick={() => zapiszTermin(terminOd, terminDo || terminOd)}
                           className="bg-foreground text-background hover:bg-foreground/90">
