@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Zdjecie from '@/components/Zdjecie';
+import PodobneMiejsca, { type PodobneMiejsce } from '@/components/PodobneMiejsca';
 
 export type Decyzja = 'must' | 'nice' | 'rejected';
 
@@ -30,6 +31,13 @@ interface Props {
   onDecyzja?: (d: Decyzja) => void;
   /** Dane jeszcze się dociągają — pokazujemy to, co już mamy. */
   ladowanie?: boolean;
+  /** Identyfikator w katalogu. Bez niego pasek podobnych miejsc się nie pokazuje
+      — propozycja agenta spoza katalogu nie ma sąsiadów do policzenia. */
+  idKatalogu?: string | null;
+  /** Miejsca już przypięte do tablicy — nie proponujemy tego, co ktoś ma. */
+  pomin?: string[];
+  onOtworzPodobne?: (m: PodobneMiejsce) => void;
+  onDodajPodobne?: (m: PodobneMiejsce) => unknown;
 }
 
 const czas = (min?: number | null) => {
@@ -54,7 +62,8 @@ const czas = (min?: number | null) => {
  * dla wyszukiwarek i podglądów odnośników. Skasowanie jej zabrałoby RouteMarket
  * z wyników wyszukiwania — okno służy przeglądaniu, strona dzieleniu się.
  */
-export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, ladowanie }: Props) {
+export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, ladowanie,
+                                       idKatalogu, pomin, onOtworzPodobne, onDodajPodobne }: Props) {
   const [foto, setFoto] = useState(0);
   useEffect(() => { setFoto(0); }, [miejsce?.name]);
 
@@ -160,6 +169,15 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                 );
               })}
           </div>
+        )}
+
+        {idKatalogu && onOtworzPodobne && (
+          <PodobneMiejsca
+            idKatalogu={idKatalogu}
+            pomin={pomin}
+            onOtworz={onOtworzPodobne}
+            onDodaj={onDodajPodobne}
+          />
         )}
 
         {/* Strona miejsca zostaje osobno: to ona ma adres do podzielenia się

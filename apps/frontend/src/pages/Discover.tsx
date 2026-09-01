@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import KartaMiejsca from '@/components/KartaMiejsca';
+import type { PodobneMiejsce } from '@/components/PodobneMiejsca';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -387,6 +388,19 @@ export default function Discover() {
     toast.success(`Dodane: ${p.name}`);
   };
 
+  /* Wiersz z `podobne_miejsca` niesie te same dane co feed, tylko z luźniejszymi
+     typami (kolumny bazy bywają puste). Domykamy je raz, żeby i otwarcie karty,
+     i dopięcie na tablicę dostały zwykły `CatalogPlace`. */
+  const zPodobnego = (m: PodobneMiejsce): CatalogPlace => ({
+    ...m,
+    slug: m.slug ?? '',
+    category: m.category ?? 'attraction',
+    description: m.description ?? '',
+    photos: jakoZdjecia(m.photos),
+    vibe_tags: m.vibe_tags ?? [],
+    pin_count: m.pin_count ?? 0,
+  });
+
   const mark = async (place: CatalogPlace, bucket: Bucket) => {
     if (!activeBoard) return toast.error(t('odkrywaj.najpierw_wybierz_wyjazd_do_ktorego'));
     const current = marks[place.id];
@@ -715,6 +729,11 @@ export default function Discover() {
           decyzja={karta ? (marks[karta.id] as any) ?? null : null}
           onDecyzja={(d) => { if (karta) mark(karta, d as Bucket); }}
           onZamknij={() => setKarta(null)}
+          idKatalogu={karta?.id ?? null}
+          /* Co już jest na tablicy, tego nie proponujemy drugi raz. */
+          pomin={Object.keys(marks)}
+          onOtworzPodobne={(m) => setKarta(zPodobnego(m))}
+          onDodajPodobne={(m) => mark(zPodobnego(m), 'nice')}
         />
 
         {/* Ten sam komponent co wyżej, dla propozycji spoza katalogu. Bez sluga

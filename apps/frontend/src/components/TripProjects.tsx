@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import KartaMiejsca from '@/components/KartaMiejsca';
+import type { PodobneMiejsce } from '@/components/PodobneMiejsca';
 import { Skeleton } from '@/components/ui/skeleton';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
@@ -855,10 +856,58 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [cardLoading, setCardLoading] = useState(false);
   const [cardPhoto, setCardPhoto] = useState(0);
 
+  /* Miejsce z paska podobnych otwieramy w tym samym oknie. Idzie z katalogu,
+     więc niesie komplet danych i nic nie trzeba dociągać. */
+  const otworzPodobne = (m: PodobneMiejsce) => {
+    setPlaceCard({
+      name: m.name,
+      catalog_id: m.id,
+      slug: m.slug ?? null,
+      note: '',
+      minutes: m.visit_minutes,
+      opening_hours: m.opening_hours,
+      website: m.website,
+      description: m.description ?? '',
+      photos: (m.photos ?? []).filter(Boolean),
+      nr: null,
+    });
+    setCardPhoto(0);
+  };
+
+  /* „Warto też rozważyć" ląduje w „być może" — to ten kubełek, a nie decyzja
+     podjęta za użytkownika. */
+  const dopnijPodobne = async (m: PodobneMiejsce) => {
+    if (!active) return;
+    const { data, error } = await (supabase as any)
+      .from('trip_project_places')
+      .insert({
+        project_id: active.id,
+        catalog_id: m.id,
+        name: m.name,
+        category: m.category ?? 'attraction',
+        priority: 'nice' as Priority,
+        lat: m.lat,
+        lng: m.lng,
+        description: m.description,
+        opening_hours: m.opening_hours,
+        visit_minutes: m.visit_minutes,
+        website: m.website,
+        image_url: (m.photos ?? []).filter(Boolean)[0] ?? null,
+      })
+      .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id')
+      .single();
+    if (error) return toast.error(error.message);
+    setPlaces((prev) => [...prev, jakoMiejsce(data)]);
+    toast.success(`Dodano do „być może": ${m.name}`);
+  };
+
   const openPlaceCard = async (item: any) => {
     const pinned = places.find((p) => p.name === item.name);
     setPlaceCard({
       name: item.name,
+      // Bez tego pasek podobnych miejsc nie ma od czego zacząć: liczy sąsiadów
+      // po wpisie w katalogu, a nie po nazwie na tablicy.
+      catalog_id: pinned?.catalog_id ?? null,
       note: item.note || '',
       minutes: item.minutes || pinned?.visit_minutes || null,
       opening_hours: pinned?.opening_hours || null,
@@ -2598,6 +2647,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 if (m) movePlace(m.id, d as Priority);
               }}
               onZamknij={() => setPlaceCard(null)}
+              idKatalogu={placeCard?.catalog_id ?? null}
+              /* Co już wisi na tablicy, tego nie proponujemy drugi raz. */
+              pomin={places.map((p) => p.catalog_id).filter(Boolean) as string[]}
+              onOtworzPodobne={otworzPodobne}
+              onDodajPodobne={dopnijPodobne}
             />
 
             {view === 'tablica' && (<>
