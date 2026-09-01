@@ -31,177 +31,11 @@ import { opisMiejsca } from '@/lib/opis';
 import { format, parse, isValid } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
-import type { Database } from '@/integrations/supabase/types';
-
-type AktualizacjaProjektu = Database['public']['Tables']['trip_projects']['Update'];
-
-interface TripProject extends Partial<AxisValues> {
-  id: string;
-  name: string;
-  destination: string;
-  days: number | null;
-  hours_per_day: number | null;
-  trip_type: string | null;
-  fill_percent?: number | null;
-  // Kolumny dołożone później: publikacja tablicy, licznik kopii, punkt startowy
-  // i termin wyjazdu. Kod korzystał z nich przez `as any`, więc literówka w
-  // nazwie przechodziła bez słowa aż do działającej aplikacji.
-  is_public?: boolean;
-  copy_count?: number;
-  like_count?: number;
-  published_at?: string | null;
-  author_display?: string | null;
-  start_name?: string | null;
-  start_lat?: number | null;
-  start_lng?: number | null;
-  start_date?: string | null;
-  end_date?: string | null;
-}
-
-type Priority = 'must' | 'nice' | 'rejected';
-
-/**
- * Priorytet w bazie jest zwykłym tekstem, więc typy wygenerowane ze schematu
- * oddają go jako `string`. Zamiast rzutować wynik zapytania — co wyłącza
- * sprawdzanie i przepuściłoby literówkę w nazwie kubełka — zawężamy wartość
- * przy wejściu. Nieznana wpada do „być może": to kubełek bez konsekwencji,
- * a zgubienie miejsca byłoby gorsze niż zaklasyfikowanie go nie tam.
- */
-const jakoPriorytet = (v: string | null | undefined): Priority =>
-  v === 'must' || v === 'rejected' ? v : 'nice';
-
-/** Wiersz z bazy jako miejsce tablicy, z zawężonym priorytetem. */
-const jakoMiejsce = (r: Record<string, unknown>): PinnedPlace =>
-  ({ ...r, priority: jakoPriorytet(r.priority as string) } as PinnedPlace);
-
-interface PinnedPlace {
-  id: string;
-  name: string;
-  category: string;
-  priority: Priority;
-  sort_order: number;
-  description: string | null;
-  opening_hours: string | null;
-  visit_minutes: number | null;
-  website: string | null;
-  image_url: string | null;
-  wiki_extract: string | null;
-  // Bez współrzędnych nie da się ani narysować mapy tablicy, ani przekazać
-  // pinezek planerowi. Kolumny są w bazie od dawna i kod je czyta — brakowało
-  // ich wyłącznie w tym opisie, więc każde użycie było błędem typu.
-  lat: number | null;
-  lng: number | null;
-  catalog_id?: string | null;
-  source?: string | null;
-}
-
-interface DiscoveredPlace {
-  name: string;
-  category: string;
-  description: string;
-  why: string;
-  visit_minutes: number | null;
-  price_hint: string | null;
-  opening_hours: string | null;
-  website: string | null;
-  image_url: string | null;
-  wiki_extract: string | null;
-  lat: number | null;
-  lng: number | null;
-  verified: boolean;
-}
-
-/** Strefy tablicy — kartkę przeciąga się między nimi. */
-/** "1 g 30 min" zamiast "90 min" — tak ludzie mówią o czasie zwiedzania. */
-function formatMinutes(min: number): string {
-  const h = Math.floor(min / 60), m = min % 60;
-  if (h && m) return `${h} g ${m} min`;
-  if (h) return `${h} g`;
-  return `${m} min`;
-}
-
-const ZONES: { id: Priority; label: string; short: string; hint: string }[] = [
-  { id: 'must', label: 'Na pewno', short: 'Na pewno', hint: 'Tu trafia to, bez czego wyjazd nie ma sensu.' },
-  { id: 'nice', label: 'Być może', short: 'Może', hint: 'Wypełnią luki, jeśli zostanie czas.' },
-  { id: 'rejected', label: 'Nie', short: 'Nie', hint: 'Odrzucone zostają tu — bez usuwania.' }
-];
-
-const CATEGORY_ICON: Record<string, any> = {
-  attraction: MapPin,
-  food: Utensils,
-  nightlife: Music,
-  hotel: Bed,
-  other: MapPin
-};
-
-/** Podpowiedzi zapytań — pokazują, że można pytać naturalnie, a nie słowami kluczowymi. */
-/**
- * Pusta tablica jest gorsza niż puste pole czatu: czat sam coś proponuje, tablica
- * każe wymyślić zapytanie. Gotowe tropy zdejmują ten pierwszy opór, a ich dobór
- * idzie za charakterem wyjazdu — na delegacji i z dziećmi szuka się czego innego.
- */
-const SUGGESTION_SETS: Record<string, string[]> = {
-  default: [
-    'klasyki, których nie wypada pominąć',
-    'miejsca nieoczywiste, z dala od tłumów',
-    'parki, bulwary i zieleń',
-    'lokalny street food, nie turystyczne pułapki',
-    'klimatyczne kawiarnie',
-    'co robić wieczorem'
-  ],
-  family: [
-    'atrakcje dla dzieci',
-    'parki i place zabaw',
-    'muzea, w których można czegoś dotknąć',
-    'gdzie zjeść z dzieckiem',
-    'klasyki, których nie wypada pominąć',
-    'miejsce na przerwę i lody'
-  ],
-  business: [
-    'jedna rzecz, którą trzeba zobaczyć',
-    'dobra kolacja blisko centrum',
-    'kawiarnia do pracy',
-    'krótki spacer na godzinę'
-  ],
-  couple: [
-    'klimatyczne kawiarnie',
-    'punkty widokowe o zachodzie',
-    'kolacja na wieczór',
-    'miejsca nieoczywiste, z dala od tłumów',
-    'spacer wzdłuż wody'
-  ],
-  solo: [
-    'miejsca nieoczywiste, z dala od tłumów',
-    'najlepsze kadry w mieście',
-    'targi, bazary i codzienne życie',
-    'sztuka współczesna i galerie'
-  ]
-};
-
-interface TripProjectsProps {
-  /** Podaje wyżej kontekst aktywnego wyjazdu, żeby wspólny pasek mógł go pokazać. */
-  onContextChange?: (ctx: string | null) => void;
-  /**
-   * Tablica otwarta z adresu. Wcześniej wybór tablicy był stanem wewnątrz strony:
-   * lista kafelków zostawała na ekranie, a treść zmieniała się pod nią, często
-   * poniżej linii wzroku. Teraz tablica jest osobnym miejscem z własnym adresem,
-   * więc kliknięcie przenosi, a nie przestawia coś w tle.
-   */
-  projectId?: string | null;
-}
-
-/**
- * Pozycja organizacyjna planu — przejście, przerwa, posiłek, nocleg. Nie jest
- * przystankiem: nie idzie do geokodera i nie dostaje wiersza z dystansem, bo
- * sama JEST tym, co dzieje się między przystankami.
- */
-const POZYCJA_ORGANIZACYJNA =
-  /^(przejazd|przej[śs]cie|przerwa|czas wolny|wolny czas|powr[óo]t|dojazd|transfer|lunch|obiad|kolacja|śniadanie|odpoczynek|spacer(\s|$)|nocleg)/i;
-
-function czyPrzystanek(it: any): boolean {
-  if (['walk', 'transit', 'break', 'meal'].includes(it?.kind)) return false;
-  return !POZYCJA_ORGANIZACYJNA.test(String(it?.name || '').trim());
-}
+import type { AktualizacjaProjektu, TripProject, Priority, PinnedPlace, DiscoveredPlace, TripProjectsProps } from './tripProjects/types';
+import {
+  jakoPriorytet, jakoMiejsce, formatMinutes, ZONES, CATEGORY_ICON, SUGGESTION_SETS,
+  czyPrzystanek, kmBetween, metryMiedzy, opisDystansu, medianOf,
+} from './tripProjects/helpers';
 
 export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
   const { t } = useTranslation();
@@ -1470,21 +1304,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    */
   const TRANSFER_MIN = 12;
 
-  /** Odległość w metrach po prostej (haversine). Do przejścia w mieście
-   *  dokładamy 30% na to, że ulice nie biegną po linii prostej. */
-  const metryMiedzy = (a: any, b: any): number | null => {
-    if (a?.lat == null || a?.lng == null || b?.lat == null || b?.lng == null) return null;
-    const R = 6371000, rad = Math.PI / 180;
-    const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
-    const s = Math.sin(dLat / 2) ** 2
-      + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
-    return Math.round(R * 2 * Math.asin(Math.sqrt(s)) * 1.3);
-  };
-
-  /** Dystans po polsku: przecinek dziesiętny, metry poniżej kilometra. */
-  const opisDystansu = (m: number) =>
-    m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${m} m`;
-
   const budget = (() => {
     if (!active?.days || !active?.hours_per_day) return null;
     const windowMin = Number(active.days) * Number(active.hours_per_day) * 60;
@@ -1492,17 +1311,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const used = totalMinutes + Math.max(0, places.length - 1) * TRANSFER_MIN;
     return { windowMin, planned, used, ratio: planned > 0 ? used / planned : 0 };
   })();
-
-  const medianOf = (nums: number[]) => {
-    const a = [...nums].sort((x, y) => x - y);
-    const m = Math.floor(a.length / 2);
-    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
-  };
-  const kmBetween = (aLat: number, aLng: number, bLat: number, bLng: number) => {
-    const dLat = (aLat - bLat) * 111;
-    const dLng = (aLng - bLng) * 111 * Math.cos((aLat * Math.PI) / 180);
-    return Math.sqrt(dLat * dLat + dLng * dLng);
-  };
 
   /**
    * Punkt na uboczu psuje dzień skuteczniej niż jego brak: dojazd zjada czas
