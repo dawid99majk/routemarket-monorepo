@@ -1545,12 +1545,20 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 )}
               </span>
 
-              {active.trip_type && (
-                <span className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-muted-foreground shrink-0">Charakter</span>
-                  <span className="text-foreground truncate">{active.trip_type}</span>
-                </span>
-              )}
+              <span className="flex items-baseline gap-2 min-w-0">
+                <span className="text-muted-foreground shrink-0">Charakter</span>
+                {active.trip_type ? (
+                  <span className="text-foreground truncate">
+                    {TRIP_PRESETS.find((p) => p.id === active.trip_type)?.label || active.trip_type}
+                  </span>
+                ) : (
+                  <button onClick={() => setPokazUstawienia(true)}
+                    className="text-foreground underline underline-offset-2 decoration-hairline
+                               hover:decoration-foreground transition-colors">
+                    ustaw charakter
+                  </button>
+                )}
+              </span>
 
               <button onClick={() => setPokazUstawienia(true)}
                 className="ml-auto text-secondary hover:text-foreground transition-colors
@@ -1658,6 +1666,33 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         </Button>
                       </div>
                     )}
+                  </div>
+
+                  {/* Charakter -- ten sam TRIP_PRESETS/changeTripType co plakietka
+                      w nagłówku tablicy, teraz też stąd, gdzie realnie go szukasz. */}
+                  <div className="rounded-md border border-border bg-card p-4">
+                    <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                      Charakter
+                    </p>
+                    <p className="text-[13px] text-muted-foreground mt-1.5 text-pretty">
+                      Charakter można zmieniać do woli — liczy się dopiero przy wyszukiwaniu i planowaniu.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {TRIP_PRESETS.map((preset) => (
+                        <button key={preset.id} title={preset.hint} onClick={() => changeTripType(preset.id)}
+                          className={`rounded-full px-3 py-1.5 text-xs border transition-colors ${
+                            active.trip_type === preset.id
+                              ? 'bg-foreground border-foreground text-background'
+                              : 'bg-background hover:bg-muted'
+                          }`}>
+                          {preset.label}
+                        </button>
+                      ))}
+                      <button onClick={() => changeTripType('')}
+                        className="rounded-full px-3 py-1.5 text-xs border bg-background hover:bg-muted text-muted-foreground">
+                        Bez charakteru
+                      </button>
+                    </div>
                   </div>
                 </div>
               </DialogContent>
