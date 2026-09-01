@@ -3,9 +3,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Zdjecie from '@/components/Zdjecie';
 import { zakresDat } from '@/lib/daty';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import PlannerHeader from '@/components/PlannerHeader';
 import TripProjects from '@/components/TripProjects';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
@@ -13,6 +18,8 @@ import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 interface Wyjazd {
   id: string; name: string; destination: string | null; days: number | null;
   trip_type: string | null; updated_at: string; created_at: string;
+  /** Publiczny przykład RouteMarket, nie prywatny wyjazd -- kosz się dla niego nie pokazuje. */
+  is_example: boolean | null;
 }
 
 /**
@@ -67,6 +74,20 @@ export default function TripPlans() {
     try { localStorage.setItem('rm_porzadek_tablic', p); } catch { /* tryb prywatny */ }
   };
 
+  const [doUsuniecia, setDoUsuniecia] = useState<Wyjazd | null>(null);
+  const [usuwanie, setUsuwanie] = useState(false);
+
+  const usunWyjazd = async () => {
+    if (!doUsuniecia) return;
+    setUsuwanie(true);
+    const { error } = await supabase.from('trip_projects').delete().eq('id', doUsuniecia.id);
+    setUsuwanie(false);
+    if (error) { toast.error(error.message); return; }
+    setWyjazdy((prev) => prev.filter((w) => w.id !== doUsuniecia.id));
+    toast.success(`Usunięto „${doUsuniecia.name}"`);
+    setDoUsuniecia(null);
+  };
+
   useEffect(() => { (async () => setInitials(await inicjalyUzytkownika()))(); }, []);
 
   // Ostatnio otwarta tablica: zakładki w pasku mają wracać tam, gdzie się skończyło.
@@ -76,7 +97,7 @@ export default function TripPlans() {
     setLadowanie(true);
     const { data } = await supabase
       .from('trip_projects')
-      .select('id, name, destination, days, trip_type, updated_at, created_at, start_date, end_date')
+      .select('id, name, destination, days, trip_type, updated_at, created_at, start_date, end_date, is_example')
       .order('updated_at', { ascending: false });
     setWyjazdy(data ?? []);
 
@@ -221,9 +242,19 @@ export default function TripPlans() {
               <>
                 {/* Wyjazd w trakcie: osobno i wyraźnie większy. To on odróżnia ten
                     ekran od galerii — reszta idzie w spokojną siatkę poniżej. */}
+                <div className="relative group mt-8 rounded-md border border-border bg-card overflow-hidden
+                                 shadow-token-sm hover:shadow-token-md transition-shadow">
+                {!wTrakcie.is_example && (
+                  <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(wTrakcie); }}
+                    aria-label="Usuń wyjazd"
+                    className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm
+                               flex items-center justify-center text-muted-foreground opacity-0
+                               group-hover:opacity-100 hover:text-destructive transition-opacity">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
                 <button onClick={() => navigate(`/plany/${wTrakcie.id}`)}
-                  className="mt-8 w-full text-left rounded-md border border-border bg-card overflow-hidden
-                             flex flex-col sm:flex-row shadow-token-sm hover:shadow-token-md transition-shadow">
+                  className="w-full text-left flex flex-col sm:flex-row">
                   <div className="w-full sm:w-[300px] h-[224px] shrink-0 bg-placeholder-photo overflow-hidden">
                     {p?.zdjecia?.[0] && (
                       <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />
@@ -290,6 +321,7 @@ export default function TripPlans() {
                     </div>
                   </div>
                 </button>
+                </div>
 
                 {/* Reszta: spokojna siatka trzech. Ostatnia komórka to kreska —
                     założenie wyjazdu jest częścią tej listy, nie osobnym ekranem. */}
@@ -339,9 +371,19 @@ export default function TripPlans() {
                       : dniW === 0 ? 'Same miejsca'
                         : dniW >= celW ? 'Plan gotowy' : 'W układaniu';
                     return (
-                      <button key={w.id} onClick={() => navigate(`/plany/${w.id}`)}
-                        className="text-left rounded-md border border-border bg-card overflow-hidden
-                                   shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
+                      <div key={w.id} className="relative group rounded-md border border-border bg-card overflow-hidden
+                                                  shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
+                      {!w.is_example && (
+                        <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(w); }}
+                          aria-label="Usuń wyjazd"
+                          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/90 backdrop-blur-sm
+                                     flex items-center justify-center text-muted-foreground opacity-0
+                                     group-hover:opacity-100 hover:text-destructive transition-opacity">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={() => navigate(`/plany/${w.id}`)}
+                        className="text-left flex flex-col flex-1">
                         {/* Mozaika tylko wtedy, gdy ma z czego: poniżej trzech zdjęć
                             małe pola robią się skrawkami przy karcie ~300 px. */}
                         <div className="relative h-[248px] bg-placeholder-photo">
@@ -424,6 +466,7 @@ export default function TripPlans() {
                           </div>
                         </div>
                       </button>
+                      </div>
                     );
                   })}
 
@@ -442,6 +485,30 @@ export default function TripPlans() {
           </>
         )}
       </main>
+
+      {/* Skutek usunięcia wypisany wprost, z prawdziwą liczbą -- "czy na pewno"
+          bez konkretów nie mówi nic o tym, co się właśnie traci. */}
+      <AlertDialog open={!!doUsuniecia} onOpenChange={(o) => !o && setDoUsuniecia(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Usunąć „{doUsuniecia?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const ile = doUsuniecia ? (podglad[doUsuniecia.id]?.ile ?? 0) : 0;
+                const maPlan = doUsuniecia ? (dniPlanu[doUsuniecia.id] ?? 0) > 0 : false;
+                return `Zniknie ${ile > 0 ? `${ile} ${odmiana(ile, 'przypięte miejsce', 'przypięte miejsca', 'przypiętych miejsc')}` : 'pusta tablica'}${maPlan ? ' i ułożony plan dni' : ''}. Tego nie da się cofnąć.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={usuwanie}>Zostaw</AlertDialogCancel>
+            <AlertDialogAction onClick={usunWyjazd} disabled={usuwanie}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {usuwanie ? 'Usuwam…' : 'Usuń'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
