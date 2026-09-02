@@ -2450,38 +2450,42 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   const id = e.dataTransfer.getData('text/plain');
                                   if (id && id !== p.id) movePlace(id, zone.id, p.id);
                                 }}
-                                className={`group rounded-md border border-border bg-background p-3.5 cursor-grab
-                                            active:cursor-grabbing shadow-token-sm hover:shadow-token-md transition-shadow`}
+                                className={`group rounded-lg border border-border/80 bg-card p-3.5 cursor-grab
+                                            active:cursor-grabbing shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:border-border transition-all duration-200`}
                               >
                                 <div className="flex gap-3.5">
-                                  <div className="w-[84px] h-[84px] rounded-sm bg-muted shrink-0 overflow-hidden
-                                                  flex items-center justify-center">
+                                  <div className="w-[96px] h-[86px] sm:w-[104px] sm:h-[90px] rounded-md bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 overflow-hidden border border-border/40 shadow-xs flex items-center justify-center">
                                     {p.image_url
-                                      ? <Zdjecie src={p.image_url} gdzie={120} alt="" className="w-full h-full object-cover" />
-                                      : <Icon className="w-5 h-5 text-muted-foreground/60" />}
+                                      ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                                      : <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
+                                          <Icon className="w-5 h-5 text-primary/60" />
+                                          <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
+                                        </div>}
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-start gap-1.5">
-                                      <button onClick={() => openPlaceCard(p)}
-                                        className="font-display text-[15px] leading-snug text-left flex-1
-                                                   hover:text-primary transition-colors">
-                                        {p.name}
-                                      </button>
-                                      <button onClick={() => unpin(p.id)} aria-label={t('tablica.usun_z_tablicy')}
-                                        className="text-muted-foreground/50 hover:text-destructive shrink-0
-                                                   opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
+                                  <div className="min-w-0 flex-1 flex flex-col justify-between">
+                                    <div>
+                                      <div className="flex items-start gap-1.5">
+                                        <button onClick={() => openPlaceCard(p)}
+                                          className="font-display text-[15px] font-medium leading-snug text-left flex-1
+                                                     hover:text-primary transition-colors">
+                                          {p.name}
+                                        </button>
+                                        <button onClick={() => unpin(p.id)} aria-label={t('tablica.usun_z_tablicy')}
+                                          className="text-muted-foreground/50 hover:text-destructive shrink-0
+                                                     opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground/90 mt-1 truncate">
+                                        {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
+                                          .filter(Boolean).join(' · ') || '—'}
+                                      </div>
+                                      {p.description && (
+                                        <p className="text-[12px] text-foreground/75 mt-1.5 line-clamp-2 leading-relaxed text-pretty">
+                                          {p.description}
+                                        </p>
+                                      )}
                                     </div>
-                                    <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
-                                      {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
-                                        .filter(Boolean).join(' · ') || '—'}
-                                    </div>
-                                    {p.description && (
-                                      <p className="text-[12px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed text-pretty">
-                                        {p.description}
-                                      </p>
-                                    )}
                                     {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
                                         wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
                                     <div className="flex items-center justify-between gap-1.5 mt-2.5">
@@ -2490,8 +2494,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                           <button key={z.id} onClick={() => movePlace(p.id, z.id)}
                                             className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
                                               p.priority === z.id
-                                                ? z.id === 'must' ? 'bg-primary text-primary-foreground'
-                                                  : z.id === 'nice' ? 'bg-accent text-accent-foreground'
+                                                ? z.id === 'must' ? 'bg-primary text-primary-foreground font-medium'
+                                                  : z.id === 'nice' ? 'bg-accent text-accent-foreground font-medium'
                                                   : 'bg-clay text-clay-foreground'
                                                 : 'text-muted-foreground hover:bg-muted'
                                             }`}>
@@ -2504,15 +2508,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                         onClick={() => glosuj(p.id)}
                                         aria-label="Głos uczestników na to miejsce"
                                         title="Głos uczestników na to miejsce"
-                                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border shadow-xs transition-all ${
                                           mojeGlosy.has(p.id)
-                                            ? 'border-accent bg-accent/15 text-accent font-medium'
-                                            : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
+                                            ? 'border-accent bg-accent/15 text-accent font-medium scale-105'
+                                            : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
                                         }`}
                                       >
                                         <Heart className={`w-3 h-3 ${mojeGlosy.has(p.id) ? 'fill-accent' : ''}`} />
                                         {(p.vote_count ?? 0) > 0 ? (
-                                          <span className="font-mono tabular-nums">{p.vote_count}</span>
+                                          <span className="font-mono tabular-nums font-medium">{p.vote_count}</span>
                                         ) : null}
                                       </button>
                                     </div>

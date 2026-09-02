@@ -301,54 +301,55 @@ export default function TablicaPubliczna() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3 mt-8">
+        <div className="grid gap-4 md:grid-cols-3 mt-8">
           {KUBELKI.map((k) => {
             const swoje = miejsca.filter((m) => m.priority === k.id);
             if (swoje.length === 0) return null;
             return (
-              <div key={k.id} className="rounded-md border border-border bg-card overflow-hidden">
-                <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor}`}>
-                  <span className={`font-narrow uppercase tracking-[0.18em] text-[10px] font-semibold ${
+              <div key={k.id} className="rounded-lg border border-border/80 bg-card shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
+                <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor} bg-muted/20`}>
+                  <span className={`font-narrow uppercase tracking-[0.18em] text-[10.5px] font-semibold ${
                     k.id === 'must' ? 'text-primary' : 'text-accent'}`}>
                     {k.label}
                   </span>
-                  <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                  <span className="font-mono text-[12px] tabular-nums text-muted-foreground font-medium">
                     {swoje.length}
                   </span>
                 </div>
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-border/60">
                   {swoje.map((m) => (
-                    <div key={m.id} className="px-4 py-3 flex gap-3">
-                      <div className="w-11 h-11 rounded-sm overflow-hidden bg-muted shrink-0">
+                    <div key={m.id} className="p-3.5 flex gap-3.5 hover:bg-muted/15 transition-colors group">
+                      <div className="w-[84px] h-[72px] sm:w-[96px] sm:h-[76px] rounded-md overflow-hidden bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 border border-border/40 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                         {m.image_url
-                          ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
-                              <MapPin className="w-4 h-4" />
+                          ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                          : <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
+                              <MapPin className="w-4 h-4 text-primary/60" />
+                              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
                             </div>}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-display text-[15px] leading-snug">{m.name}</div>
+                      <div className="min-w-0 flex-1 flex flex-col justify-center">
+                        <div className="font-display text-[15px] font-medium leading-snug text-foreground">{m.name}</div>
                         {m.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          <div className="text-[12px] text-foreground/75 line-clamp-2 mt-1 leading-relaxed">
                             {m.description}
                           </div>
                         )}
                       </div>
-                      <div className="shrink-0 self-start">
+                      <div className="shrink-0 self-start mt-0.5">
                         <button
                           type="button"
                           onClick={() => glosuj(m.id)}
                           aria-label="Głosuj na to miejsce"
                           title="Głosuj na to miejsce"
-                          className={`inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded-full border transition-colors ${
+                          className={`inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-full border shadow-xs transition-all ${
                             mojeGlosy.has(m.id)
-                              ? 'border-accent bg-accent/15 text-accent font-medium'
-                              : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
+                              ? 'border-accent bg-accent/15 text-accent font-medium scale-105'
+                              : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
                           }`}
                         >
                           <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(m.id) ? 'fill-accent' : ''}`} />
                           {(m.vote_count ?? 0) > 0 ? (
-                            <span className="font-mono tabular-nums">{m.vote_count}</span>
+                            <span className="font-mono tabular-nums font-medium">{m.vote_count}</span>
                           ) : null}
                         </button>
                       </div>
