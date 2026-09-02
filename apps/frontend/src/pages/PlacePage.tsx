@@ -7,7 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
-import { opisMiejsca } from '@/lib/opis';
+import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
+import i18n from '@/i18n';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
 import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
@@ -78,32 +79,17 @@ export default function PlacePage() {
     // Warunki geograficzne i tagowe umie policzyć baza: to samo miasto, ramka
     // ~2 km wokół punktu i przecięcie vibe_tags. Trzy wąskie zapytania zamiast
     // jednej hurtowni, a logika niżej pracuje na tej samej strukturze co dotąd.
+    // Zostaje JEDNO zapytanie: ramka ~2 km wokół punktu, z której liczy się
+    // „W okolicy". Dobór podobnych zszedł do bazy (niżej), więc zapytanie po
+    // mieście i po przecięciu tagów — razem 500 wierszy na każde wejście na
+    // stronę — nie mają już po co przychodzić.
     const POOL_COLS = 'id, slug, name, city, country, lat, lng, category, kind, description, description_i18n, photos, visit_minutes, vibe_tags, pin_count';
-    const poolQueries = [
-      data.city
-        ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id).eq('city', data.city).limit(300)
-        : null,
-      data.lat != null
-        ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id)
-            .gte('lat', data.lat - 0.02).lte('lat', data.lat + 0.02)
-            .gte('lng', data.lng - 0.03).lte('lng', data.lng + 0.03).limit(200)
-        : null,
-      (data.vibe_tags ?? []).length > 0
-        ? supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id)
-            .overlaps('vibe_tags', data.vibe_tags as string[])
-            .order('pin_count', { ascending: false }).limit(200)
-        : null,
-    ];
-    const poolParts = await Promise.all(
-      poolQueries.filter((q): q is NonNullable<typeof q> => q !== null)
-    );
-    const seen = new Set<string>();
-    const all = poolParts
-      .flatMap((part) => (part.data ?? []) as unknown as CatalogPlace[])
-      .filter((x) => (seen.has(x.id) ? false : (seen.add(x.id), true)));
-
-    // „W okolicy" liczone z prawdziwych współrzędnych, nie zgadywane
-    const pool = all;
+    const wOkolicy = data.lat != null
+      ? await supabase.from('place_catalog').select(POOL_COLS).neq('id', data.id)
+          .gte('lat', data.lat - 0.02).lte('lat', data.lat + 0.02)
+          .gte('lng', data.lng - 0.03).lte('lng', data.lng + 0.03).limit(200)
+      : null;
+    const pool = ((wOkolicy?.data ?? []) as unknown as CatalogPlace[]);
     setNearby(
       pool.filter((x) => x.lat != null)
         .map((x) => ({ x, km: kmBetween(data, x) }))
@@ -112,19 +98,19 @@ export default function PlacePage() {
         .slice(0, 3)
         .map((r) => r.x)
     );
-    // Podobne dobierane były wyłącznie po tagach klimatu, bez żadnego warunku
-    // geograficznego. Przy atrakcji w Lipsku wychodziły więc miejsca z Rygi,
-    // Tallina i Wrocławia — trafne co do klimatu, bezużyteczne przy planowaniu.
-    // Teraz to samo miasto idzie pierwsze, a resztę dobieramy tylko wtedy, gdy
-    // w mieście brakuje propozycji.
-    const myTags = new Set<string>(data.vibe_tags ?? []);
-    const wgKlimatu = pool
-      .map((x) => ({ x, shared: (x.vibe_tags ?? []).filter((t) => myTags.has(t)).length }))
-      .filter((r) => r.shared > 0)
-      .sort((a, b) => b.shared - a.shared || b.x.pin_count - a.x.pin_count);
-    const wMiescie = wgKlimatu.filter((r) => r.x.city && r.x.city === data.city);
-    const gdzieIndziej = wgKlimatu.filter((r) => !r.x.city || r.x.city !== data.city);
-    setSimilar([...wMiescie, ...gdzieIndziej].slice(0, 8).map((r) => r.x));
+    /* Podobne liczy baza — DOKŁADNIE ta sama funkcja, która zasila pasek
+       w oknie miejsca. Wcześniej strona miała własny ranking po surowej liczbie
+       wspólnych tagów i dla tego samego miejsca dawała inny, gorszy zestaw:
+       przy Ogrodzie Botanicznym prowadziła pomnikiem Szermierza, bo trafienie
+       w `ikoniczne` ważyło tam tyle samo co w `zielone`. */
+    const { data: podobne, error: bladPodobnych } = await (supabase as any).rpc('podobne_miejsca', {
+      p_place: data.id,
+      p_limit: 8,
+      p_pomin: [],
+      p_jezyk: i18n.language?.split('-')[0] || 'pl',
+    });
+    if (bladPodobnych) console.warn('[miejsce] podobne_miejsca:', bladPodobnych.message);
+    setSimilar(((podobne ?? []) as unknown) as CatalogPlace[]);
 
     // Dopiero teraz rzeczy osobiste. Gość ma za sobą komplet treści strony —
     // opis, zdjęcia, sąsiedztwo — a brakuje mu wyłącznie tego, co bez konta
@@ -300,6 +286,13 @@ export default function PlacePage() {
               {place.name}
             </h1>
 
+            {wyroznikMiejsca(place) && (
+              <p className="mt-5 max-w-[60ch] border-l-2 border-foreground/25 pl-4
+                            text-[15px] leading-relaxed text-foreground/90 text-pretty">
+                {wyroznikMiejsca(place)}
+              </p>
+            )}
+
             {(place.description || place.wiki_extract) && (
               <p className="text-[17px] leading-[1.6] mt-5 max-w-[60ch] text-foreground/85 text-pretty">
                 {opisMiejsca(place)}
@@ -332,11 +325,12 @@ export default function PlacePage() {
               <section className="mt-12">
                 <div className="flex items-baseline justify-between gap-3 flex-wrap">
                   <h2 className="font-display text-[22px]">{t('miejsce.podobne_w_klimacie')}</h2>
+                  {/* Zawsze to samo miasto: funkcja bazy nie wychodzi poza nie.
+                      Wcześniej etykieta zapowiadała „dalej inne miasta", bo stary
+                      dobór potrafił dosypać miejsc z innego kraju. */}
                   {place.city && (
                     <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                      {similar.some((sp) => sp.city !== place.city)
-                        ? `najpierw ${place.city}, dalej inne miasta`
-                        : place.city}
+                      {place.city}
                     </span>
                   )}
                 </div>
