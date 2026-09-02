@@ -47,6 +47,7 @@ export interface PinnedPlace {
   lng: number | null;
   catalog_id?: string | null;
   source?: string | null;
+  vote_count?: number | null;
 }
 
 export interface DiscoveredPlace {

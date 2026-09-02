@@ -6,8 +6,9 @@ import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
+  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Heart, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
+import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +47,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [activeId, setActiveId] = useState<string | null>(null);
   const [places, setPlaces] = useState<PinnedPlace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mojeGlosy, setMojeGlosy] = useState<Set<string>>(new Set());
 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', destination: '', days: '', hours: '', tripType: '' });
@@ -234,11 +236,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     (async () => {
       const { data } = await supabase
         .from('trip_project_places')
-        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id')
+        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id, vote_count')
         .eq('project_id', activeId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
       setPlaces((data ?? []).map(jakoMiejsce));
+      if (data?.length) {
+        wczytajMojeGlosy(data.map((m: any) => m.id)).then(setMojeGlosy);
+      }
       // Na pustej tablicy panel wyszukiwania jest jedyną treścią — nie ma czego
       // zwijać, a użytkownik i tak zaczyna od dodania pierwszego miejsca.
       if (!(data || []).length) setNarzedzie('szukaj');
@@ -605,6 +610,26 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const unpin = async (id: string) => {
     await supabase.from('trip_project_places').delete().eq('id', id);
     setPlaces((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const glosuj = async (id: string) => {
+    const juz = mojeGlosy.has(id);
+    setMojeGlosy((prev) => {
+      const next = new Set(prev);
+      if (juz) next.delete(id); else next.add(id);
+      return next;
+    });
+    setPlaces((prev) => prev.map((p) => {
+      if (p.id !== id) return p;
+      const cnt = Math.max(0, (p.vote_count ?? 0) + (juz ? -1 : 1));
+      return { ...p, vote_count: cnt };
+    }));
+    try {
+      const wynik = await glosujNaMiejsce(id);
+      setPlaces((prev) => prev.map((p) => p.id === id ? { ...p, vote_count: wynik.vote_count } : p));
+    } catch {
+      toast.error('Nie udało się zapisać głosu');
+    }
   };
 
   const movePlace = async (id: string, priority: Priority, beforeId?: string) => {
@@ -1223,7 +1248,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           // jego pula współrzędnych odrzuca pozycje bez lat/lng, więc zostawały
           // w niej same propozycje agenta i tylko one trafiały na mapę.
           lat: p.lat, lng: p.lng,
-          opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description
+          opening_hours: p.opening_hours, visit_minutes: p.visit_minutes, description: p.description,
+          vote_count: p.vote_count ?? 0
         })),
         creator_preferences: mergePreferences(userPrefs, active)
       };
@@ -1636,10 +1662,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             </div>
 
             <Dialog open={pokazUstawienia} onOpenChange={setPokazUstawienia}>
-              {/* Wysokość ograniczona zawczasu: to okno rośnie z każdą osobą
-                  dopisaną do tablicy, a bez `max-h` nie da się przewinąć tego,
-                  co wyjdzie poza ekran — tak właśnie urwała się karta miejsca. */}
-              <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Ustawienia wyjazdu</DialogTitle>
                 </DialogHeader>
@@ -2461,19 +2484,37 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                     )}
                                     {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
                                         wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
-                                    <div className="flex gap-1.5 mt-2.5">
-                                      {ZONES.map((z) => (
-                                        <button key={z.id} onClick={() => movePlace(p.id, z.id)}
-                                          className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                                            p.priority === z.id
-                                              ? z.id === 'must' ? 'bg-primary text-primary-foreground'
-                                                : z.id === 'nice' ? 'bg-accent text-accent-foreground'
-                                                : 'bg-clay text-clay-foreground'
-                                              : 'text-muted-foreground hover:bg-muted'
-                                          }`}>
-                                          {z.short}
-                                        </button>
-                                      ))}
+                                    <div className="flex items-center justify-between gap-1.5 mt-2.5">
+                                      <div className="flex gap-1.5">
+                                        {ZONES.map((z) => (
+                                          <button key={z.id} onClick={() => movePlace(p.id, z.id)}
+                                            className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                                              p.priority === z.id
+                                                ? z.id === 'must' ? 'bg-primary text-primary-foreground'
+                                                  : z.id === 'nice' ? 'bg-accent text-accent-foreground'
+                                                  : 'bg-clay text-clay-foreground'
+                                                : 'text-muted-foreground hover:bg-muted'
+                                            }`}>
+                                            {z.short}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => glosuj(p.id)}
+                                        aria-label="Głos uczestników na to miejsce"
+                                        title="Głos uczestników na to miejsce"
+                                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                                          mojeGlosy.has(p.id)
+                                            ? 'border-accent bg-accent/15 text-accent font-medium'
+                                            : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
+                                        }`}
+                                      >
+                                        <Heart className={`w-3 h-3 ${mojeGlosy.has(p.id) ? 'fill-accent' : ''}`} />
+                                        {(p.vote_count ?? 0) > 0 ? (
+                                          <span className="font-mono tabular-nums">{p.vote_count}</span>
+                                        ) : null}
+                                      </button>
                                     </div>
                                   </div>
                                 </div>

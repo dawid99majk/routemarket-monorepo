@@ -9,6 +9,7 @@ import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import { zakresDat } from '@/lib/daty';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
+import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { useTranslation } from 'react-i18next';
 import SEO from '@/components/SEO';
 
@@ -42,6 +43,7 @@ export default function TablicaPubliczna() {
   const [kopiuje, setKopiuje] = useState(false);
   const [inicjaly, setInicjaly] = useState<string | null>(null);
   const [jaId, setJaId] = useState<string | null>(null);
+  const [mojeGlosy, setMojeGlosy] = useState<Set<string>>(new Set());
   /** Moja kopia tej tablicy, jeśli już ją zrobiłem. */
   const [mojaKopia, setMojaKopia] = useState<{ id: string; copied_at: string | null } | null>(null);
 
@@ -58,10 +60,14 @@ export default function TablicaPubliczna() {
     if (!t) { setTablica(null); setLadowanie(false); return; }
 
     const { data: pl } = await (supabase as any).from('trip_project_places')
-      .select('id, name, category, priority, lat, lng, description, visit_minutes, image_url')
+      .select('id, name, category, priority, lat, lng, description, visit_minutes, image_url, vote_count')
       .eq('project_id', id).order('sort_order', { ascending: true });
     setTablica(t);
     setMiejsca(pl ?? []);
+
+    if (pl?.length) {
+      wczytajMojeGlosy(pl.map((m: any) => m.id)).then(setMojeGlosy);
+    }
 
     const { data: u } = await supabase.auth.getUser();
     setJaId(u.user?.id ?? null);
@@ -99,6 +105,26 @@ export default function TablicaPubliczna() {
       setPolubiona(bylo);
       setTablica((t: any) => ({ ...t, like_count: (t.like_count ?? 0) + (bylo ? 1 : -1) }));
       toast.error(error.message);
+    }
+  };
+
+  const glosuj = async (placeId: string) => {
+    const juz = mojeGlosy.has(placeId);
+    setMojeGlosy((prev) => {
+      const next = new Set(prev);
+      if (juz) next.delete(placeId); else next.add(placeId);
+      return next;
+    });
+    setMiejsca((prev) => prev.map((m) => {
+      if (m.id !== placeId) return m;
+      const count = Math.max(0, (m.vote_count ?? 0) + (juz ? -1 : 1));
+      return { ...m, vote_count: count };
+    }));
+    try {
+      const wynik = await glosujNaMiejsce(placeId);
+      setMiejsca((prev) => prev.map((m) => m.id === placeId ? { ...m, vote_count: wynik.vote_count } : m));
+    } catch {
+      toast.error('Nie udało się zapisać głosu');
     }
   };
 
@@ -300,13 +326,31 @@ export default function TablicaPubliczna() {
                               <MapPin className="w-4 h-4" />
                             </div>}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="font-display text-[15px] leading-snug">{m.name}</div>
                         {m.description && (
                           <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
                             {m.description}
                           </div>
                         )}
+                      </div>
+                      <div className="shrink-0 self-start">
+                        <button
+                          type="button"
+                          onClick={() => glosuj(m.id)}
+                          aria-label="Głosuj na to miejsce"
+                          title="Głosuj na to miejsce"
+                          className={`inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded-full border transition-colors ${
+                            mojeGlosy.has(m.id)
+                              ? 'border-accent bg-accent/15 text-accent font-medium'
+                              : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(m.id) ? 'fill-accent' : ''}`} />
+                          {(m.vote_count ?? 0) > 0 ? (
+                            <span className="font-mono tabular-nums">{m.vote_count}</span>
+                          ) : null}
+                        </button>
                       </div>
                     </div>
                   ))}

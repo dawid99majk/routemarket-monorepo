@@ -955,6 +955,7 @@ export type Database = {
           sort_order: number
           source: string | null
           visit_minutes: number | null
+          vote_count: number
           website: string | null
           wiki_extract: string | null
         }
@@ -976,6 +977,7 @@ export type Database = {
           sort_order?: number
           source?: string | null
           visit_minutes?: number | null
+          vote_count?: number
           website?: string | null
           wiki_extract?: string | null
         }
@@ -997,6 +999,7 @@ export type Database = {
           sort_order?: number
           source?: string | null
           visit_minutes?: number | null
+          vote_count?: number
           website?: string | null
           wiki_extract?: string | null
         }
