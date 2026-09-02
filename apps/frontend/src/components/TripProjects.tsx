@@ -1636,7 +1636,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             </div>
 
             <Dialog open={pokazUstawienia} onOpenChange={setPokazUstawienia}>
-              <DialogContent className="max-w-lg">
+              {/* Wysokość ograniczona zawczasu: to okno rośnie z każdą osobą
+                  dopisaną do tablicy, a bez `max-h` nie da się przewinąć tego,
+                  co wyjdzie poza ekran — tak właśnie urwała się karta miejsca. */}
+              <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Ustawienia wyjazdu</DialogTitle>
                 </DialogHeader>

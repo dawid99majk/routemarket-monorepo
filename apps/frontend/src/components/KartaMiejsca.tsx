@@ -79,7 +79,10 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
 
   return (
     <Dialog open onOpenChange={(o) => !o && onZamknij()}>
-      <DialogContent className="max-w-xl">
+      {/* Wysokość ograniczona do ekranu: przy pełnej karcie (zdjęcia, wyróżnik,
+          opis, decyzje, pasek podobnych) treść urosła do 1586 px i wychodziła
+          poza ekran po 343 px z góry i z dołu, bez możliwości przewinięcia. */}
+      <DialogContent className="max-w-xl max-h-[88vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5 pr-6">
             {miejsce.nr != null && (
@@ -91,6 +94,13 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
             <span className="min-w-0">{miejsce.name}</span>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Przewija się TYLKO treść. Nagłówek zostaje nieruchomy, bo przycisk
+            zamykania jest pozycjonowany względem okna — przy przewijaniu całości
+            uciekałby w górę razem ze zdjęciami. `min-h-0` jest konieczne: bez
+            niego element w kolumnie flex nie skurczy się poniżej zawartości
+            i przewijanie w ogóle nie rusza. */}
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 -mr-1">
 
         {ile > 0 && (
           <div>
@@ -201,6 +211,8 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
             Pełna strona miejsca <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}
+
+        </div>
       </DialogContent>
     </Dialog>
   );
