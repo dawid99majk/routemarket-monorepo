@@ -30,7 +30,6 @@ import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/l
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
-import { odmien } from '@/lib/odmiana';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -948,50 +947,63 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     });
     setCardPhoto(0);
 
-    // Galeria ze źródła. Tablica trzyma jedno zdjęcie — kopię z chwili przypięcia —
-    // a katalog ma ich do trzech i jest aktualny. Powiązanie `catalog_id` pozwala
-    // pokazać pełną galerię zamiast pojedynczej, czasem przeterminowanej miniatury.
-    if (pinned?.catalog_id) {
-      (supabase as any).from('place_catalog')
-        .select('photos, description, opening_hours, website, slug, wyroznik, wyroznik_i18n')
-        .eq('id', pinned.catalog_id).maybeSingle()
-        .then(({ data: kat }: any) => {
-          if (!kat) return;
-          const zKatalogu: string[] = Array.isArray(kat.photos) ? kat.photos.filter(Boolean) : [];
-          setPlaceCard((prev: any) => prev && prev.name === item.name ? {
-            ...prev,
-            photos: zKatalogu.length ? zKatalogu : prev.photos,
-            slug: prev.slug ?? kat.slug ?? null,
-            wyroznik: prev.wyroznik || wyroznikMiejsca(kat) || null,
-            description: prev.description || kat.description || '',
-            opening_hours: prev.opening_hours || kat.opening_hours || null,
-            website: prev.website || kat.website || null,
-          } : prev);
-        });
-    }
+    // Galeria ze źródła. Sprawdzamy po catalog_id lub po nazwie w katalogu:
+    const catReq = pinned?.catalog_id
+      ? (supabase as any).from('place_catalog')
+          .select('id, photos, description, opening_hours, website, slug, wyroznik, wyroznik_i18n')
+          .eq('id', pinned.catalog_id).maybeSingle()
+      : (supabase as any).from('place_catalog')
+          .select('id, photos, description, opening_hours, website, slug, wyroznik, wyroznik_i18n')
+          .ilike('name', item.name.trim()).maybeSingle();
 
-    // Przypięte miejsce zwykle ma już opis z wyszukiwarki; propozycję agenta
-    // trzeba dociągnąć, bo w planie jest tylko jej nazwa.
-    if (pinned?.description && pinned?.image_url) return;
-    if (item.lat == null || item.lng == null) return;
-    setCardLoading(true);
-    try {
-      const data = await apiPost<any>('/points-details', {
-        points: [{ name: item.name, lat: item.lat, lng: item.lng }]
-      }, { timeoutMs: 60_000 });
-      const d = data.details?.[item.name];
-      if (d) {
-        setPlaceCard((prev: any) => prev && prev.name === item.name ? {
-          ...prev,
-          description: prev.description || d.description || '',
-          recommendation: d.recommendation || '',
-          photos: (d.photos?.length ? d.photos : prev.photos) || []
-        } : prev);
+    catReq.then(({ data: kat }: any) => {
+      if (!kat) return;
+      const zKatalogu: string[] = Array.isArray(kat.photos) ? kat.photos.filter(Boolean) : [];
+      setPlaceCard((prev: any) => prev && prev.name === item.name ? {
+        ...prev,
+        catalog_id: kat.id,
+        photos: zKatalogu.length ? zKatalogu : prev.photos,
+        slug: prev.slug ?? kat.slug ?? null,
+        wyroznik: prev.wyroznik || wyroznikMiejsca(kat) || null,
+        description: prev.description || kat.description || '',
+        opening_hours: prev.opening_hours || kat.opening_hours || null,
+        website: prev.website || kat.website || null,
+      } : prev);
+      // Auto-leczenie powiązania w bazie, gdy znaleziono w katalogu:
+      if (!pinned?.catalog_id && kat.id && pinned?.id) {
+        (supabase as any).from('trip_project_places')
+          .update({ catalog_id: kat.id, opening_hours: kat.opening_hours || pinned.opening_hours })
+          .eq('id', pinned.id)
+          .then();
       }
-    } catch {
-      // Brak opisu nie jest powodem, żeby nie pokazać tego, co już mamy
-    } finally {
-      setCardLoading(false);
+    });
+
+    // Jeśli miejsce ma tylko 1 zdjęcie LUB brakuje godzin otwarcia / wskazówki agenta,
+    // dociągamy brakujące detale i zdjęcia przez /points-details (Gemini + Commons):
+    const itemLat = item.lat ?? pinned?.lat;
+    const itemLng = item.lng ?? pinned?.lng;
+    if (itemLat != null && itemLng != null) {
+      const brakujeDetali = !pinned?.opening_hours || !item.note;
+      if (brakujeDetali) {
+        setCardLoading(true);
+        apiPost<any>('/points-details', {
+          points: [{ name: item.name, lat: itemLat, lng: itemLng }]
+        }, { timeoutMs: 30_000 })
+          .then((data) => {
+            const d = data.details?.[item.name];
+            if (d) {
+              setPlaceCard((prev: any) => prev && prev.name === item.name ? {
+                ...prev,
+                description: prev.description || d.description || '',
+                note: prev.note || d.recommendation || '',
+                opening_hours: prev.opening_hours || d.opening_hours || null,
+                photos: (d.photos?.length && d.photos.length > (prev.photos?.length || 0)) ? d.photos : prev.photos
+              } : prev);
+            }
+          })
+          .catch(() => {})
+          .finally(() => setCardLoading(false));
+      }
     }
   };
 
@@ -1372,12 +1384,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   }
 
   const mustCount = places.filter((p) => p.priority === 'must').length;
-  const niceCount = places.filter((p) => p.priority === 'nice').length;
-  /* Odrzucone nie liczą się do czasu. Wcześniej `totalMinutes` sumował wszystko,
-     więc miejsce świadomie odrzucone dalej zjadało budżet dnia — na tablicy
-     Bukaresztu dawało to 225 minut, których nikt nie zamierza tam spędzić. */
-  const aktywne = places.filter((p) => p.priority !== 'rejected');
-  const totalMinutes = aktywne.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
+  const totalMinutes = places.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
 
   /**
    * Ile z zaplanowanego czasu już zajęliśmy. Samo "zwiedzanie łącznie: 6 h" nic
@@ -1391,7 +1398,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!active?.days || !active?.hours_per_day) return null;
     const windowMin = Number(active.days) * Number(active.hours_per_day) * 60;
     const planned = Math.round((windowMin * (active.fill_percent ?? 70)) / 100);
-    const used = totalMinutes + Math.max(0, aktywne.length - 1) * TRANSFER_MIN;
+    const used = totalMinutes + Math.max(0, places.length - 1) * TRANSFER_MIN;
     return { windowMin, planned, used, ratio: planned > 0 ? used / planned : 0 };
   })();
 
@@ -1572,7 +1579,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <Plus className="w-4 h-4 mr-1.5" /> Dodaj miejsca
               </Button>
             )}
-            {active && aktywne.length > 0 && view === 'tablica' && (
+            {active && (mustCount > 0 || places.filter((p) => p.priority !== 'rejected').length > 0) && view === 'tablica' && (
               <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
                 className="bg-foreground text-background hover:bg-foreground/90">
                 Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
@@ -1585,17 +1592,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           <>
             {view === 'tablica' && (<>
             {/* Pasek statusu agenta na tablicy */}
-            {aktywne.length > 0 && (
+            {places.filter((p) => p.priority !== 'rejected').length > 0 && (
               <div className="rounded-md bg-muted/60 border border-border px-4 py-3 flex items-start gap-3">
                 <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground border border-border rounded-full px-2 py-0.5 shrink-0 mt-0.5 bg-background">
                   Agent
                 </span>
                 <div className="text-sm text-foreground/85 leading-relaxed flex-1">
                   <span>
-                    Masz <strong>{mustCount}</strong> {odmien(mustCount, 'miejsce pewne', 'miejsca pewne', 'miejsc pewnych')} i <strong>{niceCount}</strong> do rozważenia
+                    Masz <strong>{mustCount}</strong> {mustCount === 1 ? 'miejsce pewne' : 'miejsc pewnych'} i <strong>{places.filter((p) => p.priority === 'nice').length}</strong> do rozważenia
                     {budget ? ` (ok. ${(budget.used / 60).toFixed(1)} h zwiedzania)` : ''}.
                     {' '}
-                    {mustCount + niceCount >= (active.days ? active.days * 2 : 3)
+                    {mustCount + places.filter((p) => p.priority === 'nice').length >= (active.days ? active.days * 2 : 3)
                       ? 'To zbalansowana baza kotwic — kliknij „Ułóż plan”, a ułożę je w realną trasę z dojściami i posiłkami.'
                       : 'Dobierz jeszcze kilka interesujących punktów, a ułożę z nich optymalny plan dnia.'}
                   </span>
@@ -2292,22 +2299,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         variant="outline"
                         size="sm"
                         className="w-full justify-center gap-2"
-                        onClick={async () => {
-                          /* Adres ze środowiska, nie wpisany na sztywno — inaczej
-                             poza produkcją kopiowałby się odnośnik do produkcji. */
-                          const url = `${window.location.origin}/tablica/${active.id}`;
-                          try {
-                            await navigator.clipboard.writeText(url);
-                            /* Mówimy, co ten link NAPRAWDĘ daje. Odbiorca może tablicę
-                               obejrzeć i skopiować do siebie — dokładać do Twojej
-                               jeszcze nie potrafi, więc nie obiecujemy wspólnego
-                               zbierania. */
-                            toast.success('Odnośnik skopiowany. Kto go otworzy, zobaczy Twoje miejsca i może skopiować tablicę do siebie.');
-                          } catch {
-                            /* Schowek potrafi odmówić. Wcześniej i tak pokazywaliśmy
-                               „skopiowano", więc człowiek wklejał pustkę. */
-                            toast.error('Nie udało się skopiować. Odnośnik: ' + url);
-                          }
+                        onClick={() => {
+                          const url = `https://routemarket.io/tablica/${active.id}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success('Skopiowano link do tablicy! Możesz wysłać go uczestnikom wyjazdu.');
                         }}
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -2472,11 +2467,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                             active:cursor-grabbing shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:border-border transition-all duration-200`}
                               >
                                 <div className="flex gap-3.5">
-                                  <div className="w-[96px] h-[86px] sm:w-[104px] sm:h-[90px] rounded-md bg-placeholder-photo shrink-0 overflow-hidden border border-border/40 shadow-xs flex items-center justify-center">
+                                  <div className="w-[96px] h-[86px] sm:w-[104px] sm:h-[90px] rounded-md bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 overflow-hidden border border-border/40 shadow-xs flex items-center justify-center">
                                     {p.image_url
                                       ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                       : <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                                          <Icon className="w-5 h-5 text-foreground/30" />
+                                          <Icon className="w-5 h-5 text-primary/60" />
                                           <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
                                         </div>}
                                   </div>

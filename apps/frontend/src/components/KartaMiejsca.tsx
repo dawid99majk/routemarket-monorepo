@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { CalendarDays, Clock, ExternalLink, Loader2, MapPin } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Zdjecie from '@/components/Zdjecie';
 import PodobneMiejsca, { type PodobneMiejsce } from '@/components/PodobneMiejsca';
@@ -79,10 +79,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
 
   return (
     <Dialog open onOpenChange={(o) => !o && onZamknij()}>
-      {/* Wysokość ograniczona do ekranu: przy pełnej karcie (zdjęcia, wyróżnik,
-          opis, decyzje, pasek podobnych) treść urosła do 1586 px i wychodziła
-          poza ekran po 343 px z góry i z dołu, bez możliwości przewinięcia. */}
-      <DialogContent className="max-w-xl max-h-[88vh] flex flex-col">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5 pr-6">
             {miejsce.nr != null && (
@@ -94,13 +91,6 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
             <span className="min-w-0">{miejsce.name}</span>
           </DialogTitle>
         </DialogHeader>
-
-        {/* Przewija się TYLKO treść. Nagłówek zostaje nieruchomy, bo przycisk
-            zamykania jest pozycjonowany względem okna — przy przewijaniu całości
-            uciekałby w górę razem ze zdjęciami. `min-h-0` jest konieczne: bez
-            niego element w kolumnie flex nie skurczy się poniżej zawartości
-            i przewijanie w ogóle nie rusza. */}
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 -mr-1">
 
         {ile > 0 && (
           <div>
@@ -138,37 +128,67 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
         )}
 
         {miejsce.wyroznik && (
-          <p className="border-l-2 border-foreground/25 pl-3 text-[14px] leading-relaxed
-                        text-foreground/90 text-pretty">
-            {miejsce.wyroznik}
-          </p>
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3.5 py-2.5 flex items-start gap-2.5">
+            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-primary font-semibold shrink-0 mt-0.5 border border-primary/30 rounded-full px-2 py-0.5 bg-background">
+              Wyróżnik
+            </span>
+            <p className="text-[13.5px] leading-snug text-foreground/90 text-pretty">
+              {miejsce.wyroznik}
+            </p>
+          </div>
         )}
 
         {miejsce.description && (
-          <p className="text-[15px] leading-relaxed text-foreground/85 text-pretty">
+          <p className="text-[14.5px] leading-relaxed text-foreground/85 text-pretty">
             {miejsce.description}
           </p>
         )}
 
         {/* Głos agenta — terakota, tak jak wszędzie indziej w produkcie. */}
         {miejsce.note && (
-          <p className="rounded-md border border-accent/30 bg-accent/5 px-3.5 py-2.5
-                        text-[13px] leading-relaxed text-pretty">
-            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-accent mr-2">
-              Agent
+          <div className="rounded-md border border-accent/30 bg-accent/5 px-3.5 py-2.5 flex items-start gap-2.5">
+            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-accent font-semibold shrink-0 mt-0.5 border border-accent/30 rounded-full px-2 py-0.5 bg-background">
+              Wskazówka
             </span>
-            {miejsce.note}
-          </p>
-        )}
-
-        {meta.length > 0 && (
-          <div className="border-t border-border pt-3 font-mono text-[12px] tabular-nums
-                          text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-            {czas(miejsce.visit_minutes) && <span>Czas: {czas(miejsce.visit_minutes)}</span>}
-            {miejsce.opening_hours && <span className="min-w-0 truncate">Godziny: {miejsce.opening_hours}</span>}
-            {miejsce.price_hint && <span className="min-w-0 truncate">Koszt: {miejsce.price_hint}</span>}
+            <p className="text-[13px] leading-relaxed text-foreground/90 text-pretty">
+              {miejsce.note}
+            </p>
           </div>
         )}
+
+        <div className="border-t border-border pt-3 font-mono text-[12px] tabular-nums
+                        text-muted-foreground/90 flex flex-wrap items-center gap-x-5 gap-y-2">
+          {czas(miejsce.visit_minutes) && (
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-muted-foreground/70" />
+              <span>Czas: {czas(miejsce.visit_minutes)}</span>
+            </span>
+          )}
+          {miejsce.opening_hours ? (
+            <span className="flex items-center gap-1.5 min-w-0">
+              <CalendarDays className="w-3.5 h-3.5 text-muted-foreground/70" />
+              <span className="truncate">Godziny: {miejsce.opening_hours}</span>
+            </span>
+          ) : (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-accent hover:underline"
+            >
+              <span>Godziny: sprawdź w Google ↗</span>
+            </a>
+          )}
+          {miejsce.price_hint && <span className="min-w-0 truncate">Koszt: {miejsce.price_hint}</span>}
+          <a
+            href={miejsce.website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-primary hover:underline ml-auto text-[11.5px]"
+          >
+            <span>{miejsce.website ? 'Strona obiektu ↗' : 'Otwórz na mapie ↗'}</span>
+          </a>
+        </div>
 
         {onDecyzja && (
           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3.5">
@@ -211,8 +231,6 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
             Pełna strona miejsca <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}
-
-        </div>
       </DialogContent>
     </Dialog>
   );

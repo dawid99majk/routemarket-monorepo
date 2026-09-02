@@ -781,7 +781,7 @@ app.post('/points-details', async (c) => {
       return c.json({ details });
     }
 
-    const prompt = `Jesteś przewodnikiem turystycznym. Dla każdego z poniższych miejsc napisz krótki opis i jedną praktyczną wskazówkę.
+    const prompt = `Jesteś przewodnikiem turystycznym. Dla każdego z poniższych miejsc napisz krótki opis, orientacyjne godziny otwarcia i jedną praktyczną wskazówkę.
 
 Miejsca:
 ${list.map((p, i) => `${i + 1}. ${p.name}${p.lat ? ` (${p.lat.toFixed(4)}, ${p.lng?.toFixed(4)})` : ''}`).join('\n')}
@@ -789,7 +789,8 @@ ${list.map((p, i) => `${i + 1}. ${p.name}${p.lat ? ` (${p.lat.toFixed(4)}, ${p.l
 Dla każdego zwróć obiekt z polami:
 - "name": nazwa DOKŁADNIE tak, jak podano wyżej
 - "description": 2-3 zdania, czym to miejsce jest i co w nim ciekawego. Konkrety, nie ogólniki.
-- "recommendation": jedno zdanie praktycznej wskazówki (co zobaczyć, kiedy przyjść, na co uważać)
+- "recommendation": jedno zdanie praktycznej wskazówki (co zobaczyć, kiedy przyjść, na co uważać, czy warto rezerwować)
+- "opening_hours": orientacyjne godziny otwarcia (np. "wt-nd 10:00-19:00" lub "całodobowo / park"), jeśli znane, inaczej null
 
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
@@ -809,7 +810,8 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
                   properties: {
                     name: { type: 'string' },
                     description: { type: 'string' },
-                    recommendation: { type: 'string' }
+                    recommendation: { type: 'string' },
+                    opening_hours: { type: 'string' }
                   },
                   required: ['name']
                 }
@@ -828,7 +830,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
     // Zdjęcia lecą równolegle — nie wydłużają odpowiedzi o sumę pojedynczych czasów
     const photos = await Promise.all(
-      list.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng))
+      list.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 5))
     );
 
     list.forEach((p, i) => {
@@ -837,6 +839,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
       const entry = {
         description: found?.description || '',
         recommendation: found?.recommendation || '',
+        opening_hours: found?.opening_hours || null,
         photos: photos[i] || []
       };
       details[p.name] = entry;
