@@ -28,8 +28,8 @@ async function fetchWikiCard(wikipediaTag: string | undefined): Promise<{ image?
 
 export const COMMONS_UA = 'RouteMarket/1.0 (+https://routemarket.io)';
 
-/** Pliki, które nigdy nie są zdjęciem miejsca: herby, flagi, mapy, schematy. */
-const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite)/i;
+/** Pliki, które nigdy nie są zdjęciem miejsca: herby, flagi, mapy, schematy, pliki wideo, ryciny, zrzuty z TV, zniszczenia wojenne */
+const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite|skizze|sketch|drawing|zeichnung|rysunek|szkic|kupferstich|litho|engraving|gravure|etching|blueprint|grundriss|reconstruction|render|simulation|screenshot|zdf|ard|arte|bbc|fernsehen|broadcast|television|\bwebm\b|\bogv\b|\bogg\b|\bmp4\b|bau_des|construction_of|ruine?|zerstört|destroyed|bombard|fire\b|brand\b|\b(18\d\d|19[0-4]\d)\b)/i;
 
 /**
  * Nazwy prosto z aparatu ("DSC_0431", "IMG 2207", "P1010823"). Taki plik nie mówi
@@ -43,7 +43,7 @@ const CAMERA_DUMP = /\b(dsc[_\s-]?\d|dscn\d|img[_\s-]?\d|imgp\d|p\d{7}|photo[_\s
  * Takiego pliku nie odrzucamy — przy małym muzeum bywa jedynym, jaki istnieje —
  * ale nie może trafić na kartę jako zdjęcie główne, gdy jest czym go zastąpić.
  */
-const PHOTO_DETAL = /(interior|interno|interieur|wnetrz|detail|detal|ceiling|sufit|plafon|soffitto|chandelier|zyrandol|żyrandol|plaque|tablica|inscription|inskrypcj|door|drzwi|window|okno|staircase|schody|fresco|fresk|mosaic|mozaik|column|kolumn|ornament|handle|klamka|sign\b)/i;
+const PHOTO_DETAL = /(interior|interno|interieur|wnetrz|detail|detal|ceiling|sufit|decke|plafon|soffitto|chandelier|zyrandol|żyrandol|plaque|tablica|inscription|inskrypcj|door|drzwi|window|okno|staircase|schody|fresco|fresk|mosaic|mozaik|column|kolumn|ornament|handle|klamka|sign\b)/i;
 
 const stripDiacritics = (t: string) =>
   t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -119,7 +119,7 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
     // w zeskanowaną stronę XVII-wiecznego dziennika podróży, bo w tytule było
     // "...to Vienna...". "Vienna" jest zbyt pospolitym słowem, żeby to złapać
     // regułą dopasowania; ten filtr łapie to niezależnie od słowa.
-    .filter((p) => !/\.(pdf|djvu)$/i.test(String(p.title || '').trim()))
+    .filter((p) => !/\.(pdf|djvu|webm|ogv|ogg|mp4|mov|svg|gif)$/i.test(String(p.title || '').trim()))
     .filter((p) => !PHOTO_JUNK.test(p.title || '') && !CAMERA_DUMP.test(p.title || ''))
     .filter((p) => {
       const c = p.coordinates?.[0];
@@ -242,6 +242,8 @@ async function wikiArticlePhotos(wikipediaTag: string | undefined, name: string,
       if (!ii) return null;
       const adres: string = ii.thumburl || ii.url || '';
       if (!adres || !/\.(jpg|jpeg|png)$/i.test(adres.split('?')[0])) return null;
+      if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return null;
+      if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)$/i.test(plik)) return null;
       if (PHOTO_JUNK.test(plik) || CAMERA_DUMP.test(plik)) return null;
 
       const plikBezOgonkow = stripDiacritics(plik).toLowerCase();
@@ -323,7 +325,13 @@ export async function fetchNearbyPhotos(
   // Kolejność źródeł jest punktem wyjścia, nie wyrokiem: wiodące, artykuł,
   // nazwa, okolica. Artykuł NIE wygrywa automatycznie — bywa ubogi albo pokazuje
   // obiekt pokrewny (artykuł o Pałacu Parlamentu ma zdjęcie Zamku Peleș).
-  const kandydaci = [...new Set([...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])];
+  const kandydaci = [...new Set([...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])]
+    .filter((adres) => {
+      const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
+      if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return false;
+      if (PHOTO_JUNK.test(plik) || CAMERA_DUMP.test(plik)) return false;
+      return true;
+    });
 
   // Jedyna informacja, którą mamy o KAŻDYM kandydacie niezależnie od źródła, to
   // nazwa pliku. Ona rozstrzyga, gdy źródła się nie zgadzają.
