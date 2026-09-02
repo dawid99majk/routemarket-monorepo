@@ -566,6 +566,20 @@ export default function Discover() {
             await load(miasto, true);
             if (!odp.remaining) break;
           }
+
+          // Wyróżniki DOPIERO TERAZ. Zdanie „czym to się różni od sąsiadów"
+          // potrzebuje własnego opisu i tagów u sąsiadów, a jedno i drugie
+          // powstaje w pętli wyżej. Puszczone równolegle dostałoby miasto bez
+          // tagów i nie miałoby czego porównywać.
+          for (let runda = 0; runda < 10; runda++) {
+            const odp = await apiPost<any>('/catalog/wyrozniki', { city: miasto }, { timeoutMs: 180_000 })
+              .catch((e) => { console.warn('Nie udało się dociągnąć wyróżników:', e); return null; });
+            // Partia bez zapisu kończy przebieg. Odrzucone zdania zostają w puli
+            // i wracałyby w kolejnej rundzie, więc bez tego warunku pętla chodzi
+            // po tych samych miejscach do limitu rund i płaci za każdą próbę.
+            if (!odp || !odp.opisane || !odp.pozostalo) break;
+          }
+          await load(miasto, true);
         })().finally(() => setOpisyWToku(false));
       }
       toast.success(
