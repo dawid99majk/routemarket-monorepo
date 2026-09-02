@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import { zakresDat } from '@/lib/daty';
+import { odmien } from '@/lib/odmiana';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { useTranslation } from 'react-i18next';
@@ -236,7 +237,7 @@ export default function TablicaPubliczna() {
               {[tablica.destination,
                 tablica.days ? `${tablica.days} dni` : null,
                 tablica.start_date ? zakresDat(tablica.start_date, tablica.end_date) : null,
-                `${miejsca.length} miejsc`,
+                `${miejsca.length} ${odmien(miejsca.length, 'miejsce', 'miejsca', 'miejsc')}`,
               ].filter(Boolean).join(' · ')}
             </p>
           </div>
