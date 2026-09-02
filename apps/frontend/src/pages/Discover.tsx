@@ -1023,7 +1023,7 @@ export default function Discover() {
                         </p>
                       )}
                       {wyroznikMiejsca(p) ? (
-                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-primary/70 pl-2.5 leading-snug line-clamp-2 text-pretty">
+                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-foreground/25 pl-2.5 leading-snug line-clamp-2 text-pretty">
                           {wyroznikMiejsca(p)}
                         </p>
                       ) : opisMiejsca(p) ? (
