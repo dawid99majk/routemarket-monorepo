@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import KartaMiejsca from '@/components/KartaMiejsca';
 import type { PodobneMiejsce } from '@/components/PodobneMiejsca';
+import KolekcjeMiasta from '@/components/KolekcjeMiasta';
+import { pasujeDoKolekcji, type Kolekcja } from '@/lib/kolekcje';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -131,6 +133,8 @@ export default function Discover() {
   const [opisyWToku, setOpisyWToku] = useState(false);
   /** Ile kart pokazujemy. Rośnie przy przewijaniu, nie przy każdym zapytaniu. */
   const [ileWidocznych, setIleWidocznych] = useState(24);
+  /** Wybrany motyw. `null` znaczy: pokaż kafelki kolekcji zamiast wejścia w jedną. */
+  const [kolekcja, setKolekcja] = useState<Kolekcja | null>(null);
   const [pokazMape, setPokazMape] = useState(true);
   const [kategoria, setKategoria] = useState<KategoriaId>('wszystkie');
   /** Miejsce pod kursorem albo wskazane pinezką — wiąże kartę z punktem na mapie. */
@@ -304,13 +308,17 @@ export default function Discover() {
       // wtedy pytanie brzmi „gdzie się zatrzymać", a nie „co zwiedzić".
       if (kategoria === 'wszystkie' && (p.category ?? 'attraction') === 'hotel') return false;
       if (kategoria !== 'wszystkie' && (p.category ?? 'attraction') !== kategoria) return false;
+      if (kolekcja && !pasujeDoKolekcji(p.vibe_tags, kolekcja)) return false;
       if (filter === 'kids')  return (p.vibe_tags ?? []).some((t) => KIDS_TAGS.includes(t));
       if (filter === 'short') return (p.visit_minutes ?? 999) <= 60;
       if (filter === 'walk')  return true;
       if (filter === 'rain')  return RAIN_KINDS.includes((p.kind ?? '').toLowerCase()) || p.category === 'attraction';
       return true;
     });
-  }, [places, query, filter]);
+    /* `kategoria` i `kolekcja` MUSZĄ tu być. Bez `kategoria` przełączanie kategorii
+       nie przeliczało listy: pigułka „Wieczory" zaznaczała się, a siatka zostawała
+       ta sama — sprawdzone na produkcji dla Wrocławia. */
+  }, [places, query, filter, kategoria, kolekcja]);
 
   /**
    * Karty ograniczone do wycinka mapy. Przewijając mapę zawężasz listę obok —
@@ -331,6 +339,11 @@ export default function Discover() {
 
   /** Widoczny wycinek. Filtrowanie idzie po całości, przycinamy dopiero na końcu. */
   const widoczne = useMemo(() => wObszarze.slice(0, ileWidocznych), [wObszarze, ileWidocznych]);
+
+  /* Kolekcje to ekran startowy, nie kolejny filtr. Znikają, gdy użytkownik już
+     czegoś szuka albo zawęził widok — wtedy odpowiedź jest na dole, nie na górze. */
+  const pokazKolekcje = !kolekcja && !query.trim() && filter === 'all'
+    && kategoria === 'wszystkie' && wynikiAgenta.length === 0 && places.length > 0;
 
   const savedCount = Object.values(marks).filter((m) => m === 'must').length;
   const maybeCount = Object.values(marks).filter((m) => m === 'nice').length;
@@ -838,6 +851,30 @@ export default function Discover() {
           </p>
         ) : (
           <div className={pokazMape ? 'mt-6 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,44%)] gap-6 items-start' : 'mt-6'}>
+          {/* Przez całą szerokość, także gdy mapa dzieli układ na dwie kolumny.
+              Nagłówek wybranej kolekcji stoi NAD pustką, nie pod nią — inaczej
+              motyw bez wyników w kadrze mapy nie miałby jak zostać zamknięty. */}
+          <div className="lg:col-span-2">
+            {pokazKolekcje && (
+              <KolekcjeMiasta
+                miejsca={places}
+                onWybierz={(k) => { setKolekcja(k); setIleWidocznych(24); }}
+              />
+            )}
+            {kolekcja && (
+              <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3
+                              border-b border-border pb-3">
+                <div className="min-w-0">
+                  <h2 className="font-display text-[20px] leading-tight">{kolekcja.nazwa}</h2>
+                  <p className="text-[13px] text-muted-foreground">{kolekcja.podpis}</p>
+                </div>
+                <button onClick={() => setKolekcja(null)}
+                  className="text-[13px] text-secondary hover:text-foreground transition-colors shrink-0">
+                  Wszystkie miejsca
+                </button>
+              </div>
+            )}
+          </div>
           {wObszarze.length === 0 ? (
           <div className="text-center py-20 space-y-4">
             {seeding ? (
@@ -867,6 +904,9 @@ export default function Discover() {
                   )}
                   {filter !== FILTERS[0].id && (
                     <Button variant="outline" onClick={() => setFilter(FILTERS[0].id)}>{t('odkrywaj.pokaz_wszystkie')}</Button>
+                  )}
+                  {kolekcja && (
+                    <Button variant="outline" onClick={() => setKolekcja(null)}>Wyjdź z kolekcji</Button>
                   )}
                   {tylkoZObszaru && obszar && visible.length > 0 && (
                     <Button variant="outline" onClick={() => setTylkoZObszaru(false)}>
