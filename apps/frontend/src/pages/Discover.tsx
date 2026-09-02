@@ -34,11 +34,14 @@ interface CatalogPlace {
   category: string;
   kind: string | null;
   description: string;
+  description_i18n?: Record<string, string> | null;
   photos: string[];
   opening_hours: string | null;
   visit_minutes: number | null;
   vibe_tags: string[];
   pin_count: number;
+  wyroznik?: string | null;
+  wyroznik_i18n?: Record<string, string> | null;
 }
 
 type Bucket = 'must' | 'nice' | 'rejected';
@@ -1019,11 +1022,15 @@ export default function Discover() {
                           {p.city}{p.country ? ` / ${p.country}` : ''}
                         </p>
                       )}
-                      {opisMiejsca(p) && (
+                      {wyroznikMiejsca(p) ? (
+                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-primary/70 pl-2.5 leading-snug line-clamp-2 text-pretty">
+                          {wyroznikMiejsca(p)}
+                        </p>
+                      ) : opisMiejsca(p) ? (
                         <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed line-clamp-3 text-pretty">
                           {opisMiejsca(p)}
                         </p>
-                      )}
+                      ) : null}
                       {(duration || p.opening_hours) && (
                         <div className="mt-2.5 flex flex-wrap gap-x-3 font-mono text-[11px] text-muted-foreground tabular-nums">
                           {duration && <span>{duration}</span>}

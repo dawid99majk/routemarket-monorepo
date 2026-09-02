@@ -1540,7 +1540,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <Plus className="w-4 h-4 mr-1.5" /> Dodaj miejsca
               </Button>
             )}
-            {active && mustCount > 0 && view === 'tablica' && (
+            {active && (mustCount > 0 || places.filter((p) => p.priority !== 'rejected').length > 0) && view === 'tablica' && (
               <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
                 className="bg-foreground text-background hover:bg-foreground/90">
                 Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
@@ -1552,6 +1552,24 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         {active && (
           <>
             {view === 'tablica' && (<>
+            {/* Pasek statusu agenta na tablicy */}
+            {places.filter((p) => p.priority !== 'rejected').length > 0 && (
+              <div className="rounded-md bg-muted/60 border border-border px-4 py-3 flex items-start gap-3">
+                <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground border border-border rounded-full px-2 py-0.5 shrink-0 mt-0.5 bg-background">
+                  Agent
+                </span>
+                <div className="text-sm text-foreground/85 leading-relaxed flex-1">
+                  <span>
+                    Masz <strong>{mustCount}</strong> {mustCount === 1 ? 'miejsce pewne' : 'miejsc pewnych'} i <strong>{places.filter((p) => p.priority === 'nice').length}</strong> do rozważenia
+                    {budget ? ` (ok. ${(budget.used / 60).toFixed(1)} h zwiedzania)` : ''}.
+                    {' '}
+                    {mustCount + places.filter((p) => p.priority === 'nice').length >= (active.days ? active.days * 2 : 3)
+                      ? 'To zbalansowana baza kotwic — kliknij „Ułóż plan”, a ułożę je w realną trasę z dojściami i posiłkami.'
+                      : 'Dobierz jeszcze kilka interesujących punktów, a ułożę z nich optymalny plan dnia.'}
+                  </span>
+                </div>
+              </div>
+            )}
             {/* Kubełki od razu pod nagłówkiem. Wcześniej stało nad nimi pięć
                 bloków — dane wyjazdu, suwak proporcji, wyszukiwarka, wydarzenia
                 i ostrzeżenia — więc tablica zaczynała się poniżej ekranu. Reszta
@@ -2234,6 +2252,25 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           active.copy_count ? ` Skopiowano ${active.copy_count} razy.` : ''}`
                       : 'Widzisz ją tylko Ty i osoby, które dopiszesz poniżej.'}
                   </p>
+
+                  {active?.is_public && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center gap-2"
+                        onClick={() => {
+                          const url = `https://routemarket.io/tablica/${active.id}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success('Skopiowano link do tablicy! Możesz wysłać go uczestnikom wyjazdu.');
+                        }}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Kopiuj odnośnik dla uczestników wyjazdu
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className={`border-t pt-4 space-y-2 ${
@@ -2414,6 +2451,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                       {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
                                         .filter(Boolean).join(' · ') || '—'}
                                     </div>
+                                    {p.description && (
+                                      <p className="text-[12px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed text-pretty">
+                                        {p.description}
+                                      </p>
+                                    )}
                                     {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
                                         wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
                                     <div className="flex gap-1.5 mt-2.5">
