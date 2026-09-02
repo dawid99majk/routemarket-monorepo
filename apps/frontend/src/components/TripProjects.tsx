@@ -2472,11 +2472,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                             active:cursor-grabbing shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:border-border transition-all duration-200`}
                               >
                                 <div className="flex gap-3.5">
-                                  <div className="w-[96px] h-[86px] sm:w-[104px] sm:h-[90px] rounded-md bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 overflow-hidden border border-border/40 shadow-xs flex items-center justify-center">
+                                  <div className="w-[96px] h-[86px] sm:w-[104px] sm:h-[90px] rounded-md bg-placeholder-photo shrink-0 overflow-hidden border border-border/40 shadow-xs flex items-center justify-center">
                                     {p.image_url
                                       ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                       : <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                                          <Icon className="w-5 h-5 text-primary/60" />
+                                          <Icon className="w-5 h-5 text-foreground/30" />
                                           <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
                                         </div>}
                                   </div>
