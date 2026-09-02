@@ -57,7 +57,7 @@ export default function ZgodaCookies() {
       role="dialog"
       aria-live="polite"
       aria-label={t('cookies.aria')}
-      className="fixed inset-x-0 bottom-0 z-[1600] border-t border-border bg-card shadow-token-lg
+      className="fixed inset-x-0 bottom-0 z-[1200] border-t border-border bg-card shadow-token-lg
                  animate-in fade-in slide-in-from-bottom-2 duration-200"
     >
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-x-6 gap-y-3">
