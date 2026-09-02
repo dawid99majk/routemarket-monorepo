@@ -477,6 +477,15 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [{"name": "...", "wyroznik": "..
          "wymienionych", więc takie odniesienie jest dla niego bez sensu. Instrukcja
          w prompcie to za mało — w poprzednim przebiegu przeszło sześć takich. */
       if (/w[śs]r[óo]d wymienionych|z wymienionych|spo[śs]r[óo]d podobnych|wymienionych (obok|powy[żz]ej)/i.test(zdanie)) {
+        console.log(`[catalog/wyrozniki] odrzucone (framing promptu) "${m.name}": ${zdanie.slice(0, 90)}`);
+        odrzucone++; continue;
+      }
+      /* Słowa z listy zakazanych. Prompt ich zabrania, ale prompt to prośba:
+         na 411 gotowych zdań dwa przemyciły „barokowe perły" i „o jego
+         wyjątkowości". Ta sama lekcja co przy powtórzeniach opisu — reguła,
+         która ma obowiązywać, musi stać po stronie serwera. */
+      if (/wyj[ąa]tkow|niesamowit|magiczn|klejnot|per[łl][ayąe]|must-see|warto zobaczy[ćc]|nie do przegapienia/i.test(zdanie)) {
+        console.log(`[catalog/wyrozniki] odrzucone (zakazane słowo) "${m.name}": ${zdanie.slice(0, 90)}`);
         odrzucone++; continue;
       }
       await repo.updateCatalogPlace(m.id, {
