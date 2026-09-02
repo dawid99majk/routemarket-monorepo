@@ -34,6 +34,8 @@ interface Props {
   idKatalogu: string;
   /** Miejsca już przypięte do tablicy — nie proponujemy tego, co ktoś ma. */
   pomin?: string[];
+  /** Tablica, z której baza czyta gust. Bez niej ranking jest neutralny. */
+  tablica?: string | null;
   /** Klik w kafelek: otwiera to miejsce w tym samym oknie. */
   onOtworz: (m: PodobneMiejsce) => void;
   /** Dopięcie bez otwierania. Bez tej funkcji przycisk się nie pokazuje.
@@ -62,7 +64,7 @@ const czas = (min?: number | null) => {
  * Dopięcie ląduje w „być może" — „warto też rozważyć" to dokładnie ten kubełek,
  * a nie decyzja podjęta za użytkownika.
  */
-export default function PodobneMiejsca({ idKatalogu, pomin, onOtworz, onDodaj }: Props) {
+export default function PodobneMiejsca({ idKatalogu, pomin, tablica, onOtworz, onDodaj }: Props) {
   const [lista, setLista] = useState<PodobneMiejsce[]>([]);
   const [laduje, setLaduje] = useState(true);
   const [dodane, setDodane] = useState<Set<string>>(new Set());
@@ -82,6 +84,7 @@ export default function PodobneMiejsca({ idKatalogu, pomin, onOtworz, onDodaj }:
         p_limit: 6,
         p_pomin: pominRef.current,
         p_jezyk: i18n.language?.split('-')[0] || 'pl',
+        p_tablica: tablica ?? null,
       });
       if (!aktualne) return;
       if (error) {
@@ -97,7 +100,7 @@ export default function PodobneMiejsca({ idKatalogu, pomin, onOtworz, onDodaj }:
     // Zależność WYŁĄCZNIE od miejsca, nigdy od wykluczeń. Gdy efekt zależał też
     // od `pomin`, dopięcie kafelka wyrzucało go z własnej listy i podmieniało na
     // inny — zamiast potwierdzenia było przetasowanie pod palcem.
-  }, [idKatalogu]);
+  }, [idKatalogu, tablica]);
 
   if (laduje) {
     return (

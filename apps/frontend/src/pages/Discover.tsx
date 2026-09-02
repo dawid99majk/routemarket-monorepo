@@ -760,6 +760,9 @@ export default function Discover() {
           idKatalogu={karta?.id ?? null}
           /* Co już jest na tablicy, tego nie proponujemy drugi raz. */
           pomin={Object.keys(marks)}
+          /* Z tej tablicy baza czyta gust: które tagi wybierasz częściej, niż
+             wynikałoby to z samego składu miasta. */
+          tablica={activeBoard}
           onOtworzPodobne={(m) => setKarta(zPodobnego(m))}
           onDodajPodobne={(m) => mark(zPodobnego(m), 'nice')}
         />

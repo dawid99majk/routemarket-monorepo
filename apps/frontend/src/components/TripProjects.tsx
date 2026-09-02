@@ -2652,6 +2652,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               idKatalogu={placeCard?.catalog_id ?? null}
               /* Co już wisi na tablicy, tego nie proponujemy drugi raz. */
               pomin={places.map((p) => p.catalog_id).filter(Boolean) as string[]}
+              /* Ta sama tablica dostarcza gustu: dobór podobnych idzie za tym,
+                 co już na niej odłożyłeś. */
+              tablica={active?.id ?? null}
               onOtworzPodobne={otworzPodobne}
               onDodajPodobne={dopnijPodobne}
             />

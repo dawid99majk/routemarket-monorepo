@@ -38,6 +38,8 @@ interface Props {
   idKatalogu?: string | null;
   /** Miejsca już przypięte do tablicy — nie proponujemy tego, co ktoś ma. */
   pomin?: string[];
+  /** Tablica, z której baza czyta gust przy doborze podobnych. */
+  tablica?: string | null;
   onOtworzPodobne?: (m: PodobneMiejsce) => void;
   onDodajPodobne?: (m: PodobneMiejsce) => unknown;
 }
@@ -65,7 +67,7 @@ const czas = (min?: number | null) => {
  * z wyników wyszukiwania — okno służy przeglądaniu, strona dzieleniu się.
  */
 export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, ladowanie,
-                                       idKatalogu, pomin, onOtworzPodobne, onDodajPodobne }: Props) {
+                                       idKatalogu, pomin, tablica, onOtworzPodobne, onDodajPodobne }: Props) {
   const [foto, setFoto] = useState(0);
   useEffect(() => { setFoto(0); }, [miejsce?.name]);
 
@@ -184,6 +186,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
           <PodobneMiejsca
             idKatalogu={idKatalogu}
             pomin={pomin}
+            tablica={tablica}
             onOtworz={onOtworzPodobne}
             onDodaj={onDodajPodobne}
           />
