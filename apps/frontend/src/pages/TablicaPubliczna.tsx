@@ -320,11 +320,11 @@ export default function TablicaPubliczna() {
                 <div className="divide-y divide-border/60">
                   {swoje.map((m) => (
                     <div key={m.id} className="p-3.5 flex gap-3.5 hover:bg-muted/15 transition-colors group">
-                      <div className="w-[84px] h-[72px] sm:w-[96px] sm:h-[76px] rounded-md overflow-hidden bg-placeholder-photo shrink-0 border border-border/40 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <div className="w-[84px] h-[72px] sm:w-[96px] sm:h-[76px] rounded-md overflow-hidden bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 border border-border/40 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                         {m.image_url
                           ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                           : <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                              <MapPin className="w-4 h-4 text-foreground/30" />
+                              <MapPin className="w-4 h-4 text-primary/60" />
                               <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
                             </div>}
                       </div>
