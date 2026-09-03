@@ -30,8 +30,29 @@ export const SZEROKOSC = {
 const COMMONS = /^https?:\/\/upload\.wikimedia\.org\/wikipedia\/commons\//i;
 const OBRAZ = /\.(jpe?g|png|gif|webp|tiff?)$/i;
 
+/**
+ * CDN Google podaje rozmiar sufiksem `=s1600` na końcu adresu.
+ *
+ * Zdjęcia z Google Places omijały dotąd zmniejszanie w całości, bo funkcja
+ * przepuszczała bez zmian wszystko, co nie jest Wikimediami — szły więc w pełnym
+ * rozmiarze do kafelków szerokich na 330 pikseli. Zmierzone na adresie z bazy:
+ * `=s1600` waży 424 153 B, `=s500` 53 387 B, a `=s330` 26 839 B. Szesnaście razy
+ * za dużo przy pełnym feedzie.
+ *
+ * W odróżnieniu od Wikimediów Google NIE ogranicza się do listy dozwolonych
+ * szerokości — przyjmuje dowolną, więc prosimy dokładnie o tę, której używamy.
+ */
+const GOOGLE_CDN = /^https?:\/\/lh\d+\.googleusercontent\.com\//i;
+
 export function miniatura(url: string | null | undefined, szerokosc: number): string {
   if (!url) return '';
+
+  if (GOOGLE_CDN.test(url)) {
+    // Sufiks bywa `=s1600`, `=w800-h600` albo go nie ma wcale.
+    const bezSufiksu = url.replace(/=[swh]\d+(-[a-z]\d+)*(-[a-z]+)*$/i, '');
+    return `${bezSufiksu}=s${szerokosc}`;
+  }
+
   if (!COMMONS.test(url)) return url;
 
   const docelowa = DOZWOLONE.find((d) => d >= szerokosc) ?? DOZWOLONE[DOZWOLONE.length - 1];

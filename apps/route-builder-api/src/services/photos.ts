@@ -28,8 +28,8 @@ async function fetchWikiCard(wikipediaTag: string | undefined): Promise<{ image?
 
 export const COMMONS_UA = 'RouteMarket/1.0 (+https://routemarket.io)';
 
-/** Pliki, które nigdy nie są zdjęciem miejsca: herby, flagi, mapy, schematy, pliki wideo, ryciny, zrzuty z TV, zniszczenia wojenne */
-const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite|skizze|sketch|drawing|zeichnung|rysunek|szkic|kupferstich|litho|engraving|gravure|etching|blueprint|grundriss|reconstruction|render|simulation|screenshot|zdf|ard|arte|bbc|fernsehen|broadcast|television|\bwebm\b|\bogv\b|\bogg\b|\bmp4\b|bau_des|construction_of|ruine?|zerstört|destroyed|bombard|fire\b|brand\b|\b(18\d\d|19[0-4]\d)\b)/i;
+/** Pliki, które nigdy nie są zdjęciem miejsca: herby, flagi, mapy, schematy, pliki wideo, ryciny, zrzuty z TV, zniszczenia wojenne, czarno-białe pocztówki i archiwalia */
+const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite|skizze|sketch|drawing|zeichnung|rysunek|szkic|kupferstich|litho|engraving|gravure|etching|blueprint|grundriss|reconstruction|render|simulation|screenshot|zdf|ard|arte|bbc|fernsehen|broadcast|television|\bwebm\b|\bogv\b|\bogg\b|\bmp4\b|bau_des|construction_of|ruine?|zerstört|destroyed|bombard|fire\b|brand\b|\b(18\d\d|19[0-7]\d)\b|black_and_white|schwarzweiss|czarno_biale|historic|historisch|vintage|postcard|ansichtskarte|postkarte|pocztowka)/i;
 
 /**
  * Nazwy prosto z aparatu ("DSC_0431", "IMG 2207", "P1010823"). Taki plik nie mówi
@@ -280,9 +280,75 @@ async function wikiArticlePhotos(wikipediaTag: string | undefined, name: string,
  * Rynek we Wrocławiu miał jako zdjęcie główne zbliżenie twarzy przypadkowego
  * turysty — plik miał geotag z płyty rynku i to wystarczało.
  */
+/**
+ * Zdjęcia z Google Places API. Najwyższej jakości, współczesne, kolorowe, robione przez gości
+ * i profesjonalnych fotografów. Zwraca bezpośrednie linki do CDN Google.
+ */
+export async function fetchGooglePlacesPhotos(
+  name: string,
+  lat?: number,
+  lng?: number,
+  city?: string,
+  limit = 5
+): Promise<string[]> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return [];
+
+  try {
+    const query = city ? `${name} ${city}` : name;
+    let url = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id,name,photos,rating&key=${apiKey}`;
+    if (lat != null && lng != null) {
+      url += `&locationbias=point:${lat},${lng}`;
+    }
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return [];
+    const data = (await res.json()) as any;
+    const candidate = data.candidates?.[0];
+    if (!candidate?.photos || candidate.photos.length === 0) return [];
+
+    const photosToFetch = candidate.photos.slice(0, limit);
+    const photoUrls = await Promise.all(
+      photosToFetch.map(async (ph: any) => {
+        const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1600&photo_reference=${ph.photo_reference}&key=${apiKey}`;
+        try {
+          const r = await fetch(photoUrl, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(4000) });
+          const loc = r.headers.get('location');
+          /* TYLKO rozwiązany adres CDN. Wcześniej przy braku przekierowania
+             zwracaliśmy `photoUrl`, a ten niesie `&key=...` — trafiłby do bazy,
+             a stamtąd do przeglądarki KAŻDEGO odwiedzającego. Do tego każde
+             wyświetlenie takiego adresu byłoby płatnym wywołaniem Place Photo,
+             czyli odwrotnością tego, po co w ogóle rozwiązujemy przekierowanie.
+             Lepiej stracić jedno zdjęcie i sięgnąć po zapas z Wikimediów. */
+          return loc && loc.startsWith('http') ? loc : '';
+        } catch {
+          return '';
+        }
+      })
+    );
+
+    // Puste wpisy to zdjęcia, których nie udało się rozwiązać do adresu CDN.
+    return photoUrls.filter((u) => !!u);
+  } catch (err) {
+    console.warn(`[photos] Google Places failed for "${name}":`, err);
+    return [];
+  }
+}
+
+/**
+ * Zdjęcia miejsca.
+ * 1. Zawsze w pierwszej kolejności sprawdzamy Google Places API (żywe, nowoczesne, pełne światła zdjęcia).
+ * 2. Jeśli brak lub za mało — dopełniamy reprezentacyjnym ujęciem z Wikipedii i Commons.
+ */
 export async function fetchNearbyPhotos(
   name: string, lat?: number, lng?: number, limit = 4, city?: string, wikipediaTag?: string
 ): Promise<string[]> {
+  // 1. Zawsze pierwszeństwo mają zdjęcia z Google Places API
+  const googlePhotos = await fetchGooglePlacesPhotos(name, lat, lng, city, limit).catch(() => []);
+  if (googlePhotos.length >= Math.min(3, limit)) {
+    return googlePhotos.slice(0, limit);
+  }
+
   const origin = lat != null && lng != null ? { lat, lng } : null;
 
   // Jeśli OSM podaje artykuł wprost, to jest odpowiedź pewna i nie ma po co
@@ -295,10 +361,6 @@ export async function fetchNearbyPhotos(
   let tokens = distinctiveTokens(name);
   if (tokens.length === 0 && city) tokens = distinctiveTokens(city);
 
-  // Miasto zawsze w zapytaniu do Commons. Wcześniej znikało z frazy, gdy nazwa
-  // miała choć jeden wyróżniający token — czyli prawie zawsze — więc "Hala
-  // Targowa" czy "Kościół Świętego Wojciecha" szukane samo trafiało identycznie
-  // nazwane obiekty z całej Polski na równi z właściwym.
   const searchPhrase = city ? `${name} ${city}` : name;
 
   const zArtykulu = await wikiArticlePhotos(wikipediaTag, name).catch(() => [] as string[]);
@@ -322,10 +384,7 @@ export async function fetchNearbyPhotos(
       : Promise.resolve([])
   ]);
 
-  // Kolejność źródeł jest punktem wyjścia, nie wyrokiem: wiodące, artykuł,
-  // nazwa, okolica. Artykuł NIE wygrywa automatycznie — bywa ubogi albo pokazuje
-  // obiekt pokrewny (artykuł o Pałacu Parlamentu ma zdjęcie Zamku Peleș).
-  const kandydaci = [...new Set([...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])]
+  const kandydaci = [...new Set([...googlePhotos, ...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])]
     .filter((adres) => {
       const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
       if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return false;
@@ -333,19 +392,18 @@ export async function fetchNearbyPhotos(
       return true;
     });
 
-  // Jedyna informacja, którą mamy o KAŻDYM kandydacie niezależnie od źródła, to
-  // nazwa pliku. Ona rozstrzyga, gdy źródła się nie zgadzają.
   const tokenyNazwy = distinctiveTokens(name).map((t) => stripDiacritics(t).toLowerCase());
   const punktyZa = (adres: string) => {
-    const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
     let p = 0;
+    // Google Places ma najwyższy priorytet
+    if (adres.includes('googleusercontent.com') || adres.includes('maps.googleapis.com')) return 10;
+    const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
     if (tokenyNazwy.some((t) => plik.includes(t))) p += 4;
     if (PHOTO_DETAL.test(plik)) p -= 3;
     if (tagged.includes(adres)) p += 2;
     return p;
   };
 
-  // Sortowanie stabilne: przy równych punktach kolejność źródeł zostaje.
   return kandydaci
     .map((adres, i) => ({ adres, p: punktyZa(adres), i }))
     .sort((a, b) => b.p - a.p || a.i - b.i)
