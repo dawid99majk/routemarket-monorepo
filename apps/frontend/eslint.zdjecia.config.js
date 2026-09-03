@@ -8,6 +8,12 @@ import reactHooks from "eslint-plugin-react-hooks";
  * zablokowałoby każde wdrożenie. Ta konfiguracja sprawdza jedną rzecz, która
  * już dwa razy weszła na produkcję i dwa razy kosztowała dziesiątki megabajtów
  * transferu na jedno wejście — dzięki temu może realnie zatrzymać build.
+ *
+ * 03.09.2026 — zdjęty zakaz surowych kolorów palety Tailwinda. Wygląd idzie do
+ * przebudowy i reguła opisująca poprzedni kierunek blokowałaby ją jako pierwsza.
+ * Zakaz zdjęcia bez miniatury ZOSTAJE, bo to nie jest reguła estetyczna: pełne
+ * zdjęcie wysłane do przeglądarki jest błędem przy każdym designie.
+ * Stara reguła siedzi w historii gita, gdyby miała wrócić.
  */
 export default tseslint.config(
   { ignores: ["dist"] },
@@ -26,15 +32,6 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "off",
       "no-restricted-syntax": [
         "error",
-        {
-          // Kolory z palety Tailwinda zamiast tokenów. System ma `--danger`,
-          // `--success`, `--warning` — surowa klasa odstaje na ciepłym papierze
-          // i nie idzie za motywem.
-          selector:
-            "JSXAttribute[name.name='className'] Literal[value=/(^|\\s)(bg|text|border)-(red|green|blue|cyan|indigo|purple|pink|teal|lime|sky|violet|fuchsia|yellow)-[0-9]{2,3}(\\s|$)/]",
-          message:
-            "Surowy kolor Tailwinda: użyj tokenu (bg-danger / text-success / bg-warning / bg-primary / text-accent).",
-        },
         {
           selector:
             "JSXOpeningElement[name.name='img'] > JSXAttribute[name.name='src'] > JSXExpressionContainer:not(:has(CallExpression[callee.name='miniatura'])) MemberExpression[property.name=/^(photos|image_url|zdjecia)$/]",
