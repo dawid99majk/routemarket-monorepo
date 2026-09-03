@@ -45,6 +45,22 @@ przenosić hexów do kodu.** `tokens.css` mapuje każdą użytą wartość na to
 w implementacji obowiązuje zasada systemu: `bg-background`, `text-foreground`,
 `bg-card`, `text-muted-foreground`, `bg-accent`, `border-border`.
 
+**Jeden wyjątek: biblioteki, które nie przyjmują klas.** Leaflet i Three.js
+dostają kolor jako wartość w JavaScripcie, nie jako klasę Tailwinda — nie da się
+im podać `bg-primary`. Dotyczy to ikon pinezek, kolorów tras i materiałów 3D.
+W tych miejscach wolno operować wartością koloru, ale **odczytaną z tokenu**:
+
+```js
+const token = (nazwa) => getComputedStyle(document.documentElement)
+  .getPropertyValue(nazwa).trim();
+color: `hsl(${token('--primary')})`
+```
+
+Czego wyjątek NIE obejmuje: wpisania własnego hexa „bo tak szybciej". Jeśli
+w kodzie stoi `'#6366f1'`, to jest błąd do poprawienia, a nie zastosowanie tego
+wyjątku. Zapisane, bo bez tego każdy kolejny przegląd zgłasza te same linie jako
+naruszenie, a poprawianie ich na siłę kończy się mapą bez kolorów.
+
 Mapowanie skrótowo:
 
 | Hex w prototypie | Token |
@@ -227,8 +243,14 @@ zasad, które w niej obowiązują i które łatwo zgubić przy tłumaczeniu na `
 
 - Zdania zaczynają się wielką literą, reszta małą — także przyciski i zakładki.
 - Wersaliki tylko w nadtytułach, `Archivo Narrow`, ≤ 11 px.
-- Odstęp liter: `0.18em` przy 11 px, `0.24em` przy 9 px (prototypy). Liczy się
-  odstęp optyczny ~2 px, nie sama wartość `em` — rośnie, gdy stopień maleje.
+- Odstęp liter — zapis zgodny z tym, co JEST w kodzie (policzone 03.09.2026),
+  a nie z prototypem: `0.18em` przy 10 px (28 wystąpień), `0.32em` przy 11 px
+  (18 wystąpień). Wartości z prototypu (`0.24em`, stopień 9 px) nie weszły do
+  implementacji ani razu. Liczy się odstęp optyczny ~2 px, nie sama wartość `em`
+  — rośnie, gdy stopień maleje.
+  **Znany dług:** cztery miejsca używają `0.18em` przy 11 px, czyli tam, gdzie
+  osiemnaście innych używa `0.32em`. Do ujednolicenia przy najbliższej okazji
+  dotykającej tych komponentów — nie warto robić z tego osobnego przebiegu.
 - Separator `·` w metadanych, ze spacjami: `1 g 30 min · rzymski · cień po 15:00`.
 - Czas po polsku: `1 g 30 min`, nie `1h 30m`. Przecinek dziesiętny: `3,8 km`.
 - Głos agenta jest **obserwacją, nie poradą**: „Czwarty punkt by się zmieścił,
