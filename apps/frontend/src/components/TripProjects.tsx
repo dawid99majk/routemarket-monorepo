@@ -30,6 +30,8 @@ import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/l
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
+import { odmien } from '@/lib/odmiana';
+import { bilansTablicy } from '@/lib/bilansTablicy';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -1384,7 +1386,12 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   }
 
   const mustCount = places.filter((p) => p.priority === 'must').length;
-  const totalMinutes = places.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
+  const niceCount = places.filter((p) => p.priority === 'nice').length;
+  /* Odrzucone nie liczą się do czasu. Gdy `totalMinutes` sumował wszystko,
+     miejsce świadomie odrzucone dalej zjadało budżet dnia — tablica Wrocławia
+     pokazywała 24,8 h zamiast 22,7 h. */
+  const aktywne = places.filter((p) => p.priority !== 'rejected');
+  const totalMinutes = aktywne.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
 
   /**
    * Ile z zaplanowanego czasu już zajęliśmy. Samo "zwiedzanie łącznie: 6 h" nic
@@ -1398,7 +1405,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!active?.days || !active?.hours_per_day) return null;
     const windowMin = Number(active.days) * Number(active.hours_per_day) * 60;
     const planned = Math.round((windowMin * (active.fill_percent ?? 70)) / 100);
-    const used = totalMinutes + Math.max(0, places.length - 1) * TRANSFER_MIN;
+    const used = totalMinutes + Math.max(0, aktywne.length - 1) * TRANSFER_MIN;
     return { windowMin, planned, used, ratio: planned > 0 ? used / planned : 0 };
   })();
 
@@ -1407,6 +1414,18 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
    * przeznaczony na zwiedzanie. Mediana jako środek, bo jest odporna na to, że
    * sam odstający punkt przeciąga średnią w swoją stronę.
    */
+  /* Jedna uwaga o tym, co zebrane — z tych samych liczb, które i tak mamy.
+     Bez wołania modelu, żeby tablica nie czekała i nie kosztowała przy każdym
+     kliknięciu. Reguły i przypadki brzegowe siedzą w `bilansTablicy` z testami. */
+  const uwagaAgenta = bilansTablicy({
+    aktywne,
+    pewnych: mustCount,
+    doRozwazenia: niceCount,
+    dni: active?.days ?? null,
+    zajeteMinut: budget?.used ?? null,
+    planowaneMinut: budget?.planned ?? null,
+  });
+
   const outliers = (() => {
     const withCoords = places.filter((p) => p.lat != null && p.lng != null);
     if (withCoords.length < 4) return [] as typeof places;
@@ -1579,7 +1598,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <Plus className="w-4 h-4 mr-1.5" /> Dodaj miejsca
               </Button>
             )}
-            {active && (mustCount > 0 || places.filter((p) => p.priority !== 'rejected').length > 0) && view === 'tablica' && (
+            {active && aktywne.length > 0 && view === 'tablica' && (
               <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
                 className="bg-foreground text-background hover:bg-foreground/90">
                 Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
@@ -1592,19 +1611,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           <>
             {view === 'tablica' && (<>
             {/* Pasek statusu agenta na tablicy */}
-            {places.filter((p) => p.priority !== 'rejected').length > 0 && (
+            {aktywne.length > 0 && (
               <div className="rounded-md bg-muted/60 border border-border px-4 py-3 flex items-start gap-3">
                 <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground border border-border rounded-full px-2 py-0.5 shrink-0 mt-0.5 bg-background">
                   Agent
                 </span>
                 <div className="text-sm text-foreground/85 leading-relaxed flex-1">
                   <span>
-                    Masz <strong>{mustCount}</strong> {mustCount === 1 ? 'miejsce pewne' : 'miejsc pewnych'} i <strong>{places.filter((p) => p.priority === 'nice').length}</strong> do rozważenia
+                    Masz <strong>{mustCount}</strong> {odmien(mustCount, 'miejsce pewne', 'miejsca pewne', 'miejsc pewnych')} i <strong>{niceCount}</strong> do rozważenia
                     {budget ? ` (ok. ${(budget.used / 60).toFixed(1)} h zwiedzania)` : ''}.
                     {' '}
-                    {mustCount + places.filter((p) => p.priority === 'nice').length >= (active.days ? active.days * 2 : 3)
-                      ? 'To zbalansowana baza kotwic — kliknij „Ułóż plan”, a ułożę je w realną trasę z dojściami i posiłkami.'
-                      : 'Dobierz jeszcze kilka interesujących punktów, a ułożę z nich optymalny plan dnia.'}
+                    {uwagaAgenta?.tekst}
                   </span>
                 </div>
               </div>
@@ -2299,10 +2316,21 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         variant="outline"
                         size="sm"
                         className="w-full justify-center gap-2"
-                        onClick={() => {
-                          const url = `https://routemarket.io/tablica/${active.id}`;
-                          navigator.clipboard.writeText(url);
-                          toast.success('Skopiowano link do tablicy! Możesz wysłać go uczestnikom wyjazdu.');
+                        onClick={async () => {
+                          /* Adres ze środowiska, nie wpisany na sztywno — inaczej
+                             poza produkcją kopiowałby się odnośnik do produkcji. */
+                          const url = `${window.location.origin}/tablica/${active.id}`;
+                          try {
+                            await navigator.clipboard.writeText(url);
+                            /* Mówimy, co ten link NAPRAWDĘ daje. Odbiorca może tablicę
+                               obejrzeć i skopiować do siebie — dokładać do Twojej
+                               jeszcze nie potrafi, więc nie obiecujemy współpracy. */
+                            toast.success('Odnośnik skopiowany. Kto go otworzy, zobaczy Twoje miejsca i może skopiować tablicę do siebie.');
+                          } catch {
+                            /* Schowek potrafi odmówić. Wcześniej i tak pokazywaliśmy
+                               „skopiowano", więc człowiek wklejał pustkę. */
+                            toast.error('Nie udało się skopiować. Odnośnik: ' + url);
+                          }
                         }}
                       >
                         <Copy className="w-3.5 h-3.5" />
