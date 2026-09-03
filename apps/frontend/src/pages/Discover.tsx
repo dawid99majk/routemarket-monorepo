@@ -611,138 +611,135 @@ export default function Discover() {
       />
 
       <main className="max-w-[1280px] mx-auto px-10 pb-24">
-        {/* Nagłówek dwukolumnowy */}
-        <div className="pt-12 flex flex-wrap items-start justify-between gap-8">
-          <div className="max-w-[560px] w-full">
+        {/* Lekki nagłówek i kontekst wyjazdu */}
+        <div className="pt-8 pb-4 flex flex-wrap items-center justify-between gap-4 border-b border-border/40">
+          <div>
             {board && boards.length > 0 ? (
               <PrzelacznikWyjazdu
                 aktywny={board}
                 wszystkie={boards}
                 onZmien={przelaczWyjazd}
                 onNowy={() => navigate('/start')}
+                wariant="kompaktowy"
               />
             ) : (
-              <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
-                Odkrywanie miejsc
-              </p>
+              <div className="flex items-center gap-3">
+                <span className="font-narrow uppercase tracking-[0.24em] text-[10px] text-muted-foreground bg-muted/80 px-2.5 py-0.5 rounded-full border border-border/60 shrink-0">
+                  Eksploracja
+                </span>
+                <h1 className="font-display font-light text-2xl sm:text-3xl tracking-[-0.01em]">
+                  {t('naglowek.odkrywaj')}
+                </h1>
+              </div>
             )}
-            {/* Nazwa ekranu przy opisie, nie nad nim -- "Odkrywaj" jest już
-                podświetlone w nawigacji, więc nie musi krzyczeć drugi raz. */}
-            <p className="mt-6 leading-snug">
-              <span className="font-display text-[22px]">{t('naglowek.odkrywaj')}</span>
-              <span className="text-[15px] text-muted-foreground ml-2">
-                — {t('odkrywaj.zapisuj_co_cie_interesuje')}
-              </span>
-            </p>
           </div>
 
-          <div className="text-right">
-            <p className="font-mono text-[13px] text-muted-foreground tabular-nums">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xs text-muted-foreground tabular-nums hidden sm:inline">
               {savedCount} zapisanych · {maybeCount} do rozważenia
-            </p>
-            <div className="flex flex-wrap gap-2 justify-end mt-3">
-              {/* Tablica dostępna też tutaj, nie tylko w pasku: zapisując miejsca
-                  najczęściej chce się sprawdzić, co już się uzbierało. */}
-              <Button variant="outline"
-                onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>{t('odkrywaj.tablica')}</Button>
-              <Button className="bg-foreground text-background hover:bg-foreground/90"
-                onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}>
-                Zbuduj plan z tablicy <ArrowUpRight className="w-4 h-4 ml-1.5" />
-              </Button>
-            </div>
+            </span>
+            <Button variant="outline" size="sm" className="rounded-full h-9 px-3.5 text-xs"
+              onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>
+              {t('odkrywaj.tablica')}
+            </Button>
+            <Button size="sm" className="rounded-full h-9 px-4 text-xs bg-foreground text-background hover:bg-foreground/90"
+              onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}>
+              Zbuduj plan <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
           </div>
         </div>
 
-        {/* Szukanie w osobnym wierszu, nie wciśnięte między pigułki: to
-            pierwsza rzecz, po którą się tu sięga, więc ma wyglądać jak ona. */}
-        <div className="mt-8 rounded-md border border-border bg-card p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1 min-w-0">
-              <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        {/* Pływająca wyspa wyszukiwania (w stylu Airbnb) */}
+        <div className="mt-6 max-w-3xl mx-auto">
+          <div className="rounded-full bg-card border border-border/80 shadow-[0_2px_16px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.1)] transition-all p-1.5 flex flex-col sm:flex-row items-center gap-2">
+            {/* Pole 1: Czego szukasz */}
+            <div className="relative flex-1 w-full flex items-center pl-4">
+              <Search className="w-4 h-4 text-muted-foreground shrink-0" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') szukajAgentem(); }}
                 placeholder={t('odkrywaj.szukaj_plaza_ruiny_deszczowy_dzien')}
-                className="w-full h-12 rounded-full bg-muted/60 border border-border pl-12 pr-[124px]
-                           text-[15px] outline-none transition-colors
-                           placeholder:text-muted-foreground
-                           focus:border-foreground/40 focus:bg-card"
+                className="w-full h-10 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground text-foreground"
               />
-              {/* Wpisanie frazy zawęża listę od razu; przycisk to drugi krok —
-                  pyta agenta o rzeczy, których w katalogu jeszcze nie ma. */}
-              <button onClick={szukajAgentem} disabled={!query.trim() || szukaAgent}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 rounded-full
-                           bg-foreground text-background px-4 text-sm
-                           hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed
-                           transition-colors">
-                {szukaAgent
-                  ? <span className="inline-flex items-center gap-1.5">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="font-mono tabular-nums text-[13px]">{szukaSekundy}s</span>
-                    </span>
-                  : 'Szukaj'}
-              </button>
             </div>
-            <div className="relative sm:w-56 shrink-0">
-              <MapPin className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <Input list="miasta" value={city} onChange={(e) => setCity(e.target.value)}
+
+            <div className="hidden sm:block w-px h-6 bg-border/60" />
+
+            {/* Pole 2: Miasto */}
+            <div className="relative w-full sm:w-56 flex items-center pl-4 sm:pl-2 pr-1">
+              <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+              <input
+                list="miasta"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
                 placeholder={t('odkrywaj.miasto')}
-                className="pl-10 h-12 rounded-full text-[15px]" />
+                className="w-full h-10 bg-transparent px-2.5 text-sm outline-none placeholder:text-muted-foreground text-foreground"
+              />
               <datalist id="miasta">{cities.map((c) => <option key={c} value={c} />)}</datalist>
+
+              <button
+                onClick={szukajAgentem}
+                disabled={!query.trim() || szukaAgent}
+                aria-label="Szukaj"
+                className="w-9 h-9 rounded-full bg-foreground text-background flex items-center justify-center shrink-0 hover:bg-foreground/90 disabled:opacity-40 transition-all shadow-xs ml-1"
+              >
+                {szukaAgent ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUpRight className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
           {szukaAgent && (
-            <p className="font-mono text-[12px] text-muted-foreground mt-3">
-              Agent przegląda miasto — to trwa do minuty. Lista niżej działa przez ten czas normalnie.
+            <p className="font-mono text-[11px] text-center text-muted-foreground mt-2 animate-pulse">
+              Agent przeszukuje miasto ({szukaSekundy}s)… możesz przeglądać dotychczasowe miejsca.
             </p>
           )}
 
-          {/* Filtry pod kreską: doprecyzowanie tego, co wyżej, a nie konkurencja
-              dla szukania. Kategorie przed klimatem — najpierw „czego szukam",
-              potem „jakie ma być". Pokazujemy tylko te kategorie, które w tym
-              mieście istnieją: pusta pigułka „Nocleg" byłaby obietnicą bez pokrycia. */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-4 pt-4 border-t border-border/50">
+          {/* Filtry jako płynny, napowietrzony pasek tagów pod wyszukiwarką */}
+          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
             {KATEGORIE.filter((k) => k.id === 'wszystkie'
                 || places.some((p) => (p.category ?? 'attraction') === k.id)).map((k) => (
               <button
                 key={k.id}
                 onClick={() => setKategoria(k.id)}
                 aria-pressed={kategoria === k.id}
-                className={`rounded-full px-3 py-1 text-xs border transition-colors ${
+                className={`rounded-full px-3 py-1 text-xs transition-all ${
                   kategoria === k.id
-                    ? 'bg-foreground border-foreground text-background'
-                    : 'bg-background border-border hover:bg-muted text-muted-foreground'
+                    ? 'bg-foreground text-background font-medium shadow-2xs'
+                    : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
                 {k.label}
               </button>
             ))}
 
-            <span className="w-px h-4 bg-border mx-1.5 hidden sm:block" />
+            <span className="w-px h-3.5 bg-border/80 mx-1 hidden sm:block" />
 
             {FILTERS.map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 aria-pressed={filter === f.id}
-                className={`rounded-full px-3 py-1 text-xs border transition-colors ${
+                className={`rounded-full px-3 py-1 text-xs transition-all ${
                   filter === f.id
-                    ? 'bg-foreground border-foreground text-background'
-                    : 'bg-background border-border hover:bg-muted'
+                    ? 'bg-foreground text-background font-medium shadow-2xs'
+                    : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
                 {f.label}
               </button>
             ))}
 
-            <button onClick={() => setPokazMape((v) => !v)}
+            <button
+              onClick={() => setPokazMape((v) => !v)}
               aria-pressed={pokazMape}
-              className={`ml-auto rounded-full px-3 py-1 text-xs border transition-colors ${
-                pokazMape ? 'bg-foreground text-background border-foreground' : 'bg-background border-border hover:bg-muted'
-              }`}>
-              {pokazMape ? 'Ukryj mapę' : 'Pokaż mapę'}
+              className={`rounded-full px-3 py-1 text-xs transition-all ml-2 ${
+                pokazMape
+                  ? 'bg-foreground text-background font-medium'
+                  : 'bg-card border border-border/80 text-foreground hover:bg-muted shadow-2xs'
+              }`}
+            >
+              {pokazMape ? 'Ukryj mapę' : '🗺️ Pokaż mapę'}
             </button>
           </div>
         </div>
@@ -850,17 +847,25 @@ export default function Discover() {
           </div>
         )}
 
-        {/* Pasek agenta */}
+        {/* Pasek agenta Co-pilot */}
         {board && places.length > 0 && (
-          <div className="mt-4 rounded-md bg-muted border border-border px-4 py-3 flex items-start gap-3">
-            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground border border-border rounded-full px-2 py-0.5 shrink-0 mt-0.5">
-              Agent
-            </span>
-            <p className="text-sm text-foreground/80 leading-relaxed">
-              {savedCount === 0
-                ? 'Zacznij od kilku miejsc, które na pewno chcesz zobaczyć. Resztę dobiorę tak, żeby dzień się spinał.'
-                : `Masz ${savedCount} pewnych i ${maybeCount} do rozważenia. Kiedy uznasz, że wystarczy, ułożę z tego plan dni.`}
-            </p>
+          <div className="mt-5 flex justify-center">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/15 text-xs text-foreground/85 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>
+                {savedCount === 0
+                  ? 'Zacznij od kilku kotwic — resztę dobiorę tak, żeby dzień się spinał.'
+                  : `Masz ${savedCount} pewnych i ${maybeCount} do rozważenia.`}
+              </span>
+              {savedCount > 0 && (
+                <button
+                  onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}
+                  className="text-primary hover:underline font-medium ml-1 inline-flex items-center"
+                >
+                  Ułóż plan ↗
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -1023,7 +1028,7 @@ export default function Discover() {
                         </p>
                       )}
                       {wyroznikMiejsca(p) ? (
-                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-foreground/25 pl-2.5 leading-snug line-clamp-2 text-pretty">
+                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-primary/70 pl-2.5 leading-snug line-clamp-2 text-pretty">
                           {wyroznikMiejsca(p)}
                         </p>
                       ) : opisMiejsca(p) ? (

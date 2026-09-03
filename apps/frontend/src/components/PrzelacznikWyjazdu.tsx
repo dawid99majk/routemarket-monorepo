@@ -22,32 +22,17 @@ interface PrzelacznikWyjazduProps {
   wszystkie: WyjazdDoPrzelaczenia[];
   onZmien: (id: string) => void;
   onNowy: () => void;
+  wariant?: 'pelny' | 'kompaktowy';
 }
 
 const KLUCZ_PODPOWIEDZI = 'rm_widzial_przelacznik_wyjazdow';
 
-/**
- * Wyjazd jako największy element na ekranie Odkrywaj, nie pole do wypełnienia.
- *
- * Wcześniej ten sam kontekst pokazywał się w trzech miejscach naraz: pigułka
- * w nagłówku (`PlannerHeader`), statyczny napis obok niej, i osobny `<select>`
- * tutaj -- trzy widoki jednej rzeczy, żaden nie był tym oczywistym. Ten
- * komponent zastępuje trzeci, a `Discover.tsx` gasi pierwszy przez
- * `ukryjPigulke` -- drugi zostaje, bo jest zbyt mały, żeby się z czymkolwiek
- * dublować.
- *
- * Rozwinięta lista pokazuje miniaturę, liczbę miejsc i zakres dat, więc wybór
- * nie opiera się na samej nazwie, którą nadaje się w pośpiechu -- "haga
- * delegacja" i "haga wakacje" różnią się dopiero w środku.
- */
-export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy }: PrzelacznikWyjazduProps) {
+export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy, wariant = 'kompaktowy' }: PrzelacznikWyjazduProps) {
   const { t } = useTranslation();
   const [otwarty, setOtwarty] = useState(false);
   const [podpowiedz, setPodpowiedz] = useState(false);
   const zamknietaRecznie = useRef(false);
 
-  // Dymek uczy, że przełącznik istnieje -- ale tylko wtedy, gdy jest między czym
-  // wybierać. Przy jednym wyjeździe "tu się przełączysz" nie znaczy nic.
   useEffect(() => {
     if (wszystkie.length < 2 || zamknietaRecznie.current) return;
     let widziane = false;
@@ -69,6 +54,73 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
     aktywny.liczba_miejsc != null ? t('odkrywaj.miejsc_na_tablicy', { count: aktywny.liczba_miejsc }) : null,
   ].filter(Boolean).join(' · ');
 
+  const popoverZawartosc = (
+    <PopoverContent align={wariant === 'kompaktowy' ? 'start' : 'end'} className="w-80 p-0 max-h-[70vh] overflow-y-auto z-[2600]">
+      <p className="font-narrow uppercase tracking-[0.24em] text-[10px] text-muted-foreground px-3.5 pt-3 pb-1.5">
+        {t('odkrywaj.twoje_wyjazdy')}
+      </p>
+      {wszystkie.map((w) => (
+        <button
+          key={w.id}
+          onClick={() => { onZmien(w.id); setOtwarty(false); }}
+          className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${
+            w.id === aktywny.id ? 'bg-muted' : 'hover:bg-muted/60'
+          }`}
+        >
+          <div className="w-11 h-11 rounded-sm overflow-hidden bg-muted shrink-0">
+            {w.miniatura && <Zdjecie src={w.miniatura} gdzie={120} alt="" className="w-full h-full object-cover" />}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[14px] font-medium truncate">{w.name}</p>
+            <p className="font-mono text-[11px] text-muted-foreground truncate">
+              {[w.destination, w.liczba_miejsc != null ? t('odkrywaj.miejsc_na_tablicy', { count: w.liczba_miejsc }) : null]
+                .filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        </button>
+      ))}
+      <button
+        onClick={() => { onNowy(); setOtwarty(false); }}
+        className="w-full flex items-center gap-2 px-3.5 py-3 text-[13px] text-muted-foreground
+                   hover:text-foreground border-t border-border transition-colors"
+      >
+        <Plus className="w-3.5 h-3.5" /> {t('odkrywaj.nowy_wyjazd_lista')}
+      </button>
+    </PopoverContent>
+  );
+
+  if (wariant === 'kompaktowy') {
+    return (
+      <div className="flex flex-wrap items-baseline gap-2.5">
+        <span className="font-narrow uppercase tracking-[0.24em] text-[10px] text-muted-foreground bg-muted/80 px-2.5 py-0.5 rounded-full border border-border/60 shrink-0">
+          Wyjazd
+        </span>
+        <h1 className="font-display font-light text-2xl sm:text-3xl tracking-[-0.01em] min-w-0 truncate">
+          {aktywny.name}
+        </h1>
+
+        <Popover open={otwarty} onOpenChange={(o) => { setOtwarty(o); if (o) zamknijPodpowiedz(); }}>
+          <PopoverTrigger asChild>
+            <button
+              className="relative shrink-0 inline-flex items-center gap-1.5 h-7 rounded-full border border-border/80
+                         bg-card px-2.5 text-[12px] hover:border-foreground/40 transition-colors shadow-2xs"
+            >
+              <span>{t('odkrywaj.zmien_wyjazd')}</span>
+              <span className="text-muted-foreground text-[10px]">▾</span>
+            </button>
+          </PopoverTrigger>
+          {popoverZawartosc}
+        </Popover>
+
+        {meta && (
+          <span className="font-mono text-xs text-muted-foreground hidden lg:inline ml-1">
+            · {meta}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-md border border-border bg-card px-5 py-4">
       <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">
@@ -88,61 +140,9 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
             >
               {t('odkrywaj.zmien_wyjazd')}
               <span className="text-muted-foreground">▾</span>
-
-              {/* Dymek zaczepiony o ten sam przycisk, który uczy obsługiwać. */}
-              {podpowiedz && (
-                <span
-                  role="tooltip"
-                  className="absolute left-1/2 -translate-x-1/2 top-full mt-2.5 z-30 w-64
-                             rounded-md border border-accent/30 bg-card shadow-token-lg p-3.5 text-left
-                             normal-case font-sans animate-in fade-in slide-in-from-top-1 duration-200"
-                >
-                  <p className="text-[13px] leading-relaxed text-foreground/85 text-pretty">
-                    {t('odkrywaj.podpowiedz_przelacznika', { count: wszystkie.length })}
-                  </p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); zamknijPodpowiedz(); }}
-                    className="mt-2 text-[12px] text-accent hover:underline"
-                  >
-                    {t('odkrywaj.zamknij_podpowiedz')}
-                  </button>
-                </span>
-              )}
             </button>
           </PopoverTrigger>
-
-          <PopoverContent align="end" className="w-80 p-0 max-h-[70vh] overflow-y-auto">
-            <p className="font-narrow uppercase tracking-[0.24em] text-[10px] text-muted-foreground px-3.5 pt-3 pb-1.5">
-              {t('odkrywaj.twoje_wyjazdy')}
-            </p>
-            {wszystkie.map((w) => (
-              <button
-                key={w.id}
-                onClick={() => { onZmien(w.id); setOtwarty(false); }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${
-                  w.id === aktywny.id ? 'bg-muted' : 'hover:bg-muted/60'
-                }`}
-              >
-                <div className="w-11 h-11 rounded-sm overflow-hidden bg-muted shrink-0">
-                  {w.miniatura && <Zdjecie src={w.miniatura} gdzie={120} alt="" className="w-full h-full object-cover" />}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-medium truncate">{w.name}</p>
-                  <p className="font-mono text-[11px] text-muted-foreground truncate">
-                    {[w.destination, w.liczba_miejsc != null ? t('odkrywaj.miejsc_na_tablicy', { count: w.liczba_miejsc }) : null]
-                      .filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-              </button>
-            ))}
-            <button
-              onClick={() => { onNowy(); setOtwarty(false); }}
-              className="w-full flex items-center gap-2 px-3.5 py-3 text-[13px] text-muted-foreground
-                         hover:text-foreground border-t border-border transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" /> {t('odkrywaj.nowy_wyjazd_lista')}
-            </button>
-          </PopoverContent>
+          {popoverZawartosc}
         </Popover>
       </div>
 
