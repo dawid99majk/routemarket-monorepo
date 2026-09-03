@@ -343,11 +343,11 @@ export async function fetchGooglePlacesPhotos(
 export async function fetchNearbyPhotos(
   name: string, lat?: number, lng?: number, limit = 4, city?: string, wikipediaTag?: string
 ): Promise<string[]> {
-  // 1. Zawsze pierwszeństwo mają zdjęcia z Google Places API
-  const googlePhotos = await fetchGooglePlacesPhotos(name, lat, lng, city, limit).catch(() => []);
-  if (googlePhotos.length >= Math.min(3, limit)) {
-    return googlePhotos.slice(0, limit);
-  }
+  // Google Places WYCOFANE jako źródło zdjęć. Adres `googleusercontent` zwrócony
+  // przez Place Photo nie jest zwolniony z zakazu przechowywania treści Places
+  // API — jedynym wyjątkiem, który wolno trzymać bezterminowo, jest `place_id`.
+  // `fetchGooglePlacesPhotos` zostaje w kodzie na wypadek powrotu do tematu
+  // w modelu zgodnym z regulaminem (place_id + zapytanie na żądanie).
 
   const origin = lat != null && lng != null ? { lat, lng } : null;
 
@@ -384,7 +384,7 @@ export async function fetchNearbyPhotos(
       : Promise.resolve([])
   ]);
 
-  const kandydaci = [...new Set([...googlePhotos, ...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])]
+  const kandydaci = [...new Set([...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])]
     .filter((adres) => {
       const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
       if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return false;
