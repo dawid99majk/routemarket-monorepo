@@ -828,9 +828,22 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const parsed = text ? JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim()) : { places: [] };
 
-    // Zdjęcia lecą równolegle — nie wydłużają odpowiedzi o sumę pojedynczych czasów
+    // Zdjęcia lecą równolegle — nie wydłużają odpowiedzi o sumę pojedynczych czasów.
+    // Najpierw jednak szukamy punktu w katalogu: stamtąd bierzemy gotową galerię
+    // (przeszła już przez filtr miasta), a gdy jej nie ma — przynajmniej miasto
+    // i tag wikipedii do zapytania. Bez tego karta pokazywała obiekty o tej samej
+    // nazwie z drugiego końca świata, a katalog dla tych samych miejsc słusznie
+    // nie zwracał nic. Dwie ścieżki, dwa różne wyniki dla jednego miejsca.
+    const wKatalogu = await Promise.all(
+      list.map((p) => repo.matchCatalogForPoint(p.name, p.lat, p.lng).catch(() => null))
+    );
     const photos = await Promise.all(
-      list.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 5))
+      list.map((p, i) => {
+        const kat = wKatalogu[i];
+        const gotowe = Array.isArray(kat?.photos) ? (kat.photos as string[]).filter(Boolean) : [];
+        if (gotowe.length) return Promise.resolve(gotowe);
+        return fetchNearbyPhotos(p.name, p.lat, p.lng, 5, kat?.city ?? undefined, kat?.wikipedia ?? undefined);
+      })
     );
 
     list.forEach((p, i) => {

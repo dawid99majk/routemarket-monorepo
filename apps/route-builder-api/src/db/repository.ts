@@ -196,6 +196,26 @@ export class RouteBuilderRepository {
   }
 
   /**
+   * Dopasowanie punktu z trasy do wpisu w katalogu — po nazwie, a przy kilku
+   * trafieniach po odległości. Bez tego dociąganie zdjęć w karcie nie zna ani
+   * miasta, ani tagu wikipedii, więc Commons oddaje pierwszy obiekt o zbliżonej
+   * nazwie na świecie: praski „Hemingway Bar" wracał jako bar w Como i pomnik
+   * Hemingwaya w Hawanie.
+   */
+  async matchCatalogForPoint(name: string, lat?: number, lng?: number): Promise<any | null> {
+    const { data, error } = await supabase
+      .from('place_catalog')
+      .select('id, name, city, lat, lng, photos, wikipedia')
+      .ilike('name', name.trim())
+      .limit(5);
+    if (error || !data || data.length === 0) return null;
+    if (data.length === 1 || lat == null || lng == null) return data[0];
+    const kwadratOdleglosci = (r: any) =>
+      ((r.lat ?? 0) - lat) ** 2 + ((r.lng ?? 0) - lng) ** 2;
+    return [...data].sort((a, b) => kwadratOdleglosci(a) - kwadratOdleglosci(b))[0];
+  }
+
+  /**
    * Dane na wizytówkę publicznej tablicy. Zwraca null także wtedy, gdy tablica
    * istnieje, ale nie jest publiczna — robot nie ma prawa zobaczyć jej tytułu
    * bardziej niż jej treści.
