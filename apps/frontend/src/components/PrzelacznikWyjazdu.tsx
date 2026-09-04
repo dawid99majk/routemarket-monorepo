@@ -12,6 +12,7 @@ export interface WyjazdDoPrzelaczenia {
   days: number | null;
   start_date?: string | null;
   end_date?: string | null;
+  trip_type?: string | null;
   /** Dociągnięte osobnym zapytaniem po id tablicy -- sam trip_projects tego nie ma. */
   liczba_miejsc?: number;
   miniatura?: string | null;

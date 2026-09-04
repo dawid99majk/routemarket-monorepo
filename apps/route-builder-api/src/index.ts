@@ -130,7 +130,12 @@ app.post('/discover-places', async (c) => {
       console.warn('[discover] POI fetch failed, continuing with search only:', err);
     }
 
-    const poiList = candidates.slice(0, 60)
+    // Lista kandydatów z OSM ograniczona do 25 (nie 60): przy pełnej liście
+    // model regularnie "gubił się" — zamiast JSON-a odpowiadał samą
+    // zapowiedzią ("Oto wyselekcjonowana lista miejsc...") i kończył z
+    // finishReason=STOP bez treści. Zmierzone: z 60 pozycjami 5 z 6 wywołań
+    // kończyło się pustym wynikiem, bez listy — zero.
+    const poiList = candidates.slice(0, 25)
       .map((p) => `- "${p.name}"${p.openingHours ? ` [godziny: ${p.openingHours}]` : ''}`)
       .join('\n');
 
@@ -138,36 +143,63 @@ app.post('/discover-places', async (c) => {
     // stronie klienta, więc tutaj dostajemy gotową, jedną prawdę.
     const prefHints = opiszPreferencje(creator_preferences);
 
-    const prompt = `Jesteś przewodnikiem po mieście ${destination}. Użytkownik szuka: "${query}".
+    const prompt = `Jesteś kuratorem i przewodnikiem po mieście ${destination} dla wymagających podróżników (styl Monocle, Conde Nast Traveler). Użytkownik szuka: "${query}".
 ${prefHints.length ? `\nZNANE PREFERENCJE TEGO UŻYTKOWNIKA (uwzględnij przy doborze i kolejności):\n${prefHints.map((h) => `- ${h}`).join('\n')}\n` : ''}
-Użyj wyszukiwarki Google, aby znaleźć REALNE, istniejące miejsca odpowiadające temu zapytaniu.
+Użyj wyszukiwarki Google, aby znaleźć REALNE, aktualnie działające i magnetyczne miejsca odpowiadające temu zapytaniu. Wybieraj miejsca z klimatem, autentycznością i charakterem (unikaj nudnych, generycznych pułapek turystycznych i surowych biurowców).
 
 ${poiList ? `Miejsca potwierdzone w OpenStreetMap (jeśli któreś pasuje, użyj DOKŁADNIE tej nazwy):\n${poiList}` : ''}
 
 Zwróć 6-10 propozycji. Dla każdej podaj:
 - "name": dokładna nazwa (jeśli jest na liście powyżej — skopiuj stamtąd znak w znak)
 - "category": jedna z: attraction, food, nightlife, hotel, other
-- "description": 1-2 zdania, czym to miejsce jest i dlaczego warto — konkrety, nie ogólniki
-- "why": jedno zdanie, dlaczego pasuje akurat do zapytania użytkownika
+- "description": 2 zdania żywego opisu: jaka tam panuje atmosfera, co tam poczujesz i zjesz/zobaczysz. Unikaj suchych roczników i encyklopedyzmu.
+- "why": jedno intrygujące zdanie, dlaczego to miejsce idealnie odpowiada zapytaniu użytkownika
 - "visit_minutes": ile realnie zajmuje zwiedzenie/pobyt (liczba minut)
-- "price_hint": orientacyjny koszt wstępu lub przedział cenowy, jeśli istotny (krótki tekst, inaczej null)
+- "price_hint": orientacyjny koszt wstępu lub przedział cenowy (krótki tekst, np. "wstęp wolny", "średnia półka", "~40 zł", inaczej null)
 
-Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}.`;
+WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, bez podsumowania, bez zdania powitalnego przed ani po. Sam JSON, nic więcej.`;
 
-    const searchData = await callGeminiTracked(
+    const runSearch = () => callGeminiTracked(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      { contents: [{ parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }] },
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ googleSearch: {} }],
+        // Model 2.5 zużywa część budżetu wyjścia na rozumowanie + wyszukiwanie —
+        // bez jawnego limitu bywało to niedokumentowane ograniczenie dostawcy,
+        // które ucinało JSON w połowie (ten sam mechanizm co w /plan-trip).
+        generationConfig: { maxOutputTokens: 16384 }
+      },
       { operation: 'discover-places', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
     );
-    const rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
+    const parsePlaces = (rawText: string): any[] | null => {
+      try {
+        const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const first = stripped.indexOf('{');
+        const last = stripped.lastIndexOf('}');
+        if (first >= 0 && last > first) return JSON.parse(stripped.slice(first, last + 1)).places ?? null;
+      } catch { /* poniżej wymuszamy strukturę */ }
+      return null;
+    };
+
+    // Nawet z krótszą listą model czasem odpowiada samą zapowiedzią i kończy
+    // (finishReason=STOP, brak listy). To nie błąd, tylko rzadsza, ale wciąż
+    // realna niedeterministyczność modelu — powtórka tego samego zapytania
+    // zwykle się udaje, więc próbujemy dwa razy zanim uznamy odpowiedź za pustą.
+    let rawText = '';
+    let searchFinish: string | undefined;
     let places: any[] | null = null;
-    try {
-      const stripped = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const first = stripped.indexOf('{');
-      const last = stripped.lastIndexOf('}');
-      if (first >= 0 && last > first) places = JSON.parse(stripped.slice(first, last + 1)).places;
-    } catch { /* poniżej wymuszamy strukturę */ }
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const searchData = await runSearch();
+      rawText = searchData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      searchFinish = searchData.candidates?.[0]?.finishReason;
+      if (searchFinish && searchFinish !== 'STOP') {
+        console.warn(`[discover] Wyszukiwanie niekompletne (próba ${attempt}), finishReason=${searchFinish}, długość=${rawText.length}`);
+      }
+      places = parsePlaces(rawText);
+      if (Array.isArray(places) && places.length > 0) break;
+      console.warn(`[discover] Próba ${attempt} bez miejsc (${rawText.length} zn., finishReason=${searchFinish}). Początek: ${rawText.slice(0, 200)}`);
+    }
 
     if (!Array.isArray(places)) {
       const jsonRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -201,7 +233,14 @@ Nie wymyślaj miejsc, które nie istnieją. Odpowiedz WYŁĄCZNIE obiektem JSON:
       });
       const jsonData = await jsonRes.json() as any;
       const text = jsonData.candidates?.[0]?.content?.parts?.[0]?.text;
+      const convertFinish = jsonData.candidates?.[0]?.finishReason;
       places = text ? JSON.parse(text).places : [];
+      if (!Array.isArray(places) || places.length === 0) {
+        console.warn(
+          `[discover] Konwersja fallback pusta (searchFinish=${searchFinish}, rawTextDługość=${rawText.length}, ` +
+          `convertFinish=${convertFinish}, convertTextDługość=${text?.length ?? 0}). rawText początek: ${rawText.slice(0, 200)}`
+        );
+      }
     }
 
     // Cała wartość planera stoi na tym, że miejsce wchodzi na tablicę ZE
@@ -781,16 +820,17 @@ app.post('/points-details', async (c) => {
       return c.json({ details });
     }
 
-    const prompt = `Jesteś przewodnikiem turystycznym. Dla każdego z poniższych miejsc napisz krótki opis, orientacyjne godziny otwarcia i jedną praktyczną wskazówkę.
+    const prompt = `Jesteś autorem inspirujących przewodników w stylu Monocle, Lonely Planet i Conde Nast Traveler. Dla każdego z poniższych miejsc napisz magnetyczny opis, orientacyjne godziny otwarcia i jedną praktyczną wskazówkę (insider tip).
+Skup się na zmysłach, klimacie, energii i tym, dlaczego to miejsce zapada w pamięć. UNIKAJ encyklopedyzmu i metryk budowlanych ("zbudowany w roku...", "charakteryzuje się...").
 
 Miejsca:
 ${list.map((p, i) => `${i + 1}. ${p.name}${p.lat ? ` (${p.lat.toFixed(4)}, ${p.lng?.toFixed(4)})` : ''}`).join('\n')}
 
 Dla każdego zwróć obiekt z polami:
 - "name": nazwa DOKŁADNIE tak, jak podano wyżej
-- "description": 2-3 zdania, czym to miejsce jest i co w nim ciekawego. Konkrety, nie ogólniki.
-- "recommendation": jedno zdanie praktycznej wskazówki (co zobaczyć, kiedy przyjść, na co uważać, czy warto rezerwować)
-- "opening_hours": orientacyjne godziny otwarcia (np. "wt-nd 10:00-19:00" lub "całodobowo / park"), jeśli znane, inaczej null
+- "description": 2-3 zdania wciągającego opisu: jaki tam panuje klimat, co tam poczujesz i dlaczego warto tam wejść (dźwięki, światło, atmosfera, widok, zapach). Pokaż żywe doświadczenie zamiast lekcji historii.
+- "recommendation": jedno zdanie genialnego "Insider Tip" (np. o której godzinie przyjść by ominąć kolejkę, co zamówić, gdzie usiąść, sekretny punkt widokowy).
+- "opening_hours": orientacyjne godziny otwarcia (np. "wt-nd 10:00-19:00" lub "całodobowo / na zewnątrz"), jeśli znane, inaczej null
 
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 

@@ -13,7 +13,7 @@ import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import SzukanieMiejsc from '@/components/SzukanieMiejsc';
 import SzukamOdpowiedzi from '@/components/SzukamOdpowiedzi';
-import PrzelacznikWyjazdu from '@/components/PrzelacznikWyjazdu';
+import PrzelacznikWyjazdu, { type WyjazdDoPrzelaczenia } from '@/components/PrzelacznikWyjazdu';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -118,12 +118,7 @@ export default function Discover() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [boards, setBoards] = useState<{
-    id: string; name: string; destination: string; days: number | null;
-    start_date?: string | null; end_date?: string | null;
-    /** Dociągane osobnym zapytaniem -- trip_projects samo tego nie ma. */
-    liczba_miejsc?: number; miniatura?: string | null;
-  }[]>([]);
+  const [boards, setBoards] = useState<WyjazdDoPrzelaczenia[]>([]);
   const [activeBoard, setActiveBoard] = useState<string | null>(null);
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
@@ -251,7 +246,7 @@ export default function Discover() {
       const [{ data: favs }, { data: projs }, { data: allCities }] = await Promise.all([
         supabase.from('place_favorites').select('place_id').eq('user_id', userData.user.id),
         supabase.from('trip_projects')
-          .select('id, name, destination, days, start_name, start_lat, start_lng, start_date, end_date')
+          .select('id, name, destination, days, start_name, start_lat, start_lng, start_date, end_date, trip_type')
           .order('updated_at', { ascending: false }),
         // DISTINCT robi baza — wcześniej szło tu 500 surowych wierszy
         // i deduplikacja w przeglądarce, a miast powyżej limitu nie było wcale.
@@ -303,12 +298,17 @@ export default function Discover() {
   /** Filtrowanie na bieżąco, filtr i wyszukiwarka działają łącznie. */
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return places.filter((p) => {
-      if (q && !(`${p.name} ${p.kind ?? ''} ${opisMiejsca(p)}`.toLowerCase().includes(q))) return false;
-      // Nocleg wypada z domyślnej listy: „dodaj hotel do tablicy jako miejsce do
-      // zobaczenia" nie ma sensu, a przy dziesięciu hotelach na miasto rozpychałby
-      // feed kosztem atrakcji. Pokazuje się dopiero po wybraniu tej kategorii —
-      // wtedy pytanie brzmi „gdzie się zatrzymać", a nie „co zwiedzić".
+    const tripType = board?.trip_type;
+
+    const filtered = places.filter((p) => {
+      // Wyszukiwanie semantyczno-tekstowe: przeszukuje nazwę, rodzaj, wyróżnik, tagi klimatu oraz opis
+      if (q) {
+        const szukanyTekst = `${p.name} ${p.kind ?? ''} ${p.wyroznik ?? ''} ${(p.vibe_tags ?? []).join(' ')} ${opisMiejsca(p)}`.toLowerCase();
+        const slowa = q.split(/\s+/).filter(Boolean);
+        const pasuje = slowa.every((s) => szukanyTekst.includes(s));
+        if (!pasuje) return false;
+      }
+
       if (kategoria === 'wszystkie' && (p.category ?? 'attraction') === 'hotel') return false;
       if (kategoria !== 'wszystkie' && (p.category ?? 'attraction') !== kategoria) return false;
       if (kolekcja && !pasujeDoKolekcji(p.vibe_tags, kolekcja)) return false;
@@ -318,10 +318,34 @@ export default function Discover() {
       if (filter === 'rain')  return RAIN_KINDS.includes((p.kind ?? '').toLowerCase()) || p.category === 'attraction';
       return true;
     });
-    /* `kategoria` i `kolekcja` MUSZĄ tu być. Bez `kategoria` przełączanie kategorii
-       nie przeliczało listy: pigułka „Wieczory" zaznaczała się, a siatka zostawała
-       ta sama — sprawdzone na produkcji dla Wrocławia. */
-  }, [places, query, filter, kategoria, kolekcja]);
+
+    // Inteligentne sortowanie uwzględniające profil wyjazdu i jakość karty
+    return filtered.sort((a, b) => {
+      // 1. Miejsca ze zdjęciami mają bezwzględne pierwszeństwo przed pustymi kafelkami
+      const aMaFoto = (a.photos?.length ?? 0) > 0 ? 1 : 0;
+      const bMaFoto = (b.photos?.length ?? 0) > 0 ? 1 : 0;
+      if (bMaFoto !== aMaFoto) return bMaFoto - aMaFoto;
+
+      // 2. Jeśli wyjazd rodzinny (family):
+      if (tripType === 'family') {
+        const aDlaDzieci = (a.vibe_tags ?? []).some((t) => KIDS_TAGS.includes(t)) ? 1 : 0;
+        const bDlaDzieci = (b.vibe_tags ?? []).some((t) => KIDS_TAGS.includes(t)) ? 1 : 0;
+        if (bDlaDzieci !== aDlaDzieci) return bDlaDzieci - aDlaDzieci;
+
+        // Miejsca martyrologiczne i cmentarze na sam koniec
+        const aCmentarz = /cmentarz|ofiarom|grobowiec|mauzoleum|stalinizmu|poleg[łl]/i.test(a.name) ? -1 : 0;
+        const bCmentarz = /cmentarz|ofiarom|grobowiec|mauzoleum|stalinizmu|poleg[łl]/i.test(b.name) ? -1 : 0;
+        if (aCmentarz !== bCmentarz) return aCmentarz - bCmentarz;
+      }
+
+      // 3. Miejsca z wyróżnikiem redakcyjnym wyżej
+      const aWyr = a.wyroznik ? 1 : 0;
+      const bWyr = b.wyroznik ? 1 : 0;
+      if (bWyr !== aWyr) return bWyr - aWyr;
+
+      return (b.pin_count ?? 0) - (a.pin_count ?? 0);
+    });
+  }, [places, query, filter, kategoria, kolekcja, board?.trip_type]);
 
   /**
    * Karty ograniczone do wycinka mapy. Przewijając mapę zawężasz listę obok —

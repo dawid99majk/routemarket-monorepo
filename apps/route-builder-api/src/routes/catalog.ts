@@ -377,26 +377,21 @@ Lista podobnych służy Tobie do wyboru faktu, nie do zacytowania. Użytkownik
 NIE WIDZI żadnej listy — czyta samo zdanie pod nazwą miejsca.
 
 Zasady:
-- Nazwę sąsiada wstaw TYLKO wtedy, gdy porównanie jest mierzalne i coś znaczy:
-  "wieża 91 m, o 15 m wyższa od wież Katedry Marii Magdaleny" — tak.
-  "w odróżnieniu od Muzeum Narodowego" doklejone na końcu — nie, to puste.
+- Nazwę sąsiada wstaw TYLKO wtedy, gdy porównanie wnosi realną wartość dla podróżnika:
+  "W przeciwieństwie do zatłoczonego rynku, ma ukryty ogród w cieniu starych drzew" — tak.
+  "w odróżnieniu od Muzeum Narodowego" doklejone sztucznie na końcu — nie, to puste.
 - ZAKAZANE zwroty: "wśród wymienionych", "z wymienionych", "spośród podobnych".
   Użytkownik nie wie, o jakiej liście mowa.
-- NIE ZACZYNAJ od nazwy tego miejsca. Nazwa stoi na karcie tuż nad tym zdaniem,
-  więc jej powtórzenie marnuje pół zdania. Zacznij od faktu.
-- Konkret zamiast przymiotnika: liczba, data, materiał, nazwisko, funkcja, rozmiar.
-- ZAKAZANE słowa: wyjątkowy, niesamowity, magiczny, klejnot, perła, must-see,
-  "warto zobaczyć", "nie do przegapienia".
-- NIE POWTARZAJ faktów z opisu. Opis dostajesz po to, żeby wiedzieć, czego NIE
-  pisać. Zdanie powtarzające opis zostanie odrzucone.
-- Jeśli NIE MASZ czym rzetelnie odróżnić tego miejsca, zwróć pusty string.
-  Puste pole jest lepsze od zmyślonej różnicy i od pustego porównania.
+- NIE ZACZYNAJ od nazwy tego miejsca. Nazwa stoi na karcie tuż nad tym zdaniem. Zacznij od cechy lub doświadczenia.
+- Wskazuj na autentyczną cechę: klimat, widok, unikalne danie, rodzaj doświadczenia (interaktywne vs tradycyjne, kameralne vs monumentalne), sekretne wejście, specyfikę pory dnia.
+- ZAKAZANE słowa: wyjątkowy, niesamowity, magiczny, klejnot, perła, must-see, "warto zobaczyć", "nie do przegapienia".
+- NIE POWTARZAJ faktów z opisu.
 - Jedno zdanie, najwyżej 25 słów. Nie zaczynaj od "Wybierz", "Odwiedź", "Zobacz".
 
 Dobre zdania:
-  "Kopuła o średnicy 67 metrów była w 1913 roku największą żelbetową na świecie."
-  "Wieża ma 91 metrów, około 15 więcej niż wieże Katedry Marii Magdaleny."
-  "Różni się od pozostałych kościołów w okolicy głównie wiekiem — jest o sto lat młodszy"
+  "W odróżnieniu od tradycyjnych galerii, wszystkiego można tu dotknąć i samodzielnie eksperymentować."
+  "Jedyny punkt widokowy w dzielnicy z otwartym tarasem 360° bez szyb i bez konieczności rezerwacji."
+  "Zamiast gwarnych sal oferuje kameralny dziedziniec z własną rzemieślniczą palarnią kawy."
 
 Miejsca:
 ${lista}
@@ -526,18 +521,30 @@ catalogRouter.post('/catalog/enrich', async (c) => {
     const doOpisania = brakujace.slice(0, limit);
     if (doOpisania.length === 0) return c.json({ city, enriched: 0, remaining: 0 });
 
-    const prompt = `Opisujesz PO POLSKU miejsca w mieście ${city} dla serwisu planowania wyjazdów. Piszesz w języku polskim niezależnie od tego, w jakim kraju leży miasto -- nawet gdy nazwa miejsca jest obcojęzyczna.
+    const prompt = `Jesteś autorem inspirujących przewodników podróżniczych (styl Monocle, Lonely Planet, Conde Nast Traveler) po mieście ${city}. Tworzysz magnetyczne, pełne klimatu i zmysłów opisy miejsc dla podróżników. Piszesz PO POLSKU niezależnie od kraju.
 
 Miejsca (nazwy skopiuj DOKŁADNIE):
 ${doOpisania.map((p: any, i: number) => `${i + 1}. ${p.name}${p.kind ? ` (${p.kind})` : ''}`).join('\n')}
 
 Dla każdego zwróć:
 - "name": nazwa dokładnie jak wyżej
-- "description": 4-6 zdań w jednym akapicie: czym to miejsce jest, kiedy powstało albo z czym się wiąże, co konkretnie w nim zobaczyć. Liczby i fakty (rok, wysokość, styl, wydarzenie) zamiast przymiotników typu "niesamowity" czy "wyjątkowy". Bez zwrotów typu "warto zobaczyć".
+- "description": 3-4 zdania żywego, wciągającego opisu. Pokaż atmosferę, energię miejsca, światło, widoki, zapachy i to, co sprawia, że człowiek natychmiast chce tam pójść. UNIKAJ encyklopedycznego żargonu (daty budowy, wysokości w metrach, style architektoniczne, zwroty typu "charakteryzuje się", "warto zobaczyć"). Skup się na autentycznym doświadczeniu podróżnika i tym, co poczuje na miejscu.
+
+  Pierwsze zdanie NIE MOŻE mieć tej samej konstrukcji co pierwsze zdanie miejsca
+  bezpośrednio wcześniej na liście — użytkownik czyta te karty jedna po drugiej
+  i identyczny wzorzec otwarcia zdradza szablon zamiast klimatu. Wybieraj za
+  każdym razem inny rodzaj otwarcia, np.:
+    a) zmysł — dźwięk, zapach, faktura, światło o konkretnej porze,
+    b) scena — co ludzie tam w tej chwili robią,
+    c) kontrast — czego człowiek się spodziewa, a co go tam zaskoczy,
+    d) pora — kiedy to miejsce żyje najmocniej,
+    e) detal — jeden konkretny, niearchitektoniczny szczegół, od którego zaczynasz.
+  Nie ograniczaj się do tej listy i nie nazywaj rodzaju w tekście — to ma być
+  naturalne zdanie, nie ćwiczenie ze wzoru.
 - "vibe_tags": 2-4 znaczniki WYŁĄCZNIE z tej listy: ${VIBE_TAGS.join(', ')}
 - "visit_minutes": ile realnie zajmuje pobyt
 
-Jeśli jakiegoś miejsca nie kojarzysz, opisz je na podstawie jego rodzaju — nie wymyślaj faktów.
+Jeśli jakiegoś miejsca nie kojarzysz w 100%, opisz je z wyczuciem na podstawie jego rodzaju z naciskiem na atmosferę i energię — nie wymyślaj zmyślonych faktów.
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
     const data = await callGeminiTracked(
