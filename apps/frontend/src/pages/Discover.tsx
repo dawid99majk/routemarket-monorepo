@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
+import { odmien } from '@/lib/odmiana';
 
 const KLUCZ_OSTATNIE = 'rm_ostatnie_miasta';
 
@@ -766,9 +767,12 @@ export default function Discover() {
           await load(miasto, true);
         })().finally(() => setOpisyWToku(false));
       }
+      // Zebrane miasto wchodzi do „ostatnio oglądanych": za chwilę stanie się
+      // kartą w pasku, więc droga powrotna do niego jest jednym kliknięciem.
+      setOstatnieMiasta(dopiszOstatnie(String(data.city || city)));
       toast.success(
         data.added > 0
-          ? `Dodano ${data.added} ${data.added === 1 ? 'miejsce' : 'miejsc'} w: ${data.city}`
+          ? `Dodano ${data.added} ${odmien(data.added, 'miejsce', 'miejsca', 'miejsc')} w: ${data.city}`
           : `Nie znalazłem nowych miejsc w: ${data.city}`
       );
     } catch (err: any) {
@@ -860,6 +864,7 @@ export default function Discover() {
           onWybierzMiasto={wybierzMiasto}
           onNowyWyjazd={() => navigate('/start')}
           onWszystkieWyjazdy={() => navigate('/plany')}
+          zbierane={seeding ? city.trim() : null}
           zwiniety={zwinietyPasek}
           onPrzelaczZwiniecie={() => setZwinietyPasek((z) => !z)}
         />

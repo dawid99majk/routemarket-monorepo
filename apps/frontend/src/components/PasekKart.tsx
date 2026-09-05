@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { ChevronDown, MapPin, Plus } from 'lucide-react';
+import { ChevronDown, Loader2, MapPin, Plus } from 'lucide-react';
 import Zdjecie from '@/components/Zdjecie';
 import type { WyjazdDoPrzelaczenia } from '@/components/PrzelacznikWyjazdu';
 import { odmien } from '@/lib/odmiana';
@@ -44,6 +44,12 @@ interface Props {
   onWybierzMiasto: (miasto: string) => void;
   onNowyWyjazd: () => void;
   onWszystkieWyjazdy: () => void;
+  /**
+    * Miasto, którego katalog właśnie zbieramy. Trwa to kilkadziesiąt sekund —
+    * najdłuższe oczekiwanie w całej aplikacji — więc musi być widać, że coś się
+    * dzieje, i to w tym samym miejscu, gdzie za chwilę stanie gotowa karta.
+    */
+  zbierane?: string | null;
   /** Po wyborze pasek się zwija — przy 375 px inaczej zajmuje cały pierwszy ekran. */
   zwiniety: boolean;
   onPrzelaczZwiniecie: () => void;
@@ -58,7 +64,7 @@ const ZAKLADKI: { id: ZakladkaPaska; etykieta: string }[] = [
 export default function PasekKart({
   zakladka, onZakladka, tablice, ostatnie, polecane,
   wybranaTablica, wybraneMiasto, onWybierzTablice, onWybierzMiasto, onNowyWyjazd,
-  onWszystkieWyjazdy,
+  onWszystkieWyjazdy, zbierane,
   zwiniety, onPrzelaczZwiniecie,
 }: Props) {
   const przewijak = useRef<HTMLDivElement>(null);
@@ -97,8 +103,10 @@ export default function PasekKart({
   return (
     <section className="mt-6" aria-label="Wybierz, czym się teraz zajmujesz">
       <div className="flex items-center justify-between gap-4 mb-3">
-        <div className="flex items-center gap-1 overflow-x-auto min-w-0
-                        [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Zawijanie, nie przewijanie: trzy krótkie zakładki mieszczą się w dwóch
+            wierszach nawet na 375 px, a przewijany rząd ucinał ostatnią w połowie
+            słowa („WARTO ZO…") i wyglądało to jak kolizja z przyciskiem obok. */}
+        <div className="flex flex-wrap items-center gap-1 min-w-0">
           {dostepne.map((z) => (
             <button
               key={z.id}
@@ -129,6 +137,21 @@ export default function PasekKart({
         className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1
                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
+        {zbierane && (
+          <div className="shrink-0 w-[170px] rounded-xl border border-primary/40 bg-primary/5
+                          overflow-hidden" aria-live="polite">
+            <div className="h-[86px] flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            </div>
+            <div className="px-3 py-2">
+              <p className="font-display text-[14px] leading-tight truncate">{zbierane}</p>
+              <p className="font-mono text-[10.5px] text-muted-foreground truncate mt-0.5">
+                zbieram miejsca…
+              </p>
+            </div>
+          </div>
+        )}
+
         {czynna === 'tablice' && tablice.slice(0, MAKS_KART).map((w) => {
           const wybrana = w.id === wybranaTablica;
           return (
