@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { bilansTablicy } from '@/lib/bilansTablicy';
 import { dziesietna } from '@/lib/liczby';
+import { odmien } from '@/lib/odmiana';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -2889,13 +2890,18 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <h2 className="font-display font-light text-[24px]">{t('tablica.planu_jeszcze_nie_ma')}</h2>
                 <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
                   {mustCount > 0
-                    ? `Na tablicy czeka ${mustCount} ${mustCount === 1 ? 'miejsce' : 'miejsc'} oznaczonych „na pewno”. Ułóż z nich dni.`
+                    ? `Na tablicy czeka ${mustCount} ${odmien(mustCount, 'miejsce', 'miejsca', 'miejsc')} oznaczonych „na pewno”. Ułóż z nich dni.`
                     : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
                 </p>
+                {/* Ten przycisk UKŁADAŁ PLAN dopiero po tej poprawce. Wcześniej
+                    wołał navigate('/plany?widok=plan'), czyli przenosił na listę
+                    wszystkich wyjazdów — z widoku planu wyglądało to jak przycisk,
+                    który nic nie robi, i stąd „nie da się zrobić planu". Układanie
+                    było dostępne wyłącznie przez „Zaplanuj" w formularzu niżej. */}
                 <Button
                   className="mt-6 bg-foreground text-background hover:bg-foreground/90"
                   disabled={mustCount === 0 || planning}
-                  onClick={() => navigate(mustCount > 0 ? '/plany?widok=plan' : '/plany')}
+                  onClick={() => (mustCount > 0 ? buildPlan() : navigate('/plany'))}
                 >
                   {planning
                     ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('tablica.uk_adam')}</>

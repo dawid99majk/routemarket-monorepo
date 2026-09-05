@@ -157,7 +157,11 @@ export default function Index() {
           znikały wszystkie zakładki i trzeba było szukać drogi powrotnej.
           Niezalogowany widzi nawigację sprzedażową — zakładki planera nie miałyby
           dla niego sensu, bo każda prowadzi do ekranu za logowaniem. */}
-      {user && <PlannerHeader />}
+      {/* Bez pigulki wybranego wyjazdu: strona glowna nie jest miejscem pracy nad
+          konkretna tablica, a wybor kontekstu ma jedno miejsce — pasek kart
+          w Odkrywaj. Dwa miejsca do wybrania tego samego to dwa miejsca, w
+          ktorych mozna sie pomylic. */}
+      {user && <PlannerHeader ukryjPigulke />}
 
       {!user && (
       <header className="sticky top-0 z-30 h-[74px] border-b border-border bg-surface/90 backdrop-blur-[8px]">
