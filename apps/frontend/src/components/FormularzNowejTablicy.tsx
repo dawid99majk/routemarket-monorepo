@@ -21,6 +21,13 @@ import { TRIP_PRESETS, EMPTY_AXES, type AxisValues } from '@/lib/tripPresets';
  * niczego ustawiać, klika „Utwórz i zapisz" od razu; przycisk stoi na dole
  * okna i nie ucieka przy przewijaniu, więc nie trzeba przejść przez formularz,
  * żeby go znaleźć.
+ *
+ * NIETKNIĘTA OŚ ZOSTAJE PUSTA. Wartości z profilu są tylko pokazywane; do bazy
+ * idzie `null`, dopóki ktoś nie ruszy suwaka albo nie wybierze charakteru.
+ * Zapisanie ich jako własnych wartości wyjazdu odcinałoby nową tablicę od
+ * profilu na zawsze — późniejsza zmiana ustawień konta nie miałaby już do niej
+ * dojścia, a użytkownik nigdy nie powiedział, że chce coś ustawić inaczej.
+ * Tak samo działają ustawienia istniejącej tablicy.
  */
 
 export interface UstawieniaNowejTablicy {
@@ -75,7 +82,7 @@ export default function FormularzNowejTablicy({
     setWypelnienie(70);
     setDataOd('');
     setDataDo('');
-    setOsie({ ...EMPTY_AXES, ...(preferencjeKonta ?? {}) });
+    setOsie({ ...EMPTY_AXES });
   }, [otwarte, miasto, preferencjeKonta]);
 
   /* Wybór charakteru nadpisuje osie — to jest jego cała rola. Bez tego pigułki
@@ -94,6 +101,10 @@ export default function FormularzNowejTablicy({
     [dataOd, dataDo]);
 
   const dniFinalne = dniZDat ?? dni;
+
+  /** Co pokazać na osi: własne, a jak nie ma — z profilu, a jak i tego nie ma — środek. */
+  const wgProfilu = (klucz: keyof AxisValues) =>
+    osie[klucz] ?? preferencjeKonta?.[klucz] ?? 50;
 
   const zloz = () => onUtworz({
     nazwa: nazwa.trim() || miasto,
@@ -228,9 +239,21 @@ export default function FormularzNowejTablicy({
             <span className="font-narrow uppercase tracking-[0.14em] text-[10.5px] text-muted-foreground">
               Czego szukasz w tym wyjeździe
             </span>
-            <p className="text-[12.5px] text-muted-foreground mt-1.5 mb-4 leading-relaxed">
-              Domyślnie ustawienia z Twojego konta. Wybór charakteru wyżej nadpisuje je jednym ruchem.
-            </p>
+            <div className="flex items-baseline justify-between gap-3 mt-1.5 mb-4">
+              <p className="text-[12.5px] text-muted-foreground leading-relaxed max-w-[46ch]">
+                Domyślnie ustawienia z Twojego konta — nietknięte zostają z nim związane.
+                Wybór charakteru wyżej nadpisuje je jednym ruchem.
+              </p>
+              {AXES.some((os) => osie[os.key as keyof AxisValues] != null) && (
+                <button
+                  type="button"
+                  onClick={() => { setOsie({ ...EMPTY_AXES }); setCharakter(null); }}
+                  className="shrink-0 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Wróć do profilu
+                </button>
+              )}
+            </div>
             {/* Ten sam komponent co w ustawieniach tablicy. Zwykły suwak wypełniany
                 od lewej krawędzi czyta się jak natężenie („ile czegoś chcę"), a to
                 jest wybór między dwiema stronami — środek znaczy „nie mam zdania",
@@ -244,7 +267,8 @@ export default function FormularzNowejTablicy({
                   lewo={os.left}
                   prawo={os.right}
                   podpowiedz={os.hint}
-                  wartosc={osie[os.key as keyof AxisValues] ?? 50}
+                  wartosc={wgProfilu(os.key as keyof AxisValues)}
+                  wlasna={osie[os.key as keyof AxisValues] != null}
                   onChange={(v) => {
                     setOsie((prev) => ({ ...prev, [os.key]: v }));
                     /* Ręczna zmiana osi znaczy, że to już nie jest czysty preset —
