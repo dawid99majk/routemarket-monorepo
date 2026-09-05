@@ -6,7 +6,7 @@ import { pasujeDoKolekcji, type Kolekcja } from '@/lib/kolekcje';
 import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, Heart, Loader2, MapPin, Search, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Heart, Loader2, MapPin, Plus, Search, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import PlannerHeader from '@/components/PlannerHeader';
@@ -14,6 +14,8 @@ import DiscoverMap from '@/components/DiscoverMap';
 import SzukanieMiejsc from '@/components/SzukanieMiejsc';
 import SzukamOdpowiedzi from '@/components/SzukamOdpowiedzi';
 import PrzelacznikWyjazdu, { type WyjazdDoPrzelaczenia } from '@/components/PrzelacznikWyjazdu';
+import PasekKart, { type KartaMiasta, type ZakladkaPaska } from '@/components/PasekKart';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -22,6 +24,42 @@ import { Badge } from '@/components/ui/badge';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
+
+const KLUCZ_OSTATNIE = 'rm_ostatnie_miasta';
+
+/**
+ * Ostatnio oglądane miasta pamięta przeglądarka. Baza nie loguje wyszukiwań —
+ * miasto obejrzane bez założenia tablicy nie zostawia w niej śladu — a do paska
+ * wystarczy pamięć tego urządzenia: bez nowej tabeli i bez śledzenia kogokolwiek.
+ */
+function wczytajOstatnie(): string[] {
+  try {
+    const zapis = JSON.parse(localStorage.getItem(KLUCZ_OSTATNIE) || '[]');
+    return Array.isArray(zapis)
+      ? zapis.filter((x: unknown): x is string => typeof x === 'string' && !!x).slice(0, 8)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function dopiszOstatnie(miasto: string): string[] {
+  const czyste = (miasto || '').trim();
+  if (!czyste) return wczytajOstatnie();
+  const bez = wczytajOstatnie().filter((m) => m.toLowerCase() !== czyste.toLowerCase());
+  const nastepne = [czyste, ...bez].slice(0, 8);
+  try {
+    localStorage.setItem(KLUCZ_OSTATNIE, JSON.stringify(nastepne));
+  } catch { /* tryb prywatny — pasek po prostu będzie pusty */ }
+  return nastepne;
+}
+
+/**
+ * „Warto zobaczyć" jest listą kuratorowaną, nie liczoną. Popularność z bazy to
+ * dziś Paryż 5 tablic, Durrës 4, Lipsk 3 — dane testowe, nie sygnał. Liczona
+ * lista wyświetliłaby pierwszemu użytkownikowi Durrës jako drugie miasto świata.
+ */
+const MIASTA_POLECANE = ['Rzym', 'Barcelona', 'Lizbona', 'Praga', 'Amsterdam', 'Wiedeń', 'Porto', 'Kraków'];
 
 interface CatalogPlace {
   id: string;
@@ -47,27 +85,24 @@ interface CatalogPlace {
 type Bucket = 'must' | 'nice' | 'rejected';
 
 /** Pigułki filtrów feedu — logika wprost z dokumentu przekazania projektu. */
-const FILTERS = [
-  { id: 'all',    label: 'Wszystko' },
-  { id: 'kids',   label: 'Z dziećmi' },
-  { id: 'short',  label: 'Do 1 godziny' },
-  { id: 'walk',   label: 'Pieszo od bazy' },
-  { id: 'rain',   label: 'Na deszcz' },
+/** Cechy i klimat miejsc — niezależne przełączniki (toggle chips). */
+const CECHY = [
+  { id: 'kids',   label: '👶 Z dziećmi' },
+  { id: 'short',  label: '⏱️ Do 1 godziny' },
+  { id: 'walk',   label: '🚶 Pieszo od bazy' },
+  { id: 'rain',   label: '☔ Na niepogodę' },
 ] as const;
-type FilterId = typeof FILTERS[number]['id'];
+type FilterId = 'all' | typeof CECHY[number]['id'];
 
 /**
- * Kategoria to inne pytanie niż filtry powyżej. Tamte mówią, do czego miejsce się
- * nadaje („na deszcz", „z dziećmi"), ta mówi, czym ono jest. Mieszanie ich w jeden
- * rząd pigułek kazałoby wybierać między „na deszcz" a „jedzenie", choć to nie są
- * warianty tego samego.
+ * Kategoria to rodzaj obiektu (atrakcja, jedzenie itp.) — wybór pojedynczy.
  */
 const KATEGORIE = [
-  { id: 'wszystkie', label: 'Wszystko' },
+  { id: 'wszystkie', label: 'Wszystkie' },
   { id: 'attraction', label: 'Atrakcje' },
   { id: 'food', label: 'Jedzenie' },
   { id: 'nightlife', label: 'Wieczory' },
-  { id: 'hotel', label: 'Nocleg' },
+  { id: 'hotel', label: 'Noclegi' },
 ] as const;
 type KategoriaId = typeof KATEGORIE[number]['id'];
 
@@ -109,6 +144,14 @@ export default function Discover() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [boards, setBoards] = useState<WyjazdDoPrzelaczenia[]>([]);
   const [activeBoard, setActiveBoard] = useState<string | null>(null);
+  const [zakladkaPaska, setZakladkaPaska] = useState<ZakladkaPaska>('polecane');
+  const [zwinietyPasek, setZwinietyPasek] = useState(false);
+  const [ostatnieMiasta, setOstatnieMiasta] = useState<string[]>([]);
+  const [zdjeciaMiast, setZdjeciaMiast] =
+    useState<Record<string, { zdjecie: string | null; ile: number }>>({});
+  /** Decyzja podjęta bez celu czeka tu na odpowiedź „utworzyć tablicę?". */
+  const [pytanieOTablice, setPytanieOTablice] =
+    useState<{ nazwa: string; miasto: string; wykonaj: (idTablicy: string) => void } | null>(null);
   const [marks, setMarks] = useState<Record<string, Bucket>>({});
   const [cities, setCities] = useState<string[]>([]);
   const [initials, setInitials] = useState<string | null>(null);
@@ -146,13 +189,59 @@ export default function Discover() {
    * teraz nad tym wyjazdem"), więc nie ma powodu, żeby wymagała dwóch ruchów —
    * ani żeby dało się zostawić te dwie rzeczy w sprzeczności.
    */
-  const przelaczWyjazd = (id: string) => {
+  const przelaczWyjazd = (id: string | null) => {
+    if (!id) {
+      setActiveBoard(null);
+      localStorage.removeItem('rm_ostatnia_tablica');
+      setSearchParams({}, { replace: true });
+      return;
+    }
     const w = boards.find((b) => b.id === id);
     if (!w) return;
     setActiveBoard(id);
+    localStorage.setItem('rm_ostatnia_tablica', id);
     if (w.destination) setCity(w.destination);
-    setSearchParams(id ? { wyjazd: id } : {}, { replace: true });
+    setSearchParams({ wyjazd: id }, { replace: true });
   };
+
+  /**
+   * Karta miasta ustawia miasto i CZYŚCI cel decyzji — to jest ta reguła.
+   * Nie da się oglądać jednego miasta, odkładając miejsca do wyjazdu o innym
+   * celu, bo bez celu pierwsze „Na pewno" zapyta o tablicę.
+   */
+  const wybierzMiasto = (nazwa: string) => {
+    setActiveBoard(null);
+    localStorage.removeItem('rm_ostatnia_tablica');
+    setSearchParams({}, { replace: true });
+    setCity(nazwa);
+    setOstatnieMiasta(dopiszOstatnie(nazwa));
+    setZwinietyPasek(true);
+  };
+
+  /* Zdjęcia na karty miast: najważniejsze miejsce każdego miasta. Jedno
+     zapytanie zamiast dwudziestu ośmiu — pasek i tak pokazuje kilka kart. */
+  useEffect(() => {
+    setOstatnieMiasta(wczytajOstatnie());
+    (async () => {
+      const { data } = await (supabase as any).from('place_catalog')
+        .select('city, photos')
+        .not('photos', 'is', null)
+        .order('waznosc', { ascending: false, nullsFirst: false })
+        .limit(900);
+      const zebrane: Record<string, { zdjecie: string | null; ile: number }> = {};
+      for (const r of (data ?? []) as { city: string | null; photos: unknown }[]) {
+        const nazwa = (r.city || '').trim();
+        if (!nazwa) continue;
+        const wpis = (zebrane[nazwa] ??= { zdjecie: null, ile: 0 });
+        wpis.ile += 1;
+        if (!wpis.zdjecie && Array.isArray(r.photos)) {
+          const foto = r.photos.find((u: unknown) => typeof u === 'string' && u);
+          if (foto) wpis.zdjecie = foto as string;
+        }
+      }
+      setZdjeciaMiast(zebrane);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!seeding) { setZbieraneSekundy(0); return; }
@@ -263,10 +352,20 @@ export default function Discover() {
         miniatura: wgTablicy[b.id]?.miniatura ?? null,
       })));
       setCities(((allCities ?? []) as { city: string }[]).map((r) => r.city));
-      if ((projs ?? []).length > 0) {
-        const wybrany = (wskazanyWyjazd && projs.find((p: any) => p.id === wskazanyWyjazd)) || projs[0];
-        setActiveBoard(wybrany.id);
-        if (wybrany.destination) setCity(wybrany.destination);
+      // Na wejściu nic nie jest wybrane. Podstawianie ostatniego wyjazdu robiło
+      // z niego cel decyzji, o którym nikt nie decydował — tak powstawał widok
+      // z feedem jednego miasta i licznikiem drugiego. Wyjazd wybiera się kartą
+      // na pasku albo przychodzi w adresie z „Dodaj miejsca".
+      const wskazany = wskazanyWyjazd
+        ? (projs ?? []).find((p: any) => p.id === wskazanyWyjazd)
+        : null;
+      if (wskazany) {
+        setActiveBoard(wskazany.id);
+        if (wskazany.destination) setCity(wskazany.destination);
+        setZakladkaPaska('tablice');
+        setZwinietyPasek(true);
+      } else if ((projs ?? []).length > 0) {
+        setZakladkaPaska('tablice');
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -393,13 +492,12 @@ export default function Discover() {
 
   /** Propozycja agenta nie ma wpisu w katalogu, więc idzie na tablicę bez
    *  `catalog_id` — tą samą drogą co propozycje w wyszukiwarce tablicy. */
-  const dopnijZAgenta = async (p: any, bucket: Bucket) => {
-    if (!activeBoard) return toast.error(t('odkrywaj.najpierw_wybierz_wyjazd_do_ktorego'));
+  const wstawZAgenta = async (p: any, bucket: Bucket, idTablicy: string) => {
     const klucz = String(p.name);
     if (dopinane[klucz]) return;
     setDopinane((prev) => ({ ...prev, [klucz]: bucket }));
     const { error } = await supabase.from('trip_project_places').insert({
-      project_id: activeBoard,
+      project_id: idTablicy,
       name: p.name,
       category: p.category || 'attraction',
       priority: bucket,
@@ -417,6 +515,11 @@ export default function Discover() {
     toast.success(`Dodane: ${p.name}`);
   };
 
+  const dopnijZAgenta = async (p: any, bucket: Bucket) => {
+    if (!activeBoard) return zapytajOTablice(p.name, (id) => { void wstawZAgenta(p, bucket, id); });
+    return wstawZAgenta(p, bucket, activeBoard);
+  };
+
   /* Wiersz z `podobne_miejsca` niesie te same dane co feed, tylko z luźniejszymi
      typami (kolumny bazy bywają puste). Domykamy je raz, żeby i otwarcie karty,
      i dopięcie na tablicę dostały zwykły `CatalogPlace`. */
@@ -430,8 +533,73 @@ export default function Discover() {
     pin_count: m.pin_count ?? 0,
   });
 
+  /**
+   * Decyzja bez celu. Zamiast odmawiać („najpierw wybierz wyjazd") pytamy raz
+   * o tablicę i od razu zapisujemy miejsce. Tworzenie wyjazdu przestaje być
+   * bramką na wejściu, a staje się skutkiem pierwszej decyzji — a kto tablicy
+   * nie chce, ma serduszko.
+   */
+  const zapytajOTablice = (nazwaMiejsca: string, wykonaj: (idTablicy: string) => void) => {
+    const miasto = (city || '').trim();
+    setPytanieOTablice({ miasto, nazwa: miasto || nazwaMiejsca, wykonaj });
+  };
+
+  /** Zapis decyzji na wskazaną tablicę — bez sprawdzania, co jest wybrane. */
+  const zapiszDecyzje = async (place: CatalogPlace, bucket: Bucket, idTablicy: string) => {
+    setMarks((prev) => ({ ...prev, [place.id]: bucket }));
+    const { error } = await supabase.from('trip_project_places').insert({
+      project_id: idTablicy,
+      catalog_id: place.id,
+      name: place.name,
+      category: place.category,
+      priority: bucket,
+      lat: place.lat,
+      lng: place.lng,
+      description: place.description,
+      opening_hours: place.opening_hours,
+      visit_minutes: place.visit_minutes,
+      image_url: place.photos?.[0] ?? null,
+      source: 'catalog',
+    });
+    if (error) {
+      setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
+      toast.error(error.message);
+    }
+  };
+
+  /**
+   * Tworzy tablicę z domyślnymi i wykonuje odłożoną decyzję. Pytanie o nazwę,
+   * charakter i termin w chwili, gdy ktoś chciał zapisać jedno miejsce, byłoby
+   * tą samą bramką co /start, tylko przesuniętą o jedno kliknięcie.
+   */
+  const utworzTabliceIZapisz = async () => {
+    if (!pytanieOTablice) return;
+    const { nazwa, miasto, wykonaj } = pytanieOTablice;
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setPytanieOTablice(null); navigate('/auth'); return; }
+    const { data, error } = await (supabase as any).from('trip_projects').insert({
+      user_id: u.user.id,
+      name: nazwa || 'Nowy wyjazd',
+      destination: miasto || nazwa,
+      days: 3,
+      hours_per_day: 8,
+      fill_percent: 70,
+    }).select('*').single();
+    if (error) { toast.error(error.message); return; }
+    setBoards((prev) => [{ ...data, liczba_miejsc: 0, miniatura: null }, ...prev]);
+    setActiveBoard(data.id);
+    localStorage.setItem('rm_ostatnia_tablica', data.id);
+    setSearchParams({ wyjazd: data.id }, { replace: true });
+    setZakladkaPaska('tablice');
+    setPytanieOTablice(null);
+    wykonaj(data.id);
+    toast.success(`Tablica „${data.name}" gotowa`, {
+      action: { label: 'Ustaw charakter', onClick: () => navigate(`/plany/${data.id}`) },
+    });
+  };
+
   const mark = async (place: CatalogPlace, bucket: Bucket) => {
-    if (!activeBoard) return toast.error(t('odkrywaj.najpierw_wybierz_wyjazd_do_ktorego'));
+    if (!activeBoard) return zapytajOTablice(place.name, (id) => { void zapiszDecyzje(place, bucket, id); });
     const current = marks[place.id];
 
     if (current === bucket) {
@@ -623,47 +791,81 @@ export default function Discover() {
         ukryjPigulke
       />
 
+      <Dialog
+        open={!!pytanieOTablice}
+        onOpenChange={(otwarte) => { if (!otwarte) setPytanieOTablice(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Utworzyć tablicę „{pytanieOTablice?.nazwa}"?</DialogTitle>
+          </DialogHeader>
+          <p className="text-[14px] leading-relaxed text-muted-foreground">
+            Odkładane miejsca muszą gdzieś trafiać. Utworzę tablicę z domyślnymi ustawieniami
+            i od razu dopiszę do niej to miejsce — charakter wyjazdu i termin ustawisz później.
+          </p>
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPytanieOTablice(null);
+                toast.info('Bez tablicy odłożysz miejsce sercem — znajdziesz je w „Zapisane".');
+              }}
+            >
+              Nie teraz
+            </Button>
+            <Button
+              onClick={utworzTabliceIZapisz}
+              className="bg-foreground text-background hover:bg-foreground/90"
+            >
+              Utwórz i zapisz
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <main className="max-w-[1280px] mx-auto px-10 pb-24">
         {/* Lekki nagłówek i kontekst wyjazdu */}
-        <div className="pt-8 pb-4 flex flex-wrap items-center justify-between gap-4 border-b border-border/40">
-          <div>
-            {board && boards.length > 0 ? (
-              <PrzelacznikWyjazdu
-                aktywny={board}
-                wszystkie={boards}
-                onZmien={przelaczWyjazd}
-                onNowy={() => navigate('/start')}
-                wariant="kompaktowy"
-              />
-            ) : (
-              <div className="flex items-center gap-3">
-                <span className="font-narrow uppercase tracking-[0.24em] text-[10px] text-muted-foreground bg-muted/80 px-2.5 py-0.5 rounded-full border border-border/60 shrink-0">
-                  Eksploracja
-                </span>
-                <h1 className="font-display font-light text-2xl sm:text-3xl tracking-[-0.01em]">
-                  {t('naglowek.odkrywaj')}
-                </h1>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-xs text-muted-foreground tabular-nums hidden sm:inline">
+        {/* Wybór wyjazdu robi teraz pasek kart niżej. Przełącznik i przyciski
+            „Wszystkie wyjazdy / Nowy wyjazd" stały tu jako drugi selektor tej
+            samej rzeczy — dwa miejsca do wybrania jednego kontekstu to dwa
+            miejsca, w których można go zgubić. Zostają wyłącznie działania na
+            już wybranym wyjeździe. */}
+        {board && (
+          <div className="pt-8 pb-4 flex flex-wrap items-center justify-end gap-3 border-b border-border/40">
+            <span className="font-mono text-xs text-muted-foreground tabular-nums hidden sm:inline mr-auto">
               {savedCount} zapisanych · {maybeCount} do rozważenia
             </span>
-            <Button variant="outline" size="sm" className="rounded-full h-9 px-3.5 text-xs"
-              onClick={() => navigate(board ? `/plany/${board.id}` : '/plany')}>
+            <Button variant="outline" size="sm" className="rounded-full h-9 px-3.5 text-xs bg-card border-border/90 shadow-2xs hover:bg-muted cursor-pointer"
+              onClick={() => navigate(`/plany/${board.id}`)}>
               {t('odkrywaj.tablica')}
             </Button>
-            <Button size="sm" className="rounded-full h-9 px-4 text-xs bg-foreground text-background hover:bg-foreground/90"
-              onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}>
+            <Button size="sm" className="rounded-full h-9 px-4 text-xs bg-foreground text-background hover:bg-foreground/90 shadow-xs cursor-pointer"
+              onClick={() => navigate(`/plany/${board.id}?widok=plan`)}>
               Zbuduj plan <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </div>
-        </div>
+        )}
+
+        <PasekKart
+          zakladka={zakladkaPaska}
+          onZakladka={setZakladkaPaska}
+          tablice={boards}
+          ostatnie={ostatnieMiasta.map((m) => ({ miasto: m, zdjecie: zdjeciaMiast[m]?.zdjecie ?? null }))}
+          polecane={MIASTA_POLECANE
+            .filter((m) => zdjeciaMiast[m])
+            .map((m) => ({ miasto: m, zdjecie: zdjeciaMiast[m]?.zdjecie ?? null }))}
+          wybranaTablica={activeBoard}
+          wybraneMiasto={city}
+          onWybierzTablice={(id) => { przelaczWyjazd(id); setZwinietyPasek(true); }}
+          onWybierzMiasto={wybierzMiasto}
+          onNowyWyjazd={() => navigate('/start')}
+          onWszystkieWyjazdy={() => navigate('/plany')}
+          zwiniety={zwinietyPasek}
+          onPrzelaczZwiniecie={() => setZwinietyPasek((z) => !z)}
+        />
 
         {/* Pływająca wyspa wyszukiwania (w stylu Airbnb) */}
-        <div className="mt-6 max-w-3xl mx-auto">
+        <div className="mt-6 max-w-4xl mx-auto">
           <div className="rounded-full bg-card border border-border/80 shadow-[0_2px_16px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.1)] transition-all p-1.5 flex flex-col sm:flex-row items-center gap-2">
             {/* Pole 1: Czego szukasz */}
             <div className="relative flex-1 w-full flex items-center pl-4">
@@ -708,51 +910,63 @@ export default function Discover() {
             </p>
           )}
 
-          {/* Filtry jako płynny, napowietrzony pasek tagów pod wyszukiwarką */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
-            {KATEGORIE.filter((k) => k.id === 'wszystkie'
-                || places.some((p) => (p.category ?? 'attraction') === k.id)).map((k) => (
-              <button
-                key={k.id}
-                onClick={() => setKategoria(k.id)}
-                aria-pressed={kategoria === k.id}
-                className={`rounded-full px-3 py-1 text-xs transition-all ${
-                  kategoria === k.id
-                    ? 'bg-foreground text-background font-medium shadow-2xs'
-                    : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                {k.label}
-              </button>
-            ))}
+          {/* Filtry jako napowietrzony, kontrastowy pasek pod wyszukiwarką */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+            {/* Grupa 1: Kategoria miejsca (wybór pojedynczy) */}
+            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-card border border-border/85 shadow-2xs">
+              {KATEGORIE.filter((k) => k.id === 'wszystkie'
+                  || places.some((p) => (p.category ?? 'attraction') === k.id)).map((k) => (
+                <button
+                  key={k.id}
+                  type="button"
+                  onClick={() => setKategoria(k.id)}
+                  aria-pressed={kategoria === k.id}
+                  className={`rounded-full px-3.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                    kategoria === k.id
+                      ? 'bg-foreground text-background shadow-xs'
+                      : 'text-foreground/75 hover:text-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {k.label}
+                </button>
+              ))}
+            </div>
 
-            <span className="w-px h-3.5 bg-border/80 mx-1 hidden sm:block" />
+            {/* Grupa 2: Cechy miejsca (niezależne toggle chips) */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {CECHY.map((f) => {
+                const aktywne = filter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFilter(aktywne ? 'all' : f.id)}
+                    aria-pressed={aktywne}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-all flex items-center gap-1.5 border shadow-2xs cursor-pointer ${
+                      aktywne
+                        ? 'bg-foreground text-background border-foreground shadow-xs'
+                        : 'bg-card border-border/85 text-foreground/80 hover:bg-muted/70 hover:border-foreground/30 hover:text-foreground'
+                    }`}
+                  >
+                    <span>{f.label}</span>
+                    {aktywne && <span className="text-[10px] opacity-70">✕</span>}
+                  </button>
+                );
+              })}
+            </div>
 
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                aria-pressed={filter === f.id}
-                className={`rounded-full px-3 py-1 text-xs transition-all ${
-                  filter === f.id
-                    ? 'bg-foreground text-background font-medium shadow-2xs'
-                    : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-
+            {/* Przycisk Pokaż / Ukryj mapę */}
             <button
+              type="button"
               onClick={() => setPokazMape((v) => !v)}
               aria-pressed={pokazMape}
-              className={`rounded-full px-3 py-1 text-xs transition-all ml-2 ${
+              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-all ml-1 border shadow-2xs flex items-center gap-1.5 cursor-pointer ${
                 pokazMape
-                  ? 'bg-foreground text-background font-medium'
-                  : 'bg-card border border-border/80 text-foreground hover:bg-muted shadow-2xs'
+                  ? 'bg-foreground text-background border-foreground shadow-xs'
+                  : 'bg-card border-border/85 text-foreground hover:bg-muted/70 hover:border-foreground/30'
               }`}
             >
-              {pokazMape ? 'Ukryj mapę' : '🗺️ Pokaż mapę'}
+              <span>{pokazMape ? 'Ukryj mapę' : '🗺️ Pokaż mapę'}</span>
             </button>
           </div>
         </div>
@@ -940,8 +1154,8 @@ export default function Discover() {
                   {query.trim() && (
                     <Button variant="outline" onClick={() => setQuery('')}>{t('odkrywaj.wyczysc_fraze')}</Button>
                   )}
-                  {filter !== FILTERS[0].id && (
-                    <Button variant="outline" onClick={() => setFilter(FILTERS[0].id)}>{t('odkrywaj.pokaz_wszystkie')}</Button>
+                  {filter !== 'all' && (
+                    <Button variant="outline" onClick={() => setFilter('all')}>{t('odkrywaj.pokaz_wszystkie')}</Button>
                   )}
                   {kolekcja && (
                     <Button variant="outline" onClick={() => setKolekcja(null)}>Wyjdź z kolekcji</Button>
