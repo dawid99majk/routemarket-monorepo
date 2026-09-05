@@ -146,7 +146,6 @@ export default function Discover() {
   const [boards, setBoards] = useState<WyjazdDoPrzelaczenia[]>([]);
   const [activeBoard, setActiveBoard] = useState<string | null>(null);
   const [zakladkaPaska, setZakladkaPaska] = useState<ZakladkaPaska>('polecane');
-  const [zwinietyPasek, setZwinietyPasek] = useState(false);
   const [ostatnieMiasta, setOstatnieMiasta] = useState<string[]>([]);
   const [zdjeciaMiast, setZdjeciaMiast] =
     useState<Record<string, { zdjecie: string | null; ile: number }>>({});
@@ -216,7 +215,6 @@ export default function Discover() {
     setSearchParams({}, { replace: true });
     setCity(nazwa);
     setOstatnieMiasta(dopiszOstatnie(nazwa));
-    setZwinietyPasek(true);
   };
 
   /* Zdjęcia na karty miast: najważniejsze miejsce każdego miasta. Jedno
@@ -364,7 +362,6 @@ export default function Discover() {
         setActiveBoard(wskazany.id);
         if (wskazany.destination) setCity(wskazany.destination);
         setZakladkaPaska('tablice');
-        setZwinietyPasek(true);
       } else if ((projs ?? []).length > 0) {
         setZakladkaPaska('tablice');
       }
@@ -860,13 +857,11 @@ export default function Discover() {
             .map((m) => ({ miasto: m, zdjecie: zdjeciaMiast[m]?.zdjecie ?? null }))}
           wybranaTablica={activeBoard}
           wybraneMiasto={city}
-          onWybierzTablice={(id) => { przelaczWyjazd(id); setZwinietyPasek(true); }}
+          onWybierzTablice={przelaczWyjazd}
           onWybierzMiasto={wybierzMiasto}
           onNowyWyjazd={() => navigate('/start')}
           onWszystkieWyjazdy={() => navigate('/plany')}
           zbierane={seeding ? city.trim() : null}
-          zwiniety={zwinietyPasek}
-          onPrzelaczZwiniecie={() => setZwinietyPasek((z) => !z)}
         />
 
         {/* Pływająca wyspa wyszukiwania (w stylu Airbnb) */}
