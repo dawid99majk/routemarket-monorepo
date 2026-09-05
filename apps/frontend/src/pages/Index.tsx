@@ -250,7 +250,7 @@ export default function Index() {
           konkretna tablica, a wybor kontekstu ma jedno miejsce — pasek kart
           w Odkrywaj. Dwa miejsca do wybrania tego samego to dwa miejsca, w
           ktorych mozna sie pomylic. */}
-      {user && <PlannerHeader ukryjPigulke />}
+      {user && <PlannerHeader />}
 
       {!user && (
       <header className="sticky top-0 z-30 h-[74px] border-b border-border bg-surface/90 backdrop-blur-[8px]">
@@ -434,13 +434,17 @@ export default function Index() {
               {t('landing.hero.zapewnienia')}
             </p>
 
-            {/* Pasek stoi pod polem, nie nad nim: pole jest dla kogoś, kto wie,
-                dokąd jedzie, a pasek — dla kogoś, kto dopiero patrzy. Odwrotna
-                kolejność kazałaby najpierw przewinąć cudze miasta, żeby wpisać
-                własne. */}
-            <div className="w-full max-w-[880px] mx-auto text-left">
-              {pasekKart}
-            </div>
+          </div>
+        </section>
+
+        {/* Pasek ma własny pas pod hero, a nie miejsce w środku. Sekcja hero ma
+            na xl sztywne 660 px i overflow-hidden, a w tej samej przestrzeni leżą
+            pływające zdjęcia (top od 58 do 606 px) — pasek wchodził dokładnie na
+            nie. Stoi pod polem, nie nad nim: pole jest dla kogoś, kto wie, dokąd
+            jedzie, a pasek dla kogoś, kto dopiero patrzy. */}
+        <section className="relative z-10 bg-background border-t border-border/60">
+          <div className="max-w-[1280px] mx-auto px-5 sm:px-10 pt-8 pb-10">
+            {pasekKart}
           </div>
         </section>
       </main>

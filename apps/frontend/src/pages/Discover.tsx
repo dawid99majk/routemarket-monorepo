@@ -818,7 +818,6 @@ export default function Discover() {
       <PlannerHeader
         context={board ? [board.destination, board.days ? `${board.days} dni` : null].filter(Boolean).join(' · ') : null}
         initials={initials}
-        ukryjPigulke
       />
 
       <FormularzNowejTablicy

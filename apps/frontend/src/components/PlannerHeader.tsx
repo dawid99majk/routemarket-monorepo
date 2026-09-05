@@ -12,7 +12,6 @@ interface PlannerHeaderProps {
   /** Inicjały do awatara. Bez nich kółko się nie pokazuje. */
   initials?: string | null;
   /** Odkrywaj ma własny, większy przełącznik -- pigułka obok logo dublowałaby go. */
-  ukryjPigulke?: boolean;
 }
 
 /**
@@ -52,22 +51,14 @@ function zakladki(tripId: string | null) {
  * skok do innej aplikacji. Projekt zakłada jeden pasek i zakładki zależne od
  * kontekstu (kierunek „Wyprawa", zadanie Z2).
  */
-export default function PlannerHeader({ context, initials, ukryjPigulke }: PlannerHeaderProps) {
+export default function PlannerHeader({ context, initials }: PlannerHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { pathname, search } = useLocation();
+  /* Ostatnia tablica decyduje już tylko o tym, czy pokazać zakładkę „Plan dni" —
+     pigułka z jej nazwą zniknęła, bo ten sam wybór robi teraz pasek kart. */
   const tripId = ostatniaTablica();
-  const [tripName, setTripName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let aktualne = true;
-    if (!tripId) { setTripName(null); return; }
-    (supabase as any).from('trip_projects').select('name').eq('id', tripId).maybeSingle()
-      .then(({ data }: any) => { if (aktualne) setTripName(data?.name ?? null); });
-    return () => { aktualne = false; };
-  }, [tripId]);
-
   /**
    * Zakładka świeci się także na ekranach, które do niej należą, choć mają własny
    * adres: karta miejsca i ulubione to nadal odkrywanie, moje trasy wychodzą
@@ -95,15 +86,6 @@ export default function PlannerHeader({ context, initials, ukryjPigulke }: Plann
             zostawalo 58 px widocznej szerokosci — mniej niz jedna zakladka. */}
         <Logo showName signature={false} size="sm"
           className="shrink-0 [&>span]:hidden sm:[&>span]:flex" />
-
-        {tripId && !ukryjPigulke && (
-          <button onClick={() => navigate('/plany')}
-            className="hidden md:inline-flex items-center gap-1.5 h-8 rounded-full bg-muted px-3.5
-                       text-[13px] font-medium max-w-[220px] hover:bg-tan/25 transition-colors">
-            <span className="truncate">{tripName || '…'}</span>
-            <span className="text-muted-foreground">▾</span>
-          </button>
-        )}
 
         {/* min-w-0 jest tu warunkiem dzialania overflow-x-auto: bez niego element
             flex nie kurczy sie ponizej szerokosci tresci, wiec zakladki nie
