@@ -30,7 +30,18 @@ async function fetchWikiCard(wikipediaTag: string | undefined): Promise<{ image?
 export const COMMONS_UA = 'RouteMarket/1.0 (+https://routemarket.io)';
 
 /** Pliki, które nigdy nie są zdjęciem miejsca: herby, flagi, mapy, schematy, pliki wideo, ryciny, zrzuty z TV, zniszczenia wojenne, czarno-białe pocztówki i archiwalia */
-const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite|skizze|sketch|drawing|zeichnung|rysunek|szkic|kupferstich|litho|engraving|gravure|etching|blueprint|grundriss|reconstruction|render|simulation|screenshot|zdf|ard|arte|bbc|fernsehen|broadcast|television|\bwebm\b|\bogv\b|\bogg\b|\bmp4\b|bau_des|construction_of|ruine?|zerstört|destroyed|bombard|fire\b|brand\b|\b(18\d\d|19[0-7]\d)\b|black_and_white|schwarzweiss|czarno_biale|historic|historisch|vintage|postcard|ansichtskarte|postkarte|pocztowka)/i;
+const PHOTO_JUNK = /(coat.of.arms|flag|logo|icon|location[_\s-]?map|[_\s-]map[_\s-0-9]|\bmap\b|mapa|karte|plan\b|diagram|blazon|wikidata|locator|satellite|skizze|sketch|drawing|zeichnung|rysunek|szkic|kupferstich|litho|engraving|gravure|etching|blueprint|grundriss|reconstruction|render|simulation|screenshot|zdf|ard|arte|bbc|fernsehen|broadcast|television|\bwebm\b|\bogv\b|\bogg\b|\bmp4\b|bau_des|construction_of|ruine?|zerstört|destroyed|bombard|fire\b|brand\b|\b(18\d\d|19[0-7]\d)\b|black_and_white|schwarzweiss|czarno_biale|historic|historisch|vintage|postcard|ansichtskarte|postkarte|pocztowka)/i;
+
+/**
+ * Pliki transportowe (stacje metra, perony, pociągi, tramwaje), które pojawiają się
+ * przy wyszukiwaniu wokół atrakcji turystycznych dzielących nazwę ze stacją metra (np. Colosseo,
+ * Palais Royal, Piazza di Spagna). Odrzucamy je, chyba że sam obiekt to dworzec/stacja.
+ */
+const TRANSIT_JUNK = /(metro[_\s-]|metrou\b|\bsubway\b|u-bahn|ubahn\b|underground[_\s-]station|tramwaj|tramway|autobus|bus[_\s-]stop|\bprzystanek\b|\bperon\b|railway[_\s-]station|\bstacja[_\s-]metra\b|station[_\s-]de[_\s-]m[eé]tro|statie[_\s-]metrou)/i;
+
+export function isTransitPlace(name: string): boolean {
+  return /\b(dworzec|stacja|station|gare|bahnhof|termini|aeroporto|lotnisko|airport|flughafen|metro)\b/i.test(name);
+}
 
 /**
  * Nazwy prosto z aparatu ("DSC_0431", "IMG 2207", "P1010823"). Taki plik nie mówi
@@ -59,7 +70,12 @@ const PHOTO_DETAL = /(interior|interno|interieur|wnetrz|detail|detal|ceiling|suf
 const COS_W_SRODKU = /\b(in de|in het|in der|in the|inside|we wnetrzu|wewnatrz)\b/i;
 
 const stripDiacritics = (t: string) =>
-  t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  (t || '')
+    .replace(/ł/g, 'l')
+    .replace(/Ł/g, 'L')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
 let miastaCache: { at: number; lista: string[] } | null = null;
 
@@ -87,20 +103,47 @@ async function inneMiastaNiz(miasto: string | undefined): Promise<string[]> {
  * "Kościół Garnizonowy" dostawał zdjęcie ulicy św. Elżbiety. Jeśli tytuł mówi
  * o innym rodzaju obiektu niż nazwa miejsca, to nie jest ten sam obiekt.
  */
-const WIKI_KIND = ['ulica', 'plac', 'parafia', 'kamienica', 'pomnik', 'most', 'dworzec',
-  'park', 'cmentarz', 'hotel', 'teatr', 'synagoga', 'street', 'square', 'monument'];
+const STOP_WORDS = new Set([
+  'w', 'we', 'na', 'nad', 'pod', 'przy', 'dla', 'ze', 'od', 'do', 'po', 'za', 'o',
+  'de', 'del', 'della', 'delle', 'delli', 'degli', 'da', 'di', 'dos', 'das',
+  'du', 'des', 'le', 'la', 'les', 'el', 'los', 'las', 'il', 'lo', 'gli', 'i', 'un', 'una', 'uno', 'une',
+  'the', 'of', 'and', 'at', 'in', 'on', 'for', 'by', 'with',
+  'von', 'und', 'der', 'die', 'das', 'den', 'dem', 'des', 'am', 'im', 'zur', 'zum',
+  'z', 'ze', 'v', 've', 'u', 'k', 'ke', 'se'
+]);
+
+const WIKI_KIND = [
+  'ulica', 'plac', 'parafia', 'kamienica', 'pomnik', 'most', 'dworzec',
+  'park', 'cmentarz', 'hotel', 'teatr', 'synagoga', 'street', 'square', 'monument',
+  'stacja', 'station', 'metro', 'subway', 'przystanek', 'gare', 'tramwaj', 'tram',
+  'muzeum', 'museum', 'museo', 'kościół', 'kosciol', 'church', 'chiesa', 'katedra',
+  'cathedral', 'pałac', 'palac', 'palace', 'palazzo', 'zamek', 'castle', 'brama', 'gate',
+  'cmentarz', 'cemetery', 'ogród', 'garden', 'divadlo', 'theatre', 'teatro', 'kino', 'cinema'
+];
 
 /**
- * Słowa, które same z siebie nie identyfikują miejsca. Nazwa złożona wyłącznie
- * z nich ("Sandy beach", "Stary rynek") pasuje w Commons do czegokolwiek na
- * świecie, więc takiego trafienia nie wolno przyjąć bez potwierdzenia położeniem.
+ * Słowa, które same z siebie nie identyfikują miejsca (kategorie, typy obiektów,
+ * określenia ogólne). Nazwa złożona wyłącznie z nich ("Sandy beach", "Teatr", "Muzeum")
+ * nie identyfikuje konkretnej placówki bez jej wyróżnika.
  */
-const GENERIC_PLACE_WORD = /^(sandy|beach|plaza|rynek|market|square|castle|church|museum|garden|view|old|new|town|city|centre|center|street|bridge|lake|river|hill|park|porto|grill|restaurant|cafe|hotel|zamek|kościół|kosciol|muzeum|stare|stary|nowe|nowy|miasto|ulica|most|jezioro|rzeka|plaża|plaza)$/i;
+const GENERIC_PLACE_WORD = /^(sandy|beach|plaza|rynek|market|square|castle|church|museum|garden|view|old|new|town|city|centre|center|street|bridge|lake|river|hill|park|porto|grill|restaurant|cafe|hotel|zamek|kościół|kosciol|muzeum|stare|stary|nowe|nowy|miasto|ulica|most|jezioro|rzeka|plaża|plaza|teatr|theatre|theater|teatro|teatre|divadlo|schauspiel|opera|filharmonia|kino|cinema|cine|auditorium|scena|arena|stadium|stadion|museo|museu|musée|musee|galeria|gallery|galleria|cerkiew|synagoga|synagogue|meczet|mosque|katedra|cathedral|cattedrale|catedral|bazylika|basilica|basilique|kaplica|chapel|cappella|capela|klasztor|monastery|convento|mosteiro|pałac|palac|palace|palazzo|palacio|palácio|palais|schloss|burg|hrad|kamienica|dom|house|casa|mansion|ratusz|wieża|wieza|tower|torre|tour|turm|brama|gate|porta|porte|tor|pomnik|monument|statue|denkmal|fontanna|fountain|fontana|fuente|fontaine|aleja|avenue|avenida|allee|bulwar|boulevard|praca|praça|place|platz|náměstí|namesti|restauracja|ristorante|restaurace|bar|pub|kawiarnia|caffè|caffe|bistro|klub|club|dworzec|stacja|station|gare|bahnhof|nádraží|nadrazi|przystanek|metro|subway|lotnisko|airport|aeroporto|port|przystań|przystan|budynek|centrum)$/i;
 
-function distinctiveTokens(name: string): string[] {
-  return (name || '')
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((t) => t.length >= 5 && !GENERIC_PLACE_WORD.test(t));
+function distinctiveTokens(name: string, city?: string): string[] {
+  const normCity = stripDiacritics(city || '');
+  const cityStem = normCity.length >= 4 ? normCity.slice(0, 4) : normCity;
+
+  const rawTokens = stripDiacritics(name || '')
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean);
+
+  return rawTokens.filter((t) => {
+    if (t.length < 3) return false;
+    if (STOP_WORDS.has(t)) return false;
+    if (GENERIC_PLACE_WORD.test(t)) return false;
+    if (normCity && t.includes(normCity)) return false;
+    if (cityStem && t.startsWith(cityStem)) return false;
+    return true;
+  });
 }
 
 function kmApart(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
@@ -138,18 +181,17 @@ async function commonsQuery(params: Record<string, string>): Promise<any[]> {
   }
 }
 
+function bezSlowNazwy(tytul: string, nameTokens: string[]): string {
+  return (nameTokens ?? []).reduce(
+    (tekst, slowo) => tekst.split(slowo.toLowerCase()).join(' '),
+    tytul.toLowerCase());
+}
+
 function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
-                      nameTokens: string[] | null, inneMiasta: string[] | null = null): string[] {
+                      nameTokens: string[] | null, inneMiasta: string[] | null = null,
+                      isTransit = false): string[] {
   return pages
     .sort((a, b) => (a.index ?? 99) - (b.index ?? 99))
-    // Skan zeskanowanej książki albo dokumentu bierzemy TYLKO po tytule oryginału
-    // ("...pdf", "...djvu"), nie po adresie miniatury: MediaWiki renderuje stronę
-    // PDF-u jako "page1-960px-Cokolwiek.pdf.jpg" -- kończy się na .jpg, więc test
-    // rozszerzenia niżej i tak by to przepuścił. Kawiarnia "Vienna" w Hadze nie
-    // miała zdjęcia z geotagiem i dopasowanie spadło na sam tytuł pliku -- trafiło
-    // w zeskanowaną stronę XVII-wiecznego dziennika podróży, bo w tytule było
-    // "...to Vienna...". "Vienna" jest zbyt pospolitym słowem, żeby to złapać
-    // regułą dopasowania; ten filtr łapie to niezależnie od słowa.
     .filter((p) => !/\.(pdf|djvu|webm|ogv|ogg|mp4|mov|svg|gif)$/i.test(String(p.title || '').trim()))
     // Slowa z nazwy miejsca wycinamy PRZED testem na smieci. PHOTO_JUNK lapie
     // m.in. "historic|historisch", zeby odsiewac archiwalia — i wycinal przez to
@@ -162,7 +204,7 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
       const bezSlowNazwy = (nameTokens ?? []).reduce(
         (tekst, slowo) => tekst.split(slowo.toLowerCase()).join(' '),
         tytul.toLowerCase());
-      return !PHOTO_JUNK.test(bezSlowNazwy) && !CAMERA_DUMP.test(bezSlowNazwy);
+      return !PHOTO_JUNK.test(bezSlowNazwy) && !CAMERA_DUMP.test(bezSlowNazwy) && (isTransit || !TRANSIT_JUNK.test(tytul));
     })
     .filter((p) => {
       const c = p.coordinates?.[0];
@@ -212,15 +254,19 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
  * rynków w Polsce, ale artykuł z geotagiem czterdzieści metrów stąd to na pewno
  * ten właściwy.
  */
-async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }): Promise<string[]> {
-  const tokens = stripDiacritics(name).split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
+async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }, city?: string): Promise<string[]> {
+  const isPlaceTransit = isTransitPlace(name);
+  const distinct = distinctiveTokens(name, city);
+  const tokens = distinct.length > 0
+    ? distinct
+    : stripDiacritics(name).split(/[^a-z0-9]+/).filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
   const nameKinds = WIKI_KIND.filter((k) => stripDiacritics(name).includes(k));
   for (const lang of ['pl', 'en']) {
     try {
       const url = `https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({
         format: 'json', action: 'query', generator: 'geosearch',
         ggscoord: `${origin.lat}|${origin.lng}`, ggsradius: '600', ggslimit: '20',
-        prop: 'pageimages|coordinates', piprop: 'original'
+        prop: 'pageimages|coordinates|description', piprop: 'original'
       });
       const res = await fetch(url, { headers: { 'User-Agent': COMMONS_UA }, signal: AbortSignal.timeout(9000) });
       if (!res.ok) continue;
@@ -230,16 +276,21 @@ async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }
         .filter((pg) => pg.original?.source)
         .map((pg) => {
           const title = stripDiacritics(pg.title || '');
-          // Slowa tytulu, nie surowy napis. Dopasowanie podciagiem dawalo trafienia
-          // miedzy roznymi miejscami: token "roman" z "Ateneul Roman" siedzi w
-          // "Piata Romana", wiec plac wygrywal z filharmonia, gdy ta akurat nie
-          // miala zdjecia wiodacego.
+          const desc = stripDiacritics(pg.description || '').toLowerCase();
+          // Słowa tytułu, nie surowy napis.
           const slowaTytulu = new Set(title.split(/[^a-z0-9]+/).filter(Boolean));
+          const isArticleTransit = /(metro|stacja|station|subway|gare|przystanek|bahn)/i.test(desc) ||
+            /(metro|stacja|station|subway|gare|przystanek)/i.test(title);
+          const transitClash = isArticleTransit && !isPlaceTransit;
           const c = pg.coordinates?.[0];
           const km = c ? kmApart(origin, { lat: c.lat, lng: c.lon }) : 9;
           const hits = tokens.filter((t) => slowaTytulu.has(t)).length;
-          const clash = WIKI_KIND.some((k) => slowaTytulu.has(k) && !nameKinds.includes(k));
-          return { pg, hits, km, clash };
+          // Artykuł musi pasować do unikalnego wyróżnika miejsca, o ile miejsce taki posiada
+          const matchesDistinct = distinct.length > 0
+            ? distinct.some((d) => slowaTytulu.has(d) || title.includes(d))
+            : true;
+          const clash = transitClash || WIKI_KIND.some((k) => slowaTytulu.has(k) && !nameKinds.includes(k));
+          return { pg, hits, km, clash, matchesDistinct };
         })
         // Artykuł musi pasować nazwą. Samo "leży blisko" nie wystarcza — w
         // starówce w promieniu stu metrów jest kilkanaście obiektów z własnym
@@ -247,11 +298,11 @@ async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }
         // Jedno wspolne slowo to za malo, gdy nazwa ma ich kilka: "Muzeum
         // Narodowe" i "Muzeum Techniki" dziela polowe nazwy i sa czym innym.
         // Zadamy polowy tokenow — przy nazwie jednoslownej to dalej jeden token.
-        .filter((r) => r.hits > 0 && !r.clash && r.hits >= Math.ceil(tokens.length / 2))
+        .filter((r) => r.hits > 0 && !r.clash && r.matchesDistinct && r.hits >= Math.ceil(tokens.length / 2))
         .sort((a, b) => b.hits - a.hits || a.km - b.km);
 
       const best = scored[0]?.pg?.original?.source as string | undefined;
-      if (best && !PHOTO_JUNK.test(best) && /\.(jpg|jpeg|png)$/i.test(best.split('?')[0])) {
+      if (best && !PHOTO_JUNK.test(best) && (isPlaceTransit || !TRANSIT_JUNK.test(best)) && /\.(jpg|jpeg|png)$/i.test(best.split('?')[0])) {
         return [best];
       }
     } catch { /* brak artykułu w tym języku — próbujemy następnego */ }
@@ -272,8 +323,9 @@ async function wikiLeadPhotos(name: string, origin: { lat: number; lng: number }
  * poziomy i rozdzielczość, a wnętrza i detale lądują na końcu.
  */
 async function wikiArticlePhotos(wikipediaTag: string | undefined, name: string,
-                                 limit = 6): Promise<string[]> {
+                                 limit = 6, city?: string): Promise<string[]> {
   if (!wikipediaTag) return [];
+  const isTransit = isTransitPlace(name);
   const m = wikipediaTag.match(/^([a-z-]{2,10}):(.+)$/i);
   const lang = m ? m[1] : 'pl';
   const title = m ? m[2] : wikipediaTag;
@@ -288,7 +340,8 @@ async function wikiArticlePhotos(wikipediaTag: string | undefined, name: string,
                                    signal: AbortSignal.timeout(9000) });
     if (!res.ok) return [];
     const strony: any[] = Object.values(((await res.json()) as any)?.query?.pages || {});
-    const tokeny = distinctiveTokens(name).map((t) => stripDiacritics(t).toLowerCase());
+    const distinct = distinctiveTokens(name, city);
+    const tokeny = (distinct.length > 0 ? distinct : distinctiveTokens(name)).map((t) => stripDiacritics(t).toLowerCase());
 
     const ocenione = strony.map((p) => {
       const plik = String(p.title || '').split(':').slice(1).join(':');
@@ -299,6 +352,7 @@ async function wikiArticlePhotos(wikipediaTag: string | undefined, name: string,
       if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return null;
       if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)$/i.test(plik)) return null;
       if (PHOTO_JUNK.test(plik) || CAMERA_DUMP.test(plik)) return null;
+      if (!isTransit && TRANSIT_JUNK.test(plik)) return null;
 
       const plikBezOgonkow = stripDiacritics(plik).toLowerCase();
       const kategorie = String(ii.extmetadata?.Categories?.value || '');
@@ -413,7 +467,7 @@ export async function fetchNearbyPhotos(
     const card = await fetchWikiCard(wikipediaTag).catch(() => ({} as any));
     if (card.image && !PHOTO_JUNK.test(card.image)) tagged = [card.image];
   }
-  let tokens = distinctiveTokens(name);
+  let tokens = distinctiveTokens(name, city);
   if (tokens.length === 0 && city) tokens = distinctiveTokens(city);
 
   // Dwa zapytania zamiast jednego. Sama nazwa daje najlepsza trafnosc
@@ -424,26 +478,27 @@ export async function fetchNearbyPhotos(
   const aliasy = aliasyMiasta(city);
   const frazy = [name, ...(aliasy.length ? [`${name} ${aliasy[0]}`] : [])];
 
-  const zArtykulu = await wikiArticlePhotos(wikipediaTag, name).catch(() => [] as string[]);
+  const zArtykulu = await wikiArticlePhotos(wikipediaTag, name, 6, city).catch(() => [] as string[]);
   // Do listy miast z katalogu (nazwy polskie) dokladamy nazwy uzywane przez
   // Commons — bez nich "Hemingway Bar in Como (Italy)" przechodzil, bo ani
   // "Como", ani "Italy" nie wystepuja w polskim spisie miast.
   const inneMiasta = [...await inneMiastaNiz(city), ...obceNazwyGeograficzne(city, country)];
 
+  const isTransit = isTransitPlace(name);
   const [byWiki, byName, byGeo] = await Promise.all([
-    origin ? wikiLeadPhotos(name, origin).catch(() => []) : Promise.resolve([]),
+    origin ? wikiLeadPhotos(name, origin, city).catch(() => []) : Promise.resolve([]),
     Promise.all(frazy.map((fraza) => commonsQuery({
       action: 'query', generator: 'search', gsrsearch: fraza, gsrnamespace: '6',
       gsrlimit: String(limit + 4), prop: 'imageinfo|coordinates',
       iiprop: 'url', iiurlwidth: '800'
-    }).then((p) => usablePhotos(p, origin, tokens, inneMiasta)).catch(() => [] as string[])))
+    }).then((p) => usablePhotos(p, origin, tokens, inneMiasta, isTransit)).catch(() => [] as string[])))
       .then((zestawy) => zestawy.flat()),
     origin
       ? commonsQuery({
           action: 'query', generator: 'geosearch', ggscoord: `${lat}|${lng}`,
           ggsradius: '250', ggslimit: String(limit + 6), ggsnamespace: '6',
           prop: 'imageinfo', iiprop: 'url', iiurlwidth: '800'
-        }).then((p) => usablePhotos(p, origin, tokens, inneMiasta)).catch(() => [])
+        }).then((p) => usablePhotos(p, origin, tokens, inneMiasta, isTransit)).catch(() => [])
       : Promise.resolve([])
   ]);
 
@@ -460,19 +515,22 @@ export async function fetchNearbyPhotos(
       if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return false;
       const doOceny = bezSlowNazwyPliku(plik);
       if (PHOTO_JUNK.test(doOceny) || CAMERA_DUMP.test(doOceny)) return false;
+      if (!isTransit && TRANSIT_JUNK.test(plik)) return false;
       return true;
     });
 
-  const tokenyNazwy = distinctiveTokens(name).map((t) => stripDiacritics(t).toLowerCase());
+  const tokenyNazwy = (distinctiveTokens(name, city).length > 0
+    ? distinctiveTokens(name, city)
+    : distinctiveTokens(name)).map((t) => stripDiacritics(t).toLowerCase());
   // Nazwa miasta w tytule pliku to najtansze dostepne potwierdzenie, ze chodzi
   // o TEN egzemplarz obiektu. Pomnik Johana de Witta stoi i w Hadze, i w
   // Rotterdamie; oba pliki maja w tytule jego nazwisko, tylko jeden ma miasto.
   // Odsiewac tego nie mozna — Rotterdamu nie ma w naszym katalogu, wiec nie da
   // sie go rozpoznac jako obcego. Wystarczy jednak, ze plik z wlasciwym miastem
   // wygra ranking.
-  const aliasyDoRankingu = aliasyMiasta(city).map((a) => a.replace(/\s+/g, ''));
+  const aliasyDoRankingu = aliasyMiasta(city).map((a: string) => a.replace(/\s+/g, ''));
   const punktyZaMiasto = (plik: string) =>
-    aliasyDoRankingu.some((a) => plik.replace(/[^a-z0-9]/g, '').includes(a)) ? 3 : 0;
+    aliasyDoRankingu.some((a: string) => plik.replace(/[^a-z0-9]/g, '').includes(a)) ? 3 : 0;
 
   const punktyZa = (adres: string) => {
     let p = 0;
