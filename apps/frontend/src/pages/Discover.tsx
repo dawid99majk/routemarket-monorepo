@@ -163,6 +163,9 @@ export default function Discover() {
   /** Wyjazd wskazany z tablicy. Bez tego Odkrywaj brał ostatnio zmieniany,
    *  więc wejście z tablicy Lipska mogło wylądować w innym mieście. */
   const wskazanyWyjazd = searchParams.get('wyjazd');
+  /* Miasto w adresie: karta miasta kliknięta gdzie indziej (strona główna)
+     musi mieć jak przekazać wybór — bez tego Odkrywaj otwierałoby się puste. */
+  const wskazaneMiasto = searchParams.get('miasto');
   const [zbieraneSekundy, setZbieraneSekundy] = useState(0);
   const [opisyWToku, setOpisyWToku] = useState(false);
   /** Ile kart pokazujemy. Rośnie przy przewijaniu, nie przy każdym zapytaniu. */
@@ -379,6 +382,9 @@ export default function Discover() {
         setActiveBoard(wskazany.id);
         if (wskazany.destination) setCity(wskazany.destination);
         setZakladkaPaska('tablice');
+      } else if (wskazaneMiasto) {
+        setCity(wskazaneMiasto);
+        setOstatnieMiasta(dopiszOstatnie(wskazaneMiasto));
       } else if ((projs ?? []).length > 0) {
         setZakladkaPaska('tablice');
       }

@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import PasekKart, { type KartaMiasta, type ZakladkaPaska } from '@/components/PasekKart';
+import type { WyjazdDoPrzelaczenia } from '@/components/PrzelacznikWyjazdu';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Heart, Search } from 'lucide-react';
@@ -73,6 +75,15 @@ export default function Index() {
   const [szukajTablic, setSzukajTablic] = useState('');
   const [ileWKatalogu, setIleWKatalogu] = useState<number | null>(null);
 
+  /* Pasek kart — ten sam wybór kontekstu co w Odkrywaj. Strona główna była
+     jedynym ekranem, z którego trzeba było najpierw gdzieś przejść, żeby
+     powiedzieć, czym się zajmujesz. */
+  const [mojeWyjazdy, setMojeWyjazdy] = useState<WyjazdDoPrzelaczenia[]>([]);
+  const [zakladkaPaska, setZakladkaPaska] = useState<ZakladkaPaska>('polecane');
+  const [ostatnieMiasta, setOstatnieMiasta] = useState<string[]>([]);
+  const [zdjeciaMiast, setZdjeciaMiast] =
+    useState<Record<string, { zdjecie: string | null }>>({});
+
   useEffect(() => {
     (async () => {
       const { count } = await supabase.from('place_catalog')
@@ -80,6 +91,62 @@ export default function Index() {
       if (typeof count === 'number') setIleWKatalogu(count);
     })();
   }, []);
+
+  useEffect(() => {
+    try {
+      const zapis = JSON.parse(localStorage.getItem('rm_ostatnie_miasta') || '[]');
+      if (Array.isArray(zapis)) {
+        setOstatnieMiasta(zapis.filter((x: unknown): x is string => typeof x === 'string' && !!x));
+      }
+    } catch { /* tryb prywatny — zakładka po prostu się nie pokaże */ }
+
+    (async () => {
+      const { data } = await (supabase as any).from('place_catalog')
+        .select('city, photos')
+        .not('photos', 'is', null)
+        .order('waznosc', { ascending: false, nullsFirst: false })
+        .limit(600);
+      const zebrane: Record<string, { zdjecie: string | null }> = {};
+      for (const r of (data ?? []) as { city: string | null; photos: unknown }[]) {
+        const nazwa = (r.city || '').trim();
+        if (!nazwa || zebrane[nazwa]?.zdjecie) continue;
+        const foto = Array.isArray(r.photos)
+          ? r.photos.find((u: unknown) => typeof u === 'string' && u) : null;
+        zebrane[nazwa] = { zdjecie: (foto as string) ?? null };
+      }
+      setZdjeciaMiast(zebrane);
+    })();
+  }, []);
+
+  /* Wyjazdy tylko dla zalogowanego. Bez konta zakładka „Twoje wyjazdy" nie ma
+     czego pokazać, a PasekKart sam chowa puste zakładki. */
+  useEffect(() => {
+    if (!user) { setMojeWyjazdy([]); return; }
+    (async () => {
+      const { data } = await supabase.from('trip_projects')
+        .select('id, name, destination, days, start_date, end_date, trip_type')
+        .order('updated_at', { ascending: false }).limit(12);
+      if (!data?.length) { setMojeWyjazdy([]); return; }
+
+      /* Miniatura karty to zdjęcie pierwszego miejsca z tablicy — trip_projects
+         samo tego nie ma. Bez tego wszystkie karty wyjazdów są szare. */
+      const { data: miejsca } = await supabase.from('trip_project_places')
+        .select('project_id, image_url').in('project_id', data.map((b: any) => b.id));
+      const wgTablicy: Record<string, { ile: number; miniatura: string | null }> = {};
+      for (const m of miejsca ?? []) {
+        const w = (wgTablicy[m.project_id] ??= { ile: 0, miniatura: null });
+        w.ile += 1;
+        if (!w.miniatura && m.image_url) w.miniatura = m.image_url;
+      }
+
+      setMojeWyjazdy(data.map((b: any) => ({
+        ...b,
+        liczba_miejsc: wgTablicy[b.id]?.ile ?? 0,
+        miniatura: wgTablicy[b.id]?.miniatura ?? null,
+      })) as WyjazdDoPrzelaczenia[]);
+      setZakladkaPaska('tablice');
+    })();
+  }, [user]);
 
   useEffect(() => {
     (async () => {
@@ -137,6 +204,28 @@ export default function Index() {
 
   // Na waskim ekranie pole i przycisk musza sie rozejsc na dwa wiersze: w jednym
   // rzedzie na 375 px input scisnal sie do 134 px i ucinal wlasny placeholder.
+  const MIASTA_POLECANE = ['Rzym', 'Barcelona', 'Lizbona', 'Praga', 'Amsterdam', 'Wiedeń', 'Porto', 'Kraków'];
+
+  const kartaMiasta = (m: string): KartaMiasta => ({ miasto: m, zdjecie: zdjeciaMiast[m]?.zdjecie ?? null });
+
+  /* Klik w kartę prowadzi do Odkrywaj z ustawionym kontekstem — te same reguły
+     co w pasku tam: karta wyjazdu niesie wyjazd, karta miasta samo miasto. */
+  const pasekKart = (
+    <PasekKart
+      zakladka={zakladkaPaska}
+      onZakladka={setZakladkaPaska}
+      tablice={mojeWyjazdy}
+      ostatnie={ostatnieMiasta.map(kartaMiasta)}
+      polecane={MIASTA_POLECANE.filter((m) => zdjeciaMiast[m]).map(kartaMiasta)}
+      wybranaTablica={null}
+      wybraneMiasto=""
+      onWybierzTablice={(id) => navigate(`/odkrywaj?wyjazd=${id}`)}
+      onWybierzMiasto={(miasto) => navigate(`/odkrywaj?miasto=${encodeURIComponent(miasto)}`)}
+      onNowyWyjazd={() => navigate(user ? '/start' : '/auth')}
+      onWszystkieWyjazdy={() => navigate(user ? '/plany' : '/auth')}
+    />
+  );
+
   const poleDestynacji = (
     <div className="flex flex-col sm:flex-row gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
       <input value={cel} onChange={(e) => setCel(e.target.value)}
@@ -344,6 +433,14 @@ export default function Index() {
             <p className="font-mono text-[12px] text-muted-foreground mt-5 text-center">
               {t('landing.hero.zapewnienia')}
             </p>
+
+            {/* Pasek stoi pod polem, nie nad nim: pole jest dla kogoś, kto wie,
+                dokąd jedzie, a pasek — dla kogoś, kto dopiero patrzy. Odwrotna
+                kolejność kazałaby najpierw przewinąć cudze miasta, żeby wpisać
+                własne. */}
+            <div className="w-full max-w-[880px] mx-auto text-left">
+              {pasekKart}
+            </div>
           </div>
         </section>
       </main>
