@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PlannerHeader from '@/components/PlannerHeader';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
+import { odmien } from '@/lib/odmiana';
 import { useTranslation } from 'react-i18next';
 
 interface Kolekcja { id: string; name: string; slug: string; is_public: boolean }
@@ -35,7 +36,8 @@ export default function Zapisane() {
   const [przypisania, setPrzypisania] = useState<Record<string, string[]>>({});
   const [filtr, setFiltr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [boards, setBoards] = useState<{ id: string; name: string }[]>([]);
+  const [boards, setBoards] = useState<{ id: string; name: string; destination?: string | null }[]>([]);
+  const [skladam, setSkladam] = useState<string | null>(null);
   const [inicjaly, setInicjaly] = useState<string | null>(null);
   const [nowaNazwa, setNowaNazwa] = useState('');
   const [zakladam, setZakladam] = useState(false);
@@ -52,7 +54,7 @@ export default function Zapisane() {
         .select('created_at, place_catalog(*)')
         .eq('user_id', userData.user.id)
         .order('created_at', { ascending: false }),
-      supabase.from('trip_projects').select('id, name').order('updated_at', { ascending: false }),
+      supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
       supabase.from('collections').select('id, name, slug, is_public')
         .eq('user_id', userData.user.id).order('created_at', { ascending: false }),
     ]);
@@ -78,6 +80,100 @@ export default function Zapisane() {
   const widoczne = useMemo(
     () => (filtr ? places.filter((p) => (przypisania[p.id] ?? []).includes(filtr)) : places),
     [places, filtr, przypisania]);
+
+  /**
+   * Miasta, z których uzbierało się na wyjazd.
+   *
+   * Serduszko było dotąd ścieżką bez wyjścia: kto nie chciał zakładać tablicy,
+   * odkładał miejsca tutaj i na tym się kończyło. Skoro ktoś zapisał sześć
+   * miejsc w jednym mieście, to nie jest już zbieranie — to jest wyjazd, tylko
+   * bez tablicy. Proponujemy złożenie jej z tego, co już jest.
+   *
+   * Istniejąca tablica na to miasto nie wycisza propozycji, tylko zmienia jej
+   * treść: sensowną ofertą jest wtedy dopisanie miejsc do niej, a nie drugi
+   * wyjazd w to samo miejsce. Wyciszanie sprawiało, że przy koncie z tablicami
+   * do prawie każdego miasta ta funkcja nie pokazywała się nigdy.
+   */
+  const propozycjeTablic = useMemo(() => {
+    const wgMiasta: Record<string, any[]> = {};
+    for (const p of places) {
+      const miasto = (p.city || '').trim();
+      if (!miasto) continue;
+      (wgMiasta[miasto] ??= []).push(p);
+    }
+    return Object.entries(wgMiasta)
+      .filter(([, lista]) => lista.length >= 2)
+      .map(([miasto, lista]) => ({
+        miasto,
+        lista,
+        istniejaca: boards.find(
+          (b) => (b.destination || '').trim().toLowerCase() === miasto.toLowerCase()) ?? null,
+      }))
+      .sort((a, b) => b.lista.length - a.lista.length)
+      .slice(0, 3);
+  }, [places, boards]);
+
+  /**
+   * Wszystko ląduje w „być może". Serce znaczy „chcę to zapamiętać", a nie
+   * „to na pewno jadę zobaczyć" — awans do „na pewno" jest decyzją, której nie
+   * wolno podjąć za kogoś. Ten sam kubełek co przy „dodaj do tablicy" niżej.
+   */
+  const zlozTablice = async (miasto: string, lista: any[], istniejaca: { id: string } | null) => {
+    if (skladam) return;
+    setSkladam(miasto);
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) { setSkladam(null); navigate('/auth'); return; }
+
+    let idTablicy = istniejaca?.id ?? null;
+    if (!idTablicy) {
+      const { data: tablica, error } = await (supabase as any).from('trip_projects').insert({
+        user_id: userData.user.id,
+        name: miasto,
+        destination: miasto,
+        days: 3,
+        hours_per_day: 8,
+        fill_percent: 70,
+      }).select('id, name').single();
+      if (error || !tablica) {
+        setSkladam(null);
+        return toast.error(error?.message ?? 'Nie udało się utworzyć tablicy');
+      }
+      idTablicy = tablica.id;
+    }
+
+    /* Do istniejącej tablicy dopisujemy tylko to, czego jeszcze na niej nie ma —
+       inaczej powtórne kliknięcie zrobiłoby duplikaty. */
+    const { data: juzTam } = await supabase.from('trip_project_places')
+      .select('catalog_id').eq('project_id', idTablicy);
+    const znane = new Set((juzTam ?? []).map((r: any) => r.catalog_id).filter(Boolean));
+    const doDodania = lista.filter((p: any) => !znane.has(p.id));
+
+    if (doDodania.length === 0) {
+      setSkladam(null);
+      navigate(`/plany/${idTablicy}`);
+      return;
+    }
+
+    const { error: bladMiejsc } = await supabase.from('trip_project_places').insert(
+      doDodania.map((p: any) => ({
+        project_id: idTablicy,
+        catalog_id: p.id,
+        name: p.name,
+        category: p.category,
+        priority: 'nice',
+        lat: p.lat,
+        lng: p.lng,
+        description: p.description,
+        opening_hours: p.opening_hours ?? null,
+        visit_minutes: p.visit_minutes ?? null,
+        image_url: p.photos?.[0] ?? null,
+        source: 'catalog',
+      })));
+
+    setSkladam(null);
+    if (bladMiejsc) return toast.error(bladMiejsc.message);
+    navigate(`/plany/${idTablicy}`);
+  };
 
   const usun = async (placeId: string) => {
     const { data: userData } = await supabase.auth.getUser();
@@ -180,6 +276,39 @@ export default function Zapisane() {
               );
             })}
           </div>
+        )}
+
+        {propozycjeTablic.length > 0 && (
+          <section className="mt-8 rounded-md border border-primary/20 bg-primary/5 px-5 py-4">
+            <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-primary">
+              Z tego zrobi się wyjazd
+            </p>
+            <p className="text-[13.5px] text-muted-foreground mt-1.5 max-w-[62ch]">
+              Zapisane miejsca zebrały się w jednym mieście. Trafią do „być może"
+              na tablicy — co pewne, przesuniesz sam.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {propozycjeTablic.map(({ miasto, lista, istniejaca }) => (
+                <button
+                  key={miasto}
+                  onClick={() => zlozTablice(miasto, lista, istniejaca)}
+                  disabled={!!skladam}
+                  className="inline-flex items-center gap-2 rounded-full border border-primary/30
+                             bg-background px-4 py-2 text-[13px] hover:bg-primary/10
+                             disabled:opacity-50 transition-colors"
+                >
+                  {skladam === miasto
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Plus className="w-3.5 h-3.5 text-primary" />}
+                  <span className="font-medium">{miasto}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    {lista.length} {odmien(lista.length, 'miejsce', 'miejsca', 'miejsc')}
+                    {istniejaca ? ' → istniejąca tablica' : ' → nowa tablica'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
 
         {loading ? (
