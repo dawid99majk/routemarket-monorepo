@@ -1,4 +1,5 @@
 import { kmBetween, medianOf } from '@/components/tripProjects/helpers';
+import { godziny } from '@/lib/liczby';
 
 /**
  * Bilans tablicy — co agent ma do powiedzenia o tym, co już zebrałeś.
@@ -59,7 +60,7 @@ const PROG_PRZELADOWANIA = 1.05;
 /** Kategorie, które liczą się jako posiłek. Katalog i agent nazywają je różnie. */
 const JEDZENIE = /^(food|restaurant|cafe|bakery|fast_food|ice_cream|bar|pub|jedzenie|restauracja|kawiarnia)$/i;
 
-const godziny = (minut: number) => (minut / 60).toFixed(1).replace('.', ',');
+
 
 /**
  * Miejsca leżące dalej niż `PROG_ODDALENIA_KM` od mediany pozostałych.

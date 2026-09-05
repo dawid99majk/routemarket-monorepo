@@ -32,6 +32,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { bilansTablicy } from '@/lib/bilansTablicy';
+import { dziesietna } from '@/lib/liczby';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -1849,8 +1850,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             </div>
                             <p className="text-[11px] text-muted-foreground mt-1.5 tabular-nums">
                               <strong className="text-foreground">{places.length}</strong> miejsc ({mustCount} koniecznie) ·{' '}
-                              Zebrane: <strong className="text-foreground">{(budget.used / 60).toFixed(1)} h</strong>
-                              {' '}z {(budget.planned / 60).toFixed(1)} h zaplanowanego czasu
+                              Zebrane: <strong className="text-foreground">{dziesietna(budget.used / 60)} h</strong>
+                              {' '}z {dziesietna(budget.planned / 60)} h zaplanowanego czasu
                             </p>
                           </div>
                         )}
@@ -2651,23 +2652,23 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 Realizm
                               </span>
                               <p className="text-[13px] text-warning-foreground font-medium leading-relaxed text-pretty">
-                                Ten dzień to <strong className="font-mono tabular-nums">{loadH.toFixed(1)} h</strong> na
+                                Ten dzień to <strong className="font-mono tabular-nums">{dziesietna(loadH)} h</strong> na
                                 nogach razem z dojściami. Realnie zwiedza się jakieś siedem, osiem — rozważ przeniesienie
                                 jednego punktu na inny dzień.
                               </p>
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-xs text-muted-foreground border-b">
-                            <span>Zwiedzanie: <strong className="font-mono tabular-nums text-foreground">{(minutes / 60).toFixed(1)} h</strong></span>
+                            <span>Zwiedzanie: <strong className="font-mono tabular-nums text-foreground">{dziesietna(minutes / 60)} h</strong></span>
                             {measured ? (
                               <>
-                                <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">{measured.km.toFixed(1)} km</strong></span>
+                                <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">{dziesietna(measured.km)} km</strong></span>
                                 <span>Marsz: <strong className="font-mono tabular-nums text-foreground">{Math.round(measured.h * 60)} min</strong></span>
                                 <span className="text-primary">przeliczone po chodnikach</span>
                               </>
                             ) : (
                               <>
-                                {km > 0 && <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">ok. {km.toFixed(1)} km</strong></span>}
+                                {km > 0 && <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">ok. {dziesietna(km)} km</strong></span>}
                                 {km > 0 && <span>Marsz: <strong className="font-mono tabular-nums text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
                               </>
                             )}
@@ -2832,7 +2833,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   brzmiało jak awaria danych, choć znaczy tylko tyle, że
                                   nie ustaliliśmy współrzędnych tego punktu. */}
                               {pts.length} z {pts.length + withoutCoords} na mapie
-                              {dayTrack && dr && dr !== 'loading' && ` · ${dr.km.toFixed(1)} km`}
+                              {dayTrack && dr && dr !== 'loading' && ` · ${dziesietna(dr.km)} km`}
                             </span>
                           </div>
                         </div>
@@ -2854,7 +2855,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       <div className="flex gap-6 mt-4 font-mono text-[12px] tabular-nums text-background/70">
                         <span>{days.length} {days.length === 1 ? 'dzień' : 'dni'}</span>
                         <span>{allItems.length} punktów</span>
-                        {totalMin > 0 && <span>{(totalMin / 60).toFixed(1)} h zwiedzania</span>}
+                        {totalMin > 0 && <span>{dziesietna(totalMin / 60)} h zwiedzania</span>}
                       </div>
                       <button
                         onClick={() => buildRouteFrom(allItems, 'cały wyjazd')}
