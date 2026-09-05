@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { AXES } from '@/components/RoutePreferences';
+import OsPreferencji from '@/components/OsPreferencji';
 import { TRIP_PRESETS, EMPTY_AXES, type AxisValues } from '@/lib/tripPresets';
 
 /**
@@ -111,7 +112,7 @@ export default function FormularzNowejTablicy({
           „Utwórz" uciekałby pod krawędź i trzeba by przejść cały formularz,
           żeby go dosięgnąć. */}
       <DialogContent className="sm:max-w-xl p-0">
-        <DialogHeader className="px-7 pt-7 pb-4 pr-14 shrink-0">
+        <DialogHeader className="px-7 pt-7 pb-4 pr-14 shrink-0 border-b border-border">
           <DialogTitle className="text-left text-[21px] leading-[1.25]">
             Nowa tablica{miasto ? `: ${miasto}` : ''}
           </DialogTitle>
@@ -230,33 +231,29 @@ export default function FormularzNowejTablicy({
             <p className="text-[12.5px] text-muted-foreground mt-1.5 mb-4 leading-relaxed">
               Domyślnie ustawienia z Twojego konta. Wybór charakteru wyżej nadpisuje je jednym ruchem.
             </p>
-            <div className="space-y-6">
-              {AXES.map((os) => {
-                const wartosc = osie[os.key as keyof AxisValues] ?? 50;
-                return (
-                  <div key={os.key}>
-                    <p className="text-[13.5px] font-medium">{os.title}</p>
-                    <Slider
-                      value={[wartosc]}
-                      min={0}
-                      max={100}
-                      step={5}
-                      className="mt-3"
-                      onValueChange={(v) => {
-                        setOsie((prev) => ({ ...prev, [os.key]: v[0] }));
-                        /* Ręczna zmiana osi znaczy, że to już nie jest czysty
-                           preset — pigułka przestaje być zaznaczona, żeby nie
-                           obiecywać czegoś, czego wartości już nie oddają. */
-                        setCharakter(null);
-                      }}
-                    />
-                    <div className="flex justify-between gap-4 mt-1.5">
-                      <span className="text-[11.5px] text-muted-foreground">{os.left}</span>
-                      <span className="text-[11.5px] text-muted-foreground text-right">{os.right}</span>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Ten sam komponent co w ustawieniach tablicy. Zwykły suwak wypełniany
+                od lewej krawędzi czyta się jak natężenie („ile czegoś chcę"), a to
+                jest wybór między dwiema stronami — środek znaczy „nie mam zdania",
+                nie „chcę połowę". OsPreferencji rysuje wypełnienie od środka
+                i nazywa stan słowami. */}
+            <div className="space-y-7">
+              {AXES.map((os) => (
+                <OsPreferencji
+                  key={os.key}
+                  tytul={os.title}
+                  lewo={os.left}
+                  prawo={os.right}
+                  podpowiedz={os.hint}
+                  wartosc={osie[os.key as keyof AxisValues] ?? 50}
+                  onChange={(v) => {
+                    setOsie((prev) => ({ ...prev, [os.key]: v }));
+                    /* Ręczna zmiana osi znaczy, że to już nie jest czysty preset —
+                       pigułka przestaje być zaznaczona, żeby nie obiecywać
+                       czegoś, czego wartości już nie oddają. */
+                    setCharakter(null);
+                  }}
+                />
+              ))}
             </div>
           </div>
         </div>
