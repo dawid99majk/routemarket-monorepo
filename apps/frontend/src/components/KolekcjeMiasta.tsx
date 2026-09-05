@@ -30,36 +30,46 @@ export default function KolekcjeMiasta({ miejsca, onWybierz }: Props) {
 
   return (
     <div className="mb-6">
-      <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-secondary mb-3">
-        Od czego zacząć
-      </p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-narrow uppercase tracking-[0.2em] text-[10.5px] font-semibold text-primary">
+          Od czego zacząć
+        </p>
+        <span className="text-xs text-muted-foreground">
+          {zestawy.length} {zestawy.length === 1 ? 'kolekcja' : zestawy.length < 5 ? 'kolekcje' : 'kolekcji'}
+        </span>
+      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-none snap-x">
         {zestawy.map(({ kolekcja, miejsca: w }) => {
-          // Cztery pierwsze zdjęcia z miejsc o najwyższej ważności — lista
-          // przychodzi już w tej kolejności, więc nic tu nie sortujemy.
           const fotki = w.map((m) => (m.photos ?? []).filter(Boolean)[0])
             .filter(Boolean).slice(0, 4) as string[];
           return (
-            <button key={kolekcja.id} onClick={() => onWybierz(kolekcja)}
-              className="group text-left rounded-md border border-border bg-card overflow-hidden
-                         hover:border-foreground/30 transition-colors">
-              <div className="grid grid-cols-2 grid-rows-2 gap-px bg-border aspect-[4/3]">
+            <button
+              key={kolekcja.id}
+              onClick={() => onWybierz(kolekcja)}
+              className="group text-left rounded-2xl border border-border/70 bg-card overflow-hidden
+                         hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 w-[230px] shrink-0 snap-start shadow-xs flex flex-col"
+            >
+              <div className="grid grid-cols-2 grid-rows-2 gap-0.5 bg-border/40 aspect-[16/10] overflow-hidden">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-placeholder-photo overflow-hidden">
+                  <div key={i} className="bg-muted overflow-hidden">
                     {fotki[i] && (
                       <Zdjecie src={fotki[i]} gdzie="kafelek" alt=""
-                        className="w-full h-full object-cover" />
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     )}
                   </div>
                 ))}
               </div>
-              <div className="px-3 py-2.5">
-                <p className="font-display text-[15px] leading-snug">{kolekcja.nazwa}</p>
-                <p className="text-[12px] text-muted-foreground leading-snug mt-0.5">
-                  {kolekcja.podpis}
-                </p>
-                <p className="font-mono tabular-nums text-[11px] text-muted-foreground mt-1.5">
+              <div className="p-3.5 flex-1 flex flex-col justify-between">
+                <div>
+                  <p className="font-display text-[15px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                    {kolekcja.nazwa}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground leading-snug mt-1 line-clamp-1">
+                    {kolekcja.podpis}
+                  </p>
+                </div>
+                <p className="font-mono tabular-nums text-[11px] text-muted-foreground/80 mt-2 font-medium">
                   {w.length} miejsc
                 </p>
               </div>

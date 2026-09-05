@@ -90,6 +90,19 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
     </PopoverContent>
   );
 
+  const formatujTytul = (txt: string) => {
+    if (txt.includes(',')) {
+      const idx = txt.indexOf(',');
+      return (
+        <>
+          <span>{txt.slice(0, idx + 1)} </span>
+          <em className="italic font-normal">{txt.slice(idx + 1).trim()}</em>
+        </>
+      );
+    }
+    return txt;
+  };
+
   if (wariant === 'kompaktowy') {
     return (
       <div className="flex flex-wrap items-baseline gap-2.5">
@@ -97,7 +110,7 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
           Wyjazd
         </span>
         <h1 className="font-display font-light text-2xl sm:text-3xl tracking-[-0.01em] min-w-0 truncate">
-          {aktywny.name}
+          {formatujTytul(aktywny.name)}
         </h1>
 
         <Popover open={otwarty} onOpenChange={(o) => { setOtwarty(o); if (o) zamknijPodpowiedz(); }}>

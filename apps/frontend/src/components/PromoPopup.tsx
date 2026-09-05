@@ -91,19 +91,19 @@ export default function PromoPopup() {
             <div className="space-y-4 flex-1">
               <Step
                 number={1}
-                icon={<PenTool className="w-4 h-4 text-accent-foreground" />}
+                icon={<PenTool className="w-4 h-4 text-accent" />}
                 title="Find your adventure"
                 desc="Browse unique routes using category filters: City, Moto, Auto, or Off-road. Pick what excites you."
               />
               <Step
                 number={2}
-                icon={<Download className="w-4 h-4 text-accent-foreground" />}
+                icon={<Download className="w-4 h-4 text-accent" />}
                 title="Get the full package"
                 desc="After purchase, get instant access to the GPX file and a personal PDF guide prepared by the creator."
               />
               <Step
                 number={3}
-                icon={<Navigation className="w-4 h-4 text-accent-foreground" />}
+                icon={<Navigation className="w-4 h-4 text-accent" />}
                 title="Hit the road"
                 desc="Load the GPX into your GPS device or favorite navigation app and enjoy the route without getting lost."
               />

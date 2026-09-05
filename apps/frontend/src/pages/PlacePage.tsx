@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Zdjecie from '@/components/Zdjecie';
+import GaleriaZdjec from '@/components/GaleriaZdjec';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Heart, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -252,30 +253,11 @@ export default function PlacePage() {
           {/* Kolumna główna */}
           <div>
             {photos.length > 0 && (
-              <>
-                {/* Wysokość na sztywno (380px) w kolumnie ~740px dawała proporcję
-                    prawie 2:1 -- portretowe zdjęcie traciło wtedy ponad połowę
-                    wysokości, a na wąskim telefonie box robił się WYŻSZY niż
-                    szerszy i ucinał boki. Proporcja skaluje się z realną
-                    szerokością zamiast trzymać sztywny piksel. */}
-                <div className="rounded-md overflow-hidden bg-muted aspect-[4/3]">
-                  <Zdjecie src={photos[Math.min(photoIdx, photos.length - 1)]} gdzie="karta" alt={place.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => setBroken((p) => new Set(p).add((e.target as HTMLImageElement).src))} />
-                </div>
-                {photos.length > 1 && (
-                  <div className="grid grid-cols-3 gap-3 mt-3">
-                    {photos.slice(0, 3).map((u, i) => (
-                      <button key={u} onClick={() => setPhotoIdx(i)}
-                        className={`h-24 rounded-md overflow-hidden bg-muted border transition-colors ${
-                          i === Math.min(photoIdx, photos.length - 1) ? 'border-foreground/40' : 'border-border'
-                        }`}>
-                        <Zdjecie src={u} gdzie={120} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
+              <GaleriaZdjec
+                zdjecia={photos}
+                nazwaMiejsca={place.name}
+                aspectRatio="aspect-[4/3]"
+              />
             )}
 
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground mt-8">

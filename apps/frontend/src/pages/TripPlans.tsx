@@ -190,23 +190,21 @@ export default function TripPlans() {
         </div>
 
         {ladowanie ? (
-          /* Szkielet w kształcie treści: duża karta wyjazdu w trakcie, pod nią
-             siatka. Dzięki temu układ nie skacze, gdy dane dojdą. */
           <div className="mt-8" aria-busy="true" aria-label="Wczytuję wyjazdy">
-            <Skeleton className="h-[242px] w-full rounded-md" />
-            <div className="mt-10 rounded-md bg-surface/70 border border-border/40 p-6 sm:p-8">
+            <Skeleton className="h-[190px] w-full rounded-2xl" />
+            <div className="mt-8 rounded-2xl bg-card border border-border/60 p-6 sm:p-8">
               <div className="flex items-baseline justify-between gap-3">
-                <Skeleton className="h-3 w-28" />
-                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-4 w-28 rounded-full" />
+                <Skeleton className="h-4 w-40 rounded-full" />
               </div>
-              <div className="mt-5 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="rounded-md border border-border bg-card overflow-hidden">
-                    <Skeleton className="h-[248px] w-full rounded-none" />
-                    <div className="p-5 space-y-3">
-                      <Skeleton className="h-5 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                      <Skeleton className="h-1 w-full mt-4" />
+                  <div key={i} className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+                    <Skeleton className="h-[170px] w-full rounded-none" />
+                    <div className="p-4 space-y-2.5">
+                      <Skeleton className="h-5 w-3/4 rounded-md" />
+                      <Skeleton className="h-3 w-1/2 rounded-md" />
+                      <Skeleton className="h-1 w-full mt-3 rounded-full" />
                     </div>
                   </div>
                 ))}
@@ -240,67 +238,64 @@ export default function TripPlans() {
             const postep = dniCel > 0 ? Math.min(100, Math.round((dniGotowe / dniCel) * 100)) : 0;
             return (
               <>
-                {/* Wyjazd w trakcie: osobno i wyraźnie większy. To on odróżnia ten
-                    ekran od galerii — reszta idzie w spokojną siatkę poniżej. */}
-                <div className="relative group mt-8 rounded-md border border-border bg-card overflow-hidden
-                                 shadow-token-sm hover:shadow-token-md transition-shadow">
+                {/* Wyjazd w trakcie: elegancki, wyniesiony ponad tło */}
+                <div className="relative group mt-8 rounded-2xl border border-border bg-card overflow-hidden
+                                 shadow-sm hover:shadow-md transition-all duration-300">
                 {!wTrakcie.is_example && (
                   <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(wTrakcie); }}
                     aria-label="Usuń wyjazd"
                     className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm
                                flex items-center justify-center text-muted-foreground opacity-70
-                               hover:opacity-100 hover:text-destructive transition-opacity">
+                               hover:opacity-100 hover:text-destructive transition-opacity shadow-xs">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
                 <button onClick={() => navigate(`/plany/${wTrakcie.id}`)}
                   className="w-full text-left flex flex-col sm:flex-row">
-                  <div className="w-full sm:w-[300px] h-[224px] shrink-0 bg-placeholder-photo overflow-hidden">
-                    {p?.zdjecia?.[0] && (
-                      <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />
+                  <div className="w-full sm:w-[260px] h-[190px] shrink-0 bg-muted overflow-hidden">
+                    {p?.zdjecia?.[0] ? (
+                      <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/40 to-accent/10 text-muted-foreground">
+                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground/70">W trakcie</span>
+                      </div>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0 p-6 flex flex-col">
-                    <p className="font-narrow uppercase tracking-[0.26em] text-[10px] text-accent">
-                      W trakcie układania
-                    </p>
-                    <h2 className="font-display font-light text-[30px] leading-[1.1] tracking-[-0.02em] mt-2 truncate">
-                      {wTrakcie.name}
-                    </h2>
-                    {/* Meta niesie to, czego NIE MA w tytule. Nazwa wyjazdu zwykle
-                        zawiera już miasto i liczbę dni („Bukareszt w dwa dni"),
-                        więc powtarzanie ich pod spodem zajmuje wiersz i nic nie
-                        dodaje. Zostaje termin, liczba miejsc i charakter. */}
-                    <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-2">
-                      {[
-                        (wTrakcie as any).start_date
-                          ? zakresDat((wTrakcie as any).start_date, (wTrakcie as any).end_date)
-                          : null,
-                        ileW > 0 ? `${ileW} ${odmiana(ileW, 'miejsce', 'miejsca', 'miejsc')}` : 'pusta tablica',
-                        wTrakcie.trip_type,
-                      ].filter(Boolean).join(' · ')}
-                    </p>
+                  <div className="flex-1 min-w-0 p-5 sm:p-6 flex flex-col justify-between">
+                    <div>
+                      <p className="font-narrow uppercase tracking-[0.22em] text-[10.5px] font-semibold text-primary">
+                        W trakcie układania
+                      </p>
+                      <h2 className="font-display font-semibold text-[24px] sm:text-[26px] leading-[1.15] tracking-tight mt-1 truncate group-hover:text-primary transition-colors">
+                        {wTrakcie.name}
+                      </h2>
+                      <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">
+                        {[
+                          (wTrakcie as any).start_date
+                            ? zakresDat((wTrakcie as any).start_date, (wTrakcie as any).end_date)
+                            : null,
+                          ileW > 0 ? `${ileW} ${odmiana(ileW, 'miejsce', 'miejsca', 'miejsc')}` : 'pusta tablica',
+                          wTrakcie.trip_type,
+                        ].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
 
-                    {/* Trzy liczby w kolorach decyzji: szałwia „na pewno",
-                        terakota „być może", wyszarzone odrzucone. */}
-                    <div className="flex items-baseline gap-6 mt-5">
+                    <div className="flex items-baseline gap-5 mt-3">
                       <span className="flex items-baseline gap-1.5">
-                        <span className="font-display font-light text-[26px] tabular-nums text-primary">{p?.must ?? 0}</span>
-                        <span className="text-[12px] text-muted-foreground">na pewno</span>
+                        <span className="font-display font-semibold text-[22px] tabular-nums text-primary">{p?.must ?? 0}</span>
+                        <span className="text-[11.5px] text-muted-foreground">na pewno</span>
                       </span>
                       <span className="flex items-baseline gap-1.5">
-                        <span className="font-display font-light text-[26px] tabular-nums text-accent">{p?.nice ?? 0}</span>
-                        <span className="text-[12px] text-muted-foreground">być może</span>
+                        <span className="font-display font-semibold text-[22px] tabular-nums text-accent">{p?.nice ?? 0}</span>
+                        <span className="text-[11.5px] text-muted-foreground">być może</span>
                       </span>
                       <span className="flex items-baseline gap-1.5">
-                        <span className="font-display font-light text-[26px] tabular-nums text-muted-foreground">{p?.rejected ?? 0}</span>
-                        <span className="text-[12px] text-muted-foreground">odrzucone</span>
+                        <span className="font-display font-semibold text-[22px] tabular-nums text-muted-foreground">{p?.rejected ?? 0}</span>
+                        <span className="text-[11.5px] text-muted-foreground">odrzucone</span>
                       </span>
                     </div>
 
-                    {/* Pasek mówi o PLANIE, nie o tablicy — zebranie miejsc to
-                        jeszcze nie jest wyjazd, który da się przejść. */}
-                    <div className="mt-auto pt-5">
+                    <div className="mt-3 pt-3 border-t border-border/50">
                       {dniCel > 0 ? (
                         <div className="flex gap-1">
                           {Array.from({ length: dniCel }).map((_, i) => (
@@ -311,7 +306,7 @@ export default function TripPlans() {
                       ) : (
                         <div className="h-1.5 rounded-full bg-muted" />
                       )}
-                      <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-2">
+                      <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1.5">
                         {dniCel === 0
                           ? 'Bez ustawionej długości wyjazdu'
                           : dniGotowe === 0
@@ -323,14 +318,9 @@ export default function TripPlans() {
                 </button>
                 </div>
 
-                {/* Reszta: spokojna siatka trzech. Ostatnia komórka to kreska —
-                    założenie wyjazdu jest częścią tej listy, nie osobnym ekranem. */}
-                {/* Własne pole dla siatki: bez niego „pozostałe" zlewały się
-                    z kartą wyjazdu w trakcie stojącą wyżej. */}
-                <div className="mt-10 rounded-md bg-surface/70 border border-border/40 p-6 sm:p-8">
+                {/* Reszta: zbalansowana siatka z wyraźną przestrzenną elewacją */}
+                <div className="mt-12">
                 {reszta.length > 0 && (() => {
-                  // Rozkład etapów liczony raz, dla nagłówka. Ta sama reguła co
-                  // na kartach, więc liczby nad siatką zgadzają się z etykietami w niej.
                   const etap = (w: any) => {
                     const cel = w.days ?? 0;
                     const dni = dniPlanu[w.id] ?? 0;
@@ -346,9 +336,9 @@ export default function TripPlans() {
                     miejsca ? `${miejsca} ${odmiana(miejsca, 'bez planu', 'bez planu', 'bez planu')}` : null,
                   ].filter(Boolean);
                   return (
-                    <div className="flex flex-wrap items-baseline justify-between gap-3">
-                      <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
-                        Pozostałe · {reszta.length}
+                    <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3 mb-6 border-b border-border">
+                      <span className="font-narrow uppercase tracking-[0.2em] text-[11px] font-semibold text-foreground/80">
+                        Pozostałe tablice · {reszta.length}
                       </span>
                       <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                         {czesci.join(' · ')}
@@ -356,7 +346,7 @@ export default function TripPlans() {
                     </div>
                   );
                 })()}
-                <div className="mt-5 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {reszta.map((w) => {
                     const q = podglad[w.id];
                     const ile = q?.ile ?? 0;
@@ -371,96 +361,92 @@ export default function TripPlans() {
                       : dniW === 0 ? 'Same miejsca'
                         : dniW >= celW ? 'Plan gotowy' : 'W układaniu';
                     return (
-                      <div key={w.id} className="relative group rounded-md border border-border bg-card overflow-hidden
-                                                  shadow-token-sm hover:shadow-token-md transition-shadow flex flex-col">
+                      <div key={w.id} className="relative group rounded-2xl border border-border bg-card overflow-hidden
+                                                  shadow-sm hover:shadow-xl hover:border-primary/50 hover:-translate-y-1 transition-all duration-300 flex flex-col">
                       {!w.is_example && (
                         <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(w); }}
                           aria-label="Usuń wyjazd"
-                          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm
+                          className="absolute top-2.5 right-2.5 z-10 w-7 h-7 rounded-full bg-background/80 backdrop-blur-sm
                                      flex items-center justify-center text-muted-foreground opacity-70
-                                     hover:opacity-100 hover:text-destructive transition-opacity">
-                          <Trash2 className="w-4 h-4" />
+                                     hover:opacity-100 hover:text-destructive transition-opacity shadow-xs">
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                       <button onClick={() => navigate(`/plany/${w.id}`)}
                         className="text-left flex flex-col flex-1">
-                        {/* Mozaika tylko wtedy, gdy ma z czego: poniżej trzech zdjęć
-                            małe pola robią się skrawkami przy karcie ~300 px. */}
-                        <div className="relative h-[248px] bg-placeholder-photo">
+                        <div className="relative h-[160px] bg-muted overflow-hidden">
                           {zdjeciaW.length >= 3 ? (
                             <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-full">
                               {zdjeciaW.slice(0, 3).map((z, i) => (
-                                <div key={i} className={`relative overflow-hidden bg-placeholder-photo ${i === 0 ? 'row-span-2' : ''}`}>
+                                <div key={i} className={`relative overflow-hidden bg-muted ${i === 0 ? 'row-span-2' : ''}`}>
                                   <Zdjecie src={z} gdzie="kafelek" alt=""
                                     className="w-full h-full object-cover" />
                                   {i === 2 && ile > 3 && (
-                                    <span className="absolute right-1.5 bottom-1.5 rounded-sm bg-ink/70 px-1.5 py-0.5
-                                                     font-mono text-[11px] tabular-nums text-background">
+                                    <span className="absolute right-1.5 bottom-1.5 rounded-full bg-background/85 backdrop-blur-sm px-1.5 py-0.5
+                                                     font-mono text-[10px] tabular-nums text-foreground shadow-xs">
                                       +{ile - 3}
                                     </span>
                                   )}
                                 </div>
                               ))}
                             </div>
+                          ) : zdjeciaW[0] ? (
+                            <Zdjecie src={zdjeciaW[0]} gdzie="kafelek" alt=""
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           ) : (
-                            zdjeciaW[0] && (
-                              <Zdjecie src={zdjeciaW[0]} gdzie="kafelek" alt=""
-                                className="w-full h-full object-cover" />
-                            )
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 text-muted-foreground">
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">Tablica</span>
+                            </div>
                           )}
-                          {/* Etap wyjazdu na zdjęciu — z listy widać, gdzie się skończyło,
-                              bez wchodzenia w każdą tablicę po kolei. */}
-                          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent
-                                           px-3 pt-6 pb-2 font-narrow uppercase tracking-[0.18em]
-                                           text-[10px] text-background">
+                          <span className="absolute left-2.5 bottom-2.5 bg-background/85 backdrop-blur-md
+                                           px-2.5 py-0.5 rounded-full font-medium text-[10.5px] text-foreground shadow-xs border border-white/20">
                             {etapW}
                           </span>
                         </div>
 
-                        <div className="p-5 flex-1 flex flex-col">
-                          <div className="font-display text-[20px] leading-snug truncate">{w.name}</div>
-                          <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1.5 truncate">
-                            {[w.destination, terminW,
-                              ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
-                              .filter(Boolean).join(' · ')}
+                        <div className="p-4 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="font-display text-[16.5px] font-semibold leading-snug truncate group-hover:text-primary transition-colors">{w.name}</div>
+                            <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
+                              {[w.destination, terminW,
+                                ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
+                                .filter(Boolean).join(' · ')}
+                            </div>
                           </div>
 
-                          <div className="border-t border-border/60 mt-3.5 pt-3.5">
-                            <div className="flex items-baseline gap-4">
-                              <span className="flex items-baseline gap-1.5">
-                                <span className="font-display text-[22px] text-primary tabular-nums">{q?.must ?? 0}</span>
-                                <span className="text-[12px] text-muted-foreground">na pewno</span>
+                          <div className="border-t border-border/50 mt-3 pt-2.5">
+                            <div className="flex items-baseline gap-3.5">
+                              <span className="flex items-baseline gap-1">
+                                <span className="font-display font-semibold text-[17px] text-primary tabular-nums">{q?.must ?? 0}</span>
+                                <span className="text-[11px] text-muted-foreground">na pewno</span>
                               </span>
-                              <span className="flex items-baseline gap-1.5">
-                                <span className="font-display text-[22px] text-accent tabular-nums">{q?.nice ?? 0}</span>
-                                <span className="text-[12px] text-muted-foreground">być może</span>
+                              <span className="flex items-baseline gap-1">
+                                <span className="font-display font-semibold text-[17px] text-accent tabular-nums">{q?.nice ?? 0}</span>
+                                <span className="text-[11px] text-muted-foreground">być może</span>
                               </span>
                             </div>
                           </div>
 
-                          <div className="mt-auto pt-3.5">
+                          <div className="mt-2.5 pt-2 border-t border-border/40">
                             {celW > 0 ? (
                               <>
-                                {/* Pasek dzielony na dni, nie ciągły procent: „dzień 1 z 2"
-                                    to jednostka, w której plan naprawdę powstaje. */}
                                 <div className="flex gap-1">
                                   {Array.from({ length: celW }).map((_, i) => (
                                     <span key={i} className={`h-1 flex-1 rounded-full ${
                                       i < dniW ? 'bg-primary' : 'bg-muted'}`} />
                                   ))}
                                 </div>
-                                <p className="font-mono text-[11px] tabular-nums text-muted-foreground mt-2">
+                                <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground mt-1.5 truncate">
                                   {dniW === 0
                                     ? 'Plan jeszcze nie ułożony'
                                     : dniW >= celW
-                                      ? `Plan gotowy na ${celW === 2 ? 'oba dni' : `wszystkie ${celW} dni`}`
-                                      : `Plan gotowy na dzień ${dniW} z ${celW}`}
+                                      ? `Plan gotowy (${celW} dni)`
+                                      : `Plan: dzień ${dniW} z ${celW}`}
                                 </p>
                               </>
                             ) : (
-                              <span className="font-mono text-[11px] text-primary underline underline-offset-4
-                                               decoration-primary/40">
-                                Ułóż plan dni
+                              <span className="font-mono text-[11px] text-primary">
+                                Ułóż plan ↗
                               </span>
                             )}
                           </div>
@@ -469,13 +455,16 @@ export default function TripPlans() {
                       </div>
                     );
                   })}
-
-                  <button onClick={() => navigate('/start')}
-                    className="rounded-md border border-dashed border-border min-h-[420px]
-                               flex flex-col items-center justify-center gap-2 text-muted-foreground
-                               hover:border-foreground/30 hover:text-foreground transition-colors">
-                    <Plus className="w-5 h-5" />
-                    <span className="text-sm">Zacznij nowy wyjazd</span>
+                  <button
+                    onClick={() => navigate('/start')}
+                    className="rounded-2xl border-2 border-dashed border-border/80 min-h-[280px]
+                               flex flex-col items-center justify-center gap-2.5 text-muted-foreground
+                               hover:border-primary/50 hover:text-primary transition-all duration-300 group bg-muted/20"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-medium">Zacznij nowy wyjazd</span>
                   </button>
                 </div>
                 </div>

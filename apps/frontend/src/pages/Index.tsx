@@ -135,14 +135,16 @@ export default function Index() {
     () => tablice.flatMap((tb) => tb.photos ?? []).filter(Boolean).slice(0, 4),
     [tablice]);
 
+  // Na waskim ekranie pole i przycisk musza sie rozejsc na dwa wiersze: w jednym
+  // rzedzie na 375 px input scisnal sie do 134 px i ucinal wlasny placeholder.
   const poleDestynacji = (
-    <div className="flex gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
+    <div className="flex flex-col sm:flex-row gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
       <input value={cel} onChange={(e) => setCel(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && zacznij()}
         placeholder={t('landing.dokad')}
         className="flex-1 min-w-0 bg-transparent px-3 h-11 text-[16px] outline-none placeholder:text-muted-foreground" />
       <Button onClick={zacznij} disabled={zakladam}
-        className="bg-foreground text-background hover:bg-foreground/90 shrink-0 h-11 px-5">
+        className="bg-foreground text-background hover:bg-foreground/90 shrink-0 h-11 px-5 w-full sm:w-auto">
         {zakladam ? t('landing.zakladam') : t('landing.cta_glowne')}
       </Button>
     </div>
@@ -307,14 +309,16 @@ export default function Index() {
 
             <div className="w-full max-w-[560px] mt-[34px] rounded-[12px] bg-card border border-border
                             shadow-token-lg p-[18px] pb-[14px]">
-              <div className="flex gap-2">
+              {/* Dwa wiersze na waskim ekranie: w jednym rzedzie na 375 px pole
+                  zwezalo sie do 134 px i ucinalo wlasny placeholder. */}
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input value={cel} onChange={(e) => setCel(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && zacznij()}
                   placeholder={t('landing.dokad')}
                   className="flex-1 min-w-0 bg-transparent px-1 h-11 text-[17px] outline-none
                              placeholder:text-muted-foreground" />
                 <Button onClick={zacznij} disabled={zakladam}
-                  className="bg-foreground text-background hover:bg-foreground/90 shrink-0 h-11 px-5">
+                  className="bg-foreground text-background hover:bg-foreground/90 shrink-0 h-11 px-5 w-full sm:w-auto">
                   {zakladam ? t('landing.zakladam') : t('landing.cta_glowne')}
                 </Button>
               </div>
@@ -363,7 +367,7 @@ export default function Index() {
       <section id="przyklad" className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
         <div className="lg:sticky lg:top-[100px] max-w-[460px]">
-          <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">{t('landing.przyklad_nadtytul')}</p>
+          <p className="font-narrow uppercase tracking-[0.24em] text-[11px] text-primary font-semibold">{t('landing.przyklad_nadtytul')}</p>
           <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
             Trzy popołudnia w Durrës, z sześciolatkiem
           </h2>
@@ -391,9 +395,9 @@ export default function Index() {
                 ))}
               </div>
               <div className="mt-5 rounded-md bg-warning/15 border border-warning/30 px-4 py-3.5 flex items-start gap-3">
-                <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground
-                                 border border-warning/45 rounded-full px-2.5 py-1 shrink-0">{t('landing.realizm')}</span>
-                <p className="text-[13px] leading-relaxed text-warning-foreground text-pretty">{t(`landing.dzien.${d.nr}.realizm`)}</p>
+                <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground font-semibold
+                                 border border-warning-foreground/25 rounded-full px-2.5 py-1 shrink-0">{t('landing.realizm')}</span>
+                <p className="text-[13px] leading-relaxed text-warning-foreground font-medium text-pretty">{t(`landing.dzien.${d.nr}.realizm`)}</p>
               </div>
             </div>
           ))}

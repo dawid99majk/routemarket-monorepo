@@ -976,7 +976,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
                   <Button
                     size="sm"
                     onClick={retryLastAction}
-                    className="w-full bg-accent hover:bg-accent/90 text-white h-8 text-xs font-semibold"
+                    className="w-full bg-foreground hover:bg-foreground/90 text-background h-8 text-xs font-semibold"
                   >
                     <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Spróbuj ponownie
                   </Button>

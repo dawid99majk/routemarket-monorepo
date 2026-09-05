@@ -31,6 +31,7 @@ import { TRIP_PRESETS, EMPTY_AXES, mergePreferences, type AxisValues } from '@/l
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
+import { bilansTablicy } from '@/lib/bilansTablicy';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -239,7 +240,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     (async () => {
       const { data } = await supabase
         .from('trip_project_places')
-        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id, vote_count')
+        .select('id, name, category, priority, lat, lng, sort_order, description, opening_hours, visit_minutes, website, image_url, wiki_extract, catalog_id, vote_count, place_catalog(photos)')
         .eq('project_id', activeId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
@@ -1394,7 +1395,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   }
 
   const mustCount = places.filter((p) => p.priority === 'must').length;
-  const totalMinutes = places.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
+  const niceCount = places.filter((p) => p.priority === 'nice').length;
+  /* Odrzucone nie zajmują dnia, więc nie mogą zawyżać godzin ani sugerować
+     przeładowania. Bez tego filtru „nie tym razem" nadal kosztowało czas. */
+  const aktywne = places.filter((p) => p.priority !== 'rejected');
+  const totalMinutes = aktywne.reduce((sum, p) => sum + (p.visit_minutes || 0), 0);
 
   /**
    * Ile z zaplanowanego czasu już zajęliśmy. Samo "zwiedzanie łącznie: 6 h" nic
@@ -1408,9 +1413,22 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!active?.days || !active?.hours_per_day) return null;
     const windowMin = Number(active.days) * Number(active.hours_per_day) * 60;
     const planned = Math.round((windowMin * (active.fill_percent ?? 70)) / 100);
-    const used = totalMinutes + Math.max(0, places.length - 1) * TRANSFER_MIN;
+    const used = totalMinutes + Math.max(0, aktywne.length - 1) * TRANSFER_MIN;
     return { windowMin, planned, used, ratio: planned > 0 ? used / planned : 0 };
   })();
+
+  /**
+   * Jedno zdanie agenta o tym, co już zebrano. Cała arytmetyka siedzi
+   * w `bilansTablicy` — tu tylko podajemy jej liczby, które i tak liczymy.
+   */
+  const uwagaAgenta = bilansTablicy({
+    aktywne,
+    pewnych: mustCount,
+    doRozwazenia: niceCount,
+    dni: active?.days ?? null,
+    zajeteMinut: budget?.used ?? null,
+    planowaneMinut: budget?.planned ?? null,
+  });
 
   /**
    * Punkt na uboczu psuje dzień skuteczniej niż jego brak: dojazd zjada czas
@@ -1615,12 +1633,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Lekka pigułka statusu agenta Co-pilot */}
             {places.filter((p) => p.priority !== 'rejected').length > 0 && (
               <div className="flex items-center justify-between flex-wrap gap-3 py-1">
-                <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-primary/5 border border-primary/15 text-xs text-foreground/85 shadow-2xs">
-                  <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-                  <span>
-                    Masz <strong>{mustCount}</strong> {mustCount === 1 ? 'miejsce pewne' : 'miejsc pewnych'} i <strong>{places.filter((p) => p.priority === 'nice').length}</strong> do rozważenia
-                    {budget ? ` (ok. ${(budget.used / 60).toFixed(1)} h zwiedzania)` : ''}.
-                  </span>
+                <div className="inline-flex items-start gap-2.5 px-4 py-2 rounded-full bg-primary/5 border border-primary/15 text-xs text-foreground/85 shadow-2xs">
+                  <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 mt-px" />
+                  <span>{uwagaAgenta?.tekst}</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
                   {active.start_name && (
@@ -2519,7 +2534,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 sprawdza się je raz na wyjazd, a nie przy każdym wejściu. */}
 
             {(outliers.length > 0 || duplicates.length > 0) && (
-              <div className="rounded-md border border-warning/40 bg-warning/60 px-4 py-3 space-y-1.5">
+              <div className="rounded-md border border-warning/30 bg-warning/15 px-4 py-3 space-y-1.5">
                 {outliers.length > 0 && (
                   <p className="text-xs text-warning-foreground">
                     <strong>{t('tablica.daleko_od_reszty')}</strong> {outliers.map((p) => p.name).join(', ')}.
@@ -2630,12 +2645,12 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         return (
                           <>
                           {loadH > 9 && (
-                            <div className="flex items-start gap-3 px-4 py-3.5 bg-warning/60 border-b border-warning/40">
-                              <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground
+                            <div className="flex items-start gap-3 px-4 py-3.5 bg-warning/15 border-b border-warning/30">
+                              <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground font-semibold
                                                border border-warning-foreground/25 rounded-full px-2.5 py-1 shrink-0">
                                 Realizm
                               </span>
-                              <p className="text-[13px] text-warning-foreground leading-relaxed text-pretty">
+                              <p className="text-[13px] text-warning-foreground font-medium leading-relaxed text-pretty">
                                 Ten dzień to <strong className="font-mono tabular-nums">{loadH.toFixed(1)} h</strong> na
                                 nogach razem z dojściami. Realnie zwiedza się jakieś siedem, osiem — rozważ przeniesienie
                                 jednego punktu na inny dzień.
@@ -2763,7 +2778,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 ))}
 
                 {plan.not_scheduled?.length > 0 && (
-                  <div className="rounded-md border border-warning/40 bg-warning/60 p-3">
+                  <div className="rounded-md border border-warning/30 bg-warning/15 p-3">
                     <div className="text-sm font-semibold text-warning-foreground mb-1">{t('tablica.nie_zmiesci_o_sie')}</div>
                     {plan.not_scheduled.map((n: any) => (
                       <div key={n.name} className="text-xs text-warning-foreground">

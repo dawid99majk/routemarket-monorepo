@@ -73,7 +73,7 @@ export default function InterviewFlowStep({
                   key={item.id}
                   onClick={() => setPath3Answers({...path3Answers, region: item.label})}
                   className={`p-4 rounded-md border cursor-pointer transition-all ${
-                    path3Answers.region === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
+                    path3Answers.region === item.label ? 'border-warning/50 bg-warning/15 text-warning-foreground font-semibold shadow-token-xs' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
                   }`}
                 >
                   {item.label}
@@ -107,7 +107,7 @@ export default function InterviewFlowStep({
                   key={item.label}
                   onClick={() => setPath3Answers({...path3Answers, activity: item.label})}
                   className={`p-4 rounded-md border cursor-pointer transition-all ${
-                    path3Answers.activity === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
+                    path3Answers.activity === item.label ? 'border-warning/50 bg-warning/15 text-warning-foreground font-semibold shadow-token-xs' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
                   }`}
                 >
                   {item.label}
@@ -126,11 +126,11 @@ export default function InterviewFlowStep({
           </div>
         )}
 
-        {/* Question 3: Parking */}
+        {/* Question 3: Parking / Start */}
         {path3Step === 3 && (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-200">
-            <Label className="text-lg font-bold text-foreground">3. Gdzie planujesz zaparkować lub zacząć?</Label>
-            <div className="grid grid-cols-1 gap-3">
+            <Label className="text-lg font-bold text-foreground">3. Gdzie chcesz zacząć?</Label>
+            <div className="grid grid-cols-1 gap-2.5">
               {[
                 { label: 'Darmowy, bezpieczny parking leśny' },
                 { label: 'Centrum miasta (blisko stacji PKP)' },
@@ -140,7 +140,7 @@ export default function InterviewFlowStep({
                   key={item.label}
                   onClick={() => setPath3Answers({...path3Answers, parking: item.label})}
                   className={`p-4 rounded-md border cursor-pointer transition-all ${
-                    path3Answers.parking === item.label ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
+                    path3Answers.parking === item.label ? 'border-warning/50 bg-warning/15 text-warning-foreground font-semibold shadow-token-xs' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
                   }`}
                 >
                   {item.label}
@@ -173,11 +173,11 @@ export default function InterviewFlowStep({
                   key={item.val}
                   onClick={() => setPath3Answers({...path3Answers, distance: item.val})}
                   className={`p-4 rounded-md border cursor-pointer text-center flex flex-col items-center justify-center transition-all ${
-                    path3Answers.distance === item.val ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
+                    path3Answers.distance === item.val ? 'border-warning/50 bg-warning/15 text-warning-foreground font-semibold shadow-token-xs' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
                   }`}
                 >
                   <span className="text-lg font-bold mb-1">{item.val} km</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight">{item.label}</span>
+                  <span className={`text-[10px] leading-tight ${path3Answers.distance === item.val ? 'text-warning-foreground/80' : 'text-muted-foreground'}`}>{item.label}</span>
                 </div>
               ))}
             </div>
@@ -208,7 +208,7 @@ export default function InterviewFlowStep({
                   key={item.val}
                   onClick={() => setPath3Answers({...path3Answers, difficulty: item.val})}
                   className={`p-4 rounded-md border text-center cursor-pointer transition-all ${
-                    path3Answers.difficulty === item.val ? 'border-warning/40 bg-warning/10 text-warning' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
+                    path3Answers.difficulty === item.val ? 'border-warning/50 bg-warning/15 text-warning-foreground font-semibold shadow-token-xs' : 'border-border bg-muted hover:bg-muted text-muted-foreground'
                   }`}
                 >
                   <span className="block font-bold text-xs">{item.label}</span>

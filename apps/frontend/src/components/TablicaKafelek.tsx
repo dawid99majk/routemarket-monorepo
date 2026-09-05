@@ -55,9 +55,9 @@ export default function TablicaKafelek({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-      className={`rounded-md border bg-card overflow-hidden transition-shadow ${
-        onClick ? 'cursor-pointer hover:shadow-token-md' : ''
-      } ${aktywny ? 'border-primary shadow-token-sm' : 'border-border'}`}
+      className={`rounded-2xl border bg-card overflow-hidden transition-all duration-300 ${
+        onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
+      } ${aktywny ? 'border-primary shadow-xs' : 'border-border/70 shadow-xs'}`}
     >
       <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-[132px]">
         {pola.map((zdj, i) => (

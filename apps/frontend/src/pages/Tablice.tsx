@@ -24,14 +24,6 @@ const PORZADKI = [
 ] as const;
 type Porzadek = typeof PORZADKI[number]['id'];
 
-/** Wysokość kafelka 144–230 px, liczona z identyfikatora — stała między
- *  przerysowaniami, a jednocześnie różna dla sąsiadów, co daje rytm potoku. */
-function wysokoscKafelka(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return 144 + (h % 87);
-}
-
 /**
  * Publiczne tablice do przeglądania.
  *
@@ -151,22 +143,23 @@ export default function Tablice() {
         </div>
 
         {ladowanie ? (
-          /* Szkielet w kształcie potoku kolumnowego — kafelki różnej wysokości,
-             tak jak wygląda gotowa galeria. */
-          <div className="mt-6 [column-gap:18px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4"
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8"
             aria-busy="true" aria-label="Wczytuję tablice">
-            {[196, 150, 224, 168, 208, 144, 186, 162].map((h, i) => (
-              <div key={i} className="break-inside-avoid mb-[18px] rounded-[10px] border border-border bg-card overflow-hidden">
-                <Skeleton className="w-full rounded-none" style={{ height: h }} />
-                <div className="p-3.5 space-y-2">
-                  <Skeleton className="h-4 w-4/5" />
-                  <Skeleton className="h-3 w-2/5" />
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="rounded-2xl border border-border/70 bg-card overflow-hidden shadow-xs">
+                <Skeleton className="w-full aspect-[16/10] rounded-none" />
+                <div className="p-4 sm:p-5 space-y-3">
+                  <Skeleton className="h-5 w-4/5 rounded-md" />
+                  <div className="flex items-center justify-between pt-1">
+                    <Skeleton className="h-4 w-28 rounded-full" />
+                    <Skeleton className="h-4 w-12 rounded-full" />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         ) : widoczne.length === 0 ? (
-          <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
+          <div className="rounded-2xl border border-border bg-card px-6 py-16 text-center mt-8 shadow-xs">
             <h2 className="font-display font-light text-[24px]">
               {szukaj ? t('galeria.brak_wynikow') : t('galeria.brak_tablic')}
             </h2>
@@ -175,100 +168,84 @@ export default function Tablice() {
             </p>
           </div>
         ) : (
-          <div className="mt-6 [column-gap:18px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4">
-            {(() => {
-              // „Tablica tygodnia" to najczęściej kopiowana pozycja — kopia kosztuje
-              // decyzję o własnym wyjeździe, więc jest mocniejszym sygnałem niż
-              // polubienie. Wchodzi do potoku jako kafelek bez zdjęcia.
-              const ranga = (x: Publiczna) => (x.like_count ?? 0) + (x.copy_count ?? 0) * 2;
-              const tygodnia = [...widoczne].sort((a, b) => ranga(b) - ranga(a))[0];
-              const pokazTygodnia = !!tygodnia && widoczne.length >= 4;
-              const elementy: JSX.Element[] = [];
-
-              widoczne.forEach((tab, i) => {
-                if (pokazTygodnia && i === 2) {
-                  elementy.push(
-                    <button key="tygodnia" onClick={() => navigate(`/tablica/${tygodnia.id}`)}
-                      className="w-full text-left break-inside-avoid mb-[18px] rounded-[10px]
-                                 bg-foreground text-background p-5 shadow-token-md
-                                 hover:shadow-token-lg transition-shadow">
-                      <p className="font-narrow uppercase tracking-[0.26em] text-[10px] text-background/55">
-                        Tablica tygodnia
-                      </p>
-                      <div className="font-display font-light text-[24px] leading-[1.15] mt-3 text-balance">
-                        {tygodnia.name}
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            {widoczne.map((tab) => {
+              const autor = tab.is_example ? null : (tab.author_display || t('galeria.autor'));
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => navigate(`/tablica/${tab.id}`)}
+                  className="group text-left rounded-2xl bg-card border border-border overflow-hidden shadow-sm
+                             hover:shadow-xl hover:border-primary/50 hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                >
+                  <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
+                    {tab.photos?.[0] ? (
+                      <Zdjecie
+                        src={tab.photos[0]}
+                        gdzie="kafelek"
+                        alt={tab.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 text-muted-foreground">
+                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground/70">RouteMarket</span>
                       </div>
-                      <p className="font-mono text-[11px] tabular-nums text-background/55 mt-3">
-                        {[tygodnia.destination, `${tygodnia.place_count} ${t('galeria.miejsc')}`]
-                          .filter(Boolean).join(' · ')}
-                      </p>
-                      <p className="font-mono text-[12px] tabular-nums text-accent mt-4">
-                        {(tygodnia.copy_count ?? 0) > 0
-                          ? `skopiowana ${tygodnia.copy_count} razy`
-                          : (tygodnia.like_count ?? 0) > 0
-                            ? `${tygodnia.like_count} polubień`
-                            : 'zobacz, co ktoś już zebrał'}
-                      </p>
-                    </button>
-                  );
-                }
+                    )}
 
-                const autor = tab.is_example ? null : (tab.author_display || t('galeria.autor'));
-                elementy.push(
-                  <button key={tab.id} onClick={() => navigate(`/tablica/${tab.id}`)}
-                    className="w-full text-left break-inside-avoid mb-[18px] rounded-[10px] bg-card
-                               border border-border overflow-hidden shadow-token-sm
-                               hover:shadow-token-md transition-shadow">
-                    <div className="relative bg-placeholder-photo"
-                         style={{ height: wysokoscKafelka(tab.id) }}>
-                      {tab.photos?.[0] && (
-                        <Zdjecie src={tab.photos[0]} gdzie="kafelek" alt=""
-                             className="w-full h-full object-cover" />
+                    {/* Etykieta celu lub przykładu */}
+                    {(tab.is_example || tab.destination) && (
+                      <span className="absolute left-3 top-3 rounded-full bg-background/85 backdrop-blur-md
+                                       px-2.5 py-1 font-medium text-[11px] text-foreground shadow-xs border border-white/20">
+                        {tab.is_example ? 'Wzorzec' : tab.destination}
+                      </span>
+                    )}
+
+                    {/* Licznik polubień */}
+                    <span className={`absolute right-3 top-3 inline-flex items-center gap-1.5
+                                      rounded-full px-2.5 py-1 text-[11px] font-mono tabular-nums
+                                      backdrop-blur-md shadow-xs border border-white/20 ${
+                      moje.has(tab.id)
+                        ? 'bg-accent/20 text-accent font-medium'
+                        : 'bg-background/85 text-muted-foreground'}`}>
+                      <Heart className={`w-3.5 h-3.5 ${moje.has(tab.id) ? 'fill-accent text-accent' : ''}`} />
+                      {tab.like_count ?? 0}
+                    </span>
+                  </div>
+
+                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="font-display text-[17px] sm:text-[18px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                        {tab.name}
+                      </h3>
+                      {tab.days && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {tab.days} {tab.days === 1 ? 'dzień' : tab.days < 5 ? 'dni' : 'dni'}
+                        </p>
                       )}
-                      {/* Etykieta w lewym górnym rogu zdjęcia, na półprzezroczystym kremie. */}
-                      {(tab.is_example || tab.destination) && (
-                        <span className="absolute left-2.5 top-2.5 rounded-sm bg-card/85 backdrop-blur-sm
-                                         px-2 py-1 font-narrow uppercase tracking-[0.18em] text-[10px]">
-                          {tab.is_example ? 'Przykład' : tab.destination}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/50">
+                      {autor ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center
+                                           text-[11px] font-semibold shrink-0">
+                            {autor.slice(0, 1).toUpperCase()}
+                          </span>
+                          <span className="text-[12.5px] text-muted-foreground truncate">{autor}</span>
+                        </div>
+                      ) : (
+                        <span className="font-medium text-[11px] text-primary bg-primary/8 px-2 py-0.5 rounded-full">
+                          RouteMarket
                         </span>
                       )}
-                      <span className={`absolute right-2.5 top-2.5 inline-flex items-center gap-1
-                                        rounded-full px-2 py-0.5 text-[11px] font-mono tabular-nums
-                                        backdrop-blur-sm ${
-                        moje.has(tab.id) ? 'bg-accent/15 text-accent' : 'bg-card/85 text-muted-foreground'}`}>
-                        <Heart className={`w-3 h-3 ${moje.has(tab.id) ? 'fill-accent' : ''}`} />
-                        {tab.like_count ?? 0}
+                      <span className="font-mono text-[11.5px] tabular-nums text-muted-foreground/80 shrink-0 font-medium">
+                        {tab.place_count} {tab.place_count === 1 ? 'miejsce' : tab.place_count < 5 ? 'miejsca' : 'miejsc'}
                       </span>
                     </div>
-                    <div className="p-3.5">
-                      <div className="font-display text-[16px] leading-snug">{tab.name}</div>
-                      {/* Autor POD tytułem, nie w rogu zdjęcia — w rogu ginął na
-                          jasnych fotografiach i konkurował z etykietą. */}
-                      <div className="flex items-center gap-2 mt-2.5">
-                        {autor ? (
-                          <>
-                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center
-                                             text-[10px] font-medium text-muted-foreground shrink-0">
-                              {autor.slice(0, 1).toUpperCase()}
-                            </span>
-                            <span className="text-[12px] text-muted-foreground truncate">{autor}</span>
-                          </>
-                        ) : (
-                          <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-accent">
-                            RouteMarket
-                          </span>
-                        )}
-                        <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground shrink-0">
-                          {tab.place_count}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              });
-
-              return elementy;
-            })()}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </main>

@@ -11,9 +11,24 @@ import type { PinnedPlace, Priority } from './types';
 export const jakoPriorytet = (v: string | null | undefined): Priority =>
   v === 'must' || v === 'rejected' ? v : 'nice';
 
-/** Wiersz z bazy jako miejsce tablicy, z zawężonym priorytetem. */
-export const jakoMiejsce = (r: Record<string, unknown>): PinnedPlace =>
-  ({ ...r, priority: jakoPriorytet(r.priority as string) } as PinnedPlace);
+/**
+ * Wiersz z bazy jako miejsce tablicy, z zawężonym priorytetem.
+ *
+ * `image_url` zapisuje się raz, przy dodawaniu miejsca. Zdjęcia w katalogu
+ * dochodzą później, więc bez tego kafelek raz dodany bez zdjęcia zostawał
+ * pusty na zawsze — mimo że galeria miejsca już istniała.
+ */
+export const jakoMiejsce = (r: Record<string, unknown>): PinnedPlace => {
+  const zKatalogu = (r.place_catalog as { photos?: unknown } | null | undefined)?.photos;
+  const pierwszeZKatalogu = Array.isArray(zKatalogu)
+    ? (zKatalogu.find((u) => typeof u === 'string' && u) as string | undefined)
+    : undefined;
+  return {
+    ...r,
+    image_url: (r.image_url as string | null) || pierwszeZKatalogu || null,
+    priority: jakoPriorytet(r.priority as string),
+  } as PinnedPlace;
+};
 
 /** "1 g 30 min" zamiast "90 min" — tak ludzie mówią o czasie zwiedzania. */
 export function formatMinutes(min: number): string {

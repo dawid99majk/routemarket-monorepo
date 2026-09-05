@@ -91,7 +91,10 @@ export default function PlannerHeader({ context, initials, ukryjPigulke }: Plann
         {/* Logotyp prowadzi na stronę główną — tak działa wszędzie i tego się po nim
             spodziewamy. Bez sygnatury: w aplikacji miejsce obok zajmuje przełącznik
             wyjazdu i zakładki produktu, nie hasło marketingowe. */}
-        <Logo showName signature={false} size="sm" />
+        {/* Na mobile zostaje sam znak: nazwa zajmowala 137 z 375 px i nawigacji
+            zostawalo 58 px widocznej szerokosci — mniej niz jedna zakladka. */}
+        <Logo showName signature={false} size="sm"
+          className="shrink-0 [&>span]:hidden sm:[&>span]:flex" />
 
         {tripId && !ukryjPigulke && (
           <button onClick={() => navigate('/plany')}
@@ -102,7 +105,11 @@ export default function PlannerHeader({ context, initials, ukryjPigulke }: Plann
           </button>
         )}
 
-        <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* min-w-0 jest tu warunkiem dzialania overflow-x-auto: bez niego element
+            flex nie kurczy sie ponizej szerokosci tresci, wiec zakladki nie
+            przewijaly sie, tylko wychodzily poza ekran (przy 375 px siegaly
+            x=558), a ikony po prawej rysowaly sie na nich. */}
+        <nav className="flex items-center gap-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Zmienna nazywa się `zakladka`, nie `t` — inaczej przesłoniłaby funkcję
               tłumaczenia i wewnątrz mapy nie dałoby się wywołać t(). */}
           {zakladki(tripId).map((zakladka) => (

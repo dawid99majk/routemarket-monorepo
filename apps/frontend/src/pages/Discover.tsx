@@ -84,17 +84,6 @@ function formatDuration(min: number | null): string | null {
   return `${m} min`;
 }
 
-/**
- * Wysokość zdjęcia w mozaice. Projekt zakłada zakres 160–260 px i wprost nazywa
- * zróżnicowanie celowym — to ono daje rytm feedu. Liczymy ją deterministycznie
- * z identyfikatora, żeby karta nie skakała przy każdym przerysowaniu.
- */
-function photoHeight(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 1000;
-  return 160 + (h % 5) * 25;
-}
-
 
 export default function Discover() {
   const { t } = useTranslation();
@@ -984,62 +973,57 @@ export default function Discover() {
           ) : (
           <div className={pokazMape
             ? '[column-gap:20px] columns-1 sm:columns-2'
-            : '[column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4'}>
+            : '[column-gap:24px] columns-1 sm:columns-2 lg:columns-3'}>
             {widoczne.map((p, idx) => {
               const mk = marks[p.id];
               const duration = formatDuration(p.visit_minutes);
               return (
-                /* Bez transformacji na hoverze. Przesunięcie o piksel promuje kartę do
-                   własnej warstwy kompozycji, a w układzie wielokolumnowym to znany powód
-                   kart, które przy najechaniu gasną. Cień i ramka dają ten sam sygnał bez
-                   ruszania warstw. Z tego samego powodu przejście dotyczy tylko cienia
-                   i koloru, a nie wszystkiego jak leci. */
                 <article
                   key={p.id}
                   ref={(el) => { kartyRef.current[p.id] = el; }}
                   onMouseEnter={() => setAktywne(p.id)}
                   onFocus={() => setAktywne(p.id)}
                   onMouseLeave={() => setAktywne(null)}
-                  className={`group mb-5 break-inside-avoid rounded-md border bg-card overflow-hidden
-                             transition-[box-shadow,border-color] duration-200 hover:shadow-token-md ${
-                    aktywne === p.id ? 'border-primary shadow-token-md' : 'border-border hover:border-foreground/25'
+                  className={`group mb-6 break-inside-avoid rounded-2xl border bg-card overflow-hidden
+                             transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-0.5 ${
+                    aktywne === p.id ? 'border-primary shadow-md' : 'border-border hover:border-primary/40'
                   }`}
                 >
                   <button onClick={() => setKarta(p)} className="block w-full text-left">
-                    <div className="relative bg-muted" style={{ height: photoHeight(p.id) }}>
+                    <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
                       {p.photos?.[0] && (
-                        <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover" />
+                        <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       )}
                       {pokazMape && (
-                        <span className="absolute left-2.5 top-2.5 w-6 h-6 rounded-full bg-foreground text-background
-                                         flex items-center justify-center text-[11px] font-medium">
+                        <span className="absolute left-3 top-3 w-6 h-6 rounded-full bg-foreground text-background
+                                         flex items-center justify-center text-[11px] font-medium shadow-xs">
                           {idx + 1}
                         </span>
                       )}
                       {p.kind && (
-                        <span className="absolute left-2.5 bottom-2.5 font-narrow uppercase tracking-[0.18em] text-[10px]
-                                         bg-background/85 backdrop-blur-sm px-2 py-1 rounded-sm">
+                        <span className="absolute left-3 bottom-3 font-medium text-[10.5px]
+                                         bg-background/85 backdrop-blur-md px-2.5 py-0.5 rounded-full shadow-xs border border-white/20">
                           {p.kind}
                         </span>
                       )}
                       {p.vibe_tags?.[0] && (
-                        <span className="absolute right-2.5 top-2.5 text-[10px] bg-background/85 backdrop-blur-sm
-                                         px-2 py-1 rounded-full">
+                        <span className="absolute right-3 top-3 text-[10.5px] bg-background/85 backdrop-blur-md
+                                         px-2.5 py-0.5 rounded-full shadow-xs border border-white/20">
                           {p.vibe_tags[0]}
                         </span>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleFavorite(p); }}
                         aria-label={t('odkrywaj.do_ulubionych')}
-                        className="absolute right-2.5 bottom-2.5 w-7 h-7 rounded-full bg-background/85 backdrop-blur-sm
-                                   flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute right-3 bottom-3 w-7 h-7 rounded-full bg-background/85 backdrop-blur-md
+                                   flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
                       >
                         <Heart className={`w-3.5 h-3.5 ${favorites.has(p.id) ? 'fill-accent text-accent' : 'text-muted-foreground'}`} />
                       </button>
                     </div>
 
-                    <div className="p-3.5">
-                      <h3 className="font-display text-[16px] font-medium leading-snug">{p.name}</h3>
+                    <div className="p-4">
+                      <h3 className="font-display text-[16.5px] font-semibold leading-snug group-hover:text-primary transition-colors">{p.name}</h3>
                       {/* Skąd to miejsce jest. Feed pokazuje też katalog z innych
                           wyjazdów, więc bez tego wiersza atrakcja z Wrocławia wygląda
                           przy albańskiej tak samo — a to zupełnie inna decyzja. */}

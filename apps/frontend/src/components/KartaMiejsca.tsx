@@ -3,6 +3,7 @@ import { CalendarDays, Clock, ExternalLink, Loader2, MapPin } from 'lucide-react
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Zdjecie from '@/components/Zdjecie';
 import PodobneMiejsca, { type PodobneMiejsce } from '@/components/PodobneMiejsca';
+import GaleriaZdjec from '@/components/GaleriaZdjec';
 
 export type Decyzja = 'must' | 'nice' | 'rejected';
 
@@ -89,18 +90,32 @@ export function formatujGodziny(raw?: string | null): string | null {
 
 export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, ladowanie,
                                        idKatalogu, pomin, tablica, onOtworzPodobne, onDodajPodobne }: Props) {
-  const [foto, setFoto] = useState(0);
-  useEffect(() => { setFoto(0); }, [miejsce?.name]);
-
   if (!miejsce) return null;
   const zdjecia = (miejsce.photos ?? []).filter(Boolean) as string[];
-  const ile = zdjecia.length;
-  const teraz = Math.min(foto, Math.max(0, ile - 1));
   const sformatowaneGodziny = formatujGodziny(miejsce.opening_hours);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onZamknij()}>
-      <DialogContent className="max-w-3xl max-h-[calc(100dvh-3rem)] p-0 flex flex-col overflow-hidden">
+      <DialogContent
+        className="max-w-3xl max-h-[calc(100dvh-3rem)] p-0 flex flex-col overflow-hidden"
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (document.querySelector('.rm-lightbox-portal') || target?.closest?.('.rm-lightbox-portal')) {
+            e.preventDefault();
+          }
+        }}
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (document.querySelector('.rm-lightbox-portal') || target?.closest?.('.rm-lightbox-portal')) {
+            e.preventDefault();
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          if (document.querySelector('.rm-lightbox-portal')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-border/60 shrink-0 bg-background flex items-center justify-between">
           <DialogTitle className="flex items-center gap-2.5 pr-8 font-display text-lg sm:text-xl font-medium tracking-tight">
             {miejsce.nr != null && (
@@ -116,52 +131,16 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
           {/* Kolumna lewa: Galeria zdjęć i powiązane */}
-          <div className="md:col-span-5 flex flex-col gap-2">
-            {ile > 0 ? (
-              <div>
-                <div className="relative rounded-lg overflow-hidden bg-muted aspect-[16/11] border border-border/60 shadow-xs">
-                  <Zdjecie src={zdjecia[teraz]} gdzie="bohater" alt={miejsce.name}
-                    className="w-full h-full object-cover transition-transform duration-300" />
-                  {ile > 1 && (
-                    <span className="absolute bottom-2 right-2 rounded-full bg-ink/80 backdrop-blur-xs text-background
-                                     font-mono tabular-nums text-[10px] px-2 py-0.5 shadow-xs">
-                      {teraz + 1}/{ile}
-                    </span>
-                  )}
-                </div>
-                {ile > 1 && (
-                  <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-                    {zdjecia.slice(0, 4).map((z, i) => (
-                      <button key={z} onClick={() => setFoto(i)}
-                        aria-label={`Zdjęcie ${i + 1} z ${ile}`}
-                        aria-current={i === teraz}
-                        className={`h-11 sm:h-12 rounded-md overflow-hidden border transition-all ${
-                          i === teraz ? 'border-primary ring-1 ring-primary/40' : 'border-border/70 opacity-70 hover:opacity-100'
-                        }`}>
-                        <Zdjecie src={z} gdzie={150} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-lg bg-gradient-to-br from-primary/10 via-muted/40 to-accent/10 aspect-[4/3] border border-border/60 flex flex-col items-center justify-center p-4 text-center">
-                <MapPin className="w-8 h-8 text-primary/50 mb-2" />
-                <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Zdjęcia w przygotowaniu</span>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
-                >
-                  Zobacz zdjęcia w Google ↗
-                </a>
-              </div>
-            )}
+          <div className="md:col-span-5 flex flex-col justify-between gap-2">
+            <GaleriaZdjec
+              zdjecia={zdjecia}
+              nazwaMiejsca={miejsce.name}
+              aspectRatio="aspect-[16/11]"
+            />
 
             {miejsce.slug && (
               <a href={`/miejsce/${miejsce.slug}`}
-                className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors mt-auto pt-1">
+                className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors mt-2 pt-1">
                 Otwórz pełną stronę miejsca <ExternalLink className="w-3 h-3" />
               </a>
             )}

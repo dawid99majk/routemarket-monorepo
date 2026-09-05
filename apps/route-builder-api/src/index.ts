@@ -102,6 +102,19 @@ for (const path of ENDPOINTY_SERWISOWE) {
   app.use(path, tylkoAdministrator);
 }
 
+/**
+ * Odczyty zwiazane z konkretnym uzytkownikiem. Nie wolaja modelu, wiec nie ma ich
+ * w AI_ENDPOINTS, ale bez authMiddleware c.get('userId') zostaje puste i handler
+ * odpowiada 401 KAZDEMU, takze zalogowanemu. Saldo tokenow nie dalo sie odczytac
+ * ani razu: licznik przy tablicy milczal, a konsola dostawala 401 przy kazdym
+ * wejsciu na strone.
+ */
+const ENDPOINTY_UZYTKOWNIKA = ['/tokens/balance'];
+
+for (const path of ENDPOINTY_UZYTKOWNIKA) {
+  app.use(path, authMiddleware);
+}
+
 
 /**
  * Wyszukiwarka miejsc dla projektu wyjazdowego. Zapytanie w języku naturalnym

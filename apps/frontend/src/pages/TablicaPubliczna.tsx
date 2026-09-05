@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import DiscoverMap from '@/components/DiscoverMap';
 import { zakresDat } from '@/lib/daty';
-import { odmien } from '@/lib/odmiana';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { useTranslation } from 'react-i18next';
@@ -61,10 +60,18 @@ export default function TablicaPubliczna() {
     if (!t) { setTablica(null); setLadowanie(false); return; }
 
     const { data: pl } = await (supabase as any).from('trip_project_places')
-      .select('id, name, category, priority, lat, lng, description, visit_minutes, image_url, vote_count')
+      .select('id, name, category, priority, lat, lng, description, visit_minutes, image_url, vote_count, place_catalog(photos)')
       .eq('project_id', id).order('sort_order', { ascending: true });
     setTablica(t);
-    setMiejsca(pl ?? []);
+    // image_url zapisuje sie raz, przy dodawaniu miejsca. Zdjecia w katalogu
+    // dochodza pozniej, wiec bez tego kafelek zostawal pusty mimo istniejacej
+    // galerii — tak wygladalo 5 z 14 miejsc na tablicy "Praga - klimat we dwoje".
+    setMiejsca((pl ?? []).map((m: any) => ({
+      ...m,
+      image_url: m.image_url || (Array.isArray(m.place_catalog?.photos)
+        ? m.place_catalog.photos.find((u: unknown) => typeof u === 'string' && u)
+        : null) || null,
+    })));
 
     if (pl?.length) {
       wczytajMojeGlosy(pl.map((m: any) => m.id)).then(setMojeGlosy);
@@ -237,7 +244,7 @@ export default function TablicaPubliczna() {
               {[tablica.destination,
                 tablica.days ? `${tablica.days} dni` : null,
                 tablica.start_date ? zakresDat(tablica.start_date, tablica.end_date) : null,
-                `${miejsca.length} ${odmien(miejsca.length, 'miejsce', 'miejsca', 'miejsc')}`,
+                `${miejsca.length} miejsc`,
               ].filter(Boolean).join(' · ')}
             </p>
           </div>
@@ -307,7 +314,7 @@ export default function TablicaPubliczna() {
             const swoje = miejsca.filter((m) => m.priority === k.id);
             if (swoje.length === 0) return null;
             return (
-              <div key={k.id} className="rounded-lg border border-border/80 bg-card shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
+              <div key={k.id} className="rounded-2xl border border-border/70 bg-card shadow-xs overflow-hidden">
                 <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor} bg-muted/20`}>
                   <span className={`font-narrow uppercase tracking-[0.18em] text-[10.5px] font-semibold ${
                     k.id === 'must' ? 'text-primary' : 'text-accent'}`}>
@@ -320,7 +327,7 @@ export default function TablicaPubliczna() {
                 <div className="divide-y divide-border/60">
                   {swoje.map((m) => (
                     <div key={m.id} className="p-3.5 flex gap-3.5 hover:bg-muted/15 transition-colors group">
-                      <div className="w-[84px] h-[72px] sm:w-[96px] sm:h-[76px] rounded-md overflow-hidden bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 border border-border/40 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                      <div className="w-[84px] h-[72px] sm:w-[96px] sm:h-[76px] rounded-xl overflow-hidden bg-muted shrink-0 border border-border/40 shadow-xs">
                         {m.image_url
                           ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                           : <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
@@ -362,7 +369,7 @@ export default function TablicaPubliczna() {
           })}
 
           {naMapie.length > 0 && (
-            <div className="rounded-md border border-border bg-card overflow-hidden
+            <div className="rounded-2xl border border-border/70 bg-card overflow-hidden shadow-xs
                             flex flex-col self-start md:sticky md:top-[88px]">
               <div className="px-3 py-2.5 border-b border-border font-narrow uppercase
                               tracking-[0.18em] text-[10px] text-muted-foreground">
