@@ -895,7 +895,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
         const kat = wKatalogu[i];
         const gotowe = Array.isArray(kat?.photos) ? (kat.photos as string[]).filter(Boolean) : [];
         if (gotowe.length) return Promise.resolve(gotowe);
-        return fetchNearbyPhotos(p.name, p.lat, p.lng, 5, kat?.city ?? undefined, kat?.wikipedia ?? undefined);
+        return fetchNearbyPhotos(p.name, p.lat, p.lng, 5, kat?.city ?? undefined, kat?.wikipedia ?? undefined, kat?.country ?? null);
       })
     );
 

@@ -1,4 +1,5 @@
 import { repo } from '../db/repository.js';
+import { aliasyMiasta, obceNazwyGeograficzne } from './miasta.js';
 
 /**
  * Zdjęcie i skrót z Wikipedii dla miejsca. Tag `wikipedia` w OSM ma postać
@@ -43,7 +44,19 @@ const CAMERA_DUMP = /\b(dsc[_\s-]?\d|dscn\d|img[_\s-]?\d|imgp\d|p\d{7}|photo[_\s
  * Takiego pliku nie odrzucamy — przy małym muzeum bywa jedynym, jaki istnieje —
  * ale nie może trafić na kartę jako zdjęcie główne, gdy jest czym go zastąpić.
  */
-const PHOTO_DETAL = /(interior|interno|interieur|wnetrz|detail|detal|ceiling|sufit|decke|plafon|soffitto|chandelier|zyrandol|żyrandol|plaque|tablica|inscription|inskrypcj|door|drzwi|window|okno|staircase|schody|fresco|fresk|mosaic|mozaik|column|kolumn|ornament|handle|klamka|sign\b)/i;
+const PHOTO_DETAL = /(interior|interno|interieur|wnetrz|detail|detal|ceiling|sufit|decke|plafon|soffitto|chandelier|zyrandol|żyrandol|plaque|tablica|inscription|inskrypcj|door|drzwi|window|okno|staircase|schody|fresco|fresk|mosaic|mozaik|column|kolumn|ornament|handle|klamka|sign\b|altaar|altar|oltarz|ołtarz|pulpit|ambona|organ[iy]|orgel|krypta|crypt)/i;
+
+/**
+ * Tytul w formie "X w Y" mowi wprost, ze tematem jest X, a obiektem tylko Y.
+ * Dokladanie kolejnych slow do listy detali bylo goniem za wlasnym ogonem:
+ * odsialem oltarz, wskoczyla chrzcielnica; odsialbym chrzcielnicę, wskoczylaby
+ * ambona. Przyimek laczy je wszystkie — i przy okazji lapie "Borstbeeld
+ * Thorbecke IN DE 2e Kamer", czyli popiersie posla podane jako zdjecie klubu.
+ *
+ * To kara w rankingu, nie odrzucenie: gdy nie ma nic innego, wnetrze jest
+ * lepsze niz pusta karta.
+ */
+const COS_W_SRODKU = /\b(in de|in het|in der|in the|inside|we wnetrzu|wewnatrz)\b/i;
 
 const stripDiacritics = (t: string) =>
   t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -96,15 +109,33 @@ function kmApart(a: { lat: number; lng: number }, b: { lat: number; lng: number 
   return Math.sqrt(dLat * dLat + dLng * dLng);
 }
 
+/**
+ * Licznik zapytan do Commons, ktore sie nie udaly (limit, timeout, 5xx).
+ *
+ * Nieudane zapytanie zwraca pusta liste, czyli wyglada dokladnie jak "nie ma
+ * takiego zdjecia". Przy sprawdzaniu jakosci zdjec dla calego miasta dalo to
+ * wynik "36 z 42 miejsc stracilo zdjecie" — a prawda byla taka, ze Wikimedia
+ * przestala odpowiadac w terminie. Bez tego licznika nie da sie odroznic pustki
+ * od odciecia, a to dwie zupelnie rozne diagnozy.
+ */
+let commonsNieudane = 0;
+export const odczytajNieudaneCommons = () => commonsNieudane;
+export const wyzerujNieudaneCommons = () => { commonsNieudane = 0; };
+
 async function commonsQuery(params: Record<string, string>): Promise<any[]> {
   const url = 'https://commons.wikimedia.org/w/api.php?' + new URLSearchParams({ format: 'json', ...params });
-  const res = await fetch(url, {
-    headers: { 'User-Agent': COMMONS_UA },
-    signal: AbortSignal.timeout(9000)
-  });
-  if (!res.ok) return [];
-  const data = await res.json() as any;
-  return Object.values(data?.query?.pages || {});
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': COMMONS_UA },
+      signal: AbortSignal.timeout(9000)
+    });
+    if (!res.ok) { commonsNieudane += 1; return []; }
+    const data = await res.json() as any;
+    return Object.values(data?.query?.pages || {});
+  } catch {
+    commonsNieudane += 1;
+    return [];
+  }
 }
 
 function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
@@ -120,19 +151,42 @@ function usablePhotos(pages: any[], origin: { lat: number; lng: number } | null,
     // "...to Vienna...". "Vienna" jest zbyt pospolitym słowem, żeby to złapać
     // regułą dopasowania; ten filtr łapie to niezależnie od słowa.
     .filter((p) => !/\.(pdf|djvu|webm|ogv|ogg|mp4|mov|svg|gif)$/i.test(String(p.title || '').trim()))
-    .filter((p) => !PHOTO_JUNK.test(p.title || '') && !CAMERA_DUMP.test(p.title || ''))
+    // Slowa z nazwy miejsca wycinamy PRZED testem na smieci. PHOTO_JUNK lapie
+    // m.in. "historic|historisch", zeby odsiewac archiwalia — i wycinal przez to
+    // "Haags Historisch Museum.jpg", czyli wlasciwe zdjecie muzeum, ktore ma to
+    // slowo we wlasnej nazwie. Miejsce nie moze przegrywac z filtrem o samo
+    // siebie; prawdziwe archiwalium i tak zlapie sie na rok w tytule albo na
+    // "postcard", bo tych slow w nazwie miejsca nie ma.
+    .filter((p) => {
+      const tytul = String(p.title || '');
+      const bezSlowNazwy = (nameTokens ?? []).reduce(
+        (tekst, slowo) => tekst.split(slowo.toLowerCase()).join(' '),
+        tytul.toLowerCase());
+      return !PHOTO_JUNK.test(bezSlowNazwy) && !CAMERA_DUMP.test(bezSlowNazwy);
+    })
     .filter((p) => {
       const c = p.coordinates?.[0];
-      // 25 km wpuszczało cały ośrodek miasta: wyszukiwanie "Arc de Triomphe"
-      // dawało też geotagowane zdjęcia Łuku Karuzelowego, bo ten stoi 3 km dalej
-      // i tylko odległość decydowała -- tytuł pliku nikt nie sprawdzał. 2 km
-      // to margines na niedokładność GPS aparatu, nie na sąsiedni zabytek.
-      if (c) return !origin || kmApart(origin, { lat: c.lat, lng: c.lon }) < 2;
-      // Plik bez geotagu przyjmujemy tylko wtedy, gdy w tytule siedzi wyróżniające
-      // słowo z nazwy miejsca — inaczej "Sandy beach" zwracało pirogę na Karaibach,
-      // a dobre zdjęcia zamku w Durrës geotagu po prostu nie mają.
-      if (!nameTokens) return true;
       const title = String(p.title || '').toLowerCase();
+
+      // ODLEGŁOŚĆ TO WARUNEK, NIE DOWÓD.
+      //
+      // Wcześniej geotag zwalniał plik ze sprawdzania nazwy: "jeśli ma
+      // współrzędne bliżej niż 2 km, bierzemy". W gęstym centrum 2 km to całe
+      // śródmieście, a przy wyszukiwaniu po okolicy `origin` bywa null, więc
+      // przechodziło DOWOLNE zdjęcie z promienia zapytania. Tak klub
+      // "Full Moon City" w Hadze dostał popiersie posła stojące w parlamencie
+      // dwieście metrów dalej — zdjęcie trafne co do miejsca na mapie i
+      // pokazujące zupełnie co innego.
+      //
+      // Blisko + nazwa się zgadza = to jest ten obiekt. Samo "blisko" nie
+      // odróżnia baru od pomnika obok niego.
+      if (c && origin && kmApart(origin, { lat: c.lat, lng: c.lon }) >= 2) return false;
+
+      // Brak wyróżniającego słowa w nazwie miejsca ("City", "2000", "The Wall")
+      // znaczy, że nie mamy czym potwierdzić żadnego kandydata. Puste pole jest
+      // wtedy uczciwsze niż losowy sąsiad — zdjęcie wiodące z artykułu i zdjęcia
+      // użyte w artykule idą osobną drogą i tego ograniczenia nie dotyczą.
+      if (!nameTokens || nameTokens.length === 0) return false;
       if (!nameTokens.some((t) => title.includes(t.toLowerCase()))) return false;
       // Dopasowanie po tokenie nie rozróżnia identycznie nazwanych obiektów w
       // różnych miastach ("Kościół Świętego Wojciecha" ma to samo wezwanie we
@@ -341,7 +395,8 @@ export async function fetchGooglePlacesPhotos(
  * 2. Jeśli brak lub za mało — dopełniamy reprezentacyjnym ujęciem z Wikipedii i Commons.
  */
 export async function fetchNearbyPhotos(
-  name: string, lat?: number, lng?: number, limit = 4, city?: string, wikipediaTag?: string
+  name: string, lat?: number, lng?: number, limit = 4, city?: string, wikipediaTag?: string,
+  country?: string | null
 ): Promise<string[]> {
   // Google Places WYCOFANE jako źródło zdjęć. Adres `googleusercontent` zwrócony
   // przez Place Photo nie jest zwolniony z zakazu przechowywania treści Places
@@ -361,45 +416,73 @@ export async function fetchNearbyPhotos(
   let tokens = distinctiveTokens(name);
   if (tokens.length === 0 && city) tokens = distinctiveTokens(city);
 
-  const searchPhrase = city ? `${name} ${city}` : name;
+  // Dwa zapytania zamiast jednego. Sama nazwa daje najlepsza trafnosc
+  // ("Haags Historisch Museum" -> wlasciwy plik na pierwszym miejscu), a nazwa
+  // z LOKALNA nazwa miasta ratuje przypadki, gdy sama nazwa jest pospolita.
+  // Polska nazwa miasta w zapytaniu psula wynik: "…haga" zwracalo mapy z XVI w.,
+  // a "De Haagsche Kluis haga" nie zwracalo nic.
+  const aliasy = aliasyMiasta(city);
+  const frazy = [name, ...(aliasy.length ? [`${name} ${aliasy[0]}`] : [])];
 
   const zArtykulu = await wikiArticlePhotos(wikipediaTag, name).catch(() => [] as string[]);
-  const inneMiasta = await inneMiastaNiz(city);
+  // Do listy miast z katalogu (nazwy polskie) dokladamy nazwy uzywane przez
+  // Commons — bez nich "Hemingway Bar in Como (Italy)" przechodzil, bo ani
+  // "Como", ani "Italy" nie wystepuja w polskim spisie miast.
+  const inneMiasta = [...await inneMiastaNiz(city), ...obceNazwyGeograficzne(city, country)];
 
   const [byWiki, byName, byGeo] = await Promise.all([
     origin ? wikiLeadPhotos(name, origin).catch(() => []) : Promise.resolve([]),
-    searchPhrase
-      ? commonsQuery({
-          action: 'query', generator: 'search', gsrsearch: searchPhrase, gsrnamespace: '6',
-          gsrlimit: String(limit + 4), prop: 'imageinfo|coordinates',
-          iiprop: 'url', iiurlwidth: '800'
-        }).then((p) => usablePhotos(p, origin, tokens, inneMiasta)).catch(() => [])
-      : Promise.resolve([]),
+    Promise.all(frazy.map((fraza) => commonsQuery({
+      action: 'query', generator: 'search', gsrsearch: fraza, gsrnamespace: '6',
+      gsrlimit: String(limit + 4), prop: 'imageinfo|coordinates',
+      iiprop: 'url', iiurlwidth: '800'
+    }).then((p) => usablePhotos(p, origin, tokens, inneMiasta)).catch(() => [] as string[])))
+      .then((zestawy) => zestawy.flat()),
     origin
       ? commonsQuery({
           action: 'query', generator: 'geosearch', ggscoord: `${lat}|${lng}`,
           ggsradius: '250', ggslimit: String(limit + 6), ggsnamespace: '6',
           prop: 'imageinfo', iiprop: 'url', iiurlwidth: '800'
-        }).then((p) => usablePhotos(p, null, tokens.length > 0 ? tokens : null, inneMiasta)).catch(() => [])
+        }).then((p) => usablePhotos(p, origin, tokens, inneMiasta)).catch(() => [])
       : Promise.resolve([])
   ]);
+
+  // Ten sam wyjatek co przy filtrowaniu wynikow wyszukiwania: slowa z nazwy
+  // miejsca wypadaja przed testem na smieci. Bez tego "historisch" z PHOTO_JUNK
+  // wycinalo plik "960px-Haags_Historisch_Museum.jpg" na samym koncu drogi —
+  // po tym, jak wczesniejszy filtr juz go slusznie przepuscil.
+  const bezSlowNazwyPliku = (plik: string) => tokens.reduce(
+    (tekst, slowo) => tekst.split(stripDiacritics(slowo).toLowerCase()).join(' '), plik);
 
   const kandydaci = [...new Set([...tagged, ...zArtykulu, ...byWiki, ...byName, ...byGeo])]
     .filter((adres) => {
       const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
       if (/\.(webm|ogv|ogg|mp4|mov|svg|gif|pdf|djvu)(\.jpg|\.png)?$/i.test(adres.split('?')[0])) return false;
-      if (PHOTO_JUNK.test(plik) || CAMERA_DUMP.test(plik)) return false;
+      const doOceny = bezSlowNazwyPliku(plik);
+      if (PHOTO_JUNK.test(doOceny) || CAMERA_DUMP.test(doOceny)) return false;
       return true;
     });
 
   const tokenyNazwy = distinctiveTokens(name).map((t) => stripDiacritics(t).toLowerCase());
+  // Nazwa miasta w tytule pliku to najtansze dostepne potwierdzenie, ze chodzi
+  // o TEN egzemplarz obiektu. Pomnik Johana de Witta stoi i w Hadze, i w
+  // Rotterdamie; oba pliki maja w tytule jego nazwisko, tylko jeden ma miasto.
+  // Odsiewac tego nie mozna — Rotterdamu nie ma w naszym katalogu, wiec nie da
+  // sie go rozpoznac jako obcego. Wystarczy jednak, ze plik z wlasciwym miastem
+  // wygra ranking.
+  const aliasyDoRankingu = aliasyMiasta(city).map((a) => a.replace(/\s+/g, ''));
+  const punktyZaMiasto = (plik: string) =>
+    aliasyDoRankingu.some((a) => plik.replace(/[^a-z0-9]/g, '').includes(a)) ? 3 : 0;
+
   const punktyZa = (adres: string) => {
     let p = 0;
     // Google Places ma najwyższy priorytet
     if (adres.includes('googleusercontent.com') || adres.includes('maps.googleapis.com')) return 10;
     const plik = stripDiacritics(decodeURIComponent(adres.split('?')[0].split('/').pop() || '')).toLowerCase();
     if (tokenyNazwy.some((t) => plik.includes(t))) p += 4;
+    p += punktyZaMiasto(plik);
     if (PHOTO_DETAL.test(plik)) p -= 3;
+    if (COS_W_SRODKU.test(plik.replace(/[_-]/g, ' '))) p -= 3;
     if (tagged.includes(adres)) p += 2;
     return p;
   };

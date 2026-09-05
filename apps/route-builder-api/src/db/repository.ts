@@ -205,7 +205,7 @@ export class RouteBuilderRepository {
   async matchCatalogForPoint(name: string, lat?: number, lng?: number): Promise<any | null> {
     const { data, error } = await supabase
       .from('place_catalog')
-      .select('id, name, city, lat, lng, photos, wikipedia')
+      .select('id, name, city, country, lat, lng, photos, wikipedia')
       .ilike('name', name.trim())
       .limit(5);
     if (error || !data || data.length === 0) return null;

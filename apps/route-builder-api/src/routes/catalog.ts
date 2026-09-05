@@ -5,7 +5,7 @@ import { poiService, poiClusterCenter } from '../services/poi.js';
 import { callGeminiTracked } from '../services/ai-usage.js';
 import { jezykZadania, JEZYKI_UI, type KodJezyka } from '../services/jezyki.js';
 import { przetlumaczPaczke } from '../services/tlumaczenia.js';
-import { fetchNearbyPhotos } from '../services/photos.js';
+import { fetchNearbyPhotos, odczytajNieudaneCommons, wyzerujNieudaneCommons } from '../services/photos.js';
 import { placeSlug, VIBE_TAGS, kategoriaZRodzaju } from '../services/katalog-helpers.js';
 
 export const catalogRouter = new Hono<{ Variables: { user: any, userId: string } }>();
@@ -638,8 +638,14 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
  */
 catalogRouter.post('/catalog/refresh-photos', async (c) => {
   try {
-    type Zadanie = { city?: string; limit?: number; tylko_braki?: boolean; tylko_z_tagiem?: boolean };
-    const { city, limit = 500, tylko_braki = false, tylko_z_tagiem = false } =
+    type Zadanie = {
+      city?: string; limit?: number; tylko_braki?: boolean; tylko_z_tagiem?: boolean;
+      /** Nic nie zapisuje — pokazuje, co dobralby dzisiejszy kod. Bez tego kazde
+          sprawdzenie jakosci zdjec nadpisywalo katalog, wiec nie dalo sie odroznic
+          zaszlosci (zdjecia z czasow luzniejszych filtrow) od bledu w regulach. */
+      proba?: boolean;
+    };
+    const { city, limit = 500, tylko_braki = false, tylko_z_tagiem = false, proba = false } =
       await c.req.json().catch(() => ({})) as Zadanie;
     const pelna = await repo.listCatalogAll(city?.trim() || null, limit);
     // `tylko_z_tagiem` ogranicza przebieg do pozycji, które mają twarde
@@ -655,7 +661,10 @@ catalogRouter.post('/catalog/refresh-photos', async (c) => {
       ? wszystkie.filter((r: any) => !Array.isArray(r.photos) || r.photos.length === 0)
       : wszystkie;
 
-    const changed: { name: string; before: number; after: number }[] = [];
+    const changed: { name: string; before: number; after: number; stare?: string[]; nowe?: string[] }[] = [];
+    const straty: { name: string; bylo: number }[] = [];
+    // Bez tego "nic nie znaleziono" i "Wikimedia nas odcieła" wygladaja tak samo.
+    wyzerujNieudaneCommons();
     // Błędy liczone osobno od „nic nie znaleziono". Wcześniej `.catch(() => [])`
     // zamieniał odmowę Wikimediów w pustą listę, więc po przekroczeniu ich limitu
     // endpoint raportował „sprawdzono 50, podmieniono 0" — brzmiało jak brak zdjęć
@@ -669,7 +678,7 @@ catalogRouter.post('/catalog/refresh-photos', async (c) => {
         // artykuł, a artykuł ma zdjęcie wiodące wybrane przez człowieka.
         // Bez tego argumentu zostawało wyszukiwanie po nazwie i po okolicy,
         // które potrafi wziąć zdjęcie sąsiedniego budynku.
-        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 5, r.city, r.wikipedia)
+        batch.map((r: any) => fetchNearbyPhotos(r.name, r.lat, r.lng, 5, r.city, r.wikipedia, r.country)
           .catch(() => { bledy += 1; return [] as string[]; }))
       );
       // Wikimedia przycina ruch przy kilkudziesięciu zapytaniach pod rząd.
@@ -679,15 +688,35 @@ catalogRouter.post('/catalog/refresh-photos', async (c) => {
         const prev: string[] = Array.isArray(r.photos) ? r.photos : [];
         // Pustej galerii nie zapisujemy: brak zdjęcia jest lepszy niż złe zdjęcie,
         // ale kasowanie działającej galerii przez chwilowy błąd sieci już nie.
-        if (next.length === 0) return;
+        // W probie odnotowujemy to jednak jako STRATE — inaczej zaostrzenie regul
+        // wyglada na darmowe, bo widac tylko podmiany, a nie zniknieciа.
+        if (next.length === 0) {
+          if (proba && prev.length > 0) straty.push({ name: r.name, bylo: prev.length });
+          return;
+        }
         if (JSON.stringify(next) === JSON.stringify(prev)) return;
-        await repo.updateCatalogPlace(r.id, { photos: next, updated_at: new Date().toISOString() });
-        changed.push({ name: r.name, before: prev.length, after: next.length });
+        if (!proba) {
+          await repo.updateCatalogPlace(r.id, { photos: next, updated_at: new Date().toISOString() });
+        }
+        changed.push({
+          name: r.name, before: prev.length, after: next.length,
+          // W probie interesuje nas nie liczba, tylko CO wchodzi zamiast czego.
+          stare: proba ? prev.slice(0, 1) : undefined,
+          nowe: proba ? next.slice(0, 1) : undefined,
+        });
       }));
     }
     console.log(`[catalog/refresh-photos] sprawdzono ${rows.length} z ${wszystkie.length}`
       + `, podmieniono ${changed.length}, błędów ${bledy}`);
-    return c.json({ checked: rows.length, updated: changed.length, failed: bledy, changed });
+    const nieudaneCommons = odczytajNieudaneCommons();
+    if (nieudaneCommons > 0) {
+      console.warn(
+        `[catalog/refresh-photos] Commons nie odpowiedział ${nieudaneCommons} razy `
+        + '— wynik jest zaniżony, nie traktuj go jako braku zdjęć');
+    }
+    return c.json({ checked: rows.length, updated: proba ? 0 : changed.length, proba,
+      roznice: changed.length, straty: straty.length, failed: bledy,
+      nieudaneCommons, changed, listaStrat: straty });
   } catch (e: any) {
     console.error('[catalog/refresh-photos]', e);
     return c.json({ error: e.message }, 500);
