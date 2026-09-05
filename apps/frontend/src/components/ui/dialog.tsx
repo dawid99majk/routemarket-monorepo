@@ -67,7 +67,12 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    className={cn(
+      // leading-snug, nie leading-none: tytuly ida krojem Fraunces, ktory ma
+      // wysokie wydluzenia i ogonki. Wiersz rowny rozmiarowi pisma obcinal je
+      // o gorna krawedz okna (DialogContent ma overflow-hidden) — widac to bylo
+      // na „Utworzyc tablice «Wieden»?".
+      "text-lg font-semibold leading-snug tracking-tight", className)}
     {...props}
   />
 ));

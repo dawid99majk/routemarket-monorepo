@@ -15,7 +15,8 @@ import SzukanieMiejsc from '@/components/SzukanieMiejsc';
 import SzukamOdpowiedzi from '@/components/SzukamOdpowiedzi';
 import PrzelacznikWyjazdu, { type WyjazdDoPrzelaczenia } from '@/components/PrzelacznikWyjazdu';
 import PasekKart, { type KartaMiasta, type ZakladkaPaska } from '@/components/PasekKart';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import FormularzNowejTablicy, { type UstawieniaNowejTablicy } from '@/components/FormularzNowejTablicy';
+import type { AxisValues } from '@/lib/tripPresets';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -149,6 +150,9 @@ export default function Discover() {
   const [ostatnieMiasta, setOstatnieMiasta] = useState<string[]>([]);
   const [zdjeciaMiast, setZdjeciaMiast] =
     useState<Record<string, { zdjecie: string | null; ile: number }>>({});
+  /** Osie z profilu — wartości domyślne w formularzu nowej tablicy. */
+  const [preferencjeKonta, setPreferencjeKonta] = useState<Partial<AxisValues> | null>(null);
+  const [tworzeTablice, setTworzeTablice] = useState(false);
   /** Decyzja podjęta bez celu czeka tu na odpowiedź „utworzyć tablicę?". */
   const [pytanieOTablice, setPytanieOTablice] =
     useState<{ nazwa: string; miasto: string; wykonaj: (idTablicy: string) => void } | null>(null);
@@ -216,6 +220,19 @@ export default function Discover() {
     setCity(nazwa);
     setOstatnieMiasta(dopiszOstatnie(nazwa));
   };
+
+  /* Ustawienia z konta wchodzą do formularza jako domyślne — po to zostały
+     raz ustawione, żeby nie ustawiać ich przy każdym wyjeździe od nowa. */
+  useEffect(() => {
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { data } = await supabase.from('route_preferences')
+        .select('pace, popularity, wandering, dining, effort, crowds')
+        .eq('user_id', u.user.id).maybeSingle();
+      if (data) setPreferencjeKonta(data as Partial<AxisValues>);
+    })();
+  }, []);
 
   /* Zdjęcia na karty miast: najważniejsze miejsce każdego miasta. Jedno
      zapytanie zamiast dwudziestu ośmiu — pasek i tak pokazuje kilka kart. */
@@ -570,19 +587,25 @@ export default function Discover() {
    * charakter i termin w chwili, gdy ktoś chciał zapisać jedno miejsce, byłoby
    * tą samą bramką co /start, tylko przesuniętą o jedno kliknięcie.
    */
-  const utworzTabliceIZapisz = async () => {
-    if (!pytanieOTablice) return;
-    const { nazwa, miasto, wykonaj } = pytanieOTablice;
+  const utworzTabliceIZapisz = async (u2: UstawieniaNowejTablicy) => {
+    if (!pytanieOTablice || tworzeTablice) return;
+    const { miasto, wykonaj } = pytanieOTablice;
+    setTworzeTablice(true);
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) { setPytanieOTablice(null); navigate('/auth'); return; }
+    if (!u.user) { setTworzeTablice(false); setPytanieOTablice(null); navigate('/auth'); return; }
     const { data, error } = await (supabase as any).from('trip_projects').insert({
       user_id: u.user.id,
-      name: nazwa || 'Nowy wyjazd',
-      destination: miasto || nazwa,
-      days: 3,
-      hours_per_day: 8,
-      fill_percent: 70,
+      name: u2.nazwa,
+      destination: miasto || u2.nazwa,
+      days: u2.dni,
+      hours_per_day: u2.godzinDziennie,
+      fill_percent: u2.wypelnienie,
+      start_date: u2.dataOd,
+      end_date: u2.dataDo,
+      trip_type: u2.charakter,
+      ...u2.osie,
     }).select('*').single();
+    setTworzeTablice(false);
     if (error) { toast.error(error.message); return; }
     setBoards((prev) => [{ ...data, liczba_miejsc: 0, miniatura: null }, ...prev]);
     setActiveBoard(data.id);
@@ -592,7 +615,7 @@ export default function Discover() {
     setPytanieOTablice(null);
     wykonaj(data.id);
     toast.success(`Tablica „${data.name}" gotowa`, {
-      action: { label: 'Ustaw charakter', onClick: () => navigate(`/plany/${data.id}`) },
+      action: { label: 'Otwórz', onClick: () => navigate(`/plany/${data.id}`) },
     });
   };
 
@@ -792,37 +815,18 @@ export default function Discover() {
         ukryjPigulke
       />
 
-      <Dialog
-        open={!!pytanieOTablice}
-        onOpenChange={(otwarte) => { if (!otwarte) setPytanieOTablice(null); }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Utworzyć tablicę „{pytanieOTablice?.nazwa}"?</DialogTitle>
-          </DialogHeader>
-          <p className="text-[14px] leading-relaxed text-muted-foreground">
-            Odkładane miejsca muszą gdzieś trafiać. Utworzę tablicę z domyślnymi ustawieniami
-            i od razu dopiszę do niej to miejsce — charakter wyjazdu i termin ustawisz później.
-          </p>
-          <div className="flex flex-wrap justify-end gap-2 pt-1">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setPytanieOTablice(null);
-                toast.info('Bez tablicy odłożysz miejsce sercem — znajdziesz je w „Zapisane".');
-              }}
-            >
-              Nie teraz
-            </Button>
-            <Button
-              onClick={utworzTabliceIZapisz}
-              className="bg-foreground text-background hover:bg-foreground/90"
-            >
-              Utwórz i zapisz
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FormularzNowejTablicy
+        otwarte={!!pytanieOTablice}
+        miasto={pytanieOTablice?.nazwa ?? ''}
+        preferencjeKonta={preferencjeKonta}
+        zapisywanie={tworzeTablice}
+        onZamknij={() => setPytanieOTablice(null)}
+        onOdmowa={() => {
+          setPytanieOTablice(null);
+          toast.info('Bez tablicy odłożysz miejsce sercem — znajdziesz je w „Zapisane".');
+        }}
+        onUtworz={utworzTabliceIZapisz}
+      />
 
       <main className="max-w-[1280px] mx-auto px-10 pb-24">
         {/* Lekki nagłówek i kontekst wyjazdu */}
