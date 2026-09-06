@@ -774,6 +774,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
     <div className="relative flex h-[100dvh] w-full bg-muted font-sans overflow-hidden">
       {interviewActive && (
         <InterviewOverlay
+          zPlanu={zPlanuMiasta}
           messages={chatMessages}
           phase={context.phase}
           tripProfile={context.tripProfile}
