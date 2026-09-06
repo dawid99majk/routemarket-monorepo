@@ -11,7 +11,6 @@ import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import { ROLES } from "./lib/auth";
 import Index from "./pages/Index";
 import { useGaPageview } from "./hooks/use-ga-pageview";
-import { ThemeSelector } from "./components/ThemeSelector";
 
 const GaTracker = () => {
   useGaPageview();
@@ -171,7 +170,6 @@ const App = () => (
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-                <ThemeSelector />
               </Suspense>
             </BrowserRouter>
           </TooltipProvider>

@@ -89,10 +89,10 @@ type Bucket = 'must' | 'nice' | 'rejected';
 /** Pigułki filtrów feedu — logika wprost z dokumentu przekazania projektu. */
 /** Cechy i klimat miejsc — niezależne przełączniki (toggle chips). */
 const CECHY = [
-  { id: 'kids',   label: '👶 Z dziećmi' },
-  { id: 'short',  label: '⏱️ Do 1 godziny' },
-  { id: 'walk',   label: '🚶 Pieszo od bazy' },
-  { id: 'rain',   label: '☔ Na niepogodę' },
+  { id: 'kids',   label: 'Z dziećmi' },
+  { id: 'short',  label: '⏱Do 1 godziny' },
+  { id: 'walk',   label: 'Pieszo od bazy' },
+  { id: 'rain',   label: 'Na niepogodę' },
 ] as const;
 type FilterId = 'all' | typeof CECHY[number]['id'];
 
@@ -958,7 +958,7 @@ export default function Discover() {
                     }`}
                   >
                     <span>{f.label}</span>
-                    {aktywne && <span className="text-[10px] opacity-70">✕</span>}
+                    {aktywne && <span className="text-[10px] opacity-70" aria-hidden="true">×</span>}
                   </button>
                 );
               })}
@@ -975,7 +975,7 @@ export default function Discover() {
                   : 'bg-card border-border/85 text-foreground hover:bg-muted/70 hover:border-foreground/30'
               }`}
             >
-              <span>{pokazMape ? 'Ukryj mapę' : '🗺️ Pokaż mapę'}</span>
+              <span>{pokazMape ? 'Ukryj mapę' : 'Pokaż mapę'}</span>
             </button>
           </div>
         </div>

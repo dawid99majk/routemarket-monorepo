@@ -357,7 +357,7 @@ export default function Index() {
                           rounded-[10px] bg-card px-[19px] py-[17px] shadow-token-lg">
             <div className="flex items-baseline justify-between">
               <span className="font-narrow uppercase tracking-[0.26em] text-[9px] text-muted-foreground">Dzień 1</span>
-              <span className="font-mono text-[10px] text-accent">3 g 25</span>
+              <span className="font-mono text-[10px] text-foreground">3 g 25</span>
             </div>
             <div className="grid grid-cols-[44px_1fr] gap-x-3 gap-y-[7px] mt-[14px] items-baseline">
               {PLAN_DEMO.map(([godz, nazwa]) => (
@@ -376,7 +376,7 @@ export default function Index() {
           {/* ── wypełnienie 2 z 2: terakota, i jedyna karta z pełnym zdaniem ── */}
           <div aria-hidden className="hidden xl:block absolute right-[88px] top-[454px] w-[214px] rotate-[-4deg]
                           rounded-[10px] bg-accent px-[17px] py-[16px] shadow-token-lg">
-            <div className="font-narrow uppercase tracking-[0.26em] text-[9px] text-accent-foreground/70">Agent zauważa</div>
+            <div className="font-narrow uppercase tracking-[0.26em] text-[9px] text-accent-foreground">Agent zauważa</div>
             <div className="text-[14px] leading-[1.45] text-accent-foreground mt-[9px] text-pretty">
               Czwarty punkt by się zmieścił, ale to dużo schodów jak na jedno popołudnie.
             </div>
