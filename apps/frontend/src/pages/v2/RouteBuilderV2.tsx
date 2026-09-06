@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { dziesietna } from '@/lib/liczby';
 import jsPDF from 'jspdf';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -202,6 +203,15 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
   const { state, context, send, setField, chooseOption, retryLastAction } = useWizardMachine(searchParams.get('projectId'));
   
   const projectId = context.projectId;
+
+  /**
+   * Trasa otwarta z tablicy jest spacerem po mieście — punkty przyszły z planu
+   * dnia. Pytanie „motocykl czy samochód?" nie ma wtedy sensu: pięć pigułek nad
+   * mapą, z których cztery są nie na temat, zasłania mapę i sugeruje wybór,
+   * którego nikt nie ma tu robić. W kreatorze otwartym samodzielnie zostają —
+   * tam trasa motocyklowa czy rowerowa to realny przypadek.
+   */
+  const zPlanuMiasta = !!searchParams.get('projectId');
   const chatMessages = context.chatMessages;
   const inputNotes = context.inputNotes;
   const vehicleType = context.vehicleType;
@@ -800,9 +810,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
             </button>
           )}
           <div className="flex items-start justify-between gap-2">
-            <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              Atlas Builder Live
+            {/* „Atlas Builder Live" to nazwa robocza z czasow, gdy to byl osobny
+                produkt. W aplikacji nie ma zadnego innego ekranu z angielska nazwa
+                i czcionka font-black — reszta idzie krojem display. */}
+            <h2 className="font-display text-[22px] leading-tight text-foreground flex items-center gap-2">
+              <Sparkles className="w-4.5 h-4.5 text-primary shrink-0" />
+              Kreator trasy
             </h2>
             <button
               type="button"
@@ -813,7 +826,9 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
               <ChevronDown className="w-5 h-5" />
             </button>
           </div>
-          <p className="text-xs text-muted-foreground font-medium mt-1">Dodawaj punkty na mapie lub rozmawiaj z Agentem.</p>
+          <p className="text-[13px] leading-relaxed text-muted-foreground mt-1.5">
+            Dodawaj punkty na mapie albo napisz, czego szukasz.
+          </p>
           {/* Kreator był ślepym zaułkiem — pełny ekran bez wyjścia do reszty aplikacji. */}
           <div className="flex items-center gap-3 mt-3 text-xs font-semibold">
             <button onClick={() => navigate('/plany')} className="text-muted-foreground hover:text-primary">Plany</button>
@@ -825,38 +840,40 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
         </div>
 
         {/* Tabs Switcher */}
-        <div className="flex border-b border-border p-2 bg-muted/30 gap-1 shrink-0">
+        {/* Pigulki, nie karty z cieniem: tak wygladaja przelaczniki w Odkrywaj
+            i w ustawieniach tablicy. */}
+        <div className="flex border-b border-border px-5 py-3 gap-1.5 shrink-0">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 ${
+            className={`flex-1 py-1.5 px-3 text-[13px] rounded-full transition-colors ${
               activeTab === 'chat'
-                ? 'bg-card text-primary shadow-token-sm border border-border/50'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                ? 'bg-foreground text-background font-medium'
+                : 'text-foreground/70 hover:bg-muted/60'
             }`}
           >
             Kreator AI
           </button>
           <button
             onClick={() => setActiveTab('details')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 px-3 text-[13px] rounded-full transition-colors flex items-center justify-center gap-1.5 ${
               activeTab === 'details'
-                ? 'bg-card text-primary shadow-token-sm border border-border/50'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                ? 'bg-foreground text-background font-medium'
+                : 'text-foreground/70 hover:bg-muted/60'
             }`}
           >
             Szczegóły
             {geometry && (
-              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold ml-1">
-                {routeStats.distance.toFixed(1)} km
+              <span className="font-mono text-[10.5px] opacity-70 tabular-nums">
+                {dziesietna(routeStats.distance)} km
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('saved')}
-            className={`flex-1 py-2 px-3 text-xs font-semibold rounded-md transition-all duration-200 ${
+            className={`flex-1 py-1.5 px-3 text-[13px] rounded-full transition-colors ${
               activeTab === 'saved'
-                ? 'bg-card text-primary shadow-token-sm border border-border/50'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                ? 'bg-foreground text-background font-medium'
+                : 'text-foreground/70 hover:bg-muted/60'
             }`}
           >
             Moje trasy
@@ -1182,10 +1199,12 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
       <div className="flex-1 relative bg-muted h-full w-full">
         
         {/* Floating Vehicle Selector */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2">
+        <div className={`absolute top-6 left-1/2 -translate-x-1/2 z-[1000] flex-col items-center gap-2 ${
+          zPlanuMiasta ? 'hidden' : 'flex'
+        }`}>
           
           {/* Main Selector */}
-          <div className="bg-white/90 backdrop-blur-md rounded-full shadow-token-lg p-1.5 flex gap-1 border border-border/50 max-w-[95vw] overflow-x-auto scrollbar-none">
+          <div className="bg-card/90 backdrop-blur-md rounded-full shadow-token-lg p-1.5 flex gap-1 border border-border/50 max-w-[95vw] overflow-x-auto scrollbar-none">
             <Button 
               variant={vehicleType === 'motorcycle' ? 'default' : 'ghost'} 
               className={`rounded-full px-5 h-10 shrink-0 ${vehicleType === 'motorcycle' ? 'bg-foreground text-background' : 'text-foreground/80 hover:text-foreground'}`}
@@ -1225,7 +1244,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
           {/* Sub Selector for Bicycle */}
           {vehicleType === 'bicycle' && (
-            <div className="bg-white/90 backdrop-blur-md rounded-full shadow-token-md p-1 flex gap-1 border border-border/50 animate-in slide-in-from-top-2">
+            <div className="bg-card/90 backdrop-blur-md rounded-full shadow-token-md p-1 flex gap-1 border border-border/50 animate-in slide-in-from-top-2">
               <Button 
                 variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} 
                 size="sm"
@@ -1256,7 +1275,7 @@ export default function RouteBuilderV2({ initialData, onBack }: { initialData?: 
 
         {/* Loading Indicator */}
         {isRouting && (
-          <div className="absolute top-6 right-6 z-[1000] bg-white/90 backdrop-blur-md rounded-full shadow-token-lg py-2 px-4 flex items-center gap-2 border border-primary/30">
+          <div className="absolute top-6 right-6 z-[1000] bg-card/90 backdrop-blur-md rounded-full shadow-token-lg py-2 px-4 flex items-center gap-2 border border-primary/30">
             <Loader2 className="w-4 h-4 text-primary animate-spin" />
             <span className="text-sm font-semibold text-primary">Przeliczam trasę...</span>
           </div>
