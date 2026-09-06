@@ -332,7 +332,7 @@ export default function TablicaPubliczna() {
                           ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                           : <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
                               <MapPin className="w-4 h-4 text-primary/60" />
-                              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
+                              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">miejsce</span>
                             </div>}
                       </div>
                       <div className="min-w-0 flex-1 flex flex-col justify-center">

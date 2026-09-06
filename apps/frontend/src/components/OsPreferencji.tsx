@@ -87,7 +87,7 @@ export default function OsPreferencji({
       </p>
 
       {podpowiedz && (
-        <p className="text-[11px] text-muted-foreground/80 mt-1 text-center text-pretty">{podpowiedz}</p>
+        <p className="text-[11px] text-muted-foreground mt-1 text-center text-pretty">{podpowiedz}</p>
       )}
     </div>
   );

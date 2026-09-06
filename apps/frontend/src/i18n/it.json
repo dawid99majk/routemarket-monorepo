@@ -280,6 +280,15 @@
     "contact": {
       "description": "Contatta il team RouteMarket. Supporto tecnico, richieste creatori e acquirenti.",
       "title": "Contatti — RouteMarket"
+    },
+    "odkrywaj": {
+      "title": "Scopri luoghi"
+    },
+    "plany": {
+      "title": "I tuoi viaggi"
+    },
+    "tablice": {
+      "title": "Bacheche di viaggiatori"
     }
   },
   "start": {

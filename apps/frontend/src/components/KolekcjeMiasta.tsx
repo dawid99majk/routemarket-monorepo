@@ -69,7 +69,7 @@ export default function KolekcjeMiasta({ miejsca, onWybierz }: Props) {
                     {kolekcja.podpis}
                   </p>
                 </div>
-                <p className="font-mono tabular-nums text-[11px] text-muted-foreground/80 mt-2 font-medium">
+                <p className="font-mono tabular-nums text-[11px] text-muted-foreground mt-2 font-medium">
                   {w.length} miejsc
                 </p>
               </div>

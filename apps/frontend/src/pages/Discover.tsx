@@ -22,6 +22,7 @@ import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import SEO from '@/components/SEO';
 import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
@@ -809,7 +810,10 @@ export default function Discover() {
   };
 
   return (
+
+    
     <div className="min-h-screen bg-background">
+      <SEO title={t('seo.odkrywaj.title')} url="/odkrywaj" />
       {/* Pasek górny: 64 px, półprzezroczysty z rozmyciem, dolna linia — jak w projekcie */}
       {/* Wspólny pasek zamiast własnego. Ten nagłówek miał inny logotyp, brakowało
           w nim zakładki Start, a "Plan" prowadził na tablicę zamiast do planu —

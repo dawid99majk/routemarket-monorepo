@@ -6,6 +6,7 @@ import { Heart, Loader2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import PlannerHeader from '@/components/PlannerHeader';
+import SEO from '@/components/SEO';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { useTranslation } from 'react-i18next';
 
@@ -106,7 +107,10 @@ export default function Tablice() {
   }, [tablice, szukaj, porzadek]);
 
   return (
+
+    
     <div className="min-h-screen bg-background">
+      <SEO title={t('seo.tablice.title')} url="/tablice" />
       <PlannerHeader initials={inicjaly} />
 
       <main className="max-w-[1400px] mx-auto px-6 py-8">
@@ -188,7 +192,7 @@ export default function Tablice() {
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 text-muted-foreground">
-                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground/70">RouteMarket</span>
+                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">RouteMarket</span>
                       </div>
                     )}
 
@@ -238,7 +242,7 @@ export default function Tablice() {
                           RouteMarket
                         </span>
                       )}
-                      <span className="font-mono text-[11.5px] tabular-nums text-muted-foreground/80 shrink-0 font-medium">
+                      <span className="font-mono text-[11.5px] tabular-nums text-muted-foreground shrink-0 font-medium">
                         {tab.place_count} {tab.place_count === 1 ? 'miejsce' : tab.place_count < 5 ? 'miejsca' : 'miejsc'}
                       </span>
                     </div>

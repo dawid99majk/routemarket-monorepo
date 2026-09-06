@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import PlannerHeader from '@/components/PlannerHeader';
 import TripProjects from '@/components/TripProjects';
+import SEO from '@/components/SEO';
+import { useTranslation } from 'react-i18next';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 
 interface Wyjazd {
@@ -53,6 +55,7 @@ const odmiana = (n: number, jeden: string, kilka: string, wiele: string) => {
  * zmieniał, więc odświeżenie gubiło wybór.
  */
 export default function TripPlans() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [initials, setInitials] = useState<string | null>(null);
@@ -140,7 +143,9 @@ export default function TripPlans() {
   // ── Pojedyncza tablica ────────────────────────────────────────────────────
   if (id) {
     return (
+      
       <div className="min-h-screen bg-background">
+        <SEO title={t('seo.plany.title')} url="/plany" />
         <PlannerHeader context={context} initials={initials} />
         <main className="max-w-[1400px] mx-auto px-6 py-8">
           <TripProjects projectId={id} onContextChange={setContext} />
@@ -152,6 +157,7 @@ export default function TripPlans() {
   // ── Lista wyjazdów ────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
+      <SEO title={t('seo.plany.title')} url="/plany" />
       <PlannerHeader initials={initials} />
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -257,7 +263,7 @@ export default function TripPlans() {
                       <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/40 to-accent/10 text-muted-foreground">
-                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground/70">W trakcie</span>
+                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">W trakcie</span>
                       </div>
                     )}
                   </div>
@@ -395,7 +401,7 @@ export default function TripPlans() {
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 text-muted-foreground">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70">Tablica</span>
+                              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Tablica</span>
                             </div>
                           )}
                           <span className="absolute left-2.5 bottom-2.5 bg-background/85 backdrop-blur-md

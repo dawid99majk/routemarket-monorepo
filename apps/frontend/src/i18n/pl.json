@@ -286,6 +286,15 @@
     "contact": {
       "description": "Skontaktuj się z zespołem RouteMarket. Pomoc techniczna, pytania dla twórców tras i kupujących.",
       "title": "Kontakt — RouteMarket"
+    },
+    "odkrywaj": {
+      "title": "Odkrywaj miejsca"
+    },
+    "plany": {
+      "title": "Twoje wyjazdy"
+    },
+    "tablice": {
+      "title": "Tablice od podróżników"
     }
   },
   "start": {

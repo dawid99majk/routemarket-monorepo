@@ -191,7 +191,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
 
             <div className="pt-3 border-t border-border/80 space-y-3">
               {/* Metadane: godziny, czas, www */}
-              <div className="font-mono text-[12px] tabular-nums text-muted-foreground/90 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <div className="font-mono text-[12px] tabular-nums text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-2">
                 {czas(miejsce.visit_minutes) && (
                   <span className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-primary/70" />

@@ -83,7 +83,7 @@ export default function Logo({ showName = true, signature = true, size = 'md', c
           </span>
           {signature && (
             <span
-              className={`font-mono ${s.sub} text-muted-foreground/80 mt-1 uppercase`}
+              className={`font-mono ${s.sub} text-muted-foreground mt-1 uppercase`}
               style={{ letterSpacing: '0.32em' }}
             >
               zbieraj · układaj · jedź

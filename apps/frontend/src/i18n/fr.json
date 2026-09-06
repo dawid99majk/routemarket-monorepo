@@ -283,6 +283,15 @@
     "contact": {
       "description": "Contactez l'équipe RouteMarket. Support technique, questions créateurs et acheteurs.",
       "title": "Contact — RouteMarket"
+    },
+    "odkrywaj": {
+      "title": "Découvrir des lieux"
+    },
+    "plany": {
+      "title": "Tes voyages"
+    },
+    "tablice": {
+      "title": "Tableaux de voyageurs"
     }
   },
   "start": {

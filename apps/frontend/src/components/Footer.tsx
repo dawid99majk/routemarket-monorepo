@@ -28,7 +28,7 @@ export default function Footer() {
             <p className="text-xs text-muted-foreground">
               © {year} RouteMarket.io. {t('legal.all_rights_reserved')}
             </p>
-            <Link to="/brand" className="text-[11px] text-muted-foreground/80 hover:text-foreground transition-colors uppercase tracking-[0.18em] font-mono">
+            <Link to="/brand" className="text-[11px] text-muted-foreground hover:text-foreground transition-colors uppercase tracking-[0.18em] font-mono">
               Brand assets ↗
             </Link>
           </div>

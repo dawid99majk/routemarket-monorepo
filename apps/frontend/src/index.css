@@ -94,6 +94,10 @@
 
 
 
+  /* NIEAKTYWNY. Nic w aplikacji nie zaklada klasy `dark` na <html> — nie ma
+     przelacznika ani wykrywania preferencji systemu. Te tokeny sa przygotowaniem
+     na tryb ciemny, nie jego dzialajaca wersja. Zanim je zmienisz albo oprzesz
+     na nich ekran, sprawdz, czy cokolwiek je wlacza. */
   .dark {
     /* Inverted soft palette — ink ground, sage glow */
     --background: 60 6% 11%;

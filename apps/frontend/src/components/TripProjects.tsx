@@ -2240,7 +2240,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                       ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                       : <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
                                           <Icon className="w-5 h-5 text-primary/60" />
-                                          <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground/60">miejsce</span>
+                                          <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">miejsce</span>
                                         </div>}
                                   </div>
                                   <div className="min-w-0 flex-1 flex flex-col justify-between">
@@ -2257,7 +2257,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                           <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
-                                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground/90 mt-1 truncate">
+                                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
                                         {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
                                           .filter(Boolean).join(' · ') || '—'}
                                       </div>

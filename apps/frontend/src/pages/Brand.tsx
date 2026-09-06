@@ -78,7 +78,7 @@ export default function Brand() {
                 <div className="p-3">
                   <p className="text-sm font-medium text-foreground">{c.name}</p>
                   <p className="font-mono text-[11px] text-muted-foreground tracking-wider mt-1">{c.hex}</p>
-                  <p className="font-mono text-[10px] text-muted-foreground/70 mt-0.5">{c.token}</p>
+                  <p className="font-mono text-[10px] text-muted-foreground mt-0.5">{c.token}</p>
                 </div>
               </div>
             ))}

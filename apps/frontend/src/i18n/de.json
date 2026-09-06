@@ -283,6 +283,15 @@
     "contact": {
       "description": "Kontaktieren Sie das RouteMarket-Team. Support, Anfragen für Ersteller und Käufer.",
       "title": "Kontakt — RouteMarket"
+    },
+    "odkrywaj": {
+      "title": "Orte entdecken"
+    },
+    "plany": {
+      "title": "Deine Reisen"
+    },
+    "tablice": {
+      "title": "Boards von Reisenden"
     }
   },
   "start": {
