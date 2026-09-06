@@ -1,3 +1,9 @@
+> **MATERIAŁ HISTORYCZNY (od 6.09.2026).** Kierunek „Wyprawa" nie jest już
+> wdrażany — produkt stoi na kierunku **Horizon**. Plik `kierunek.md`, do którego
+> odsyła spis poniżej, został usunięty razem z paletą. Trzymamy ten katalog dla
+> historii decyzji; aktualne reguły są w
+> `docs/narzedzia-agentow/routemarket-design/SKILL.md`.
+
 # Redesign „Wyprawa” — pakiet wdrożeniowy
 
 Ten katalog jest kompletny i samowystarczalny. Wszystko, czego potrzeba do wdrożenia

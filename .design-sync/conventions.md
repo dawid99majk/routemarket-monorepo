@@ -1,3 +1,10 @@
+> **Uwaga (6.09.2026).** Obowiązującym źródłem reguł designu jest
+> `docs/narzedzia-agentow/routemarket-design/SKILL.md` — tam opisany jest
+> aktualny kierunek **Horizon**. Ten plik pochodzi z eksportu biblioteki
+> komponentów i opisuje wcześniejszy etap („Soft-Tech Outdoor"); zasady
+> techniczne (tokeny zamiast palety, składanie komponentów) pozostają aktualne,
+> ale nazwy kolorów i kierunek czytaj ze skilla.
+
 # RouteMarket — jak budować z tym systemem
 
 RouteMarket to **planer wyjazdów**: użytkownik zbiera miejsca na tablicy, a z nich powstaje
