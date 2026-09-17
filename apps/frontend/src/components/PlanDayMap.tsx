@@ -35,9 +35,10 @@ const IKONA_DOMU = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="1
  * `var(--x)` sam, ale linia Leafleta trafia do atrybutu SVG `stroke`, a tam
  * zmienne CSS nie działają we wszystkich przeglądarkach.
  */
-function kolorTokenu(nazwa: string, zapas: string): string {
+function kolorTokenu(nazwa: string): string {
   const v = getComputedStyle(document.documentElement).getPropertyValue(nazwa).trim();
-  return v ? `hsl(${v})` : zapas;
+  // Bez tokenu linia bierze kolor tekstu kontenera — żadnej wartości wpisanej na sztywno.
+  return v ? `hsl(${v})` : 'currentColor';
 }
 
 /**
@@ -89,7 +90,7 @@ function PlanDayMapInner({ points, baza, track, onPunkt, className = '' }: PlanD
     // Przerywana linia prosta to uczciwe "tędy mniej więcej". Kiedy dzień zostanie
     // przeliczony, zastępuje ją ciągły przebieg po chodnikach — i wtedy ciągłość
     // linii sama mówi, że to już pomiar, a nie szacunek.
-    const kolorLinii = kolorTokenu('--foreground', '#1f2937');
+    const kolorLinii = kolorTokenu('--foreground');
     if (track && track.length > 1) {
       L.polyline(track.map(([lat, lng]) => L.latLng(lat, lng)), {
         color: kolorLinii, weight: 3.5, opacity: 0.75

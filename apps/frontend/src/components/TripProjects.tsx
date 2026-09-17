@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import KartaMiejsca from '@/components/KartaMiejsca';
 import type { PodobneMiejsce } from '@/components/PodobneMiejsca';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,7 +6,7 @@ import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Footprints, Heart, House, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, SlidersHorizontal, Sparkles, Star, Trash2, Users, Utensils, Wand2
+  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Footprints, Heart, House, Loader2, MapPin, MoreHorizontal, Music, Pin, Plus, RefreshCw, Search, Share2, SlidersHorizontal, Sparkles, Star, Trash2, Users, Utensils
 } from 'lucide-react';
 import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { toast } from 'sonner';
@@ -47,6 +47,12 @@ import {
 import KrokiPlanu from '@/components/planDni/KrokiPlanu';
 import WersjePlanu from '@/components/planDni/WersjePlanu';
 import UlozPlanDialog from '@/components/planDni/UlozPlanDialog';
+import CoDalej from '@/components/planDni/CoDalej';
+import { usunPozycje, przeniesPozycje, koniecDnia, czasNaMinuty, minutyNaCzas } from '@/components/planDni/edycja';
+import { gpxDnia, nazwaPliku, pobierzPlik } from '@/lib/gpx';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
   const { t, i18n } = useTranslation();
@@ -752,6 +758,80 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setDayRoutes(zapisane);
   };
 
+  // Cofnięcie z powiadomienia przychodzi kilka sekund później — wersja mogła się
+  // w tym czasie zmienić, więc ekran odświeżamy tylko wtedy, gdy wciąż jest otwarta.
+  const planIdRef = useRef(planId);
+  planIdRef.current = planId;
+
+  /**
+   * Zmiana w gotowym planie: od razu na ekranie, potem w zapisanej wersji.
+   * Przy błędzie zapisu plan na ekranie zostaje — użytkownik dostaje wprost,
+   * że po odświeżeniu wróci poprzedni układ.
+   */
+  const zapiszZmianePlanu = async (nowy: any, idWersji: string | null = planId): Promise<boolean> => {
+    if (planIdRef.current === idWersji) {
+      setPlan(nowy);
+      const przebiegi: Record<number, { km: number; h: number; track: [number, number][] | null }> = {};
+      for (const d of nowy.days || []) {
+        if (Array.isArray(d.track) && d.track.length > 1) {
+          przebiegi[d.day] = { km: d.route_km ?? 0, h: d.route_h ?? 0, track: d.track };
+        }
+      }
+      setDayRoutes(przebiegi);
+    }
+    setSavedPlans((prev) => prev.map((sp) => (sp.id === idWersji ? { ...sp, plan: nowy } : sp)));
+    if (!idWersji) return true;
+    const { error } = await supabase.from('trip_plans').update({ plan: nowy }).eq('id', idWersji);
+    if (error) {
+      toast.error(t('plan.zapis_nieudany'));
+      return false;
+    }
+    return true;
+  };
+
+  const usunZPlanu = async (dzienIdx: number, pozycja: number) => {
+    if (!plan) return;
+    const poprzedni = plan;
+    const idWersji = planId;
+    const wynik = usunPozycje(plan, dzienIdx, pozycja, bazaWyjazdu);
+    if (!(await zapiszZmianePlanu(wynik.plan, idWersji))) return;
+    toast.success(
+      t('plan.usunieto', { nazwa: wynik.nazwa, nr: plan.days[dzienIdx].day, czas: formatMinutes(wynik.zwolnione) })
+        + (wynik.mialPrzebieg ? ` ${t('plan.trasa_do_ponowienia')}` : ''),
+      { action: { label: t('plan.cofnij'), onClick: () => { zapiszZmianePlanu(poprzedni, idWersji); } } },
+    );
+  };
+
+  const przeniesWPlanie = async (zDnia: number, pozycja: number, doDnia: number) => {
+    if (!plan) return;
+    const poprzedni = plan;
+    const idWersji = planId;
+    const start = savedPlans.find((sp) => sp.id === planId)?.window_start || planForm.start;
+    const wynik = przeniesPozycje(plan, zDnia, pozycja, doDnia, bazaWyjazdu, start);
+    if (!(await zapiszZmianePlanu(wynik.plan, idWersji))) return;
+    const dane = { nazwa: wynik.nazwa, nr: plan.days[doDnia].day, godzina: wynik.godzina, minuty: wynik.przesuniecie };
+    toast.success(
+      (wynik.przesuniecie > 0 ? t('plan.przeniesiono_przesuniecie', dane) : t('plan.przeniesiono', dane))
+        + (wynik.mialPrzebieg ? ` ${t('plan.trasa_do_ponowienia')}` : ''),
+      { action: { label: t('plan.cofnij'), onClick: () => { zapiszZmianePlanu(poprzedni, idWersji); } } },
+    );
+  };
+
+  /** GPX ze zmierzonego przebiegu dnia — bez kolejnego wywołania i bez opłaty. */
+  const pobierzGpxDnia = (day: any) => {
+    const przebieg = dayRoutes[day.day];
+    if (!active || !przebieg || przebieg === 'loading' || !przebieg.track?.length) return;
+    let nocleg = false;
+    const punkty = punktyDnia(day.items || [], bazaWyjazdu).punkty
+      // Poranny wyjazd i wieczorny powrót to ten sam nocleg — jeden punkt w pliku.
+      .filter((p) => (p.nr != null ? true : !nocleg && (nocleg = true)))
+      .map((p) => ({
+        name: p.nr != null ? `${p.nr}. ${p.name}` : `${t('plan.legenda_nocleg')}: ${p.name}`,
+        lat: p.lat, lng: p.lng,
+      }));
+    const nazwa = `${active.name} — ${t('plan.dzien', { nr: day.day })}`;
+    pobierzPlik(`${nazwaPliku(nazwa)}.gpx`, gpxDnia(nazwa, przebieg.track, punkty));
+  };
 
   const recalcDay = async (day: any) => {
     // Przebieg liczymy po tym, co widać na mapie: nocleg w swoim miejscu, bez przejść.
@@ -2850,6 +2930,23 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </button>
                             )}
                           </div>
+                          {/* Po przeniesieniu punktu dzień potrafi wyjść poza okno godzin.
+                              Nie przycinamy go po cichu — mówimy, o ile. */}
+                          {(() => {
+                            const wersja = savedPlans.find((sp) => sp.id === planId);
+                            const oknoDo = czasNaMinuty(wersja?.window_end ?? '');
+                            const koniec = koniecDnia(day);
+                            if (oknoDo == null || koniec == null || koniec <= oknoDo) return null;
+                            return (
+                              <p className="px-4 py-2 border-b border-border bg-warning/10 text-[13px] text-foreground">
+                                {t('plan.koniec_po_oknie', {
+                                  koniec: minutyNaCzas(koniec),
+                                  minuty: koniec - oknoDo,
+                                  okno: `${wersja?.window_start}–${wersja?.window_end}`,
+                                })}
+                              </p>
+                            );
+                          })()}
                           </>
                         );
                       })()}
@@ -2946,10 +3043,48 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               <button
                                 onClick={() => pinSuggestion(it)}
                                 title={t('tablica.dodaj_do_tablicy')}
-                                className="text-muted-foreground hover:text-primary shrink-0 mt-0.5"
+                                aria-label={t('tablica.dodaj_do_tablicy')}
+                                className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
                               >
                                 <Pin className="w-3.5 h-3.5" />
                               </button>
+                            )}
+                            {/* Poprawka bez układania od nowa: przenieść na inny dzień albo
+                                wyrzucić. Nocleg i przejścia nie są do przenoszenia. */}
+                            {!wBazie && !przejscie && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button type="button"
+                                    aria-label={t('plan.opcje_punktu', { nazwa: it.name })}
+                                    title={t('plan.opcje_punktu', { nazwa: it.name })}
+                                    className="w-7 h-7 -mt-0.5 rounded-sm shrink-0 flex items-center justify-center
+                                               text-muted-foreground hover:text-foreground hover:bg-muted transition-colors
+                                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="min-w-[220px]">
+                                  {(plan.days || []).map((cel: any, celIdx: number) => {
+                                    const zIdx = Math.min(planDay, (plan.days || []).length - 1);
+                                    if (celIdx === zIdx) return null;
+                                    return (
+                                      <DropdownMenuItem key={cel.day} onSelect={() => przeniesWPlanie(zIdx, i, celIdx)}>
+                                        {t('plan.przenies_na', { nr: cel.day })}
+                                        {cel.date && (
+                                          <span className="ml-auto pl-3 font-mono text-[12px] tabular-nums text-muted-foreground">
+                                            {new Date(`${cel.date}T12:00:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                          </span>
+                                        )}
+                                      </DropdownMenuItem>
+                                    );
+                                  })}
+                                  {(plan.days || []).length > 1 && <DropdownMenuSeparator />}
+                                  <DropdownMenuItem className="text-destructive focus:text-destructive"
+                                    onSelect={() => usunZPlanu(Math.min(planDay, (plan.days || []).length - 1), i)}>
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" aria-hidden /> {t('plan.usun_z_planu')}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
 
                           </div>
@@ -3030,31 +3165,20 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
                 {(() => {
                   const days = plan.days || [];
-                  const allItems = days.flatMap((d: any) => d.items || []);
-                  const totalMin = allItems.reduce((sum: number, it: any) => sum + (it.minutes || 0), 0);
+                  const d = days[Math.min(planDay, days.length - 1)];
+                  if (!d) return null;
+                  const punktyTrasy = punktyDnia(d.items || [], bazaWyjazdu).punkty;
                   return (
-                    <div className="rounded-md bg-foreground text-background p-5">
-                      <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-background/60">
-                        Gotowy plan
-                      </p>
-                      <h3 className="font-display font-light text-[24px] leading-tight mt-2">
-                        Zamień go w jedną trasę
-                      </h3>
-                      <div className="flex gap-6 mt-4 font-mono text-[12px] tabular-nums text-background/70">
-                        <span>{days.length} {days.length === 1 ? 'dzień' : 'dni'}</span>
-                        <span>{allItems.length} punktów</span>
-                        {totalMin > 0 && <span>{dziesietna(totalMin / 60)} h zwiedzania</span>}
-                      </div>
-                      <button
-                        onClick={() => buildRouteFrom(allItems, 'cały wyjazd')}
-                        className="mt-5 w-full rounded-sm bg-primary-light text-foreground py-2.5 text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center"
-                      >
-                        <Wand2 className="w-4 h-4 mr-2" /> Zrób jedną trasę z całego wyjazdu
-                      </button>
-                      <p className="text-[11px] text-background/50 mt-2.5 text-center">
-                        Trasę pobierzesz jako GPX w widoku kreatora.
-                      </p>
-                    </div>
+                    <CoDalej
+                      nrDnia={d.day}
+                      przebieg={dayRoutes[d.day] ?? null}
+                      mozna={punktyTrasy.length >= 2}
+                      cenaTrasy={tokens?.prices?.['live-route']}
+                      onWyznacz={() => recalcDay(d)}
+                      onPobierzGpx={() => pobierzGpxDnia(d)}
+                      onKreator={() => buildRouteFrom(d.items || [], `dzień ${d.day}`)}
+                      onCalyWyjazd={() => buildRouteFrom(days.flatMap((x: any) => x.items || []), 'cały wyjazd')}
+                    />
                   );
                 })()}
 
