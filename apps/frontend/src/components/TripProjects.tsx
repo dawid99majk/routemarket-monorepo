@@ -44,9 +44,12 @@ import {
   czyPrzystanek, kmBetween, metryMiedzy, opisDystansu, medianOf,
   czyBaza, punktyDnia, type BazaWyjazdu,
 } from './tripProjects/helpers';
+import KrokiPlanu from '@/components/planDni/KrokiPlanu';
+import WersjePlanu from '@/components/planDni/WersjePlanu';
+import UlozPlanDialog from '@/components/planDni/UlozPlanDialog';
 
 export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<TripProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -87,6 +90,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [podpowiedzi, setPodpowiedzi] = useState<any[]>([]);
   const [pokazPodpowiedzi, setPokazPodpowiedzi] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [pokazUkladanie, setPokazUkladanie] = useState(false);
   /** Sekundy od startu planowania. Samo kółko przy zapytaniu trwającym minutę
    *  wygląda jak zawieszenie — licznik dowodzi, że coś się dzieje. */
   const [planSekundy, setPlanSekundy] = useState(0);
@@ -127,12 +131,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   // z przykładu "trzy popołudnia" i dla kogoś planującego cały dzień z dziećmi
   // dawało plan na późny wieczór.
   const [planForm, setPlanForm] = useState({ start: '09:00', end: '17:00', date: '', dinner: '' });
-  // Data w formularzu zostaje stringiem 'yyyy-MM-dd' — kalendarz potrzebuje obiektu Date
-  const planDate = (() => {
-    if (!planForm.date) return undefined;
-    const d = parse(planForm.date, 'yyyy-MM-dd', new Date());
-    return isValid(d) ? d : undefined;
-  })();
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -189,8 +187,12 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
   useEffect(() => {
     if (!onContextChange) return;
+    // Charakter po ludzku: w nagłówku stało surowe id presetu („FRIENDS").
+    const charakter = active?.trip_type
+      ? (TRIP_PRESETS.find((p) => p.id === active.trip_type)?.label ?? active.trip_type).toLowerCase()
+      : null;
     onContextChange(active
-      ? [active.destination, active.days ? `${active.days} dni` : null, active.trip_type]
+      ? [active.destination, active.days ? `${active.days} dni` : null, charakter]
           .filter(Boolean).join(' · ')
       : null);
   }, [active?.id, active?.destination, active?.days, active?.trip_type, onContextChange]);
@@ -281,7 +283,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         .select('id, shared_with_email, role')
         .eq('project_id', activeId);
       setShares(sh || []);
-      setPlan(null);
+      // Wejście w Plan dni otwiera najnowszą wersję. Dotąd zakładka pokazywała
+      // listę wersji i formularz, a sam plan dopiero po kliknięciu w nazwę —
+      // na pierwszy rzut oka wyglądało to, jakby planu nie było.
+      if (plans?.length) {
+        otworzPlan(plans[0]);
+        setPlanDay(0);
+      } else {
+        setPlan(null);
+        setPlanId(null);
+      }
     })();
   }, [activeId]);
 
@@ -741,17 +752,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setDayRoutes(zapisane);
   };
 
-  /**
-   * Wyjście z otwartego planu do listy wszystkich. Lista renderowała się dotąd
-   * pod całym planem, więc przy dwudniowym wyjeździe leżała jakieś dwa ekrany
-   * niżej — technicznie dostępna, praktycznie nie.
-   */
-  const pokazWszystkiePlany = () => {
-    setPlan(null);
-    setPlanId(null);
-    setDayRoutes({});
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const recalcDay = async (day: any) => {
     // Przebieg liczymy po tym, co widać na mapie: nocleg w swoim miejscu, bez przejść.
@@ -1267,12 +1267,20 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   const deletePlan = async (id: string) => {
-    await supabase.from('trip_plans').delete().eq('id', id);
-    setSavedPlans((prev) => prev.filter((p) => p.id !== id));
+    const { error } = await supabase.from('trip_plans').delete().eq('id', id);
+    if (error) return toast.error(error.message);
+    const zostaja = savedPlans.filter((p) => p.id !== id);
+    setSavedPlans(zostaja);
+    // Usunięcie otwartej wersji otwiera następną najnowszą, zamiast zostawiać pusty ekran.
+    if (id === planId) {
+      if (zostaja.length) { otworzPlan(zostaja[0]); setPlanDay(0); }
+      else { setPlan(null); setPlanId(null); setDayRoutes({}); }
+    }
   };
 
   const buildPlan = async () => {
     if (!active || places.length === 0) return;
+    setPokazUkladanie(false);
     setPlanning(true);
     setPlan(null);
     try {
@@ -1514,6 +1522,25 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               Zbieraj miejsca, kiedy tylko chcesz. Trasy ułożymy z nich później.
             </p>
           )}
+          {/* Jedno zdanie o tym, czym jest ten ekran i co z nim zrobić — z liczbami
+              z otwartego planu, nie z ogólnym opisem funkcji. */}
+          {active && view === 'plan' && plan && (plan.days || []).length > 0 && (() => {
+            const dniPlanu = plan.days as any[];
+            const zTablicy = new Set(dniPlanu.flatMap((d) => (d.items || [])
+              .filter((it: any) => it.source === 'pinned' && !czyBaza(it, bazaWyjazdu) && czyPrzystanek(it))
+              .map((it: any) => String(it.name).trim().toLowerCase()))).size;
+            const pierwsza = dniPlanu[0]?.date;
+            const ostatnia = dniPlanu[dniPlanu.length - 1]?.date;
+            return (
+              <p className="text-[15px] text-muted-foreground mt-3 max-w-[68ch] text-pretty">
+                {t('plan.opis', {
+                  dni: t('plan.dni', { count: dniPlanu.length }),
+                  miejsca: t('plan.z_miejsc', { count: zTablicy }),
+                  termin: pierwsza ? ` — ${zakresDat(pierwsza, ostatnia)}` : '',
+                })}
+              </p>
+            );
+          })()}
         </div>
       </div>
 
@@ -1614,19 +1641,29 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 </span>
               </div>
             )}
-            <Button variant="outline" onClick={() => setCreating((v) => !v)}>
-              <Plus className="w-4 h-4 mr-1" /> {t('tablica.nowa_tablica')}
-            </Button>
-            {active && view === 'plan' && plan && savedPlans.length > 0 && (
-              <Button variant="outline" onClick={pokazWszystkiePlany}>
-                <CalendarDays className="w-4 h-4 mr-1.5" /> Wszystkie plany ({savedPlans.length})
+            {/* W planie dni „Nowa tablica" była trzecim przyciskiem bez związku z tym,
+                co się tu robi — zostaje w widoku tablicy. */}
+            {view !== 'plan' && (
+              <Button variant="outline" onClick={() => setCreating((v) => !v)}>
+                <Plus className="w-4 h-4 mr-1" /> {t('tablica.nowa_tablica')}
               </Button>
             )}
-            {active && view === 'plan' && plan && (
-              <Button variant="outline" onClick={buildPlan} disabled={planning}>
+            {active && view === 'plan' && savedPlans.length > 0 && (
+              <WersjePlanu
+                wersje={savedPlans}
+                aktywnaId={planId}
+                onOtworz={(id) => {
+                  const sp = savedPlans.find((p) => p.id === id);
+                  if (sp) { otworzPlan(sp); setPlanDay(0); }
+                }}
+                onUsun={deletePlan}
+              />
+            )}
+            {active && view === 'plan' && savedPlans.length > 0 && (
+              <Button variant="outline" onClick={() => setPokazUkladanie(true)} disabled={planning}>
                 {planning
-                  ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('tablica.licze')}</>
-                  : <><RefreshCw className="w-4 h-4 mr-1.5" /> {t('tablica.przelicz_plan')}</>}
+                  ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> {t('plan.ukladam')}</>
+                  : <><RefreshCw className="w-4 h-4 mr-1.5" /> {t('plan.uloz_ponownie')}</>}
               </Button>
             )}
             {active && view === 'tablica' && (
@@ -2584,6 +2621,48 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             </>)}
 
             {view === 'plan' && (<>
+            <KrokiPlanu
+              naPewno={mustCount}
+              dniUlozone={plan?.days?.length ? plan.days.length : null}
+              onTablica={() => navigate(`/plany/${active.id}`)}
+              onTrasa={() => document.getElementById('co-dalej')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+            />
+
+            <UlozPlanDialog
+              open={pokazUkladanie}
+              onOpenChange={setPokazUkladanie}
+              form={planForm}
+              onForm={(zmiana) => setPlanForm((f) => ({ ...f, ...zmiana }))}
+              termin={active.start_date ? { od: active.start_date, do: active.end_date ?? null } : null}
+              dni={active.days || 1}
+              cena={tokens?.prices?.['plan-trip']}
+              saldo={tokens?.balance}
+              planning={planning}
+              onUloz={buildPlan}
+            />
+
+            {/* Postęp układania stał pod formularzem na dole strony — przy ponownym
+                układaniu, uruchamianym z nagłówka, nie było go widać wcale. */}
+            {planning && (
+              <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-3" role="status">
+                <Loader2 className="w-4 h-4 animate-spin text-foreground shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-[14px]">
+                    {etapPlanu ?? 'Sprawdzam godziny otwarcia, liczę dojścia i układam dni.'}
+                  </p>
+                  <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1">
+                    {planSekundy} s · dni pojawiają się pojedynczo
+                  </p>
+                  {planSekundy > 100 && (
+                    <p className="text-[13px] text-muted-foreground mt-1.5 text-pretty">
+                      Dłużej niż zwykle. Nie odświeżaj strony — plan dojdzie albo
+                      zobaczysz komunikat o błędzie.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Plan na górze, narzędzia pod nim. Lista zapisanych planów i pola
                 z godzinami stały wyżej niż sam plan, więc po wejściu w zakładkę
                 widać było formularz, a nie to, po co się tu przychodzi. */}
@@ -2602,22 +2681,50 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
                 {/* Dni jako zakładki: data nad nazwą dnia. Wybrany dzień ma ciemną
                     ramkę, bo wypełnienie kolorem konkurowałoby z kubełkami. */}
+                {/* Dni w jednym rzędzie, każdy z liczbami: ile przystanków, ile marszu
+                    i czy jest coś do sprawdzenia. Wcześniej kafelek niósł tylko datę
+                    w zapisie ISO i napis „Dzień 1", czyli nic, czego nie było w numerze. */}
                 {(plan.days || []).length > 1 && (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {(plan.days || []).map((d: any, i: number) => (
-                      <button key={d.day} onClick={() => setPlanDay(i)}
-                        className={`text-left rounded-md border px-4 py-3 transition-colors ${
-                          i === Math.min(planDay, (plan.days || []).length - 1)
-                            ? 'border-foreground bg-card' : 'border-border hover:bg-muted/50'
-                        }`}>
-                        <span className="font-mono uppercase tracking-[0.14em] text-[10px] text-muted-foreground tabular-nums">
-                          {[d.weekday, d.date].filter(Boolean).join(' · ') || `Dzień ${d.day}`}
-                        </span>
-                        <span className="font-display text-[17px] block mt-1">
-                          {d.title || `Dzień ${d.day}`}
-                        </span>
-                      </button>
-                    ))}
+                  <div role="tablist" aria-label={t('plan.dni_planu')}
+                    className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min((plan.days || []).length, 7)}, minmax(0, 1fr))` }}>
+                    {(plan.days || []).map((d: any, i: number) => {
+                      const wybrany = i === Math.min(planDay, (plan.days || []).length - 1);
+                      const { punkty } = punktyDnia(d.items || [], bazaWyjazdu);
+                      const przystanki = punkty.filter((p) => p.nr != null).length;
+                      let kmDnia = 0;
+                      for (let p = 1; p < punkty.length; p++) {
+                        kmDnia += kmBetween(punkty[p - 1].lat, punkty[p - 1].lng, punkty[p].lat, punkty[p].lng);
+                      }
+                      const uwagi = (d.warnings || []).length;
+                      return (
+                        <button key={d.day} type="button" role="tab" aria-selected={wybrany} onClick={() => setPlanDay(i)}
+                          className={`text-left rounded-md border px-3.5 py-2.5 transition-colors
+                                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            wybrany ? 'border-foreground bg-card shadow-token-sm' : 'border-border hover:bg-muted/50'
+                          }`}>
+                          <span className="flex items-baseline justify-between gap-2">
+                            <span className={`font-display text-[16px] ${wybrany ? 'text-foreground' : 'text-foreground/80'}`}>
+                              {t('plan.dzien', { nr: d.day })}
+                            </span>
+                            {d.date && (
+                              <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                                {new Date(`${d.date}T12:00:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
+                          </span>
+                          <span className="block font-mono text-[12px] tabular-nums text-muted-foreground mt-1">
+                            {t('plan.przystankow', { count: przystanki })}
+                            {kmDnia > 0 && ` · ok. ${dziesietna(kmDnia * 1.3)} km`}
+                          </span>
+                          {uwagi > 0 && (
+                            <span className="inline-flex items-center gap-1 mt-1.5 text-[12px] text-foreground">
+                              <AlertTriangle className="w-3 h-3 text-warning" aria-hidden />
+                              {t('plan.uwagi', { count: uwagi })}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -2626,23 +2733,47 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 {(plan.days || [])
                   .filter((_: any, i: number) => i === Math.min(planDay, (plan.days || []).length - 1))
                   .map((day: any) => (
-                  <div key={day.day} className="rounded-md border overflow-hidden">
-                    <div className="bg-muted/60 border-l-2 border-l-primary px-4 py-2.5 flex items-center justify-between gap-2">
+                  <div key={day.day} className="rounded-md border border-border bg-card overflow-hidden">
+                    {/* Teal na krawędzi nagłówka dnia i na linku „Zrób trasę" łamał jedyną
+                        regułę tego koloru — oznacza „na pewno", nie ozdobę ani akcję. */}
+                    <div className="bg-muted/60 px-4 py-2.5 flex items-center justify-between gap-2">
                       <span className="flex items-baseline gap-2.5">
-                        <span className="font-display text-[17px]">Dzień {day.day}</span>
-                        {day.weekday && (
-                          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-                            {day.weekday} · {day.date}
+                        <span className="font-display text-[17px]">{t('plan.dzien', { nr: day.day })}</span>
+                        {day.date && (
+                          <span className="text-[13px] text-foreground/70">
+                            {new Date(`${day.date}T12:00:00`).toLocaleDateString(i18n.language, { weekday: 'long', day: 'numeric', month: 'long' })}
                           </span>
                         )}
                       </span>
-                      <button
-                        onClick={() => buildRouteFrom(day.items || [], `dzień ${day.day}`)}
-                        className="text-xs font-normal text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Wand2 className="w-3.5 h-3.5" /> Zrób trasę z tego dnia
-                      </button>
+                      <span className="flex items-center gap-3 text-[12px] text-foreground/70">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-primary" aria-hidden />{t('plan.legenda_tablica')}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-accent" aria-hidden />{t('plan.legenda_agent')}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <House className="w-3 h-3" aria-hidden />{t('plan.legenda_nocleg')}
+                        </span>
+                      </span>
                     </div>
+                    {/* Uwagi tego dnia na górze dnia, nie zbiorczo pod planem — ostrzeżenie
+                        o zamkniętym muzeum w sobotę nie dotyczy piątku. */}
+                    {(day.warnings || []).length > 0 && (
+                      <div className="px-4 py-3 border-b border-border bg-warning/10">
+                        <p className="font-narrow uppercase tracking-[0.18em] text-[11px] text-foreground/70">
+                          {t('plan.do_sprawdzenia')}
+                        </p>
+                        <ul className="mt-1.5 space-y-1">
+                          {(day.warnings as string[]).map((w, wi) => (
+                            <li key={wi} className="flex gap-2 text-[13px] text-foreground">
+                              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" aria-hidden />
+                              <span className="text-pretty">{w}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div className="divide-y">
                       {(() => {
                         // Podsumowanie dnia: ile czasu zajmą same wizyty i ile
@@ -2651,7 +2782,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         // biegną w linii prostej — to szacunek, nie pomiar, więc
                         // podpisujemy go jako "ok.".
                         const items = day.items || [];
-                        const minutes = items.reduce((sum: number, it: any) => sum + (it.minutes || 0), 0);
+                        // Zwiedzanie to czas w miejscach — bez „Koniec dnia" w hotelu (45 min
+                        // w planie Hagi) i bez przejść, które i tak liczą się niżej jako marsz.
+                        const przystankiDnia = items.filter((it: any) => !czyBaza(it, bazaWyjazdu) && czyPrzystanek(it));
+                        const minutes = przystankiDnia.reduce((sum: number, it: any) => sum + (it.minutes || 0), 0);
                         // Dystans po punktach z mapy: nocleg w swoim miejscu, przejścia
                         // bez własnych punktów. Wcześniej hotel stojący "w Delft" dopisywał
                         // do dnia kilkanaście kilometrów, których nikt nie miał iść.
@@ -2684,13 +2818,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </p>
                             </div>
                           )}
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-xs text-muted-foreground border-b">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 bg-muted/40 text-[13px] text-foreground/70 border-b border-border">
                             <span>Zwiedzanie: <strong className="font-mono tabular-nums text-foreground">{dziesietna(minutes / 60)} h</strong></span>
                             {measured ? (
                               <>
                                 <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">{dziesietna(measured.km)} km</strong></span>
                                 <span>Marsz: <strong className="font-mono tabular-nums text-foreground">{Math.round(measured.h * 60)} min</strong></span>
-                                <span className="text-primary">przeliczone po chodnikach</span>
+                                <span>{t('plan.po_chodnikach')}</span>
                               </>
                             ) : (
                               <>
@@ -2698,16 +2832,21 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 {km > 0 && <span>Marsz: <strong className="font-mono tabular-nums text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
                               </>
                             )}
-                            <span>{t('tablica.punktow')} <strong className="font-mono tabular-nums text-foreground">{items.length}</strong></span>
-                            {items.filter((it: any) => it.lat != null).length >= 2 && !measured && (
+                            <span>{t('tablica.punktow')} <strong className="font-mono tabular-nums text-foreground">{przystankiDnia.length}</strong></span>
+                            {trasa.length >= 2 && !measured && (
                               <button
                                 onClick={() => recalcDay(day)}
                                 disabled={exact === 'loading'}
-                                className="ml-auto flex items-center gap-1 text-primary hover:text-primary hover:underline disabled:opacity-60"
+                                className="ml-auto flex items-center gap-1 text-foreground hover:underline underline-offset-2 disabled:opacity-60"
                               >
                                 {exact === 'loading'
                                   ? <><Loader2 className="w-3 h-3 animate-spin" /> {t('tablica.licze_przebieg')}</>
-                                  : <><RefreshCw className="w-3 h-3" /> {t('tablica.przelicz_dok_adnie')}</>}
+                                  : <><RefreshCw className="w-3 h-3" /> {t('plan.przelicz_po_chodnikach')}
+                                      {tokens?.prices?.['live-route'] != null && (
+                                        <span className="font-mono tabular-nums text-foreground/70">
+                                          · {t('plan.koszt', { count: tokens.prices['live-route'] })}
+                                        </span>
+                                      )}</>}
                               </button>
                             )}
                           </div>
@@ -2794,8 +2933,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   {it.name}
                                 </button>
                                 {suggested && (
-                                  <span className="text-[10px] font-normal text-accent bg-accent/10 rounded-full px-1.5 py-0.5">
-                                    propozycja agenta
+                                  // Bursztyn jako tło pod ciemnym napisem — jako kolor tekstu
+                                  // na jasnym tle ma kontrast 2,13 i był nieczytelny.
+                                  <span className="font-sans text-[11px] font-normal text-accent-foreground bg-accent rounded-full px-2 py-0.5">
+                                    {t('plan.legenda_agent')}
                                   </span>
                                 )}
                               </div>
@@ -2830,7 +2971,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   </div>
                 )}
 
-                {plan.warnings?.length > 0 && (
+                {/* Zbiorcza lista tylko dla planów, które nie mają uwag przypisanych do dni
+                    (starsze wersje z pojedynczego wywołania) — inaczej każda uwaga
+                    pokazywałaby się dwa razy. */}
+                {plan.warnings?.length > 0 && !(plan.days || []).some((d: any) => (d.warnings || []).length) && (
                   <div className="space-y-1.5">
                     {plan.warnings.map((w: string, i: number) => (
                       <div key={i} className="flex gap-2 text-xs text-muted-foreground">
@@ -2928,7 +3072,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Pusto w zakładce planu nie znaczy "nic tu nie ma", tylko "nie ma
                 jeszcze czego pokazać" — więc mówimy, czego brakuje i dajemy
                 przycisk, zamiast zostawiać białą stronę. */}
-            {!plan && savedPlans.length === 0 && (
+            {!plan && savedPlans.length === 0 && !planning && (
               <div className="rounded-md border border-border bg-card px-6 py-16 text-center">
                 <h2 className="font-display font-light text-[24px]">{t('tablica.planu_jeszcze_nie_ma')}</h2>
                 <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
@@ -2936,154 +3080,21 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     ? `Na tablicy czeka ${mustCount} ${odmien(mustCount, 'miejsce', 'miejsca', 'miejsc')} oznaczonych „na pewno”. Ułóż z nich dni.`
                     : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
                 </p>
-                {/* Ten przycisk UKŁADAŁ PLAN dopiero po tej poprawce. Wcześniej
-                    wołał navigate('/plany?widok=plan'), czyli przenosił na listę
-                    wszystkich wyjazdów — z widoku planu wyglądało to jak przycisk,
-                    który nic nie robi, i stąd „nie da się zrobić planu". Układanie
-                    było dostępne wyłącznie przez „Zaplanuj" w formularzu niżej. */}
+                {/* Przycisk otwiera ustawienia ułożenia (godziny, data, cena), zamiast
+                    układać od razu na domyślnych godzinach. Bez miejsc „na pewno" prowadzi
+                    tam, skąd plan bierze treść. Wcześniej był wtedy wyłączony, więc jego
+                    własny napis „Wróć na tablicę" nie dawał się kliknąć. */}
                 <Button
                   className="mt-6 bg-foreground text-background hover:bg-foreground/90"
-                  disabled={mustCount === 0 || planning}
-                  onClick={() => (mustCount > 0 ? buildPlan() : navigate('/plany'))}
+                  onClick={() => (mustCount > 0 ? setPokazUkladanie(true) : navigate(`/plany/${active.id}`))}
                 >
-                  {planning
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('tablica.uk_adam')}</>
-                    : mustCount > 0
-                      ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
-                      : 'Wróć na tablicę'}
+                  {mustCount > 0
+                    ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
+                    : 'Wróć na tablicę'}
                 </Button>
               </div>
             )}
 
-            {savedPlans.length > 0 && (
-              <div className="border-t pt-4 space-y-2">
-                <h3 className="text-sm font-semibold">
-                  Wszystkie plany ({savedPlans.length})
-                </h3>
-                {savedPlans.map((sp) => (
-                  <div key={sp.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
-                    <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <button onClick={() => otworzPlan(sp)}
-                      aria-current={planId === sp.id}
-                      className={`flex-1 text-left truncate ${
-                        planId === sp.id ? 'font-medium text-primary' : 'hover:underline'
-                      }`}>
-                      {sp.name}
-                      <span className="text-xs text-muted-foreground ml-2">
-                        {new Date(sp.created_at).toLocaleDateString('pl-PL')}
-                      </span>
-                    </button>
-                    <button onClick={() => deletePlan(sp.id)} className="text-muted-foreground hover:text-danger">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {places.length > 0 && (
-              <div className="border-t pt-4 space-y-3">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-primary" /> Ułóż plan dni
-                </h3>
-                {/* Gotowe okna czasowe. Wybór trybu dnia jednym kliknięciem, zamiast
-                    dłubania w natywnym selektorze godzin — a przy okazji podpowiedź,
-                    że dzień z dziećmi i dzień w delegacji to nie to samo. */}
-                <div className="flex flex-wrap gap-2">
-                  {([
-                    ['Standardowy', '09:00', '18:00'],
-                    ['Z dziećmi', '09:00', '16:00'],
-                    ['Intensywny', '08:00', '20:00'],
-                    ['Popołudniowy', '14:00', '21:00'],
-                  ] as const).map(([etykieta, od, doG]) => {
-                    const wybrany = planForm.start === od && planForm.end === doG;
-                    return (
-                      <button key={etykieta}
-                        onClick={() => setPlanForm({ ...planForm, start: od, end: doG })}
-                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                          wybrany
-                            ? 'bg-foreground border-foreground text-background'
-                            : 'border-border hover:bg-muted'
-                        }`}>
-                        {etykieta}
-                        <span className={`font-mono ml-1.5 ${wybrany ? 'opacity-80' : 'text-muted-foreground'}`}>
-                          {od}–{doG}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-5">
-                  <label className="text-xs text-muted-foreground">Od
-                    <Input type="time" value={planForm.start}
-                      onChange={(e) => setPlanForm({ ...planForm, start: e.target.value })} className="mt-1" />
-                  </label>
-                  <label className="text-xs text-muted-foreground">Do
-                    <Input type="time" value={planForm.end}
-                      onChange={(e) => setPlanForm({ ...planForm, end: e.target.value })} className="mt-1" />
-                  </label>
-                  {/* Natywny picker otwierał się w dół i chował się pod krawędzią okna —
-                      formularz siedzi na samym dole strony. Radix sam odwraca panel do góry,
-                      gdy pod spodem nie ma miejsca. */}
-                  <label className="text-xs text-muted-foreground">Pierwszy dzień
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="mt-1 w-full justify-start font-normal text-sm h-10"
-                        >
-                          <CalendarDays className="w-4 h-4 mr-2 text-primary shrink-0" />
-                          {planDate ? format(planDate, 'd MMMM yyyy', { locale: pl }) : 'Wybierz datę'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start" side="top" sideOffset={8} collisionPadding={16}>
-                        <Calendar
-                          mode="single"
-                          locale={pl}
-                          weekStartsOn={1}
-                          selected={planDate}
-                          defaultMonth={planDate}
-                          onSelect={(d) => d && setPlanForm({ ...planForm, date: format(d, 'yyyy-MM-dd') })}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </label>
-                  <label className="text-xs text-muted-foreground">Kolacja o
-                    <Input type="time" value={planForm.dinner}
-                      onChange={(e) => setPlanForm({ ...planForm, dinner: e.target.value })} className="mt-1" />
-                  </label>
-                  <Button onClick={buildPlan} disabled={planning}
-                    className="self-end bg-foreground text-background hover:bg-foreground/90">
-                    {planning ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Zaplanuj'}
-                  </Button>
-                </div>
-                {planning && (
-                  <div className="rounded-md border border-border bg-muted/40 px-4 py-3.5 flex items-start gap-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="text-[13px]">
-                        {etapPlanu ?? 'Sprawdzam godziny otwarcia, liczę dojścia i układam dni.'}
-                      </p>
-                      {/* Etapy są teraz prawdziwe — serwer melduje każdy gotowy dzień,
-                          więc nie ma tu już zgadywania. Licznik zostaje obok, bo
-                          odpowiada na inne pytanie: nie „co się dzieje", tylko
-                          „czy to jeszcze normalny czas". */}
-                      <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1">
-                        {planSekundy} s · dni pojawiają się pojedynczo
-                      </p>
-                      {planSekundy > 100 && (
-                        <p className="text-[12px] text-muted-foreground mt-1.5 text-pretty">
-                          Dłużej niż zwykle. Nie odświeżaj strony — plan dojdzie albo
-                          zobaczysz komunikat o błędzie.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             </>)}
           </>
