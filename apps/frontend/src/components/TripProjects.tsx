@@ -6,7 +6,7 @@ import PunktStartowy from '@/components/PunktStartowy';
 import Zdjecie from '@/components/Zdjecie';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Heart, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, SlidersHorizontal, Sparkles, Star, Trash2, Users, Utensils, Wand2
+  AlertTriangle, ArrowLeft, Bed, CalendarDays, ChevronLeft, ChevronRight, Crosshair, Clock, Coins, Copy, ExternalLink, Footprints, Heart, House, Loader2, MapPin, Music, Pin, Plus, RefreshCw, Search, Share2, SlidersHorizontal, Sparkles, Star, Trash2, Users, Utensils, Wand2
 } from 'lucide-react';
 import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { toast } from 'sonner';
@@ -42,6 +42,7 @@ import type { AktualizacjaProjektu, TripProject, Priority, PinnedPlace, Discover
 import {
   jakoPriorytet, jakoMiejsce, formatMinutes, ZONES, CATEGORY_ICON, SUGGESTION_SETS,
   czyPrzystanek, kmBetween, metryMiedzy, opisDystansu, medianOf,
+  czyBaza, punktyDnia, type BazaWyjazdu,
 } from './tripProjects/helpers';
 
 export default function TripProjects({ onContextChange, projectId }: TripProjectsProps = {}) {
@@ -143,6 +144,19 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
   const active = projects.find((p) => p.id === activeId) || null;
 
+  // Pierwszy dzień planu idzie za terminem wyjazdu. Puste pole znaczyło dotąd
+  // "od dzisiaj", więc plan Hagi zaczął się w czwartek, w którym nikt nie jechał.
+  useEffect(() => {
+    setPlanForm((f) => ({ ...f, date: active?.start_date ?? '' }));
+  }, [active?.id, active?.start_date]);
+
+  /** Nocleg z ustawień wyjazdu — punkt, z którego wychodzi i do którego wraca każdy dzień planu. */
+  const bazaWyjazdu = useMemo<BazaWyjazdu | null>(
+    () => (active?.start_name
+      ? { name: active.start_name, lat: active.start_lat ?? null, lng: active.start_lng ?? null }
+      : null),
+    [active?.start_name, active?.start_lat, active?.start_lng]);
+
   /** Miejsca dla mapy tablicy: tylko te ze współrzędnymi, odrzucone pomijamy —
    *  skoro zeszły z kolumn, to i z mapy, żeby nie zaśmiecały obrazu rozrzutu. */
   /** Punkt startowy w postaci, jakiej oczekuje mapa. Bez współrzędnych nie ma co
@@ -190,7 +204,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       await supabase.rpc('claim_pending_trip_shares');
       const { data } = await supabase
         .from('trip_projects')
-        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count, start_name, start_lat, start_lng')
+        // Termin musi przyjść razem z resztą: bez niego po odświeżeniu strony pasek
+        // pokazywał "ustaw termin" przy ustawionym terminie, wydarzenia nie znały dat
+        // wyjazdu, a plan dni zaczynał się od dzisiaj.
+        .select('id, name, destination, days, hours_per_day, trip_type, fill_percent, pace, popularity, wandering, dining, effort, crowds, is_public, copy_count, start_name, start_lat, start_lng, start_date, end_date')
         .order('updated_at', { ascending: false });
       setProjects(data || []);
 
@@ -737,9 +754,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   const recalcDay = async (day: any) => {
-    const points = (day.items || [])
-      .filter((it: any) => it.lat != null && it.lng != null)
-      .map((it: any) => ({ lat: it.lat, lng: it.lng, name: it.name }));
+    // Przebieg liczymy po tym, co widać na mapie: nocleg w swoim miejscu, bez przejść.
+    const points = punktyDnia(day.items || [], bazaWyjazdu).punkty
+      .map((p) => ({ lat: p.lat, lng: p.lng, name: p.name }));
     if (points.length < 2) return toast.error(t('tablica.ten_dzien_ma_za_ma'));
 
     setDayRoutes((prev) => ({ ...prev, [day.day]: 'loading' }));
@@ -1117,6 +1134,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const unresolved: string[] = [];
 
     for (const it of venues) {
+      // Nocleg bierze punkt z ustawień wyjazdu. W starszych planach pozycja hotelu
+      // niosła współrzędne sąsiedniego miejsca, a bez punktu startowego lepiej ją
+      // pominąć, niż wysłać nazwę hotelu do geokodera.
+      if (czyBaza(it, bazaWyjazdu)) {
+        if (bazaWyjazdu?.lat != null && bazaWyjazdu?.lng != null) {
+          resolved.push({ lat: bazaWyjazdu.lat, lng: bazaWyjazdu.lng, name: bazaWyjazdu.name || it.name, type: 'waypoint' });
+        }
+        continue;
+      }
       // Planer dokleja współrzędne do każdej pozycji, którą potrafi umiejscowić —
       // także do własnych propozycji. Korzystamy z nich w pierwszej kolejności,
       // żeby nie odsyłać nazwy do geokodera: to ten krok wysyłał trasy w
@@ -1157,7 +1183,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       }
     }
 
-    const waypoints = resolved.filter(Boolean) as { lat: number; lng: number; name: string; type: string }[];
+    const waypoints = (resolved.filter(Boolean) as { lat: number; lng: number; name: string; type: string }[])
+      // Koniec dnia i początek następnego to ten sam nocleg — jeden punkt, nie dwa.
+      .filter((w, i, arr) => i === 0 || kmBetween(w.lat, w.lng, arr[i - 1].lat, arr[i - 1].lng) > 0.01);
 
     // Ostatnia bariera po stronie klienta: jeśli mimo wszystko któryś punkt
     // wypadł daleko poza skupisko, nie wpuszczamy go do trasy.
@@ -1265,10 +1293,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         days: active.days || 1,
         window: { start: planForm.start, end: planForm.end },
         hotel: start,
-        start_date: planForm.date || undefined,
+        start_date: planForm.date || active.start_date || undefined,
         fill_percent: active.fill_percent ?? 70,
         fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
-        places: places.map((p) => ({
+        // Odrzucone zostają na tablicy, ale do planu nie idą.
+        places: places.filter((p) => p.priority !== 'rejected').map((p) => ({
           name: p.name, category: p.category, priority: p.priority,
           // Bez tych dwóch pól backend nie ma czym dopasować przypiętych miejsc:
           // jego pula współrzędnych odrzuca pozycje bez lat/lng, więc zostawały
@@ -1350,7 +1379,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
           name: `${planForm.start}-${planForm.end}${active.trip_type ? ` · ${TRIP_PRESETS.find((t) => t.id === active.trip_type)?.label ?? ''}` : ''}`,
           window_start: planForm.start,
           window_end: planForm.end,
-          start_date: planForm.date || null,
+          start_date: planForm.date || active.start_date || null,
           plan: data
         })
         .select('id, name, window_start, window_end, start_date, plan, created_at')
@@ -2623,17 +2652,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         // podpisujemy go jako "ok.".
                         const items = day.items || [];
                         const minutes = items.reduce((sum: number, it: any) => sum + (it.minutes || 0), 0);
+                        // Dystans po punktach z mapy: nocleg w swoim miejscu, przejścia
+                        // bez własnych punktów. Wcześniej hotel stojący "w Delft" dopisywał
+                        // do dnia kilkanaście kilometrów, których nikt nie miał iść.
                         let km = 0;
-                        let prev: any = null;
-                        for (const it of items) {
-                          if (it.lat != null && it.lng != null) {
-                            if (prev) {
-                              const dLat = (it.lat - prev.lat) * 111;
-                              const dLng = (it.lng - prev.lng) * 111 * Math.cos((it.lat * Math.PI) / 180);
-                              km += Math.sqrt(dLat * dLat + dLng * dLng);
-                            }
-                            prev = it;
-                          }
+                        const trasa = punktyDnia(items, bazaWyjazdu).punkty;
+                        for (let p = 1; p < trasa.length; p++) {
+                          km += kmBetween(trasa[p - 1].lat, trasa[p - 1].lng, trasa[p].lat, trasa[p].lng);
                         }
                         km *= 1.3;
                         if (minutes === 0 && km === 0) return null;
@@ -2693,18 +2718,22 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       {(day.items || []).map((it: any, i: number) => {
                         const suggested = it.source === 'suggested';
                         const alreadyPinned = places.some((p) => p.name === it.name);
-                        const naMapie = it.lat != null && it.lng != null;
-                        const nrNaMapie = naMapie
-                          ? (day.items || []).slice(0, i + 1)
-                              .filter((x: any) => x.lat != null && x.lng != null).length
-                          : null;
+                        // Numer liczy wyłącznie przystanki z mapy — ten sam, co na pinezce.
+                        // Nocleg i przejścia nie dostają numeru, więc nie przesuwają reszty.
+                        const { numery, bazy } = punktyDnia(day.items || [], bazaWyjazdu);
+                        const nrNaMapie = numery[i];
+                        const wBazie = bazy[i];
+                        const przejscie = !wBazie && !czyPrzystanek(it);
+                        const naMapie = nrNaMapie != null;
                         // Przerwa między tym punktem a poprzednim — własny wiersz,
                         // nie dopisek pod nazwą i nie tooltip.
                         const poprzedni = i > 0 ? (day.items || [])[i - 1] : null;
+                        const wPunkcie = (x: any) => (czyBaza(x, bazaWyjazdu) && bazaWyjazdu?.lat != null
+                          ? { ...x, lat: bazaWyjazdu.lat, lng: bazaWyjazdu.lng } : x);
                         // Dystans tylko między dwoma PRZYSTANKAMI. Przy pozycji
                         // organizacyjnej plan i tak mówi już o przerwie wprost.
                         const metry = poprzedni && czyPrzystanek(poprzedni) && czyPrzystanek(it)
-                          ? metryMiedzy(poprzedni, it)
+                          ? metryMiedzy(wPunkcie(poprzedni), wPunkcie(it))
                           : null;
   return (
                           <Fragment key={`poz-${i}`}>
@@ -2732,7 +2761,18 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 liczy tylko punkty, które na tę mapę trafiają. Pozycja bez
                                 współrzędnych dostaje pustą obwódkę zamiast numeru, żeby nie
                                 przesuwać numeracji reszty dnia. */}
-                            {naMapie ? (
+                            {wBazie ? (
+                              <span title="Nocleg"
+                                className="w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
+                                           border border-foreground/30 bg-background text-foreground">
+                                <House className="w-3.5 h-3.5" />
+                              </span>
+                            ) : przejscie ? (
+                              <span title="Przejście"
+                                className="w-6 h-6 shrink-0 mt-0.5 flex items-center justify-center text-muted-foreground">
+                                <Footprints className="w-3.5 h-3.5" />
+                              </span>
+                            ) : naMapie ? (
                               <span className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
                                                 text-[12px] font-medium ${
                                 suggested
@@ -2809,21 +2849,24 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     {(() => {
                       const d = (plan.days || [])[Math.min(planDay, (plan.days || []).length - 1)];
                       const wszystkie = d?.items || [];
-                      const pts = wszystkie
-                        .filter((it: any) => it.lat != null && it.lng != null)
-                        .map((it: any) => ({ name: it.name, lat: it.lat, lng: it.lng }));
-                      if (pts.length === 0) return null;
+                      // Na mapę trafiają przystanki i nocleg; przejścia zostają na osi dnia.
+                      const { punkty } = punktyDnia(wszystkie, bazaWyjazdu);
+                      const pts = punkty.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng, nr: p.nr, propozycja: p.propozycja }));
+                      const bazaNaMapie = bazaWyjazdu?.lat != null && bazaWyjazdu?.lng != null
+                        ? { name: bazaWyjazdu.name || 'Nocleg', lat: bazaWyjazdu.lat, lng: bazaWyjazdu.lng }
+                        : null;
+                      if (pts.length === 0 && !bazaNaMapie) return null;
                       const dr = d ? dayRoutes[d.day] : null;
                       const dayTrack = dr && dr !== 'loading' ? dr.track ?? null : null;
-                      const withoutCoords = (d?.items || []).length - pts.length;
+                      const przystanki = wszystkie.filter((it: any) => !czyBaza(it, bazaWyjazdu) && czyPrzystanek(it)).length;
+                      const naMapieIle = punkty.filter((p) => p.nr != null).length;
                       return (
                         <div className="rounded-md border border-border overflow-hidden bg-card">
-                          <PlanDayMap points={pts} track={dayTrack} className="h-[380px] w-full"
+                          <PlanDayMap points={pts} baza={bazaNaMapie} track={dayTrack} className="h-[380px] w-full"
                             onPunkt={(i) => {
-                              // Numer pinezki to jej pozycja na mapie, więc karta otwarta
-                              // z mapy pokazuje dokładnie ten numer, w który kliknięto.
-                              const it = pts[i] && wszystkie.find((x: any) => x.name === pts[i].name);
-                              if (it) openPlaceCard({ ...it, nr: i + 1 });
+                              // Karta otwiera się z tym samym numerem, który widać na pinezce.
+                              const p = punkty[i];
+                              if (p && p.nr != null) openPlaceCard({ ...wszystkie[p.pozycja], nr: p.nr });
                             }} />
                           <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
                             <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
@@ -2833,7 +2876,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               {/* Liczymy to, co widać, a nie czego brakuje. „Bez położenia"
                                   brzmiało jak awaria danych, choć znaczy tylko tyle, że
                                   nie ustaliliśmy współrzędnych tego punktu. */}
-                              {pts.length} z {pts.length + withoutCoords} na mapie
+                              {naMapieIle} z {przystanki} na mapie
                               {dayTrack && dr && dr !== 'loading' && ` · ${dziesietna(dr.km)} km`}
                             </span>
                           </div>

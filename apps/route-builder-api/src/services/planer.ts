@@ -55,6 +55,8 @@ export interface PozycjaDnia {
   time: string; name: string; kind?: string; minutes?: number;
   note?: string; source?: 'pinned' | 'suggested';
   lat?: number; lng?: number; approx?: boolean;
+  /** Pozycja w noclegu (start lub koniec dnia) — punkt z ustawień wyjazdu, nie z modelu. */
+  baza?: boolean;
 }
 
 export interface DzienPlanu {
@@ -246,7 +248,23 @@ export interface KontekstPlanu {
   /** Pula ze współrzędnymi do rozwiązywania pozycji planu. */
   pulaWspolrzednych: { name: string; lat: any; lng: any }[];
   center: { lat: number; lng: number } | null;
+  /** Punkt startowy wyjazdu ze współrzędnymi — nocleg, z którego wychodzi każdy dzień. */
+  baza: { name: string; lat: number; lng: number } | null;
 }
+
+/**
+ * Jak daleko od miejsc danego dnia wolno szukać propozycji.
+ *
+ * Pula POI przychodzi z kwadratu ±8 km od środka miasta, a to dla Hagi obejmuje
+ * rynek w Delft. Dzień z kotwicami przy Binnenhofie dostał więc „Nieuwe Kerk"
+ * i „Oude Kerk" z Delft, a model wstawił je z trzydziestominutowym przejściem na
+ * dystansie ośmiu kilometrów. Dwa i pół kilometra to kwadrans do pół godziny
+ * spaceru — wciąż okolica dnia. Szerszy promień jest zapasem dla miejsc, gdzie
+ * w najbliższym otoczeniu nie ma z czego wybierać.
+ */
+const PROMIEN_PROPOZYCJI_KM = 2.5;
+const PROMIEN_ZAPASOWY_KM = 4;
+const MIN_PROPOZYCJI = 5;
 
 /**
  * Czy wizyta zmieści się gdziekolwiek w oknie dnia.
@@ -346,10 +364,16 @@ function przydzielGrupyDoDni(grupy: MiejsceWejscie[][], dni: InfoDnia[], oknoOd:
  * kilkukrotne odpytywanie Overpassa o to samo miasto.
  */
 export async function przygotujKontekst(
-  zadanie: ZadaniePlanu,
+  zadanieWejscie: ZadaniePlanu,
   userId: string | null,
   jezyk: KodJezyka = 'pl'
 ): Promise<KontekstPlanu> {
+  // Odrzucone z tablicy nie są kotwicami — dotąd szły do planu jako "jeśli wyjdzie",
+  // bo planer znał tylko dwa priorytety, a front wysyłał wszystkie przypięte.
+  const zadanie: ZadaniePlanu = {
+    ...zadanieWejscie,
+    places: scalDuplikaty(zadanieWejscie.places.filter((p) => (p.priority as string) !== 'rejected')),
+  };
   const oknoOd = czasNaMinuty(zadanie.window.start);
   const oknoDo = czasNaMinuty(zadanie.window.end);
   const minutNaDzien = Math.max(0, oknoDo - oknoOd);
@@ -399,6 +423,13 @@ export async function przygotujKontekst(
 
   const prefOpisy = opiszPreferencje(zadanie.creator_preferences);
 
+  const h = zadanie.hotel;
+  const baza = h?.name && Number.isFinite(h.lat) && Number.isFinite(h.lng)
+    ? { name: h.name, lat: h.lat as number, lng: h.lng as number }
+    : null;
+  // Dzień bez własnych kotwic mierzy okolicę od noclegu, a gdy go nie ma — od środka miasta.
+  const zapas = baza ?? center;
+
   return {
     zadanie,
     klucz: process.env.GEMINI_API_KEY || '',
@@ -411,10 +442,11 @@ export async function przygotujKontekst(
     prefLines: prefOpisy.map((o) => `- ${o}`).join('\n'),
     zabytki: fillerSights,
     lokale: fillerFood,
-    zabytkiDnia: rozdzielPoi(fillerSights, grupy, 14),
-    lokaleDnia: rozdzielPoi(fillerFood, grupy, 6),
+    zabytkiDnia: rozdzielPoi(fillerSights, grupy, 14, zapas),
+    lokaleDnia: rozdzielPoi(fillerFood, grupy, 6, zapas),
     pulaWspolrzednych,
     center,
+    baza,
   };
 }
 
@@ -461,25 +493,34 @@ const SCHEMAT_DNIA = {
  * kotwic dnia jest krótszy i trafniejszy naraz: krótszy prompt liczy się szybciej,
  * a podpowiedzi są w zasięgu spaceru od miejsc, w których użytkownik i tak będzie.
  *
- * Gdy dzień nie ma ani jednej kotwicy ze współrzędnymi, nie ma od czego mierzyć —
- * wtedy wracamy do pierwszych z listy, uporządkowanej już wcześniej po ważności.
+ * Gdy dzień nie ma ani jednej kotwicy ze współrzędnymi, okolicę mierzymy od
+ * noclegu albo od środka miasta. Dopiero bez żadnego punktu odniesienia wracamy
+ * do pierwszych z listy, uporządkowanej już wcześniej po ważności.
  */
-function wOkolicy(kandydaci: PoiCandidate[], kotwice: MiejsceWejscie[], ile: number): PoiCandidate[] {
-  const zPunktem = kotwice.filter((p) => p.lat != null && p.lng != null);
-  if (!zPunktem.length || !kandydaci.length) return kandydaci.slice(0, ile);
-  const srodek = {
-    lat: zPunktem.reduce((s, p) => s + (p.lat as number), 0) / zPunktem.length,
-    lng: zPunktem.reduce((s, p) => s + (p.lng as number), 0) / zPunktem.length,
-  };
-  const km = (a: { lat: number; lng: number }) => {
-    const dLat = (a.lat - srodek.lat) * 111;
-    const dLng = (a.lng - srodek.lng) * 111 * Math.cos((srodek.lat * Math.PI) / 180);
-    return Math.sqrt(dLat * dLat + dLng * dLng);
-  };
-  return [...kandydaci]
+function wOkolicy(
+  kandydaci: PoiCandidate[],
+  kotwice: MiejsceWejscie[],
+  ile: number,
+  zapas: { lat: number; lng: number } | null
+): PoiCandidate[] {
+  const srodek = srodekKotwic(kotwice) ?? zapas;
+  if (!srodek || !kandydaci.length) return kandydaci.slice(0, ile);
+  const posortowane = [...kandydaci]
     .filter((c) => c.lat != null && c.lng != null)
-    .sort((a, b) => km(a as any) - km(b as any))
-    .slice(0, ile);
+    .sort((a, b) => kmOd(srodek, a as any) - kmOd(srodek, b as any));
+  return wZasiegu(posortowane, srodek).slice(0, ile);
+}
+
+/**
+ * Kandydaci w zasięgu spaceru, już posortowani po odległości. Najpierw ciasny
+ * promień; szerszy tylko wtedy, gdy w ciasnym jest za mało, żeby było z czego
+ * wybierać. Poza szerszym nie bierzemy nic — lepiej nazwany spacer niż kościół
+ * z sąsiedniego miasta.
+ */
+function wZasiegu(posortowane: PoiCandidate[], srodek: { lat: number; lng: number }): PoiCandidate[] {
+  const blisko = posortowane.filter((c) => kmOd(srodek, c as any) <= PROMIEN_PROPOZYCJI_KM);
+  if (blisko.length >= MIN_PROPOZYCJI) return blisko;
+  return posortowane.filter((c) => kmOd(srodek, c as any) <= PROMIEN_ZAPASOWY_KM);
 }
 
 function srodekKotwic(kotwice: MiejsceWejscie[]): { lat: number; lng: number } | null {
@@ -491,7 +532,7 @@ function srodekKotwic(kotwice: MiejsceWejscie[]): { lat: number; lng: number } |
   };
 }
 
-function kmOd(srodek: { lat: number; lng: number }, a: { lat: any; lng: any }): number {
+function kmOd(srodek: { lat: number; lng: number }, a: { lat?: any; lng?: any }): number {
   const dLat = (a.lat - srodek.lat) * 111;
   const dLng = (a.lng - srodek.lng) * 111 * Math.cos((srodek.lat * Math.PI) / 180);
   return Math.sqrt(dLat * dLat + dLng * dLng);
@@ -518,13 +559,14 @@ function kmOd(srodek: { lat: number; lng: number }, a: { lat: any; lng: any }): 
 function rozdzielPoi(
   kandydaci: PoiCandidate[],
   grupy: MiejsceWejscie[][],
-  ile: number
+  ile: number,
+  zapas: { lat: number; lng: number } | null
 ): PoiCandidate[][] {
   const ileDni = Math.max(1, grupy.length);
   const puste = () => Array.from({ length: ileDni }, () => [] as PoiCandidate[]);
-  if (ileDni === 1) return [wOkolicy(kandydaci, grupy[0] ?? [], ile)];
+  if (ileDni === 1) return [wOkolicy(kandydaci, grupy[0] ?? [], ile, zapas)];
 
-  const srodki = grupy.map(srodekKotwic);
+  const srodki = grupy.map((g) => srodekKotwic(g) ?? zapas);
   const zPunktem = kandydaci.filter((c) => c.lat != null && c.lng != null);
 
   // Bez współrzędnych nie ma od czego mierzyć — rozdajemy po kolei, byle rozłącznie.
@@ -554,7 +596,7 @@ function rozdzielPoi(
   kubelki.forEach((kubel, i) => {
     const s = srodki[i];
     const posortowane = s
-      ? [...kubel].sort((a, b) => kmOd(s, a as any) - kmOd(s, b as any))
+      ? wZasiegu([...kubel].sort((a, b) => kmOd(s, a as any) - kmOd(s, b as any)), s)
       : kubel;
     for (const c of posortowane.slice(0, ile)) { wynik[i].push(c); wziete.add(c); }
   });
@@ -562,9 +604,9 @@ function rozdzielPoi(
   wynik.forEach((lista, i) => {
     const s = srodki[i];
     if (lista.length >= ile || !s) return;
-    const wolne = zPunktem
+    const wolne = wZasiegu(zPunktem
       .filter((c) => !wziete.has(c))
-      .sort((a, b) => kmOd(s, a as any) - kmOd(s, b as any));
+      .sort((a, b) => kmOd(s, a as any) - kmOd(s, b as any)), s);
     for (const c of wolne.slice(0, ile - lista.length)) { lista.push(c); wziete.add(c); }
   });
 
@@ -760,7 +802,12 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   };
 
   uzupelnijBraki(k, dzien);
+  // Przejścia i nocleg rozpoznajemy PRZED szukaniem współrzędnych: inaczej
+  // "Spacer do Mauritshuis" dostawał punkt muzeum, a hotel punkt sąsiada.
+  oznaczPrzejscia(dzien);
+  przypnijBaze(k, dzien);
   uzupelnijWspolrzedne(k, dzien);
+  sprawdzOdleglosci(k, dzien, numer);
   // Kolejność ma znaczenie: strażnik dokłada wpisy do not_scheduled, więc musi
   // zadziałać przed filtrem, który zostawia tam wyłącznie kotwice tego dnia.
   odsiejZamkniete(k, dzien, numer);
@@ -891,7 +938,12 @@ export function uzupelnijWspolrzedne(k: KontekstPlanu, dzien: DzienPlanu): void 
     return Math.sqrt(dLat * dLat + dLng * dLng);
   };
 
+  // Przejścia nie są miejscami, a nocleg ma już punkt z przypnijBaze — żadnego
+  // z nich nie dopasowujemy do puli ani nie interpolujemy z sąsiadów.
+  const pomin = (item: PozycjaDnia) => item.kind === 'walk' || item.baza === true;
+
   for (const item of dzien.items) {
+    if (pomin(item)) continue;
     const raw = String(item.name || '');
     const exact = pula.find((x) => x.name.trim().toLowerCase() === raw.trim().toLowerCase());
     let hit: { lat: any; lng: any } | undefined = exact;
@@ -909,8 +961,9 @@ export function uzupelnijWspolrzedne(k: KontekstPlanu, dzien: DzienPlanu): void 
 
     // Bez dopasowania zostają współrzędne od modelu, a te bywają zmyślone.
     // Przyjmujemy je wyłącznie w zasięgu miasta; lepszy brak pinezki niż
-    // pinezka w innym kraju.
-    if (!(typeof item.lat === 'number' && typeof item.lng === 'number' && kmOdSrodka(item.lat, item.lng) < 40)) {
+    // pinezka w innym mieście. 40 km przepuszczało sąsiednie miasta — Delft
+    // leży 8 km od Hagi — a to dalej niż dzień zwiedzania ma prawo sięgać.
+    if (!(typeof item.lat === 'number' && typeof item.lng === 'number' && kmOdSrodka(item.lat, item.lng) < 15)) {
       delete item.lat;
       delete item.lng;
     }
@@ -922,6 +975,7 @@ export function uzupelnijWspolrzedne(k: KontekstPlanu, dzien: DzienPlanu): void 
   // zawiedzie, pozycja dostaje punkt między sąsiadami: pinezka "po drodze" jest
   // bliżej prawdy niż dziura w mapie dnia i w pliku GPX.
   dzien.items.forEach((item, i) => {
+    if (pomin(item)) return;
     if (typeof item.lat === 'number' && typeof item.lng === 'number') return;
     const raw = String(item.name || '');
     const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -949,4 +1003,154 @@ export function uzupelnijWspolrzedne(k: KontekstPlanu, dzien: DzienPlanu): void 
       item.approx = true;
     }
   });
+}
+
+const kluczNazwy = (s: unknown): string =>
+  String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+/**
+ * To samo miejsce przypięte dwa razy liczy się raz.
+ *
+ * Tablica Hagi miała Mauritshuis i Museum Bredius po dwa razy — raz z wyszukiwarki,
+ * raz z katalogu — bo przy przypinaniu duplikat rozpoznaje się tylko po id katalogu.
+ * Grupowanie po położeniu rozdzieliło bliźniaki na różne dni i Bredius wypadło
+ * w planie w sobotę i w niedzielę. Za to samo miejsce uznajemy tę samą nazwę
+ * w odległości do 200 m; łączymy priorytet w górę i uzupełniamy brakujące pola.
+ */
+function scalDuplikaty(miejsca: MiejsceWejscie[]): MiejsceWejscie[] {
+  const wynik: MiejsceWejscie[] = [];
+  for (const m of miejsca) {
+    const nazwa = kluczNazwy(m.name);
+    const blizniak = wynik.find((w) => kluczNazwy(w.name) === nazwa && (
+      w.lat == null || w.lng == null || m.lat == null || m.lng == null
+      || kmOd({ lat: w.lat, lng: w.lng }, m) < 0.2));
+    if (!blizniak) { wynik.push({ ...m }); continue; }
+    if (m.priority === 'must') blizniak.priority = 'must';
+    if ((blizniak.lat == null || blizniak.lng == null) && m.lat != null && m.lng != null) {
+      blizniak.lat = m.lat;
+      blizniak.lng = m.lng;
+    }
+    blizniak.opening_hours ||= m.opening_hours;
+    blizniak.visit_minutes ||= m.visit_minutes;
+    blizniak.description ||= m.description;
+    blizniak.category ||= m.category;
+  }
+  if (wynik.length < miejsca.length) {
+    console.log(`[planer] scalono ${miejsca.length - wynik.length} zdublowanych miejsc z tablicy`);
+  }
+  return wynik;
+}
+
+const PRZEJSCIE = /^(spacer|przej[śs]cie|przejazd|dojazd|doj[śs]cie|powr[óo]t|transfer|walk)\b/i;
+
+/**
+ * Przejście to odcinek między miejscami, a nie miejsce.
+ *
+ * Dostawało dotąd własny punkt: "Spacer do Mauritshuis" dopasowywał się do
+ * Mauritshuis i na mapie w jednym punkcie stały trzy pinezki — nocleg, spacer
+ * i muzeum. Oznaczone `walk` zostaje na osi dnia, ale bez współrzędnych: czas
+ * przejścia widać w harmonogramie, a mapa pokazuje tylko to, dokąd się idzie.
+ */
+export function oznaczPrzejscia(dzien: DzienPlanu): void {
+  for (const item of dzien.items) {
+    const rodzaj = String(item.kind || '').toLowerCase();
+    if (PRZEJSCIE.test(item.name.trim()) || ['walk', 'travel', 'transport', 'transit'].includes(rodzaj)) {
+      item.kind = 'walk';
+      delete item.lat;
+      delete item.lng;
+      delete item.approx;
+    }
+  }
+}
+
+/**
+ * Nocleg zawsze w swoim miejscu.
+ *
+ * Punkt startowy wyjazdu przychodzi ze współrzędnymi, ale nie trafiał do puli
+ * dopasowań, więc "Ibis Styles" dostawał punkt sąsiedniej pozycji: rano stał
+ * w Mauritshuis, wieczorem w Delft. W czterodniowym planie Hagi hotel miał osiem
+ * różnych położeń i ani jednego prawdziwego. Teraz pozycję w noclegu rozpoznajemy
+ * po nazwie i przypinamy do współrzędnych z ustawień. Gdy wyjazd ich nie ma,
+ * lepiej zostawić nocleg bez pinezki niż wstawić go w cudzy punkt.
+ */
+export function przypnijBaze(k: KontekstPlanu, dzien: DzienPlanu): void {
+  const nazwaBazy = kluczNazwy(k.zadanie.hotel?.name);
+  for (const item of dzien.items) {
+    if (item.kind === 'walk') continue;
+    const nazwa = kluczNazwy(item.name);
+    const poNazwie = !!nazwaBazy
+      && (nazwa === nazwaBazy || (nazwaBazy.length >= 4 && nazwa.includes(nazwaBazy)));
+    const ogolna = /^(hotel|nocleg|baza|kwatera|apartament)$/.test(nazwa);
+    // Rodzaj "hotel" bez nazwy noclegu w ustawieniach też jest noclegiem; przy
+    // ustawionym noclegu inny hotel to zwykłe miejsce (np. kawiarnia w Des Indes).
+    const bezNazwyBazy = item.kind === 'hotel' && !nazwaBazy;
+    if (!poNazwie && !ogolna && !bezNazwyBazy) continue;
+
+    item.kind = 'hotel';
+    item.baza = true;
+    delete item.approx;
+    if (k.baza) {
+      item.lat = k.baza.lat;
+      item.lng = k.baza.lng;
+    } else {
+      delete item.lat;
+      delete item.lng;
+    }
+  }
+}
+
+const GODZINA = /^\d{1,2}:\d{2}$/;
+
+/**
+ * Deterministyczna kontrola geografii dnia — ta sama zasada co przy godzinach
+ * otwarcia: reguła w prompcie była, a mimo to plan kazał przejść osiem kilometrów
+ * w pół godziny.
+ *
+ * 1. Propozycja agenta leżąca dalej niż zasięg dnia wypada. Pinezki użytkownika
+ *    zostają zawsze — to jego decyzja, co najwyżej dostanie ostrzeżenie.
+ * 2. Gdy między dwoma kolejnymi punktami pieszo wychodzi wyraźnie więcej, niż plan
+ *    zostawia czasu, użytkownik dostaje ostrzeżenie z liczbami.
+ */
+export function sprawdzOdleglosci(k: KontekstPlanu, dzien: DzienPlanu, numer: number): void {
+  const kotwice = (k.grupy[numer - 1] ?? []).filter((p) => p.lat != null && p.lng != null);
+  const srodek = srodekKotwic(kotwice) ?? k.baza ?? k.center;
+
+  if (srodek) {
+    // Zasięg rośnie z rozrzutem kotwic: dzień z Watykanem i Zatybrzem ma prawo
+    // sięgać dalej niż dzień wokół jednego rynku.
+    const rozrzut = kotwice.reduce((m, p) => Math.max(m, kmOd(srodek, p)), 0);
+    const zasieg = Math.max(PROMIEN_ZAPASOWY_KM + 1, rozrzut * 1.5);
+    const odrzucone: string[] = [];
+    dzien.items = dzien.items.filter((it) => {
+      if (it.source !== 'suggested' || it.kind === 'walk' || it.baza) return true;
+      if (typeof it.lat !== 'number' || typeof it.lng !== 'number' || it.approx) return true;
+      if (kmOd(srodek, it) <= zasieg) return true;
+      odrzucone.push(it.name);
+      return false;
+    });
+    if (odrzucone.length) {
+      // Przejście prowadzące do wyciętej propozycji nie ma już dokąd prowadzić.
+      const cele = odrzucone.map(kluczNazwy);
+      dzien.items = dzien.items.filter((it) =>
+        it.kind !== 'walk' || !cele.some((c) => c.length >= 4 && kluczNazwy(it.name).includes(c)));
+      console.warn(`[planer] dzień ${numer}: poza zasięgiem ${zasieg.toFixed(1)} km wypadły propozycje: ${odrzucone.join(', ')}`);
+    }
+  }
+
+  const punkty = dzien.items.filter((it) =>
+    it.kind !== 'walk' && typeof it.lat === 'number' && typeof it.lng === 'number' && !it.approx);
+  for (let i = 1; i < punkty.length; i++) {
+    const a = punkty[i - 1];
+    const b = punkty[i];
+    if (!GODZINA.test(a.time) || !GODZINA.test(b.time)) continue;
+    const km = kmOd({ lat: a.lat!, lng: a.lng! }, b) * 1.3;
+    if (km < 1.5) continue;
+    const naPrzejscie = Math.max(0, czasNaMinuty(b.time) - (czasNaMinuty(a.time) + (a.minutes || 0)));
+    const pieszo = Math.round(km * 15);
+    if (pieszo <= naPrzejscie + 15) continue;
+    (dzien.warnings ??= []).push(
+      `Z „${a.name}" do „${b.name}" jest ok. ${km.toFixed(1).replace('.', ',')} km — pieszo to ok. ${pieszo} min, `
+      + `a plan zostawia na przejście ${naPrzejscie} min. Podjedź komunikacją albo przesuń godziny.`
+    );
+  }
 }

@@ -109,6 +109,83 @@ export function czyPrzystanek(it: any): boolean {
   return !POZYCJA_ORGANIZACYJNA.test(String(it?.name || '').trim());
 }
 
+/** Punkt startowy wyjazdu, tak jak leży w ustawieniach tablicy. */
+export interface BazaWyjazdu { name?: string | null; lat?: number | null; lng?: number | null }
+
+const kluczNazwy = (s: unknown): string =>
+  String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+/**
+ * Pozycja planu w noclegu — start albo koniec dnia.
+ *
+ * Nowe plany niosą z serwera flagę `baza`. Starsze jej nie mają, a ich pozycja
+ * hotelu dostawała współrzędne sąsiedniego miejsca (w planie Hagi rano w
+ * Mauritshuis, wieczorem w Delft), więc rozpoznajemy ją po nazwie noclegu
+ * z ustawień i rysujemy tam, gdzie nocleg naprawdę stoi.
+ */
+export function czyBaza(it: any, baza: BazaWyjazdu | null): boolean {
+  if (it?.baza === true) return true;
+  if (it?.kind === 'walk') return false;
+  const nazwa = kluczNazwy(it?.name);
+  const nazwaBazy = kluczNazwy(baza?.name);
+  if (!czyPrzystanek(it)) return false;
+  if (nazwaBazy && (nazwa === nazwaBazy || (nazwaBazy.length >= 4 && nazwa.includes(nazwaBazy)))) return true;
+  return it?.kind === 'hotel' && !nazwaBazy;
+}
+
+export interface PunktDnia {
+  name: string;
+  lat: number;
+  lng: number;
+  /** Numer przystanku na osi i na pinezce; `null` dla noclegu. */
+  nr: number | null;
+  /** Indeks pozycji w `day.items`. */
+  pozycja: number;
+  propozycja: boolean;
+}
+
+/**
+ * Co z dnia planu trafia na mapę i pod jakim numerem — jedno źródło dla osi
+ * godzinowej, mapy, dystansu dnia i przeliczenia przebiegu.
+ *
+ * Przejścia nie są punktami: "Spacer do Mauritshuis" stał dotąd pinezką w samym
+ * muzeum i razem z hotelem dawał trzy pinezki jedna na drugiej. Nocleg dostaje
+ * punkt z ustawień wyjazdu i nie ma numeru, żeby nie przesuwał numeracji
+ * przystanków. `numery` i `bazy` idą równolegle do `items`.
+ */
+export function punktyDnia(items: any[], baza: BazaWyjazdu | null): {
+  punkty: PunktDnia[]; numery: (number | null)[]; bazy: boolean[];
+} {
+  const maPunktBazy = baza?.lat != null && baza?.lng != null;
+  const punkty: PunktDnia[] = [];
+  const numery: (number | null)[] = [];
+  const bazy: boolean[] = [];
+  let nr = 0;
+  items.forEach((it, i) => {
+    if (czyBaza(it, baza)) {
+      numery.push(null);
+      bazy.push(true);
+      // Bez punktu w ustawieniach nie ufamy współrzędnym przybliżonym — to były
+      // współrzędne sąsiada, nie hotelu.
+      const lat = maPunktBazy ? baza!.lat! : (it.approx ? null : it.lat);
+      const lng = maPunktBazy ? baza!.lng! : (it.approx ? null : it.lng);
+      if (lat != null && lng != null) {
+        punkty.push({ name: baza?.name || it.name, lat, lng, nr: null, pozycja: i, propozycja: false });
+      }
+      return;
+    }
+    bazy.push(false);
+    if (!czyPrzystanek(it) || it.lat == null || it.lng == null) {
+      numery.push(null);
+      return;
+    }
+    nr += 1;
+    numery.push(nr);
+    punkty.push({ name: it.name, lat: it.lat, lng: it.lng, nr, pozycja: i, propozycja: it.source === 'suggested' });
+  });
+  return { punkty, numery, bazy };
+}
+
 /** Odległość w km po prostej — do wykrywania odstających punktów i duplikatów. */
 export function kmBetween(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const dLat = (aLat - bLat) * 111;

@@ -15,14 +15,13 @@ import { faktyTablicy, wygenerujTresci, type Kanal } from './services/marketing.
 import { rateLimit } from './middleware/rate-limit.js';
 import { poiService, poiClusterCenter, PoiCandidate } from './services/poi.js';
 import { routeValidatorService } from './services/route-validator.js';
-import { describeAvailability, isOpenDuring } from './services/opening-hours.js';
 import { callGeminiTracked } from './services/ai-usage.js';
 import { streamSSE } from 'hono/streaming';
 import { pobierzZewnetrzna, NiedozwolonyAdres } from './services/bezpieczne-pobieranie.js';
 import { jezykZadania, JEZYKI_UI, type KodJezyka } from './services/jezyki.js';
 import { przetlumaczPaczke } from './services/tlumaczenia.js';
 import {
-  przygotujKontekst, ulozDzien, opiszPreferencje, clusterPlacesByProximity,
+  przygotujKontekst, ulozDzien, opiszPreferencje,
   type ZadaniePlanu,
 } from './services/planer.js';
 import { fetchWikiCard, fetchNearbyPhotos, COMMONS_UA } from './services/photos.js';
@@ -332,403 +331,36 @@ WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, b
  */
 
 app.post('/plan-trip', async (c) => {
+  // Droga odwrotu dla frontu, gdy strumień SSE nie przejdzie przez proxy albo
+  // rozszerzenie przeglądarki. Dotąd miała własną kopię całego planera — prompt,
+  // dopasowanie współrzędnych, filtry — i każda poprawka w planer.ts omijała ją
+  // po cichu. Teraz to ten sam planer dzień po dniu, tylko oddany jednym JSON-em.
   try {
     const tokenUserId = c.get('userId') || null;
     const shortfall = await ensureTokens(tokenUserId, 'plan-trip');
     if (shortfall) return c.json({ error: shortfall, needs_tokens: true }, 402);
-    const body = await c.req.json() as {
-      destination: string;
-      days: number;
-      window: { start: string; end: string };
-      start_date?: string;
-      hotel?: { name: string; lat?: number; lng?: number } | null;
-      fill_percent?: number;
-      fixed?: { time: string; label: string; minutes?: number }[];
-      places: {
-        name: string; category?: string; priority?: 'must' | 'nice';
-        lat?: number | null; lng?: number | null;
-        opening_hours?: string | null; visit_minutes?: number | null; description?: string | null;
-      }[];
-      creator_preferences?: Record<string, number>;
-    };
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+    const body = await c.req.json() as ZadaniePlanu;
+    if (!process.env.GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
     if (!body.places?.length) return c.json({ error: 'Brak przypiętych miejsc' }, 400);
 
-    const toMin = (t: string) => {
-      const m = t.match(/^(\d{1,2}):(\d{2})$/);
-      return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+    const kontekst = await przygotujKontekst(body, tokenUserId, jezykZadania(c));
+    const wyniki = await Promise.all(kontekst.dni.map((d) =>
+      ulozDzien(kontekst, d.index)
+        .then((dzien) => ({ ok: true as const, dzien }))
+        .catch((err: any) => ({ ok: false as const, numer: d.index, blad: err.message as string }))
+    ));
+
+    const dni = wyniki.flatMap((w) => (w.ok ? [w.dzien] : []));
+    if (!dni.length) throw new Error('Nie udało się ułożyć żadnego dnia. Spróbuj ponownie.');
+    for (const w of wyniki) if (!w.ok) console.warn(`[plan-trip] dzień ${w.numer}: ${w.blad}`);
+
+    const nieZaplanowane = dni.flatMap((d) => d.not_scheduled ?? []);
+    const plan = {
+      days: dni,
+      warnings: [...new Set(dni.flatMap((d) => d.warnings ?? []))],
+      not_scheduled: nieZaplanowane.filter((n, i, a) =>
+        a.findIndex((x) => x.name.trim().toLowerCase() === n.name.trim().toLowerCase()) === i),
     };
-    const windowStart = toMin(body.window.start);
-    const windowEnd = toMin(body.window.end);
-    const minutesPerDay = Math.max(0, windowEnd - windowStart);
-    const dayCount = Math.max(1, body.days || 1);
-
-    const baseDate = body.start_date ? new Date(`${body.start_date}T12:00:00`) : new Date();
-    const dayNames = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
-
-    // Dostępność każdego miejsca w każdym dniu — policzona, nie zgadnięta
-    const dayInfos = Array.from({ length: dayCount }, (_, i) => {
-      const date = new Date(baseDate);
-      date.setDate(date.getDate() + i);
-      return {
-        index: i + 1,
-        date: date.toISOString().slice(0, 10),
-        weekday: dayNames[date.getDay()],
-        dateObj: date
-      };
-    });
-
-    const placeLines = body.places.map((pl) => {
-      const minutes = pl.visit_minutes || 60;
-      const perDay = dayInfos.map((d) => {
-        const fits = isOpenDuring(pl.opening_hours, d.dateObj, windowStart, Math.min(minutes, minutesPerDay));
-        const desc = describeAvailability(pl.opening_hours, d.dateObj);
-        const verdict = fits === false ? ' — NIE MIEŚCI SIĘ W TWOIM OKNIE' : '';
-        return `dzień ${d.index} (${d.weekday}): ${desc}${verdict}`;
-      }).join(' | ');
-      return `- "${pl.name}" [${pl.priority === 'must' ? 'KONIECZNIE' : 'jeśli wyjdzie'}, ${pl.category || 'attraction'}, ok. ${minutes} min] ${perDay}`;
-    }).join('\n');
-
-    const totalVisitMinutes = body.places.reduce((sum, p) => sum + (p.visit_minutes || 60), 0);
-    const mustMinutes = body.places.filter((p) => p.priority === 'must')
-      .reduce((sum, p) => sum + (p.visit_minutes || 60), 0);
-    const budget = minutesPerDay * dayCount;
-    // Suwak "ile czasu zaplanować": reszta okna ma zostać pusta z rozmysłu.
-    // Dzień wypełniony co do minuty to lista zadań, nie plan wyjazdu.
-    const fillPercent = Math.min(100, Math.max(0, body.fill_percent ?? 70));
-
-    // Podział geograficzny liczony tutaj, nie zlecany modelowi
-    const clusters = dayCount > 1 ? clusterPlacesByProximity(body.places, dayCount) : [];
-    const clusterHint = clusters.length > 1
-      ? `\n\nSKUPISKA GEOGRAFICZNE (policzone z współrzędnych — trzymaj się ich, chyba że godziny otwarcia każą inaczej; wtedy napisz o tym w "warnings"):\n`
-        + clusters.map((g, i) => `Grupa ${i + 1}: ${g.map((p) => p.name).join(', ')}`).join('\n')
-      : '';
-    const plannedBudget = Math.round(budget * fillPercent / 100);
-
-    // Tablica użytkownika jest inspiracją, nie ramą — ktoś może przypiąć jedno
-    // miejsce i oczekiwać, że resztę dnia agent zaproponuje sam. Bez puli
-    // kandydatów planer nie miałby czym wypełnić czasu poza "spacerem".
-    let fillerPois: PoiCandidate[] = [];
-    let fillerSights: PoiCandidate[] = [];
-    let fillerFood: PoiCandidate[] = [];
-    // Środek miasta przydaje się jeszcze raz niżej, przy sprawdzaniu współrzędnych
-    // od modelu, więc żyje poza tym blokiem.
-    let center: { lat: number; lng: number } | null = null;
-    try {
-      center = await geocodingService.geocodeSettlement(body.destination);
-      const [sights, food] = await Promise.all([
-        poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'city_walk', { limit: 40 }),
-        poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 15 }).catch(() => [])
-      ]);
-      const pinnedNames = new Set(body.places.map((p) => p.name.toLowerCase()));
-      const nieprzypiete = (c: any) => !pinnedNames.has(c.name.toLowerCase());
-      // Rozdzielone, bo w prompcie pełnią różne role: zabytkami wypełnia się dzień,
-      // a lokalami obsadza konkretne godziny posiłków. Zlane w jedną listę model
-      // traktował jednakowo i zostawiał "Kolacja" jako pustą pozycję bez miejsca.
-      fillerSights = sights.filter(nieprzypiete);
-      fillerFood = food.filter(nieprzypiete);
-      fillerPois = [...fillerSights, ...fillerFood];
-      console.log(`[plan-trip] ${fillerSights.length} propozycji do zwiedzania, `
-        + `${fillerFood.length} lokali na posiłki`);
-    } catch (err) {
-      console.warn('[plan-trip] Nie udało się pobrać propozycji:', err);
-    }
-
-    const opisPoi = (c: any) =>
-      `- "${c.name}" (${c.kind}${c.openingHours ? `, godziny: ${c.openingHours}` : ''})`;
-    const fillerLines = fillerSights.slice(0, 30).map(opisPoi).join('\n');
-    const foodLines = fillerFood.slice(0, 15).map(opisPoi).join('\n');
-
-    const prefOpisy = opiszPreferencje(body.creator_preferences);
-    const prefLines = prefOpisy.map((o) => `- ${o}`).join('\n');
-    if (prefOpisy.length) {
-      console.log(`[plan-trip] preferencje w podpowiedzi: ${prefOpisy.length} — ${prefOpisy.join(' | ')}`);
-    }
-
-    const fixedLines = (body.fixed || [])
-      .map((f) => `- ${f.time} ${f.label}${f.minutes ? ` (${f.minutes} min)` : ''}`).join('\n');
-
-    const prompt = `Ułóż plan zwiedzania miasta ${body.destination}.
-
-RAMY: ${dayCount} dni, każdego dnia od ${body.window.start} do ${body.window.end} (${Math.round(minutesPerDay / 60 * 10) / 10} h dziennie, łącznie ${Math.round(budget / 60)} h).
-${body.hotel?.name ? `BAZA: ${body.hotel.name} — każdy dzień zaczyna się i kończy tutaj.` : ''}
-${fixedLines ? `STAŁE PUNKTY DNIA (nie do przesunięcia):\n${fixedLines}` : ''}
-${prefLines ? `PREFERENCJE UŻYTKOWNIKA — uwzględnij je przy doborze miejsc, długości postojów i kolejności:\n${prefLines}` : ''}
-
-MIEJSCA PRZYPIĘTE PRZEZ UŻYTKOWNIKA — to KOTWICE planu, nie cały plan
-(dostępność policzona dla Twoich okien czasowych):
-${placeLines}
-
-${fillerLines ? `ZWERYFIKOWANE MIEJSCA W TYM MIEŚCIE, KTÓRYCH UŻYTKOWNIK NIE PRZYPIĄŁ
-(możesz i POWINIENEŚ nimi wypełnić resztę dnia — kopiuj nazwy dokładnie):
-${fillerLines}` : ''}
-
-${foodLines ? `LOKALE NA POSIŁKI W TYM MIEŚCIE (kopiuj nazwy dokładnie):
-${foodLines}` : ''}
-
-BILANS: samo zwiedzanie to ok. ${Math.round(totalVisitMinutes / 60 * 10) / 10} h (w tym ${Math.round(mustMinutes / 60 * 10) / 10} h oznaczone KONIECZNIE), a całe okno to ${Math.round(budget / 60)} h.
-
-${clusterHint}
-
-WYPEŁNIENIE DNIA: ${fillPercent}%. Zaplanuj ok. ${Math.round(plannedBudget / 60 * 10) / 10} h konkretnych punktów na cały wyjazd, a POZOSTAŁE ${Math.round((budget - plannedBudget) / 60 * 10) / 10} h ZOSTAW PUSTE Z ROZMYSŁU. To nie jest czas do zapełnienia — użytkownik świadomie poprosił o luz na włóczenie się, przypadkowe przystanki i dłuższe siedzenie tam, gdzie mu się spodoba.${fillPercent <= 40 ? ' Przy tak niskim wypełnieniu wybierz TYLKO najważniejsze kotwice i nie dokładaj propozycji z listy poniżej.' : ''}${fillPercent >= 90 ? ' Przy tak wysokim wypełnieniu możesz zagęścić dzień i dołożyć propozycje z listy.' : ''}
-W polu "summary" każdego dnia napisz jednym zdaniem, ile czasu zostaje wolnego i co można w nim zrobić w tej okolicy. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
-
-ZASADY:
-1. Miejsca oznaczone KONIECZNIE mają pierwszeństwo — wstaw je najpierw, w dniach, w których są otwarte.
-2. NIGDY nie planuj wizyty w miejscu oznaczonym jako ZAMKNIĘTE danego dnia ani takiego, które NIE MIEŚCI SIĘ W OKNIE.
-3. Grupuj miejsca leżące blisko siebie w ten sam dzień — dzień ma być spójny geograficznie, bez biegania przez miasto.
-4. NIGDY NIE ZOSTAWIAJ PUSTEGO DNIA. "Czas wolny" na kilka godzin przy niewykorzystanych miejscach to błąd planu, nie wynik.
-5. KRÓTSZA WIZYTA ZAMIAST REZYGNACJI. Jeśli miejsce jest otwarte, ale zostało mniej czasu, niż wynosi pełne zwiedzanie, ZAPLANUJ JE NA TYLE, ILE ZOSTAŁO, i napisz to wprost w "note", np. "zamykają o 18:00 — masz 60 z 90 min, wejdź od razu". Turysta sam zdecyduje, czy mu to wystarczy. Do "not_scheduled" trafia tylko to, co jest ZAMKNIĘTE danego dnia albo czego naprawdę nie da się wcisnąć.
-6. TABLICA TO INSPIRACJA, NIE RAMA. Użytkownik mógł przypiąć jedno miejsce i oczekuje, że resztę dnia ZAPROPONUJESZ TY. Wypełnij wolny czas konkretnymi miejscami z listy powyżej, dobranymi do jego preferencji i leżącymi blisko kotwic tego dnia. W polu "source" wpisz "pinned" dla miejsc przypiętych przez użytkownika i "suggested" dla Twoich propozycji, żeby wiedział, co jest czyje.
-   Gdy w okolicy naprawdę nie ma czego dodać, dopiero wtedy zaproponuj nazwany spacer ("spacer po Starym Mieście: Rynek, Katharinenstraße"). Samo "czas wolny" jest zawsze błędem.
-7. POSIŁEK TO MIEJSCE, NIE GODZINA. Jeśli w stałych punktach dnia jest obiad albo kolacja,
-   wstaw w tym czasie KONKRETNY LOKAL z listy powyżej i jego nazwę wpisz w "name" — wybierz
-   taki, który leży blisko punktu, w którym użytkownik akurat wtedy będzie, a nie najlepszy
-   w mieście. Sama "Kolacja" bez nazwy lokalu jest pustą pozycją: nie da się jej pokazać na
-   mapie, dodać do trasy ani sprawdzić godzin otwarcia. Gdy w okolicy naprawdę nie ma nic
-   z listy, napisz w "note", w której dzielnicy szukać, zamiast zostawiać samo słowo.
-   Uwzględnij preferencje użytkownika co do jedzenia, jeśli je podano.
-8. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
-   "not_scheduled" DOTYCZY WYŁĄCZNIE MIEJSC Z TABLICY UŻYTKOWNIKA. Twoich niewykorzystanych propozycji NIE WYPISUJ TAM — użytkownik ich nie wybierał i nie interesuje go, że nie weszły. Lista propozycji to Twoja pula do wypełniania dnia, nie zobowiązanie.
-9. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X w poniedziałek zamknięte, przeniosłem na środę", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
-10. Jeśli KONIECZNIE nie mieszczą się w budżecie, w "question" zadaj konkretne pytanie o wybór (np. skrócić wizyty, odpuścić coś, czy przemieszczać się taksówką).
-
-ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
-
-Odpowiedz WYŁĄCZNIE obiektem JSON.`;
-
-    const data = await callGeminiTracked(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'object',
-            properties: {
-              days: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    day: { type: 'integer' },
-                    summary: { type: 'string' },
-                    items: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          time: { type: 'string' },
-                          name: { type: 'string' },
-                          kind: { type: 'string' },
-                          minutes: { type: 'integer' },
-                          note: { type: 'string' },
-                          source: { type: 'string', enum: ['pinned', 'suggested'] },
-                          lat: { type: 'number' },
-                          lng: { type: 'number' }
-                        },
-                        required: ['time', 'name']
-                      }
-                    }
-                  },
-                  required: ['day', 'items']
-                }
-              },
-              not_scheduled: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { name: { type: 'string' }, reason: { type: 'string' } },
-                  required: ['name']
-                }
-              },
-              warnings: { type: 'array', items: { type: 'string' } },
-              question: { type: 'string' }
-            },
-            required: ['days']
-          },
-          // Model 2.5 zużywa część budżetu na rozumowanie — przy ciasnym limicie
-          // JSON urywał się w połowie zdania. Limit musi mieścić jedno i drugie.
-          maxOutputTokens: 32768
-        }
-      },
-      { operation: 'plan-trip', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
-    );
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const finish = data.candidates?.[0]?.finishReason;
-    if (!text) throw new Error(`Pusta odpowiedź planera (finishReason: ${finish})`);
-    if (finish && finish !== 'STOP') {
-      console.warn(`[plan-trip] Odpowiedź niekompletna, finishReason=${finish}, długość=${text.length}`);
-    }
-    let plan: any;
-    try {
-      plan = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
-    } catch (parseErr: any) {
-      console.error(`[plan-trip] Niepoprawny JSON (${text.length} zn., finishReason=${finish}). Początek: ${text.slice(0, 220)}`);
-      throw new Error(`Planer zwrócił niekompletną odpowiedź (${finish || 'nieznany powód'}). Spróbuj ponownie lub zmniejsz liczbę miejsc.`);
-    }
-
-    // Każda pozycja planu dostaje współrzędne, jeśli tylko da się je ustalić.
-    // Propozycje agenta niosły dotąd samą nazwę, więc przy robieniu trasy z dnia
-    // wracały do geokodera — a to jest ten krok, przez który trasy lądowały w
-    // przypadkowych miastach. Pinezki użytkownika i pula POI mają współrzędne z
-    // OSM, wystarczy je przenieść.
-    const coordPool = [
-      ...body.places.map((pl) => ({ name: pl.name, lat: (pl as any).lat, lng: (pl as any).lng })),
-      ...fillerPois.map((f) => ({ name: f.name, lat: f.lat, lng: f.lng }))
-    ].filter((x) => x.lat != null && x.lng != null);
-
-    // Dopasowanie po samej równości nazw prawie nie działało. Model przeformułowuje
-    // nazwy — "Amfiteatr w Durrës" wraca jako "Amfiteatr rzymski", "Kościół
-    // Garnizonowy pw. św. Elżbiety" jako "Bazylika św. Elżbiety" — więc równość
-    // łapała jedną pozycję na dzień i mapa pokazywała jedną pinezkę. Porównujemy
-    // teraz zbiory słów znaczących, bez znaków diakrytycznych i bez wyrazów
-    // pospolitych, które w nazwach zabytków powtarzają się wszędzie.
-    const NAME_STOP = new Set(['w', 'we', 'na', 'pod', 'przy', 'the', 'of', 'i', 'oraz',
-      'pw', 'sw', 'swietej', 'swietego', 'sw.', 'stary', 'stare', 'nowy', 'nowe']);
-
-    const nameTokens = (raw: string): string[] => [...new Set(
-      String(raw || '')
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-        .split(/[^a-z0-9]+/)
-        .filter((t) => t.length >= 3 && !NAME_STOP.has(t))
-    )];
-
-    const pool = coordPool.map((x) => ({ ...x, tokens: nameTokens(x.name) }));
-
-    // Same liczone słowa nie wystarczą. "Muzeum Archeologiczne" i "Muzeum Narodowe"
-    // dzielą połowę nazwy, a to dwa różne budynki; "Amfiteatr rzymski" i "Amfiteatr
-    // w Durrës" dzielą też połowę i to jest jedno miejsce. Różnica siedzi w tym, że
-    // "muzeum" powtarza się w całej puli, a "amfiteatr" występuje raz. Dlatego słowo
-    // waży tym więcej, im rzadziej pojawia się wśród nazw, które mamy.
-    const docFreq = new Map<string, number>();
-    for (const x of pool) for (const t of x.tokens) docFreq.set(t, (docFreq.get(t) || 0) + 1);
-    const weight = (t: string) => Math.log((pool.length + 1) / ((docFreq.get(t) || 0) + 1)) + 1;
-    const mass = (tokens: string[]) => tokens.reduce((sum, t) => sum + weight(t), 0);
-
-    const similarity = (a: string[], b: string[]): number => {
-      if (a.length === 0 || b.length === 0) return 0;
-      const inB = new Set(b);
-      const shared = a.filter((t) => inB.has(t)).reduce((sum, t) => sum + weight(t), 0);
-      const base = Math.min(mass(a), mass(b));
-      return base > 0 ? shared / base : 0;
-    };
-
-    const kmFromCenter = (lat: number, lng: number): number => {
-      if (!center) return 0;
-      const dLat = (lat - center.lat) * 111;
-      const dLng = (lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180);
-      return Math.sqrt(dLat * dLat + dLng * dLng);
-    };
-
-    let located = 0;
-    let unlocated = 0;
-    const missing: string[] = [];
-    for (const day of plan.days || []) {
-      for (const item of day.items || []) {
-        const raw = String(item.name || '');
-        const exact = pool.find((x) => x.name.trim().toLowerCase() === raw.trim().toLowerCase());
-        let hit: { lat: any; lng: any } | undefined = exact;
-
-        if (!hit) {
-          const tokens = nameTokens(raw);
-          const scored = pool
-            .map((x) => ({ x, score: similarity(tokens, x.tokens) }))
-            .filter((r) => r.score >= 0.5)
-            .sort((a, b) => b.score - a.score);
-          hit = scored[0]?.x;
-        }
-
-        if (hit) {
-          item.lat = hit.lat;
-          item.lng = hit.lng;
-          located++;
-          continue;
-        }
-
-        // Bez dopasowania zostają tylko współrzędne od modelu, a te bywają zmyślone.
-        // Przyjmujemy je wyłącznie wtedy, gdy leżą w zasięgu miasta; inaczej lepszy
-        // jest brak pinezki niż pinezka w innym kraju.
-        if (typeof item.lat === 'number' && typeof item.lng === 'number' && kmFromCenter(item.lat, item.lng) < 40) {
-          located++;
-        } else {
-          delete item.lat;
-          delete item.lng;
-          unlocated++;
-        }
-      }
-    }
-
-    // Druga runda dla pozycji, które zostały bez punktu. To niemal zawsze pozycje
-    // przejściowe — "Przejście do Ogrodu Botanicznego", "Powrót pod hotel",
-    // "Obiad w Hali Targowej" — gdzie cel siedzi w końcówce nazwy, tyle że
-    // w odmienionej formie ("Ogrodu Botanicznego" vs "Ogród Botaniczny" w puli).
-    // Dlatego porównujemy rdzenie słów (pierwsze 5 znaków), a gdy i to zawiedzie,
-    // pozycja dostaje punkt między najbliższymi sąsiadami dnia: pinezka "po
-    // drodze" jest bliżej prawdy niż dziura w mapie dnia i w pliku GPX.
-    const TRANSITION = /^(przejscie|przejazd|spacer|powrot|wyjazd|zejscie|wejscie|dojazd|dojscie|obiad|lunch|kolacja|sniadanie|przerwa)[a-z ]*?\b(do|pod|na|w|we|z|ze|przez|przy|obok)\b/;
-    for (const day of plan.days || []) {
-      const items: any[] = day.items || [];
-      items.forEach((item: any, i: number) => {
-        if (typeof item.lat === 'number' && typeof item.lng === 'number') return;
-        const raw = String(item.name || '');
-        const norm = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        const m = norm.match(TRANSITION);
-        const target = m ? norm.slice((m.index ?? 0) + m[0].length) : norm;
-        const tStems = nameTokens(target).map((t) => t.slice(0, 5));
-        if (tStems.length > 0) {
-          const scored = pool
-            .map((x) => {
-              const xs = new Set(x.tokens.map((t) => t.slice(0, 5)));
-              const shared = tStems.filter((t) => xs.has(t)).length;
-              return { x, score: shared / tStems.length };
-            })
-            .filter((r) => r.score >= 0.6)
-            .sort((a, b) => b.score - a.score);
-          if (scored[0]) {
-            item.lat = scored[0].x.lat;
-            item.lng = scored[0].x.lng;
-            located++;
-            unlocated--;
-            return;
-          }
-        }
-        const prev = items.slice(0, i).reverse().find((x) => typeof x.lat === 'number');
-        const next = items.slice(i + 1).find((x) => typeof x.lat === 'number');
-        const anchor = prev && next
-          ? { lat: (prev.lat + next.lat) / 2, lng: (prev.lng + next.lng) / 2 }
-          : (prev || next);
-        if (anchor) {
-          item.lat = anchor.lat;
-          item.lng = anchor.lng;
-          // Punkt przybliżony — frontend może go rysować delikatniej.
-          item.approx = true;
-          located++;
-          unlocated--;
-        } else {
-          missing.push(raw);
-        }
-      });
-    }
-    console.log(`[plan-trip] Współrzędne: ${located} pozycji ma, ${unlocated} bez${
-      missing.length ? ` (${missing.slice(0, 5).join(', ')})` : ''}`);
-
-    // "Nie zmieściło się" ma mówić o tym, co użytkownik przypiął. Model dostaje
-    // pulę kilkudziesięciu propozycji do wypełniania dnia i raportował każdą
-    // niewykorzystaną — plan na 4 miejsca kończył się listą 35 "pominiętych"
-    // pomników i barów, których nikt nie wybierał.
-    const pinnedNames = new Set(body.places.map((p) => p.name.trim().toLowerCase()));
-    plan.not_scheduled = (plan.not_scheduled || [])
-      .filter((n: any) => n?.name && pinnedNames.has(String(n.name).trim().toLowerCase()))
-      .filter((n: any, i: number, arr: any[]) =>
-        arr.findIndex((x) => String(x.name).trim().toLowerCase() === String(n.name).trim().toLowerCase()) === i);
-
-    // Daty i nazwy dni dokładamy po stronie serwera, żeby nie zależały od modelu
-    plan.days = (plan.days || []).map((d: any) => {
-      const info = dayInfos.find((x) => x.index === d.day);
-      return { ...d, date: info?.date, weekday: info?.weekday };
-    });
 
     // Opłata dopiero teraz: plan jest gotowy i za chwilę trafi do użytkownika
     await repo.chargeTokens(tokenUserId!, TOKEN_PRICES['plan-trip'], 'plan dni', body.destination);
