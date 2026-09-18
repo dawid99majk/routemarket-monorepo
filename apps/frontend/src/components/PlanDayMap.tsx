@@ -21,6 +21,12 @@ interface PlanDayMapProps {
   /** Kliknięcie pinezki. Bez tego mapa była tylko obrazkiem: kartę miejsca dało
    *  się otworzyć wyłącznie z listy po lewej, choć pinezka wygląda na klikalną. */
   onPunkt?: (index: number) => void;
+  /** Punkty „po drodze" — którędy trasa ma iść między przystankami. */
+  via?: { lat: number; lng: number }[];
+  /** Kliknięcie punktu po drodze usuwa go. */
+  onUsunVia?: (index: number) => void;
+  /** Podane tylko w trybie dodawania punktu po drodze — wtedy kliknięcie mapy go stawia. */
+  onKlikMapy?: (lat: number, lng: number) => void;
   className?: string;
 }
 
@@ -50,12 +56,19 @@ function kolorTokenu(nazwa: string): string {
  * współrzędnych sąsiedniego miejsca, więc dzień wyglądał na skupiony w dwóch
  * punktach, z których żaden nie był hotelem.
  */
-function PlanDayMapInner({ points, baza, track, onPunkt, className = '' }: PlanDayMapProps) {
+function PlanDayMapInner({
+  points, baza, track, onPunkt, via, onUsunVia, onKlikMapy, className = '',
+}: PlanDayMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
+  const viaRef = useRef<L.LayerGroup | null>(null);
   const naPunkt = useRef(onPunkt);
   naPunkt.current = onPunkt;
+  const naUsunVia = useRef(onUsunVia);
+  naUsunVia.current = onUsunVia;
+  const naKlik = useRef(onKlikMapy);
+  naKlik.current = onKlikMapy;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -64,8 +77,44 @@ function PlanDayMapInner({ points, baza, track, onPunkt, className = '' }: PlanD
       { maxZoom: 19, attribution: '&copy; Esri, HERE, Garmin, OpenStreetMap' }).addTo(map);
     mapRef.current = map;
     layerRef.current = L.layerGroup().addTo(map);
+    viaRef.current = L.layerGroup().addTo(map);
+    // Leaflet nie wywołuje `click` po przeciągnięciu mapy, więc przesuwanie widoku
+    // w trybie dodawania nie stawia przypadkowych punktów.
+    map.on('click', (e: L.LeafletMouseEvent) => naKlik.current?.(e.latlng.lat, e.latlng.lng));
     return () => { map.remove(); mapRef.current = null; };
   }, []);
+
+  // Tryb dodawania widać po kursorze — bez tego kliknięcie w mapę raz stawia
+  // punkt, a raz nic nie robi, i nie wiadomo dlaczego.
+  useEffect(() => {
+    if (containerRef.current) containerRef.current.style.cursor = onKlikMapy ? 'crosshair' : '';
+  }, [!!onKlikMapy]);
+
+  // Punkty po drodze na osobnej warstwie: dodanie jednego nie przestawia kadru mapy.
+  const kluczVia = JSON.stringify(via ?? []);
+  useEffect(() => {
+    const warstwa = viaRef.current;
+    if (!warstwa) return;
+    warstwa.clearLayers();
+    (via ?? []).forEach((v, i) => {
+      if (!Number.isFinite(v.lat) || !Number.isFinite(v.lng)) return;
+      const znacznik = L.marker(L.latLng(v.lat, v.lng), {
+        keyboard: true,
+        title: 'Punkt po drodze — kliknij, żeby usunąć',
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="width:14px;height:14px;border-radius:50%;background:hsl(var(--background));
+                 border:2.5px solid hsl(var(--foreground));box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:pointer"></div>`,
+          iconSize: [14, 14], iconAnchor: [7, 7],
+        }),
+      }).addTo(warstwa).bindTooltip('Po drodze — kliknij, żeby usunąć', { direction: 'top', offset: [0, -8] });
+      znacznik.on('click', (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e);
+        naUsunVia.current?.(i);
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kluczVia]);
 
   // Rodzic liczy punkty przy każdym renderze, więc tablica jest za każdym razem
   // nowa. Porównujemy treść, żeby mapa nie wracała do kadru przy każdej zmianie

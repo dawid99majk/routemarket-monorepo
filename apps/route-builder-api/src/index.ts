@@ -2,7 +2,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import { serve } from '@hono/node-server';
 import { zValidator } from '@hono/zod-validator';
 import { RouteRequirementsSchema } from './types/index.js';
-import { repo } from './db/repository.js';
+import { repo, type AuthenticatedRouteBuilderUser } from './db/repository.js';
 import { geocodingService } from './services/geocoding.js';
 import { wizytowkaTablicy, wizytowkaMiejsca, stronaZWizytowka } from './services/wizytowki.js';
 import { routingService } from './services/routing.js';
@@ -30,6 +30,7 @@ import { placesRouter } from './routes/places.js';
 import { chatInterviewRouter } from './routes/chat-interview.js';
 import { routeProjectsRouter } from './routes/route-projects.js';
 import { TOKEN_PRICES, ensureTokens } from './services/tokens.js';
+import { punktyDnia, wstawPoDrodze, podejscie, PROFIL_TRYBU, type TrybTrasy } from './services/trasa-dnia.js';
 import { catalogRouter } from './routes/catalog.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
@@ -60,6 +61,9 @@ const AI_ENDPOINTS: Record<string, { windowMs: number; max: number }> = {
   '/geocode-points': { windowMs: 5 * 60_000, max: 60 },
   '/marketing/tresci': { windowMs: 10 * 60_000, max: 20 },
   '/plan-trip/stream': { windowMs: 5 * 60_000, max: 20 },
+  // Przeliczenia opłaconego dnia są darmowe, więc limit jest jedyną zaporą
+  // przed pętlą wywołań routera — 30 na 5 minut to kilka poprawek na minutę.
+  '/plan-day-route': { windowMs: 5 * 60_000, max: 30 },
   // Oba przyjmują adres od użytkownika i karmią nim model. Bez logowania i
   // limitu byłby to darmowy generator kosztów po stronie Gemini, dostępny
   // dla każdego bota, który znajdzie ten adres.
@@ -377,6 +381,85 @@ app.post('/plan-trip', async (c) => {
  * robimy trasę: pozycje dołożone przez agenta mają tylko nazwy, a bez
  * współrzędnych nie da się wyznaczyć przebiegu.
  */
+/**
+ * Trasa dnia planu: przebieg po chodnikach (albo ścieżkach rowerowych) przez
+ * przystanki dnia, zapisywany w planie. To zastępuje przejście do osobnego
+ * kreatora — plan i trasa są jedną rzeczą.
+ *
+ * Cena: pierwsze wyznaczenie trasy danego dnia kosztuje tyle co dawne
+ * `live-route`; każde kolejne przeliczenie tego dnia jest bez opłaty. Poprawki
+ * planu kasują przebieg, a płacenie za każde przeciągnięcie pinezki karało za
+ * dopracowywanie dnia.
+ */
+app.post('/plan-day-route', async (c) => {
+  try {
+    const user = c.get('user') as AuthenticatedRouteBuilderUser;
+    const body = await c.req.json() as { plan_id?: string; day?: number; tryb?: TrybTrasy; via?: { lat: number; lng: number }[] };
+    const tryb: TrybTrasy = body.tryb === 'rower' ? 'rower' : 'pieszo';
+    const dzienNr = Number(body.day);
+    if (!body.plan_id || !Number.isInteger(dzienNr) || dzienNr < 1) {
+      return c.json({ error: 'Brak planu albo numeru dnia' }, 400);
+    }
+
+    const plan = await repo.getPlanForUser(body.plan_id, user);
+    if (!plan) return c.json({ error: 'Nie ma takiego planu albo nie masz do niego dostępu' }, 404);
+
+    const dzien = (plan.plan?.days || []).find((d: any) => d.day === dzienNr);
+    if (!dzien) return c.json({ error: `Plan nie ma dnia ${dzienNr}` }, 404);
+
+    const baza = plan.projekt.start_name
+      ? { name: plan.projekt.start_name, lat: plan.projekt.start_lat, lng: plan.projekt.start_lng }
+      : null;
+    const via = (Array.isArray(body.via) ? body.via : []).slice(0, 10)
+      .filter((v) => Number.isFinite(v?.lat) && Number.isFinite(v?.lng));
+    const punkty = wstawPoDrodze(punktyDnia(dzien.items || [], baza), via);
+    if (punkty.length < 2) {
+      return c.json({ error: 'Ten dzień ma za mało punktów na mapie, żeby wyznaczyć trasę.' }, 400);
+    }
+
+    const oplacony = await repo.isDayRoutePaid(plan.id, dzienNr);
+    const cena = TOKEN_PRICES['live-route'];
+    if (!oplacony) {
+      const brak = await ensureTokens(user.id, 'live-route');
+      if (brak) return c.json({ error: brak, needs_tokens: true }, 402);
+    }
+
+    const miejsca = punkty.map((p, i) => ({
+      name: p.name, lat: p.lat, lng: p.lng, confidence: 1, source: 'plan', provider: 'plan',
+      type: i === 0 ? 'start' : (i === punkty.length - 1 ? 'end' : 'waypoint'),
+    }));
+    const trasa = await routingService.getRoute(miejsca as any, PROFIL_TRYBU[tryb], { intent: 'popular' });
+    if (!trasa.trackPoints?.length) throw new Error('Router nie zwrócił przebiegu');
+
+    // Pobieramy dopiero po udanym wyznaczeniu. Zapis opłaty idzie pierwszy:
+    // gdy dwa zapytania o ten sam dzień przyjdą naraz, drugie nie wstawi wiersza
+    // i nie pobierze drugi raz.
+    let pobrano = 0;
+    if (!oplacony && await repo.markDayRoutePaid(plan.id, dzienNr, user.id, cena)) {
+      await repo.chargeTokens(user.id, cena, 'trasa dnia', `${plan.projekt.name} · dzień ${dzienNr}`);
+      pobrano = cena;
+    }
+
+    const slad = trasa.trackPoints.map((p) => [
+      Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6, Math.round((p[2] ?? 0) * 10) / 10,
+    ] as [number, number, number]);
+    console.log(`[plan-day-route] ${plan.projekt.name} d${dzienNr} ${tryb}: ${trasa.distance_km.toFixed(2)} km, ${punkty.length} pkt (${via.length} po drodze), ${pobrano ? `pobrano ${pobrano}` : 'bez opłaty'}`);
+    return c.json({
+      track: slad,
+      km: trasa.distance_km,
+      h: trasa.duration_h,
+      podejscie_m: podejscie(slad),
+      tryb,
+      via,
+      punktow: punkty.length,
+      pobrano,
+    });
+  } catch (err: any) {
+    console.error('[plan-day-route]', err);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 app.post('/geocode-points', async (c) => {
   try {
     const { names, near } = await c.req.json() as { names: string[]; near: string };

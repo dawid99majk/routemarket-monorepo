@@ -15,24 +15,43 @@ const wspolrzedna = (n: number): string => (Number.isFinite(n) ? n.toFixed(6) : 
 
 export interface PunktGpx { name: string; lat: number; lng: number }
 
-export function gpxDnia(nazwa: string, slad: [number, number][], punkty: PunktGpx[]): string {
+/** Punkt śladu: [lat, lng] albo [lat, lng, wysokość]. */
+export type PunktSladu = [number, number] | [number, number, number] | number[];
+
+export interface OdcinekGpx { nazwa: string; slad: PunktSladu[] }
+
+/**
+ * GPX z kilku śladów — dla całego wyjazdu każdy dzień jest osobnym `trk`, żeby
+ * zegarek pokazał je jako osobne trasy, a nie jedną linię z przeskokiem przez noc.
+ */
+export function gpxTras(nazwa: string, odcinki: OdcinekGpx[], punkty: PunktGpx[]): string {
   const wpt = punkty.map((p) =>
     `  <wpt lat="${wspolrzedna(p.lat)}" lon="${wspolrzedna(p.lng)}"><name>${xml(p.name)}</name></wpt>`).join('\n');
-  // Ślad przychodzi jako [lat, lng] — zamiana kolejności przeniosłaby trasę na inny kontynent.
-  const trkpt = slad.map(([lat, lng]) =>
-    `      <trkpt lat="${wspolrzedna(lat)}" lon="${wspolrzedna(lng)}"></trkpt>`).join('\n');
+  const trk = odcinki.map((o) => {
+    // Ślad przychodzi jako [lat, lng, ele] — zamiana kolejności przeniosłaby trasę na inny kontynent.
+    const trkpt = o.slad.map((p) => {
+      const ele = typeof p[2] === 'number' && Number.isFinite(p[2]) && p[2] !== 0
+        ? `<ele>${p[2].toFixed(1)}</ele>` : '';
+      return `      <trkpt lat="${wspolrzedna(p[0])}" lon="${wspolrzedna(p[1])}">${ele}</trkpt>`;
+    }).join('\n');
+    return `  <trk>
+    <name>${xml(o.nazwa)}</name>
+    <trkseg>
+${trkpt}
+    </trkseg>
+  </trk>`;
+  }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="RouteMarket" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata><name>${xml(nazwa)}</name></metadata>
 ${wpt}
-  <trk>
-    <name>${xml(nazwa)}</name>
-    <trkseg>
-${trkpt}
-    </trkseg>
-  </trk>
+${trk}
 </gpx>
 `;
+}
+
+export function gpxDnia(nazwa: string, slad: PunktSladu[], punkty: PunktGpx[]): string {
+  return gpxTras(nazwa, [{ nazwa, slad }], punkty);
 }
 
 export function nazwaPliku(s: string): string {

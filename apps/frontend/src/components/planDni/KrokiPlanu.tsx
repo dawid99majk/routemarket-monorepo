@@ -7,6 +7,8 @@ interface KrokiPlanuProps {
   naPewno: number;
   /** Liczba dni w otwartym planie; `null`, gdy planu jeszcze nie ma. */
   dniUlozone: number | null;
+  /** Ile dni planu ma już wyznaczoną trasę. */
+  dniZTrasa?: number;
   onTablica: () => void;
   /** Przewija do panelu „Co dalej". Bez planu krok trzeci nie jest klikalny. */
   onTrasa?: () => void;
@@ -22,7 +24,7 @@ type Stan = 'zrobione' | 'teraz' | 'przed';
  * Użytkownik nie wiedział, czym jest ten ekran i co ma z nim zrobić. Etapy mówią
  * to jednym rzędem, a przy każdym stoi liczba zamiast opisu.
  */
-export default function KrokiPlanu({ naPewno, dniUlozone, onTablica, onTrasa }: KrokiPlanuProps) {
+export default function KrokiPlanu({ naPewno, dniUlozone, dniZTrasa = 0, onTablica, onTrasa }: KrokiPlanuProps) {
   const { t } = useTranslation();
 
   const kroki: { id: string; nazwa: string; opis: string; stan: Stan; onClick?: () => void }[] = [
@@ -42,8 +44,10 @@ export default function KrokiPlanu({ naPewno, dniUlozone, onTablica, onTrasa }: 
     {
       id: 'trasa',
       nazwa: t('plan.krok_trasa'),
-      opis: t('plan.krok_trasa_opis'),
-      stan: 'przed',
+      opis: dniUlozone && dniZTrasa > 0
+        ? t('plan.krok_trasa_ile', { ile: dniZTrasa, wszystkie: dniUlozone })
+        : t('plan.krok_trasa_opis'),
+      stan: dniUlozone && dniZTrasa >= dniUlozone ? 'zrobione' : 'przed',
       onClick: dniUlozone ? onTrasa : undefined,
     },
   ];

@@ -49,7 +49,7 @@ import WersjePlanu from '@/components/planDni/WersjePlanu';
 import UlozPlanDialog from '@/components/planDni/UlozPlanDialog';
 import CoDalej from '@/components/planDni/CoDalej';
 import { usunPozycje, przeniesPozycje, koniecDnia, czasNaMinuty, minutyNaCzas } from '@/components/planDni/edycja';
-import { gpxDnia, nazwaPliku, pobierzPlik } from '@/lib/gpx';
+import { gpxDnia, gpxTras, nazwaPliku, pobierzPlik } from '@/lib/gpx';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -111,6 +111,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   /** Który dzień planu jest pokazany. Projekt pokazuje jeden dzień naraz, bo
    *  trzy dni na jednej stronie to ściana tekstu, w której nic nie widać. */
   const [planDay, setPlanDay] = useState(0);
+  /** Tryb stawiania punktów po drodze na mapie dnia — kończy się przy zmianie dnia. */
+  const [dodawanieVia, setDodawanieVia] = useState(false);
+  useEffect(() => { setDodawanieVia(false); }, [planDay]);
   const [publishing, setPublishing] = useState(false);
   // Publikacja bez podpisu daje w galerii „Tablica od podróżnika" — dwadzieścia
   // razy to samo. Nie da się tego wypełnić za użytkownika: w profilu siedzi
@@ -771,13 +774,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const zapiszZmianePlanu = async (nowy: any, idWersji: string | null = planId): Promise<boolean> => {
     if (planIdRef.current === idWersji) {
       setPlan(nowy);
-      const przebiegi: Record<number, { km: number; h: number; track: [number, number][] | null }> = {};
-      for (const d of nowy.days || []) {
-        if (Array.isArray(d.track) && d.track.length > 1) {
-          przebiegi[d.day] = { km: d.route_km ?? 0, h: d.route_h ?? 0, track: d.track };
-        }
-      }
-      setDayRoutes(przebiegi);
+      setDayRoutes(przebiegiZPlanu(nowy));
     }
     setSavedPlans((prev) => prev.map((sp) => (sp.id === idWersji ? { ...sp, plan: nowy } : sp)));
     if (!idWersji) return true;
@@ -797,9 +794,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     if (!(await zapiszZmianePlanu(wynik.plan, idWersji))) return;
     toast.success(
       t('plan.usunieto', { nazwa: wynik.nazwa, nr: plan.days[dzienIdx].day, czas: formatMinutes(wynik.zwolnione) })
-        + (wynik.mialPrzebieg ? ` ${t('plan.trasa_do_ponowienia')}` : ''),
+        + dopiskiOTrasie(wynik.plan, wynik.mialPrzebieg),
       { action: { label: t('plan.cofnij'), onClick: () => { zapiszZmianePlanu(poprzedni, idWersji); } } },
     );
+    przeliczOplaconeDni(wynik.plan);
+  };
+
+  /** Co się dzieje z trasą po poprawce: opłacona przelicza się sama, starsza wymaga ponownego wyznaczenia. */
+  const dopiskiOTrasie = (nowy: any, mialPrzebieg: boolean) => {
+    if ((nowy.days || []).some((d: any) => d.trasa?.oplacona && !d.track)) return ` ${t('plan.trasa_przelicza_sie')}`;
+    return mialPrzebieg ? ` ${t('plan.trasa_do_ponowienia')}` : '';
   };
 
   const przeniesWPlanie = async (zDnia: number, pozycja: number, doDnia: number) => {
@@ -812,9 +816,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     const dane = { nazwa: wynik.nazwa, nr: plan.days[doDnia].day, godzina: wynik.godzina, minuty: wynik.przesuniecie };
     toast.success(
       (wynik.przesuniecie > 0 ? t('plan.przeniesiono_przesuniecie', dane) : t('plan.przeniesiono', dane))
-        + (wynik.mialPrzebieg ? ` ${t('plan.trasa_do_ponowienia')}` : ''),
+        + dopiskiOTrasie(wynik.plan, wynik.mialPrzebieg),
       { action: { label: t('plan.cofnij'), onClick: () => { zapiszZmianePlanu(poprzedni, idWersji); } } },
     );
+    przeliczOplaconeDni(wynik.plan);
   };
 
   /** GPX ze zmierzonego przebiegu dnia — bez kolejnego wywołania i bez opłaty. */
@@ -833,49 +838,92 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     pobierzPlik(`${nazwaPliku(nazwa)}.gpx`, gpxDnia(nazwa, przebieg.track, punkty));
   };
 
-  const recalcDay = async (day: any) => {
-    // Przebieg liczymy po tym, co widać na mapie: nocleg w swoim miejscu, bez przejść.
-    const points = punktyDnia(day.items || [], bazaWyjazdu).punkty
-      .map((p) => ({ lat: p.lat, lng: p.lng, name: p.name }));
-    if (points.length < 2) return toast.error(t('tablica.ten_dzien_ma_za_ma'));
+  /** Cały wyjazd w jednym pliku: każdy dzień z trasą jako osobny ślad, nocleg raz. */
+  const pobierzGpxWyjazdu = () => {
+    if (!active || !plan) return;
+    const dni = (plan.days || []).filter((d: any) => Array.isArray(d.track) && d.track.length > 1);
+    if (!dni.length) return;
+    let nocleg = false;
+    const punkty = dni.flatMap((d: any) => punktyDnia(d.items || [], bazaWyjazdu).punkty
+      .filter((p) => (p.nr != null ? true : !nocleg && (nocleg = true)))
+      .map((p) => ({
+        name: p.nr != null ? `${t('plan.dzien', { nr: d.day })} · ${p.nr}. ${p.name}` : `${t('plan.legenda_nocleg')}: ${p.name}`,
+        lat: p.lat, lng: p.lng,
+      })));
+    const odcinki = dni.map((d: any) => ({ nazwa: `${active.name} — ${t('plan.dzien', { nr: d.day })}`, slad: d.track }));
+    pobierzPlik(`${nazwaPliku(active.name)}.gpx`, gpxTras(active.name, odcinki, punkty));
+  };
 
-    setDayRoutes((prev) => ({ ...prev, [day.day]: 'loading' }));
+  const planRef = useRef(plan);
+  planRef.current = plan;
+
+  /** Przebiegi dni do wyświetlenia — odtwarzane z planu, więc zawsze zgodne z zapisem. */
+  const przebiegiZPlanu = (p: any) => {
+    const wynik: Record<number, { km: number; h: number; track: [number, number][] | null }> = {};
+    for (const d of p?.days || []) {
+      if (Array.isArray(d.track) && d.track.length > 1) wynik[d.day] = { km: d.route_km ?? 0, h: d.route_h ?? 0, track: d.track };
+    }
+    return wynik;
+  };
+
+  /** Plan z podmienionym jednym dniem, liczony na najświeższym stanie, a nie na tym sprzed `await`. */
+  const zDniem = (p: any, nr: number, zmiana: (d: any) => any) =>
+    ({ ...p, days: (p?.days || []).map((d: any) => (d.day === nr ? zmiana(d) : d)) });
+
+  /**
+   * Trasa dnia — dawniej osobny kreator, teraz część planu.
+   *
+   * Serwer bierze punkty z zapisanego planu, więc tu podajemy tylko dzień, tryb
+   * i punkty po drodze. Pierwsze wyznaczenie dnia kosztuje tokeny, kolejne
+   * przeliczenia tego dnia są bez opłaty — dlatego po każdej poprawce opłacony
+   * dzień przelicza się sam.
+   */
+  const wyznaczTraseDnia = async (nr: number, zmiany: { tryb?: 'pieszo' | 'rower'; via?: { lat: number; lng: number }[] } = {}) => {
+    const idWersji = planIdRef.current;
+    const dzien = (planRef.current?.days || []).find((d: any) => d.day === nr);
+    if (!idWersji || !dzien) return;
+    const tryb = zmiany.tryb ?? dzien.trasa?.tryb ?? 'pieszo';
+    const via = zmiany.via ?? dzien.trasa?.via ?? [];
+
+    setDayRoutes((prev) => ({ ...prev, [nr]: 'loading' }));
     try {
-      const data = await apiPost<any>('/live-route', {
-        points,
-        route_type: 'city_walk',
-        intent: 'popular'
-      }, { timeoutMs: 90_000 });
-      const wynik = {
-        km: data.distance_km,
-        h: data.duration_h,
-        // Ślad z routera trzymamy przy dniu, żeby mapa obok pokazała ten sam
-        // przebieg, o którym mówią liczby w pasku.
-        track: Array.isArray(data.trackPoints)
-          ? data.trackPoints.map((t: any[]) => [t[0], t[1]] as [number, number])
-          : null
-      };
-      setDayRoutes((prev) => ({ ...prev, [day.day]: wynik }));
-
-      // Przebieg kosztuje 10 tokenów, a leżał wyłącznie w stanie komponentu —
-      // odświeżenie strony kasowało to, za co użytkownik zapłacił, i kazało
-      // płacić drugi raz. Dopisujemy go do zapisanego planu.
-      if (planId && wynik.track) {
-        const zPrzebiegiem = {
-          ...plan,
-          days: (plan?.days || []).map((d: any) =>
-            d.day === day.day
-              ? { ...d, track: wynik.track, route_km: wynik.km, route_h: wynik.h }
-              : d)
-        };
-        setPlan(zPrzebiegiem);
-        setSavedPlans((prev) => prev.map((sp) =>
-          sp.id === planId ? { ...sp, plan: zPrzebiegiem } : sp));
-        await supabase.from('trip_plans').update({ plan: zPrzebiegiem }).eq('id', planId);
+      const data = await apiPost<any>('/plan-day-route', { plan_id: idWersji, day: nr, tryb, via }, { timeoutMs: 90_000 });
+      const nowy = zDniem(planRef.current, nr, (d) => ({
+        ...d,
+        track: data.track, route_km: data.km, route_h: data.h,
+        trasa: { tryb: data.tryb, via: data.via, podejscie_m: data.podejscie_m, oplacona: true },
+      }));
+      await zapiszZmianePlanu(nowy, idWersji);
+      if (data.pobrano > 0) {
+        toast.success(t('plan.trasa_oplacona', { nr, koszt: t('plan.koszt', { count: data.pobrano }) }));
+        refreshTokens();
       }
     } catch (err: any) {
-      setDayRoutes((prev) => { const next = { ...prev }; delete next[day.day]; return next; });
-      toast.error(err.message || 'Nie udało się przeliczyć dnia');
+      setDayRoutes(przebiegiZPlanu(planRef.current));
+      toast.error(err?.message || t('plan.trasa_blad'));
+    }
+  };
+
+  /**
+   * Tryb i punkty po drodze. Na opłaconym dniu trasa przelicza się od razu, bez
+   * opłaty; na nieopłaconym wybór tylko się zapisuje, a liczy się dopiero po
+   * „Wyznacz trasę" — żeby zmiana trybu nie pobierała tokenów bez pytania.
+   */
+  const ustawTraseDnia = async (nr: number, zmiany: { tryb?: 'pieszo' | 'rower'; via?: { lat: number; lng: number }[] }) => {
+    const dzien = (planRef.current?.days || []).find((d: any) => d.day === nr);
+    if (!dzien) return;
+    if (dzien.trasa?.oplacona) return wyznaczTraseDnia(nr, zmiany);
+    const bezPrzebiegu = zmiany.via !== undefined || (zmiany.tryb && zmiany.tryb !== (dzien.trasa?.tryb ?? 'pieszo'));
+    await zapiszZmianePlanu(zDniem(planRef.current, nr, (d) => {
+      const { track: _t, route_km: _k, route_h: _h, ...reszta } = d;
+      return { ...(bezPrzebiegu ? reszta : d), trasa: { ...(d.trasa || {}), ...zmiany } };
+    }));
+  };
+
+  /** Po poprawce planu opłacone dni bez przebiegu przeliczają się same — po kolei, żeby zapisy się nie nadpisały. */
+  const przeliczOplaconeDni = async (p: any) => {
+    for (const d of p?.days || []) {
+      if (d.trasa?.oplacona && !d.track) await wyznaczTraseDnia(d.day);
     }
   };
 
@@ -1197,133 +1245,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     setShares((prev) => prev.filter((s) => s.id !== id));
   };
 
-  /**
-   * Most do kreatora: z harmonogramu robimy projekt trasy z prawdziwymi
-   * współrzędnymi przypiętych miejsc, charakterem wyjazdu i historią rozmowy,
-   * po czym otwieramy kreator. Bez tego plan kończył się tekstem.
-   */
-  const buildRouteFrom = async (items: any[], label: string) => {
-    if (!active) return;
-    // Pozycje organizacyjne nie są przystankami trasy
-    // Jedna definicja dla całego pliku: bez tego pozycja organizacyjna szła do
-    // geokodera i lądowała w przypadkowym mieście.
-    const isVenue = czyPrzystanek;
-
-    const venues = items.filter(isVenue);
-    const resolved: { lat: number; lng: number; name: string; type: string }[] = [];
-    const unresolved: string[] = [];
-
-    for (const it of venues) {
-      // Nocleg bierze punkt z ustawień wyjazdu. W starszych planach pozycja hotelu
-      // niosła współrzędne sąsiedniego miejsca, a bez punktu startowego lepiej ją
-      // pominąć, niż wysłać nazwę hotelu do geokodera.
-      if (czyBaza(it, bazaWyjazdu)) {
-        if (bazaWyjazdu?.lat != null && bazaWyjazdu?.lng != null) {
-          resolved.push({ lat: bazaWyjazdu.lat, lng: bazaWyjazdu.lng, name: bazaWyjazdu.name || it.name, type: 'waypoint' });
-        }
-        continue;
-      }
-      // Planer dokleja współrzędne do każdej pozycji, którą potrafi umiejscowić —
-      // także do własnych propozycji. Korzystamy z nich w pierwszej kolejności,
-      // żeby nie odsyłać nazwy do geokodera: to ten krok wysyłał trasy w
-      // przypadkowe miasta.
-      if (it.lat != null && it.lng != null) {
-        resolved.push({ lat: it.lat, lng: it.lng, name: it.name, type: 'waypoint' });
-        continue;
-      }
-      const place = places.find(
-        (p) => p.name === it.name || it.name?.includes(p.name) || p.name.includes(it.name)
-      );
-      if (place?.lat && place?.lng) {
-        resolved.push({ lat: place.lat, lng: place.lng, name: place.name, type: 'waypoint' });
-      } else {
-        unresolved.push(it.name);
-        resolved.push(null as any);
-      }
-    }
-
-    // Propozycje agenta mają tylko nazwy — dogeokodowujemy je, żeby nie wypadały
-    // z trasy tylko dlatego, że nie zostały wcześniej przypięte.
-    if (unresolved.length > 0) {
-      try {
-        const data = await apiPost<any>('/geocode-points', { names: unresolved, near: active.destination });
-        const found = new Map<string, { lat: number; lng: number }>();
-        for (const pt of data.points || []) {
-          if (pt.lat != null && pt.lng != null) found.set(pt.name, { lat: pt.lat, lng: pt.lng });
-        }
-        let cursor = 0;
-        for (let i = 0; i < resolved.length; i++) {
-          if (resolved[i] !== null) continue;
-          const name = unresolved[cursor++];
-          const hit = found.get(name);
-          resolved[i] = hit ? { ...hit, name, type: 'waypoint' } : (null as any);
-        }
-      } catch {
-        toast.error(t('tablica.nie_uda_o_sie_ustalic'));
-      }
-    }
-
-    const waypoints = (resolved.filter(Boolean) as { lat: number; lng: number; name: string; type: string }[])
-      // Koniec dnia i początek następnego to ten sam nocleg — jeden punkt, nie dwa.
-      .filter((w, i, arr) => i === 0 || kmBetween(w.lat, w.lng, arr[i - 1].lat, arr[i - 1].lng) > 0.01);
-
-    // Ostatnia bariera po stronie klienta: jeśli mimo wszystko któryś punkt
-    // wypadł daleko poza skupisko, nie wpuszczamy go do trasy.
-    if (waypoints.length >= 3) {
-      const lats = [...waypoints.map((w) => w.lat)].sort((a, b) => a - b);
-      const lngs = [...waypoints.map((w) => w.lng)].sort((a, b) => a - b);
-      const mid = Math.floor(waypoints.length / 2);
-      const cLat = lats[mid];
-      const cLng = lngs[mid];
-      const kmFrom = (w: { lat: number; lng: number }) => {
-        const dLat = (w.lat - cLat) * 111;
-        const dLng = (w.lng - cLng) * 111 * Math.cos((cLat * Math.PI) / 180);
-        return Math.sqrt(dLat * dLat + dLng * dLng);
-      };
-      const far = waypoints.filter((w) => kmFrom(w) > 40);
-      if (far.length > 0) {
-        for (const w of far) waypoints.splice(waypoints.indexOf(w), 1);
-        toast.warning(`Pominięto ${far.length} punktów poza obszarem wyjazdu: ${far.map((w) => w.name).join(', ')}`);
-      }
-    }
-
-    if (waypoints.length < 2) {
-      toast.error(t('tablica.za_ma_o_miejsc_ze'));
-      return;
-    }
-    waypoints[0].type = 'start';
-    waypoints[waypoints.length - 1].type = 'end';
-
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
-    const brief = `${active.destination}: ${label}. Miejsca: ${waypoints.map((w) => w.name).join(', ')}.`;
-    const { data, error } = await supabase
-      .from('route_builder_projects')
-      .insert({
-        user_id: userData.user.id,
-        requirements: {
-          title: `${active.name} — ${label}`,
-          waypoints,
-          vehicleType: 'city',
-          inputNotes: brief,
-          routingPreference: (active.popularity ?? 50) > 60 ? 'wild' : 'popular',
-          tripProfile: { start_point: waypoints[0].name },
-          // Punkty są ustalone — kreator ma policzyć przebieg, a nie zaczynać wywiad
-          autoCalculate: true,
-          phase: 'generate',
-          chatMessages: [
-            { role: 'user', text: brief },
-            { role: 'agent', text: `Przeniosłem ${waypoints.length} miejsc z planu. Wyznaczam przebieg — możesz go potem zmienić, przesuwając punkty albo pisząc, co poprawić.` }
-          ]
-        }
-      })
-      .select('id')
-      .single();
-    if (error) return toast.error(error.message);
-    const skipped = venues.length - waypoints.length;
-    if (skipped > 0) toast.info(`Pominięto ${skipped} miejsc, których nie udało się zlokalizować`);
-    navigate(`/route-builder-v2?projectId=${data.id}`);
-  };
 
   /** Propozycja agenta, która się spodobała, trafia na tablicę jak każde inne miejsce. */
   const pinSuggestion = async (item: any) => {
@@ -2704,6 +2625,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             <KrokiPlanu
               naPewno={mustCount}
               dniUlozone={plan?.days?.length ? plan.days.length : null}
+              dniZTrasa={(plan?.days || []).filter((x: any) => Array.isArray(x.track) && x.track.length > 1).length}
               onTablica={() => navigate(`/plany/${active.id}`)}
               onTrasa={() => document.getElementById('co-dalej')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
             />
@@ -2913,21 +2835,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </>
                             )}
                             <span>{t('tablica.punktow')} <strong className="font-mono tabular-nums text-foreground">{przystankiDnia.length}</strong></span>
-                            {trasa.length >= 2 && !measured && (
-                              <button
-                                onClick={() => recalcDay(day)}
-                                disabled={exact === 'loading'}
-                                className="ml-auto flex items-center gap-1 text-foreground hover:underline underline-offset-2 disabled:opacity-60"
-                              >
-                                {exact === 'loading'
-                                  ? <><Loader2 className="w-3 h-3 animate-spin" /> {t('tablica.licze_przebieg')}</>
-                                  : <><RefreshCw className="w-3 h-3" /> {t('plan.przelicz_po_chodnikach')}
-                                      {tokens?.prices?.['live-route'] != null && (
-                                        <span className="font-mono tabular-nums text-foreground/70">
-                                          · {t('plan.koszt', { count: tokens.prices['live-route'] })}
-                                        </span>
-                                      )}</>}
-                              </button>
+                            {exact === 'loading' && (
+                              <span className="ml-auto inline-flex items-center gap-1 text-foreground">
+                                <Loader2 className="w-3 h-3 animate-spin" aria-hidden /> {t('tablica.licze_przebieg')}
+                              </span>
                             )}
                           </div>
                           {/* Po przeniesieniu punktu dzień potrafi wyjść poza okno godzin.
@@ -3131,6 +3042,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       // Na mapę trafiają przystanki i nocleg; przejścia zostają na osi dnia.
                       const { punkty } = punktyDnia(wszystkie, bazaWyjazdu);
                       const pts = punkty.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng, nr: p.nr, propozycja: p.propozycja }));
+                      const via: { lat: number; lng: number }[] = d?.trasa?.via ?? [];
+                      const tryb: 'pieszo' | 'rower' = d?.trasa?.tryb === 'rower' ? 'rower' : 'pieszo';
                       const bazaNaMapie = bazaWyjazdu?.lat != null && bazaWyjazdu?.lng != null
                         ? { name: bazaWyjazdu.name || 'Nocleg', lat: bazaWyjazdu.lat, lng: bazaWyjazdu.lng }
                         : null;
@@ -3141,23 +3054,68 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       const naMapieIle = punkty.filter((p) => p.nr != null).length;
                       return (
                         <div className="rounded-md border border-border overflow-hidden bg-card">
+                          {/* Edycja trasy, która mieszkała w osobnym kreatorze: tryb, punkty
+                              po drodze klikane na mapie. Zapis idzie do tego samego planu. */}
                           <PlanDayMap points={pts} baza={bazaNaMapie} track={dayTrack} className="h-[380px] w-full"
+                            via={via}
+                            onUsunVia={(i) => ustawTraseDnia(d.day, { via: via.filter((_: any, j: number) => j !== i) })}
+                            onKlikMapy={dodawanieVia && via.length < 10
+                              ? (lat, lng) => ustawTraseDnia(d.day, {
+                                  via: [...via, { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 }],
+                                })
+                              : undefined}
                             onPunkt={(i) => {
                               // Karta otwiera się z tym samym numerem, który widać na pinezce.
                               const p = punkty[i];
                               if (p && p.nr != null) openPlaceCard({ ...wszystkie[p.pozycja], nr: p.nr });
                             }} />
-                          <div className="flex items-center justify-between px-4 py-2.5 border-t border-border">
-                            <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                              Trasa dnia
-                            </span>
-                            <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
-                              {/* Liczymy to, co widać, a nie czego brakuje. „Bez położenia"
-                                  brzmiało jak awaria danych, choć znaczy tylko tyle, że
-                                  nie ustaliliśmy współrzędnych tego punktu. */}
-                              {naMapieIle} z {przystanki} na mapie
-                              {dayTrack && dr && dr !== 'loading' && ` · ${dziesietna(dr.km)} km`}
-                            </span>
+                          <div className="px-4 py-3 border-t border-border space-y-2.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div role="group" aria-label={t('plan.tryb_aria')}
+                                className="inline-flex rounded-full border border-border p-0.5">
+                                {(['pieszo', 'rower'] as const).map((tr) => (
+                                  <button key={tr} type="button" aria-pressed={tryb === tr}
+                                    disabled={dr === 'loading'}
+                                    onClick={() => tryb !== tr && ustawTraseDnia(d.day, { tryb: tr })}
+                                    className={`rounded-full px-3 py-1 text-[13px] transition-colors disabled:opacity-60
+                                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                      tryb === tr ? 'bg-foreground text-background' : 'text-foreground/70 hover:text-foreground'
+                                    }`}>
+                                    {t(`plan.tryb_${tr}`)}
+                                  </button>
+                                ))}
+                              </div>
+                              <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                                {/* Liczymy to, co widać, a nie czego brakuje. „Bez położenia"
+                                    brzmiało jak awaria danych, choć znaczy tylko tyle, że
+                                    nie ustaliliśmy współrzędnych tego punktu. */}
+                                {naMapieIle} z {przystanki} na mapie
+                                {dayTrack && dr && dr !== 'loading' && ` · ${dziesietna(dr.km)} km`}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 text-[13px] min-h-[24px]">
+                              {dodawanieVia ? (
+                                <>
+                                  <span className="text-foreground text-pretty">{t('plan.po_drodze_aktywne')}</span>
+                                  <button type="button" onClick={() => setDodawanieVia(false)}
+                                    className="shrink-0 font-medium text-foreground underline underline-offset-2
+                                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+                                    {t('plan.po_drodze_koniec')}
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button type="button" onClick={() => setDodawanieVia(true)} disabled={via.length >= 10}
+                                    className="inline-flex items-center gap-1.5 text-foreground hover:underline underline-offset-2
+                                               disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+                                    <Plus className="w-3.5 h-3.5" aria-hidden /> {t('plan.po_drodze_dodaj')}
+                                  </button>
+                                  {via.length > 0 && (
+                                    <span className="text-muted-foreground">{t('plan.po_drodze_ile', { count: via.length })}</span>
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -3174,10 +3132,14 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       przebieg={dayRoutes[d.day] ?? null}
                       mozna={punktyTrasy.length >= 2}
                       cenaTrasy={tokens?.prices?.['live-route']}
-                      onWyznacz={() => recalcDay(d)}
+                      oplacona={!!d.trasa?.oplacona}
+                      tryb={d.trasa?.tryb === 'rower' ? 'rower' : 'pieszo'}
+                      podejscieM={d.trasa?.podejscie_m ?? 0}
+                      onWyznacz={() => wyznaczTraseDnia(d.day)}
                       onPobierzGpx={() => pobierzGpxDnia(d)}
-                      onKreator={() => buildRouteFrom(d.items || [], `dzień ${d.day}`)}
-                      onCalyWyjazd={() => buildRouteFrom(days.flatMap((x: any) => x.items || []), 'cały wyjazd')}
+                      dniZTrasa={days.filter((x: any) => Array.isArray(x.track) && x.track.length > 1).length}
+                      wszystkichDni={days.length}
+                      onPobierzGpxWyjazdu={pobierzGpxWyjazdu}
                     />
                   );
                 })()}

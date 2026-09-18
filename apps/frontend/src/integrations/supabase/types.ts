@@ -424,10 +424,11 @@ export type Database = {
           visit_minutes: number | null
           waznosc: number | null
           waznosc_zrodlo: string | null
-          wyroznik: string | null
-          wyroznik_i18n: Json | null
           website: string | null
           wiki_extract: string | null
+          wikipedia: string | null
+          wyroznik: string | null
+          wyroznik_i18n: Json | null
         }
         Insert: {
           category?: string
@@ -455,10 +456,11 @@ export type Database = {
           visit_minutes?: number | null
           waznosc?: number | null
           waznosc_zrodlo?: string | null
-          wyroznik?: string | null
-          wyroznik_i18n?: Json | null
           website?: string | null
           wiki_extract?: string | null
+          wikipedia?: string | null
+          wyroznik?: string | null
+          wyroznik_i18n?: Json | null
         }
         Update: {
           category?: string
@@ -486,10 +488,11 @@ export type Database = {
           visit_minutes?: number | null
           waznosc?: number | null
           waznosc_zrodlo?: string | null
-          wyroznik?: string | null
-          wyroznik_i18n?: Json | null
           website?: string | null
           wiki_extract?: string | null
+          wikipedia?: string | null
+          wyroznik?: string | null
+          wyroznik_i18n?: Json | null
         }
         Relationships: []
       }
@@ -895,6 +898,38 @@ export type Database = {
         }
         Relationships: []
       }
+      trasy_dni_oplacone: {
+        Row: {
+          created_at: string
+          dzien: number
+          plan_id: string
+          tokeny: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dzien: number
+          plan_id: string
+          tokeny: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dzien?: number
+          plan_id?: string
+          tokeny?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trasy_dni_oplacone_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "trip_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_plans: {
         Row: {
           created_at: string
@@ -932,6 +967,32 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "trip_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_project_place_votes: {
+        Row: {
+          created_at: string
+          place_id: string
+          voter_token: string
+        }
+        Insert: {
+          created_at?: string
+          place_id: string
+          voter_token: string
+        }
+        Update: {
+          created_at?: string
+          place_id?: string
+          voter_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_project_place_votes_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "trip_project_places"
             referencedColumns: ["id"]
           },
         ]
@@ -1252,6 +1313,37 @@ export type Database = {
         }
         Returns: number
       }
+      podobne_miejsca: {
+        Args: {
+          p_jezyk?: string
+          p_limit?: number
+          p_place: string
+          p_pomin?: string[]
+          p_tablica?: string
+        }
+        Returns: {
+          category: string
+          city: string
+          country: string
+          description: string
+          id: string
+          kind: string
+          lat: number
+          lng: number
+          name: string
+          opening_hours: string
+          photos: Json
+          pin_count: number
+          slug: string
+          trafnosc: number
+          vibe_tags: string[]
+          visit_minutes: number
+          waznosc: number
+          website: string
+          wspolne: number
+          wyroznik: string
+        }[]
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -1259,6 +1351,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      rm_glosuj_miejsce: {
+        Args: { p_place_id: string; p_voter_token: string }
+        Returns: Json
       }
       rm_podbij_kopie: { Args: { p_project: string }; Returns: undefined }
       show_limit: { Args: never; Returns: number }

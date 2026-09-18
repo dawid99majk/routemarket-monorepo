@@ -723,6 +723,69 @@ export class RouteBuilderRepository {
     return data as RouteArtifact;
   }
 
+  // --- Trasa dnia w planie -------------------------------------------------
+  // Klient API działa z kluczem serwisowym, więc RLS go nie chroni. Dostęp do
+  // planu sprawdzamy tu tą samą regułą co `has_project_access` w bazie:
+  // właściciel tablicy albo osoba, której ją udostępniono (po id albo e-mailu).
+
+  async getPlanForUser(planId: string, user: AuthenticatedRouteBuilderUser): Promise<{
+    id: string; project_id: string; plan: any;
+    projekt: { name: string; start_name: string | null; start_lat: number | null; start_lng: number | null };
+  } | null> {
+    const { data: wiersz, error } = await supabase
+      .from('trip_plans').select('id, project_id, plan').eq('id', planId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!wiersz) return null;
+
+    const { data: projekt } = await supabase
+      .from('trip_projects').select('id, user_id, name, start_name, start_lat, start_lng')
+      .eq('id', wiersz.project_id).maybeSingle();
+    if (!projekt) return null;
+
+    let dostep = projekt.user_id === user.id || user.roles.includes('admin');
+    if (!dostep) {
+      const { data: udzialy } = await supabase
+        .from('trip_project_shares').select('shared_with_user_id, shared_with_email')
+        .eq('project_id', projekt.id);
+      const email = (user.email || '').toLowerCase();
+      dostep = (udzialy || []).some((u: any) =>
+        u.shared_with_user_id === user.id || (!!email && String(u.shared_with_email || '').toLowerCase() === email));
+    }
+    if (!dostep) return null;
+
+    return {
+      id: wiersz.id, project_id: wiersz.project_id, plan: wiersz.plan,
+      projekt: { name: projekt.name, start_name: projekt.start_name, start_lat: projekt.start_lat, start_lng: projekt.start_lng },
+    };
+  }
+
+  async isDayRoutePaid(planId: string, dzien: number): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('trasy_dni_oplacone').select('plan_id').eq('plan_id', planId).eq('dzien', dzien).maybeSingle();
+    if (error) throw new Error(error.message);
+    return !!data;
+  }
+
+  /**
+   * Zapis opłaty za trasę dnia. Klucz główny (plan, dzień) sprawia, że drugi
+   * równoległy zapis dla tego samego dnia się nie uda — zwracamy wtedy `false`
+   * i wywołujący nie pobiera drugi raz.
+   */
+  async markDayRoutePaid(planId: string, dzien: number, userId: string, tokeny: number): Promise<boolean> {
+    const { error } = await supabase
+      .from('trasy_dni_oplacone').insert({ plan_id: planId, dzien, user_id: userId, tokeny });
+    if (error) {
+      if ((error as any).code === '23505') return false;
+      throw new Error(error.message);
+    }
+    return true;
+  }
+
+  async listPaidDays(planId: string): Promise<number[]> {
+    const { data } = await supabase.from('trasy_dni_oplacone').select('dzien').eq('plan_id', planId);
+    return (data || []).map((r: any) => r.dzien);
+  }
+
 }
 
 export const repo = new RouteBuilderRepository();
