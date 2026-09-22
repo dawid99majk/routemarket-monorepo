@@ -59,6 +59,15 @@ export function punktyDnia(
     if (!czyPrzystanek(it) || typeof it.lat !== 'number' || typeof it.lng !== 'number') continue;
     punkty.push({ name: it.name, lat: it.lat, lng: it.lng });
   }
+  // Dzień wychodzi z noclegu i do niego wraca, także w planach, w których model
+  // go pominął — inaczej odcinek i plik GPX zaczynały się przy pierwszej atrakcji
+  // i start wypadał każdego dnia gdzie indziej. Dotyczy też planów zapisanych
+  // wcześniej, bez układania ich od nowa.
+  if (maBaza && punkty.length > 0) {
+    const b = { name: baza!.name || punkty[0].name, lat: baza!.lat!, lng: baza!.lng! };
+    if (km(punkty[0], b) > 0.01) punkty.unshift({ ...b });
+    if (km(punkty[punkty.length - 1], b) > 0.01) punkty.push({ ...b });
+  }
   // Koniec jednego odcinka i początek następnego w tym samym miejscu to jeden punkt.
   return punkty.filter((p, i) => i === 0 || km(p, punkty[i - 1]) > 0.01);
 }

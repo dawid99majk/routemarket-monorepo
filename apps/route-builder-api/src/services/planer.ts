@@ -811,6 +811,8 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   // Kolejność ma znaczenie: strażnik dokłada wpisy do not_scheduled, więc musi
   // zadziałać przed filtrem, który zostawia tam wyłącznie kotwice tego dnia.
   odsiejZamkniete(k, dzien, numer);
+  // Na końcu, żeby żaden wcześniejszy krok nie przesunął ani nie wyciął noclegu.
+  dopnijBazeDoDnia(k, dzien);
 
   // "Nie zmieściło się" ma mówić o tym, co użytkownik przypiął na ten dzień.
   const kotwice = new Set((k.grupy[numer - 1] ?? []).map((p) => p.name.trim().toLowerCase()));
@@ -1100,6 +1102,71 @@ export function przypnijBaze(k: KontekstPlanu, dzien: DzienPlanu): void {
 }
 
 const GODZINA = /^\d{1,2}:\d{2}$/;
+
+/** Odwrotność `czasNaMinuty`: 520 → "08:40". */
+const minutyNaCzas = (m: number): string => {
+  const x = Math.max(0, Math.min(23 * 60 + 59, Math.round(m)));
+  return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`;
+};
+
+/** Dojście pieszo w pełnych pięciu minutach — ta sama miara co w sprawdzOdleglosci. */
+const dojsciePieszo = (a: { lat: number; lng: number }, b: { lat?: any; lng?: any }): number =>
+  Math.ceil((kmOd(a, b) * 1.3 * 15) / 5) * 5;
+
+const maPunkt = (it: PozycjaDnia): boolean =>
+  it.kind !== 'walk' && typeof it.lat === 'number' && typeof it.lng === 'number';
+
+/**
+ * Każdy dzień wychodzi z noclegu i do niego wraca.
+ *
+ * Prompt prosił o to od dawna („dzień zaczyna się i kończy tutaj"), ale prośba to
+ * nie gwarancja. W czterodniowym planie Hagi dni 1 i 3 zaczynały się w hotelu,
+ * a 2 i 4 przy pierwszej atrakcji i do hotelu nie wracały — na mapie start
+ * wypadał każdego dnia gdzie indziej, choć nocleg był jeden. `przypnijBaze`
+ * poprawia tylko pozycje, które model sam napisał; tu dopisujemy brakujące.
+ *
+ * Godzina wyjścia jest liczona wstecz od pierwszej pozycji: model zwykle stawia
+ * pierwszą atrakcję na samym początku dnia i nie zostawia czasu na dojście.
+ * Powrót — od końca ostatniej pozycji plus dojście. Bez `minutes`: w noclegu
+ * nic się nie zwiedza, a zero wyrenderowałoby się na osi dnia jako „0".
+ */
+export function dopnijBazeDoDnia(k: KontekstPlanu, dzien: DzienPlanu): void {
+  const baza = k.baza;
+  if (!baza) return;
+  const items = dzien.items;
+  // Dzień bez żadnego miejsca na mapie nie potrzebuje wyjścia ani powrotu.
+  if (!items.some((it) => maPunkt(it) && !it.baza)) return;
+
+  const nocleg = (time: string, note: string): PozycjaDnia => ({
+    time, note,
+    name: k.zadanie.hotel?.name || baza.name,
+    kind: 'hotel', baza: true, source: 'pinned',
+    lat: baza.lat, lng: baza.lng,
+  });
+
+  const pierwszeMiejsce = items.find((it) => it.kind !== 'walk');
+  if (!pierwszeMiejsce?.baza) {
+    const pierwsza = items[0];
+    let godzina = pierwsza.time;
+    // Przejście na początku dnia już zawiera dojście — wtedy wychodzimy o jego godzinie.
+    if (maPunkt(pierwsza) && GODZINA.test(pierwsza.time)) {
+      godzina = minutyNaCzas(czasNaMinuty(pierwsza.time) - dojsciePieszo(baza, pierwsza));
+    }
+    items.unshift(nocleg(godzina, 'Wyjście z noclegu.'));
+  }
+
+  const ostatnieMiejsce = [...items].reverse().find((it) => it.kind !== 'walk');
+  if (!ostatnieMiejsce?.baza) {
+    const ostatnia = items[items.length - 1];
+    let godzina = ostatnia.time;
+    if (GODZINA.test(ostatnia.time)) {
+      let koniec = czasNaMinuty(ostatnia.time) + (ostatnia.minutes || 0);
+      if (maPunkt(ostatnia)) koniec += dojsciePieszo(baza, ostatnia);
+      godzina = minutyNaCzas(koniec);
+    }
+    items.push(nocleg(godzina, 'Powrót do noclegu.'));
+  }
+}
 
 /**
  * Deterministyczna kontrola geografii dnia — ta sama zasada co przy godzinach

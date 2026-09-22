@@ -183,6 +183,18 @@ export function punktyDnia(items: any[], baza: BazaWyjazdu | null): {
     numery.push(nr);
     punkty.push({ name: it.name, lat: it.lat, lng: it.lng, nr, pozycja: i, propozycja: it.source === 'suggested' });
   });
+  // Dzień wychodzi z noclegu i do niego wraca, także gdy model pominął nocleg
+  // w planie. Bez tego linia dnia i plik GPX zaczynały się przy pierwszej atrakcji,
+  // choć dom na mapie stał w hotelu — start wypadał każdego dnia gdzie indziej.
+  // Dopisany punkt nie wskazuje żadnej pozycji planu, stąd `pozycja: -1`;
+  // `numery` i `bazy` zostają równoległe do `items`.
+  if (maPunktBazy && punkty.some((p) => p.nr != null)) {
+    const nocleg = (): PunktDnia => ({
+      name: baza!.name || 'Nocleg', lat: baza!.lat!, lng: baza!.lng!, nr: null, pozycja: -1, propozycja: false,
+    });
+    if (punkty[0].nr != null) punkty.unshift(nocleg());
+    if (punkty[punkty.length - 1].nr != null) punkty.push(nocleg());
+  }
   return { punkty, numery, bazy };
 }
 
