@@ -180,8 +180,8 @@ export default function Start() {
         // Ktoś wpisał miasto na landingu i po drodze musiał się zalogować.
         // Dokończenie za niego jest sensem tego przeniesienia — wypełnione pole
         // i tak kazałoby kliknąć drugi raz to samo.
-        await utworzWyjazd({ cel, klimat: klimat || 'family' });
-        navigate('/odkrywaj?nowy=1');
+        const id = await utworzWyjazd({ cel, klimat: klimat || 'family' });
+        navigate(id ? `/odkrywaj?wyjazd=${id}` : '/odkrywaj');
       } catch { /* uszkodzony zapis albo nieudany zapis pomijamy */ }
     })();
   }, [navigate]);

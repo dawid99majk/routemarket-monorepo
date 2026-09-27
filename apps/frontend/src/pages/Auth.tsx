@@ -190,14 +190,14 @@ export default function Auth() {
           {mode === 'login' ? (
             <p className="text-sm text-muted-foreground">
               {t('auth.no_account')}{' '}
-              <button onClick={() => setMode('signup')} className="text-primary hover:underline font-medium">
+              <button onClick={() => setMode('signup')} className="text-foreground underline underline-offset-2 hover:no-underline font-medium">
                 {t('common.signup')}
               </button>
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">
               {t('auth.has_account')}{' '}
-              <button onClick={() => setMode('login')} className="text-primary hover:underline font-medium">
+              <button onClick={() => setMode('login')} className="text-foreground underline underline-offset-2 hover:no-underline font-medium">
                 {t('common.login')}
               </button>
             </p>

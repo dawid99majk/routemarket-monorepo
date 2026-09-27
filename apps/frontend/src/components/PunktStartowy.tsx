@@ -3,6 +3,7 @@ import { Crosshair, Loader2, MapPin, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { etykietaRodzaju } from '@/lib/rodzaj';
 import { apiPost } from '@/lib/api';
 
 interface PunktStartowyProps {
@@ -126,7 +127,7 @@ export default function PunktStartowy({
                          border-b border-border last:border-b-0">
               <div className="text-sm truncate">{sug.name}</div>
               <div className="font-mono text-[11px] text-muted-foreground truncate">
-                {[sug.kind, [sug.city, sug.country].filter(Boolean).join(' / ')]
+                {[etykietaRodzaju(sug.kind), [sug.city, sug.country].filter(Boolean).join(' / ')]
                   .filter(Boolean).join(' · ')}
               </div>
             </button>
@@ -138,7 +139,7 @@ export default function PunktStartowy({
           planer i tak dostanie ją jako bazę wyjazdu. */}
       {fraza.trim().length >= 3 && (
         <button onClick={() => zapisz(fraza.trim(), null, null)}
-          className="mt-2 text-[12px] text-accent hover:underline">
+          className="mt-2 text-[12px] text-foreground underline underline-offset-2 hover:no-underline">
           Użyj „{fraza.trim()}" jako nazwy własnej
         </button>
       )}

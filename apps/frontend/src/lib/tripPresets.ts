@@ -77,3 +77,12 @@ export function mergePreferences(
   }
   return out;
 }
+
+/**
+ * Charakter wyjazdu do wyświetlenia („we dwoje”), nie identyfikator („couple”).
+ * Nieznany identyfikator daje null — lepiej nic niż kod w interfejsie.
+ */
+export function etykietaCharakteru(id?: string | null): string | null {
+  if (!id) return null;
+  return TRIP_PRESETS.find((p) => p.id === id)?.label.toLowerCase() ?? null;
+}

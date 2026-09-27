@@ -9,12 +9,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-token-xs hover:bg-primary/90 hover:shadow-token-sm active:scale-[0.98]",
+        // Granat, nie teal: teal znaczy w tym systemie wyłącznie „na pewno”, a bursztyn
+        // „być może” i głos agenta. Domyślny wariant w kolorze teal robił z każdego
+        // przycisku bez klasy (logowanie, „Ułóż plan”, „Opublikuj”) fałszywy sygnał
+        // decyzji; obrys i ghost podświetlały się bursztynem jak propozycja agenta.
+        default: "bg-foreground text-background shadow-token-xs hover:bg-foreground/90 hover:shadow-token-sm active:scale-[0.98]",
         destructive: "bg-destructive text-destructive-foreground shadow-token-xs hover:bg-destructive/90 hover:shadow-token-sm active:scale-[0.98]",
-        outline: "border border-input bg-background shadow-token-xs hover:bg-accent hover:text-accent-foreground hover:shadow-token-sm active:scale-[0.98]",
+        outline: "border border-input bg-background shadow-token-xs hover:bg-muted hover:text-foreground hover:shadow-token-sm active:scale-[0.98]",
         secondary: "bg-secondary text-secondary-foreground shadow-token-xs hover:bg-secondary/80 hover:shadow-token-sm active:scale-[0.98]",
-        ghost: "hover:bg-accent hover:text-accent-foreground active:scale-[0.98]",
-        link: "text-primary underline-offset-4 hover:underline",
+        ghost: "hover:bg-muted hover:text-foreground active:scale-[0.98]",
+        link: "text-foreground underline underline-offset-4 decoration-foreground/40 hover:decoration-foreground",
         success: "bg-success text-success-foreground shadow-token-xs hover:bg-success/90 hover:shadow-token-sm active:scale-[0.98]",
         warning: "bg-warning text-warning-foreground shadow-token-xs hover:bg-warning/90 hover:shadow-token-sm active:scale-[0.98]",
         danger: "bg-danger text-danger-foreground shadow-token-xs hover:bg-danger/90 hover:shadow-token-sm active:scale-[0.98]",

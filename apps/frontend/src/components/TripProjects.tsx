@@ -34,6 +34,7 @@ import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { bilansTablicy } from '@/lib/bilansTablicy';
 import { dziesietna } from '@/lib/liczby';
 import { odmien } from '@/lib/odmiana';
+import { etykietaRodzaju } from '@/lib/rodzaj';
 import { format, parse, isValid } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { pl } from 'date-fns/locale';
@@ -287,6 +288,13 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         .eq('project_id', activeId)
         .order('created_at', { ascending: false });
       setSavedPlans(plans || []);
+      // „Ułóż plan” z Odkrywaj przychodzi z ?uloz=1. Bez tego lądowało się na
+      // pustej zakładce planu z kolejnym przyciskiem „Ułóż plan” — trzecie
+      // kliknięcie w to samo, zanim cokolwiek się stało.
+      if (new URLSearchParams(window.location.search).get('uloz') === '1') {
+        navigate(`/plany/${activeId}?widok=plan`, { replace: true });
+        if (!plans?.length && (data ?? []).some((m: any) => m.priority === 'must')) setPokazUkladanie(true);
+      }
       const { data: sh } = await supabase
         .from('trip_project_shares')
         .select('id, shared_with_email, role')
@@ -1688,9 +1696,16 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </Button>
             )}
             {active && (mustCount > 0 || places.filter((p) => p.priority !== 'rejected').length > 0) && view === 'tablica' && (
-              <Button onClick={() => navigate(`/plany/${active.id}?widok=plan`)}
+              <Button onClick={() => {
+                  navigate(`/plany/${active.id}?widok=plan`);
+                  // Bez planu od razu okno ułożenia — wcześniej ten przycisk prowadził
+                  // na pustą zakładkę z drugim „Ułóż plan”, a tamten dopiero do okna.
+                  if (savedPlans.length === 0 && mustCount > 0) setPokazUkladanie(true);
+                }}
                 className="bg-foreground text-background hover:bg-foreground/90">
-                Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗
+                {savedPlans.length > 0
+                  ? t('plan.otworz_plan')
+                  : <>Ułóż plan{active.days ? ` na ${active.days} ${odmien(active.days, 'dzień', 'dni', 'dni')}` : ''}</>} ↗
               </Button>
             )}
           </div>
@@ -1702,8 +1717,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Lekka pigułka statusu agenta Co-pilot */}
             {places.filter((p) => p.priority !== 'rejected').length > 0 && (
               <div className="flex items-center justify-between flex-wrap gap-3 py-1">
-                <div className="inline-flex items-start gap-2.5 px-4 py-2 rounded-full bg-primary/5 border border-primary/15 text-xs text-foreground/85 shadow-2xs">
-                  <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 mt-px" />
+                <div className="inline-flex items-start gap-2.5 px-4 py-2 rounded-full bg-accent/15 border border-accent/40 text-xs text-foreground/85 shadow-2xs">
+                  <Sparkles className="w-3.5 h-3.5 text-foreground/70 shrink-0 mt-px" />
                   <span>{uwagaAgenta?.tekst}</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
@@ -1715,7 +1730,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   )}
                   <button
                     onClick={() => { setPokazBocznyPanel(true); setZakladkaPanelu('logistyka'); }}
-                    className="text-primary hover:underline font-sans font-medium ml-1"
+                    className="text-foreground underline underline-offset-2 hover:no-underline font-sans font-medium ml-1"
                   >
                     Dostosuj ↗
                   </button>
@@ -2050,7 +2065,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               <div key={`${m.name}-${i}`} className="rounded-md border border-border bg-background p-2.5 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="font-display text-[14px] leading-snug truncate">{m.name}</div>
-                                  <div className="font-mono text-[11px] text-muted-foreground truncate">{m.kind}</div>
+                                  {etykietaRodzaju(m.kind) && (
+                                    <div className="font-mono text-[11px] text-muted-foreground truncate">{etykietaRodzaju(m.kind)}</div>
+                                  )}
                                 </div>
                                 <div className="flex gap-1 shrink-0">
                                   <Button size="sm" onClick={() => dodajWyluskane(m, 'must')} className="h-7 px-2 text-xs bg-primary text-primary-foreground">
@@ -2263,7 +2280,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           <span className="flex items-center gap-2.5">
                             <span className={`font-narrow uppercase tracking-[0.18em] text-[11px] font-semibold ${
                               zone.id === 'must' ? 'text-primary'
-                                : zone.id === 'nice' ? 'text-accent' : 'text-muted-foreground'
+                                : zone.id === 'nice' ? 'text-foreground' : 'text-muted-foreground'
                             }`}>
                               {zone.label}
                             </span>
@@ -2472,7 +2489,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <button onClick={() => setEditingType((v) => !v)}
                   className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                     active.trip_type
-                      ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+                      ? 'border-border bg-muted text-foreground hover:bg-muted/70'
                       : 'hover:bg-muted'
                   }`}>
                   {active.trip_type
@@ -2536,9 +2553,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Okno karty miejsca zostaje poza podziałem: otwiera je zarówno kafelek
                 na tablicy, jak i punkt na osi dnia w planie. */}
             <Dialog open={pytanieOPodpis} onOpenChange={setPytanieOPodpis}>
-              <DialogContent className="max-w-sm">
+              <DialogContent className="max-w-sm p-6 gap-4">
                 <DialogHeader>
-                  <DialogTitle className="text-left leading-snug">Jak Cię podpisać?</DialogTitle>
+                  <DialogTitle className="text-left leading-snug pr-8">Jak Cię podpisać?</DialogTitle>
                 </DialogHeader>
                 <p className="text-[13px] text-muted-foreground leading-relaxed">
                   Ten podpis zobaczą wszyscy, którzy trafią na Twoją tablicę.
@@ -2863,13 +2880,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       })()}
 
                       {(day.items || []).map((it: any, i: number) => {
-                        const suggested = it.source === 'suggested';
                         const alreadyPinned = places.some((p) => p.name === it.name);
                         // Numer liczy wyłącznie przystanki z mapy — ten sam, co na pinezce.
                         // Nocleg i przejścia nie dostają numeru, więc nie przesuwają reszty.
                         const { numery, bazy } = punktyDnia(day.items || [], bazaWyjazdu);
                         const nrNaMapie = numery[i];
                         const wBazie = bazy[i];
+                        // Starsze plany mają przy noclegu „suggested” i 15–45 min od modelu;
+                        // serwer już to zdejmuje, tu chowamy to w planach zapisanych wcześniej.
+                        const suggested = it.source === 'suggested' && !wBazie;
                         const przejscie = !wBazie && !czyPrzystanek(it);
                         const naMapie = nrNaMapie != null;
                         // Przerwa między tym punktem a poprzednim — własny wiersz,
@@ -2898,7 +2917,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           <div className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
                             <span className="w-14 shrink-0 pt-0.5">
                               <span className="font-mono text-[13px] tabular-nums block">{it.time}</span>
-                              {it.minutes && (
+                              {it.minutes && !wBazie && (
                                 <span className="font-mono text-[11px] tabular-nums text-muted-foreground block mt-0.5">
                                   {formatMinutes(it.minutes)}
                                 </span>
@@ -2936,7 +2955,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               <div className="font-display text-[15px] flex items-center gap-2 flex-wrap">
                                 <button
                                   onClick={() => openPlaceCard({ ...it, nr: nrNaMapie })}
-                                  className="text-left hover:text-primary hover:underline decoration-dotted underline-offset-2"
+                                  className="text-left hover:underline decoration-dotted underline-offset-2"
                                 >
                                   {it.name}
                                 </button>
@@ -3148,7 +3167,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 </div>
 
                 {plan.question && (
-                  <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
+                  <div className="rounded-md border border-accent/40 bg-accent/10 p-3 text-sm text-foreground">
                     {plan.question}
                   </div>
                 )}
@@ -3163,7 +3182,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 <h2 className="font-display font-light text-[24px]">{t('tablica.planu_jeszcze_nie_ma')}</h2>
                 <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
                   {mustCount > 0
-                    ? `Na tablicy czeka ${mustCount} ${odmien(mustCount, 'miejsce', 'miejsca', 'miejsc')} oznaczonych „na pewno”. Ułóż z nich dni.`
+                    ? `Na tablicy ${odmien(mustCount, 'czeka', 'czekają', 'czeka')} ${mustCount} ${odmien(mustCount, 'miejsce oznaczone', 'miejsca oznaczone', 'miejsc oznaczonych')} „na pewno”. Ułóż z nich dni.`
                     : 'Najpierw oznacz na tablicy miejsca, bez których wyjazd nie ma sensu. Z nich powstanie plan.'}
                 </p>
                 {/* Przycisk otwiera ustawienia ułożenia (godziny, data, cena), zamiast
@@ -3175,7 +3194,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   onClick={() => (mustCount > 0 ? setPokazUkladanie(true) : navigate(`/plany/${active.id}`))}
                 >
                   {mustCount > 0
-                    ? <>Ułóż plan{active.days ? ` na ${active.days} dni` : ''} ↗</>
+                    ? <>Ułóż plan{active.days ? ` na ${active.days} ${odmien(active.days, 'dzień', 'dni', 'dni')}` : ''} ↗</>
                     : 'Wróć na tablicę'}
                 </Button>
               </div>

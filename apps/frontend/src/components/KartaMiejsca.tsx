@@ -3,6 +3,7 @@ import { CalendarDays, Clock, ExternalLink, Loader2, MapPin } from 'lucide-react
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Zdjecie from '@/components/Zdjecie';
 import PodobneMiejsca, { type PodobneMiejsce } from '@/components/PodobneMiejsca';
+import { formatujGodziny } from '@/lib/godziny';
 import GaleriaZdjec from '@/components/GaleriaZdjec';
 
 export type Decyzja = 'must' | 'nice' | 'rejected';
@@ -67,26 +68,7 @@ const czas = (min?: number | null) => {
  * dla wyszukiwarek i podglądów odnośników. Skasowanie jej zabrałoby RouteMarket
  * z wyników wyszukiwania — okno służy przeglądaniu, strona dzieleniu się.
  */
-export function formatujGodziny(raw?: string | null): string | null {
-  if (!raw) return null;
-  let h = raw.trim();
-  // Czyścimy reguły świąteczne zaśmiecające widok
-  const czesci = h.split(';')
-    .map(s => s.trim())
-    .filter(s => !s.match(/^(PH|Dec\s*\d+|Jan\s*\d+|Nov\s*\d+|Easter)/i));
-  if (czesci.length === 0) return raw;
-  h = czesci.join(' · ')
-    .replace(/\bMo\b/g, 'pn')
-    .replace(/\bTu\b/g, 'wt')
-    .replace(/\bWe\b/g, 'śr')
-    .replace(/\bTh\b/g, 'czw')
-    .replace(/\bFr\b/g, 'pt')
-    .replace(/\bSa\b/g, 'sob')
-    .replace(/\bSu\b/g, 'nd')
-    .replace(/\boff\b/gi, 'nieczynne')
-    .replace(/-/g, '–');
-  return h.length > 60 ? h.slice(0, 58) + '…' : h;
-}
+export { formatujGodziny };
 
 export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, ladowanie,
                                        idKatalogu, pomin, tablica, onOtworzPodobne, onDodajPodobne }: Props) {

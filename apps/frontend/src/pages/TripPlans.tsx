@@ -14,6 +14,7 @@ import {
 import PlannerHeader from '@/components/PlannerHeader';
 import TripProjects from '@/components/TripProjects';
 import SEO from '@/components/SEO';
+import { etykietaCharakteru } from '@/lib/tripPresets';
 import { useTranslation } from 'react-i18next';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 
@@ -145,7 +146,8 @@ export default function TripPlans() {
     return (
       
       <div className="min-h-screen bg-background">
-        <SEO title={t('seo.plany.title')} url="/plany" />
+        {/* Karta przeglądarki mówiła „Twoje wyjazdy” także na konkretnej tablicy. */}
+        <SEO title={context ?? t('seo.plany.title')} url={`/plany/${id}`} noIndex />
         <PlannerHeader context={context} initials={initials} />
         <main className="max-w-[1400px] mx-auto px-6 py-8">
           <TripProjects projectId={id} onContextChange={setContext} />
@@ -269,10 +271,10 @@ export default function TripPlans() {
                   </div>
                   <div className="flex-1 min-w-0 p-5 sm:p-6 flex flex-col justify-between">
                     <div>
-                      <p className="font-narrow uppercase tracking-[0.22em] text-[10.5px] font-semibold text-primary">
+                      <p className="font-narrow uppercase tracking-[0.22em] text-[10.5px] font-semibold text-muted-foreground">
                         W trakcie układania
                       </p>
-                      <h2 className="font-display font-semibold text-[24px] sm:text-[26px] leading-[1.15] tracking-tight mt-1 truncate group-hover:text-primary transition-colors">
+                      <h2 className="font-display font-semibold text-[24px] sm:text-[26px] leading-[1.15] tracking-tight mt-1 truncate group-hover:underline decoration-foreground/30 underline-offset-4 transition-colors">
                         {wTrakcie.name}
                       </h2>
                       <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">
@@ -281,7 +283,7 @@ export default function TripPlans() {
                             ? zakresDat((wTrakcie as any).start_date, (wTrakcie as any).end_date)
                             : null,
                           ileW > 0 ? `${ileW} ${odmiana(ileW, 'miejsce', 'miejsca', 'miejsc')}` : 'pusta tablica',
-                          wTrakcie.trip_type,
+                          etykietaCharakteru(wTrakcie.trip_type),
                         ].filter(Boolean).join(' · ')}
                       </p>
                     </div>
@@ -292,7 +294,7 @@ export default function TripPlans() {
                         <span className="text-[11.5px] text-muted-foreground">na pewno</span>
                       </span>
                       <span className="flex items-baseline gap-1.5">
-                        <span className="font-display font-semibold text-[22px] tabular-nums text-accent">{p?.nice ?? 0}</span>
+                        <span className="font-display font-semibold text-[22px] tabular-nums text-foreground">{p?.nice ?? 0}</span>
                         <span className="text-[11.5px] text-muted-foreground">być może</span>
                       </span>
                       <span className="flex items-baseline gap-1.5">
@@ -412,7 +414,7 @@ export default function TripPlans() {
 
                         <div className="p-4 flex-1 flex flex-col justify-between">
                           <div>
-                            <div className="font-display text-[16.5px] font-semibold leading-snug truncate group-hover:text-primary transition-colors">{w.name}</div>
+                            <div className="font-display text-[16.5px] font-semibold leading-snug truncate">{w.name}</div>
                             <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
                               {[w.destination, terminW,
                                 ile > 0 ? `${ile} ${odmiana(ile, 'miejsce', 'miejsca', 'miejsc')}` : 'szkic']
@@ -427,7 +429,7 @@ export default function TripPlans() {
                                 <span className="text-[11px] text-muted-foreground">na pewno</span>
                               </span>
                               <span className="flex items-baseline gap-1">
-                                <span className="font-display font-semibold text-[17px] text-accent tabular-nums">{q?.nice ?? 0}</span>
+                                <span className="font-display font-semibold text-[17px] text-foreground tabular-nums">{q?.nice ?? 0}</span>
                                 <span className="text-[11px] text-muted-foreground">być może</span>
                               </span>
                             </div>
@@ -451,7 +453,7 @@ export default function TripPlans() {
                                 </p>
                               </>
                             ) : (
-                              <span className="font-mono text-[11px] text-primary">
+                              <span className="font-mono text-[11px] text-foreground underline underline-offset-2">
                                 Ułóż plan ↗
                               </span>
                             )}

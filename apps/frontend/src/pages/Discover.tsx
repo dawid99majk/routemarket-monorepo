@@ -27,6 +27,8 @@ import { opisMiejsca, wyroznikMiejsca } from '@/lib/opis';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
 import { odmien } from '@/lib/odmiana';
+import { etykietaRodzaju } from '@/lib/rodzaj';
+import { formatujGodziny } from '@/lib/godziny';
 
 const KLUCZ_OSTATNIE = 'rm_ostatnie_miasta';
 
@@ -87,6 +89,11 @@ interface CatalogPlace {
 
 type Bucket = 'must' | 'nice' | 'rejected';
 
+/** Nazwa do porównań: bez znaków diakrytycznych, wielkości liter i interpunkcji. */
+const kluczNazwy = (s: string) => String(s || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/ł/g, 'l').replace(/[^a-z0-9]+/g, ' ').trim();
+
 /** Pigułki filtrów feedu — logika wprost z dokumentu przekazania projektu. */
 /** Cechy i klimat miejsc — niezależne przełączniki (toggle chips). */
 const CECHY = [
@@ -140,6 +147,12 @@ export default function Discover() {
    *  licznika nie da się odróżnić długiego czekania od zawieszenia. */
   const [szukaSekundy, setSzukaSekundy] = useState(0);
   const [dopinane, setDopinane] = useState<Record<string, Bucket>>({});
+  /** Miejsca bieżącej tablicy spoza katalogu (dopięte z agenta), po nazwie.
+   *  Panel agenta pokazywał „Na pewno” jako niezaznaczone przy miejscach, które
+   *  już leżały na tablicy — drugi klik robił duplikat. */
+  const [naTablicyPoNazwie, setNaTablicyPoNazwie] = useState<Record<string, Bucket>>({});
+  /** Pytanie, na które odpowiadają wyniki agenta — żeby nie wisiały pod innym. */
+  const [pytanieAgenta, setPytanieAgenta] = useState('');
   const [filter, setFilter] = useState<FilterId>('all');
   const [places, setPlaces] = useState<CatalogPlace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -313,7 +326,11 @@ export default function Discover() {
     const { data } = await q
       .order('waznosc', { ascending: false, nullsFirst: false })
       .order('pin_count', { ascending: false })
-      .order('created_at', { ascending: false });
+      // Przy remisie ważności kolejność zbierania, nie odwrotna: zbieranie zapisuje
+      // najpierw zwiedzanie (posortowane rozpoznawalnością), potem jedzenie,
+      // wieczory i noclegi. Malejąco hotele i puby wychodziły przed muzea bez
+      // artykułu w Wikipedii, jak Muzeum Toruńskiego Piernika.
+      .order('created_at', { ascending: true });
     // Odpowiedź starszego zapytania nie może nadpisać nowszego. To była przyczyna
     // pustej listy po wyszukaniu: wpisanie "nowy york" wysyłało dziewięć zapytań,
     // po jednym na znak, a wracały w dowolnej kolejności. Wynik dla "nowy yor"
@@ -393,15 +410,31 @@ export default function Discover() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* Wyniki agenta odpowiadają na jedno pytanie w jednym mieście. Zostawały po
+     zmianie frazy i wyglądały jak odpowiedź na nową. */
+  useEffect(() => {
+    if (pytanieAgenta && query.trim() !== pytanieAgenta) { setWynikiAgenta([]); setPytanieAgenta(''); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+  useEffect(() => { setWynikiAgenta([]); setPytanieAgenta(''); }, [city]);
+
   /** Kubełki bieżącej tablicy — sterują podświetleniem przycisków w stopce karty. */
   useEffect(() => {
     if (!activeBoard) { setMarks({}); return; }
     (async () => {
       const { data } = await supabase
-        .from('trip_project_places').select('catalog_id, priority').eq('project_id', activeBoard);
+        .from('trip_project_places').select('catalog_id, priority, name').eq('project_id', activeBoard);
       const next: Record<string, Bucket> = {};
-      for (const row of data ?? []) if (row.catalog_id) next[row.catalog_id] = row.priority as Bucket;
+      const poNazwie: Record<string, Bucket> = {};
+      for (const row of data ?? []) {
+        if (row.catalog_id) next[row.catalog_id] = row.priority as Bucket;
+        else if (row.name) poNazwie[kluczNazwy(row.name)] = row.priority as Bucket;
+      }
       setMarks(next);
+      setNaTablicyPoNazwie(poNazwie);
+      // Dopięcia z agenta należą do poprzedniej tablicy — po przełączeniu
+      // zostawały zaznaczone, choć na nowej tablicy ich nie ma.
+      setDopinane({});
     })();
   }, [activeBoard]);
 
@@ -486,6 +519,25 @@ export default function Discover() {
   const maybeCount = Object.values(marks).filter((m) => m === 'nice').length;
 
   /**
+   * Licznik i miniatura na karcie wyjazdu. Liczone raz przy wejściu, więc karta
+   * świeżej tablicy pokazywała „0 miejsc” mimo pięciu oznaczonych.
+   */
+  const zmienLicznik = (idTablicy: string, o: number, miniatura?: string | null) =>
+    setBoards((prev) => prev.map((b) => (b.id === idTablicy
+      ? { ...b, liczba_miejsc: Math.max(0, (b.liczba_miejsc ?? 0) + o), miniatura: b.miniatura ?? miniatura ?? null }
+      : b)));
+
+  /** Wynik agenta, który jest już w katalogu miasta — wtedy decyzja idzie przez katalog. */
+  const zKataloguPoNazwie = (nazwa: string): CatalogPlace | null =>
+    places.find((m) => kluczNazwy(m.name) === kluczNazwy(nazwa)) ?? null;
+
+  const stanAgenta = (p: any): Bucket | undefined => {
+    const zKatalogu = zKataloguPoNazwie(String(p.name));
+    if (zKatalogu) return marks[zKatalogu.id];
+    return dopinane[String(p.name)] ?? naTablicyPoNazwie[kluczNazwy(String(p.name))];
+  };
+
+  /**
    * Kliknięcie oznacza, ponowne kliknięcie tego samego kubełka usuwa oznaczenie,
    * kliknięcie innego przenosi. Bez potwierdzeń i bez okien — tak mówi projekt.
    */
@@ -498,13 +550,14 @@ export default function Discover() {
     if (!miasto) return toast.info('Najpierw wpisz miasto.');
     setSzukaAgent(true);
     setWynikiAgenta([]);
+    setPytanieAgenta(q);
     try {
       const d = await apiPost<any>('/discover-places',
         { query: q, destination: miasto }, { timeoutMs: 90_000 });
       const zn = d.places || [];
       setWynikiAgenta(zn);
       if (zn.length === 0) toast.info(`Agent nic nie znalazł dla: „${q}".`);
-      else toast.success(`Agent znalazł ${zn.length} ${zn.length === 1 ? 'miejsce' : 'miejsc'} dla: „${q}".`);
+      else toast.success(`Agent znalazł ${zn.length} ${odmien(zn.length, 'miejsce', 'miejsca', 'miejsc')} dla: „${q}".`);
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się wyszukać');
     } finally {
@@ -534,12 +587,36 @@ export default function Discover() {
       setDopinane((prev) => { const n = { ...prev }; delete n[klucz]; return n; });
       return toast.error(error.message);
     }
+    zmienLicznik(idTablicy, 1, p.photos?.[0] ?? p.image_url ?? null);
     toast.success(`Dodane: ${p.name}`);
   };
 
+  /**
+   * Decyzja przy wyniku agenta działa jak przy karcie katalogu: ten sam kubełek
+   * drugi raz zdejmuje miejsce, inny — przenosi. Wynik, który jest w katalogu,
+   * idzie przez katalog (z catalog_id i godzinami), żeby nie powstał duplikat.
+   */
   const dopnijZAgenta = async (p: any, bucket: Bucket) => {
+    const zKatalogu = zKataloguPoNazwie(String(p.name));
+    if (zKatalogu) return mark(zKatalogu, bucket);
     if (!activeBoard) return zapytajOTablice(p.name, (id) => { void wstawZAgenta(p, bucket, id); });
-    return wstawZAgenta(p, bucket, activeBoard);
+    const obecny = stanAgenta(p);
+    if (!obecny) return wstawZAgenta(p, bucket, activeBoard);
+    const nazwa = String(p.name);
+    const ustaw = (b: Bucket | null) => {
+      setDopinane((prev) => { const n = { ...prev }; if (b) n[nazwa] = b; else delete n[nazwa]; return n; });
+      setNaTablicyPoNazwie((prev) => { const n = { ...prev }; if (b) n[kluczNazwy(nazwa)] = b; else delete n[kluczNazwy(nazwa)]; return n; });
+    };
+    if (obecny === bucket) {
+      ustaw(null);
+      zmienLicznik(activeBoard, -1);
+      await supabase.from('trip_project_places').delete()
+        .eq('project_id', activeBoard).eq('name', nazwa).is('catalog_id', null);
+      return;
+    }
+    ustaw(bucket);
+    await supabase.from('trip_project_places').update({ priority: bucket })
+      .eq('project_id', activeBoard).eq('name', nazwa).is('catalog_id', null);
   };
 
   /* Wiersz z `podobne_miejsca` niesie te same dane co feed, tylko z luźniejszymi
@@ -586,7 +663,9 @@ export default function Discover() {
     if (error) {
       setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
       toast.error(error.message);
+      return;
     }
+    zmienLicznik(idTablicy, 1, place.photos?.[0] ?? null);
   };
 
   /**
@@ -632,6 +711,7 @@ export default function Discover() {
 
     if (current === bucket) {
       setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
+      zmienLicznik(activeBoard, -1);
       await supabase.from('trip_project_places')
         .delete().eq('project_id', activeBoard).eq('catalog_id', place.id);
       return;
@@ -660,7 +740,9 @@ export default function Discover() {
     if (error) {
       setMarks((prev) => { const n = { ...prev }; delete n[place.id]; return n; });
       toast.error(error.message);
+      return;
     }
+    zmienLicznik(activeBoard, 1, place.photos?.[0] ?? null);
   };
 
   const toggleFavorite = async (place: CatalogPlace) => {
@@ -847,7 +929,7 @@ export default function Discover() {
         {board && (
           <div className="pt-8 pb-4 flex flex-wrap items-center justify-end gap-3 border-b border-border/40">
             <span className="font-mono text-xs text-muted-foreground tabular-nums hidden sm:inline mr-auto">
-              {savedCount} zapisanych · {maybeCount} do rozważenia
+              {savedCount} na pewno · {maybeCount} do rozważenia
             </span>
             <Button variant="outline" size="sm" className="rounded-full h-9 px-3.5 text-xs bg-card border-border/90 shadow-2xs hover:bg-muted cursor-pointer"
               onClick={() => navigate(`/plany/${board.id}`)}>
@@ -1026,10 +1108,11 @@ export default function Discover() {
         {/* Znalezione przez agenta: propozycje spoza katalogu, na konkretne
             pytanie. Osobny pasek, żeby nie udawały części zbioru miasta. */}
         {wynikiAgenta.length > 0 && (
-          <div className="mt-4 rounded-md border border-accent/30 bg-accent/5 p-4 sm:p-5">
+          <div className="mt-4 rounded-md border border-accent/40 bg-accent/10 p-4 sm:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-accent">
-                Agent znalazł · {wynikiAgenta.length}
+              {/* Bursztyn to tło pod głosem agenta; jako kolor napisu miał kontrast 2,13. */}
+              <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-foreground/75">
+                Agent znalazł · {wynikiAgenta.length}{pytanieAgenta ? ` · „${pytanieAgenta}”` : ''}
               </span>
               <button onClick={() => setWynikiAgenta([])}
                 className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
@@ -1039,7 +1122,12 @@ export default function Discover() {
 
             <div className="mt-3.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {wynikiAgenta.map((p: any, i: number) => {
-                const stan = dopinane[String(p.name)];
+                const stan = stanAgenta(p);
+                const zKatalogu = zKataloguPoNazwie(String(p.name));
+                // Czas z katalogu, gdy miejsce w nim jest — agent szacuje sam
+                // i karta wyniku mówiła 60 min przy 90 min w karcie katalogu.
+                const minuty = zKatalogu?.visit_minutes ?? p.visit_minutes;
+                const rodzaj = etykietaRodzaju(zKatalogu?.kind ?? p.category);
                 return (
                   <div key={`${p.name}-${i}`}
                     className="rounded-md border border-border bg-card p-3.5 flex flex-col">
@@ -1047,9 +1135,9 @@ export default function Discover() {
                         ten sam układ co karty katalogu, żeby jedno nie blokowało drugiego. */}
                     <button onClick={() => setKartaAgenta(p)} className="text-left">
                       <div className="font-display text-[15px] leading-snug">{p.name}</div>
-                      {(p.visit_minutes || p.category) && (
+                      {(minuty || rodzaj) && (
                         <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1">
-                          {[p.category, p.visit_minutes ? `${p.visit_minutes} min` : null]
+                          {[rodzaj, minuty ? `${minuty} min` : null]
                             .filter(Boolean).join(' · ')}
                         </div>
                       )}
@@ -1060,25 +1148,7 @@ export default function Discover() {
                       )}
                     </button>
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60 text-[12px]">
-                      {stan ? (
-                        <span className={`rounded-full px-3 py-1 font-medium ${
-                          stan === 'must' ? 'bg-primary text-primary-foreground'
-                                          : 'bg-accent text-accent-foreground'}`}>
-                          {stan === 'must' ? 'Na pewno' : 'Być może'}
-                        </span>
-                      ) : (
-                        <>
-                          <button onClick={() => dopnijZAgenta(p, 'must' as Bucket)}
-                            className="rounded-full bg-muted px-3 py-1 font-medium
-                                       hover:bg-tan/25 transition-colors">
-                            Na pewno
-                          </button>
-                          <button onClick={() => dopnijZAgenta(p, 'nice' as Bucket)}
-                            className="text-muted-foreground hover:text-foreground transition-colors">
-                            Może
-                          </button>
-                        </>
-                      )}
+                      <PrzyciskiDecyzji stan={stan} onDecyzja={(b) => dopnijZAgenta(p, b)} />
                     </div>
                   </div>
                 );
@@ -1090,17 +1160,17 @@ export default function Discover() {
         {/* Pasek agenta Co-pilot */}
         {board && places.length > 0 && (
           <div className="mt-5 flex justify-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/15 text-xs text-foreground/85 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/15 border border-accent/40 text-xs text-foreground/85 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-foreground/70 shrink-0" />
               <span>
                 {savedCount === 0
                   ? 'Zacznij od kilku kotwic — resztę dobiorę tak, żeby dzień się spinał.'
-                  : `Masz ${savedCount} pewnych i ${maybeCount} do rozważenia.`}
+                  : `Masz ${savedCount} ${odmien(savedCount, 'miejsce', 'miejsca', 'miejsc')} na pewno i ${maybeCount} do rozważenia.`}
               </span>
               {savedCount > 0 && (
                 <button
-                  onClick={() => navigate(board ? `/plany/${board.id}?widok=plan` : '/plany')}
-                  className="text-primary hover:underline font-medium ml-1 inline-flex items-center"
+                  onClick={() => navigate(board ? `/plany/${board.id}?widok=plan&uloz=1` : '/plany')}
+                  className="text-foreground underline underline-offset-2 hover:no-underline font-medium ml-1 inline-flex items-center"
                 >
                   Ułóż plan ↗
                 </button>
@@ -1213,7 +1283,7 @@ export default function Discover() {
                   onMouseLeave={() => setAktywne(null)}
                   className={`group mb-6 break-inside-avoid rounded-2xl border bg-card overflow-hidden
                              transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-0.5 ${
-                    aktywne === p.id ? 'border-primary shadow-md' : 'border-border hover:border-primary/40'
+                    aktywne === p.id ? 'border-foreground/50 shadow-md' : 'border-border hover:border-foreground/30'
                   }`}
                 >
                   <button onClick={() => setKarta(p)} className="block w-full text-left">
@@ -1227,10 +1297,10 @@ export default function Discover() {
                           {idx + 1}
                         </span>
                       )}
-                      {p.kind && (
+                      {etykietaRodzaju(p.kind) && (
                         <span className="absolute left-3 bottom-3 font-medium text-[10.5px]
                                          bg-background/85 backdrop-blur-md px-2.5 py-0.5 rounded-full shadow-xs border border-white/20">
-                          {p.kind}
+                          {etykietaRodzaju(p.kind)}
                         </span>
                       )}
                       {p.vibe_tags?.[0] && (
@@ -1250,20 +1320,20 @@ export default function Discover() {
                     </div>
 
                     <div className="p-4">
-                      <h3 className="font-display text-[16.5px] font-semibold leading-snug group-hover:text-primary transition-colors">{p.name}</h3>
+                      <h3 className="font-display text-[16.5px] font-semibold leading-snug">{p.name}</h3>
                       {/* Skąd to miejsce jest. Feed pokazuje też katalog z innych
                           wyjazdów, więc bez tego wiersza atrakcja z Wrocławia wygląda
                           przy albańskiej tak samo — a to zupełnie inna decyzja. */}
                       {p.city && (
                         <p className={`font-mono text-[11px] mt-1 ${
                           board?.destination && p.city.toLowerCase() !== board.destination.toLowerCase()
-                            ? 'text-accent' : 'text-muted-foreground'
+                            ? 'text-foreground font-medium' : 'text-muted-foreground'
                         }`}>
                           {p.city}{p.country ? ` / ${p.country}` : ''}
                         </p>
                       )}
                       {wyroznikMiejsca(p) ? (
-                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-primary/70 pl-2.5 leading-snug line-clamp-2 text-pretty">
+                        <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-foreground/25 pl-2.5 leading-snug line-clamp-2 text-pretty">
                           {wyroznikMiejsca(p)}
                         </p>
                       ) : opisMiejsca(p) ? (
@@ -1275,7 +1345,7 @@ export default function Discover() {
                         <div className="mt-2.5 flex flex-wrap gap-x-3 font-mono text-[11px] text-muted-foreground tabular-nums">
                           {duration && <span>{duration}</span>}
                           {duration && p.opening_hours && <span>·</span>}
-                          {p.opening_hours && <span className="truncate max-w-[140px]">{p.opening_hours}</span>}
+                          {p.opening_hours && <span className="truncate max-w-[180px]">{formatujGodziny(p.opening_hours)}</span>}
                         </div>
                       )}
                     </div>
@@ -1285,27 +1355,7 @@ export default function Discover() {
                       Podjęta decyzja jest widoczna kolorem — szałwia „na pewno",
                       terakota „być może" — więc widać ją bez czytania etykiet. */}
                   <div className="flex items-center gap-2 border-t border-border px-3 py-2.5 text-[12px]">
-                    {mk === 'must' ? (
-                      <>
-                        <span className="rounded-full bg-primary text-primary-foreground px-3 py-1 font-medium">
-                          Na pewno
-                        </span>
-                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'nice' as Bucket); }}
-                          className="text-muted-foreground hover:text-foreground transition-colors">
-                          Może
-                        </button>
-                      </>
-                    ) : mk === 'nice' ? (
-                      <>
-                        <span className="rounded-full bg-accent text-accent-foreground px-3 py-1 font-medium">
-                          Być może
-                        </span>
-                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
-                          className="text-muted-foreground hover:text-foreground transition-colors">
-                          Na pewno
-                        </button>
-                      </>
-                    ) : mk === 'rejected' ? (
+                    {mk === 'rejected' ? (
                       <>
                         <span className="rounded-full bg-muted text-muted-foreground px-3 py-1 line-through">
                           Nie tym razem
@@ -1316,16 +1366,7 @@ export default function Discover() {
                         </button>
                       </>
                     ) : (
-                      <>
-                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
-                          className="rounded-full bg-muted px-3 py-1 font-medium hover:bg-tan/25 transition-colors">
-                          Na pewno
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'nice' as Bucket); }}
-                          className="text-muted-foreground hover:text-foreground transition-colors">
-                          Może
-                        </button>
-                      </>
+                      <PrzyciskiDecyzji stan={mk} onDecyzja={(b) => mark(p, b)} />
                     )}
                     {mk !== 'rejected' && (
                       <button onClick={(e) => { e.stopPropagation(); mark(p, 'rejected' as Bucket); }}
@@ -1411,5 +1452,35 @@ export default function Discover() {
         )}
       </main>
     </div>
+  );
+}
+
+/**
+ * Stopka decyzji — ta sama w karcie katalogu i w wynikach agenta.
+ *
+ * Kolejność stoi w miejscu: „Na pewno” zawsze pierwsze, „Być może” drugie.
+ * Wcześniej wybrany kubełek wskakiwał na początek, więc po „Być może” przyciski
+ * zamieniały się miejscami pod kursorem. Aktywna pigułka jest klikalna — drugi
+ * klik zdejmuje decyzję, tak jak mówi `mark`.
+ */
+function PrzyciskiDecyzji({ stan, onDecyzja }: { stan?: Bucket; onDecyzja: (b: Bucket) => void }) {
+  const klik = (b: Bucket) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); onDecyzja(b); };
+  return (
+    <>
+      <button onClick={klik('must' as Bucket)} aria-pressed={stan === 'must'}
+        title={stan === 'must' ? 'Kliknij, żeby cofnąć' : undefined}
+        className={`rounded-full px-3 py-1 font-medium transition-colors ${
+          stan === 'must' ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                          : 'bg-muted text-foreground hover:bg-primary/15'}`}>
+        Na pewno
+      </button>
+      <button onClick={klik('nice' as Bucket)} aria-pressed={stan === 'nice'}
+        title={stan === 'nice' ? 'Kliknij, żeby cofnąć' : undefined}
+        className={`rounded-full px-3 py-1 transition-colors ${
+          stan === 'nice' ? 'bg-accent text-accent-foreground font-medium hover:bg-accent/85'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/20'}`}>
+        Być może
+      </button>
+    </>
   );
 }

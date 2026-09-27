@@ -54,9 +54,11 @@ export default function UlozPlanDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      {/* Bazowe okno nie ma marginesu (przewijanie i stały nagłówek robią okna
+          same), więc treść stała przyklejona do krawędzi ramki. */}
+      <DialogContent className="max-w-lg p-6 gap-4 overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t('plan.dialog_tytul')}</DialogTitle>
+          <DialogTitle className="pr-8">{t('plan.dialog_tytul')}</DialogTitle>
           <DialogDescription>{t('plan.dialog_opis', { dni: t('plan.dni', { count: dni }) })}</DialogDescription>
         </DialogHeader>
 

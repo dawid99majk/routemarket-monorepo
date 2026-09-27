@@ -188,8 +188,10 @@ export default function Index() {
     }
     setZakladam(true);
     try {
-      await utworzWyjazd({ cel: cel.trim(), klimat });
-      navigate('/odkrywaj?nowy=1');
+      // Z identyfikatorem: bez niego Odkrywaj nie wiedziało, który wyjazd jest
+      // nowy, i pierwsze „Na pewno” pytało o tablicę, którą właśnie założyliśmy.
+      const id = await utworzWyjazd({ cel: cel.trim(), klimat });
+      navigate(id ? `/odkrywaj?wyjazd=${id}` : '/odkrywaj');
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się założyć wyjazdu');
     } finally {
