@@ -259,7 +259,7 @@ export default function TablicaPubliczna() {
                   aria-pressed={polubiona}
                   className={`h-10 inline-flex items-center gap-2 rounded-full border px-4 text-sm
                               transition-colors ${polubiona
-                                ? 'border-accent bg-accent/10 text-accent'
+                                ? 'border-accent bg-accent/10 text-foreground'
                                 : 'border-border bg-card hover:bg-muted'}`}>
                   <Heart className={`w-4 h-4 ${polubiona ? 'fill-accent' : ''}`} />
                   {tablica.like_count ?? 0}
@@ -317,7 +317,7 @@ export default function TablicaPubliczna() {
               <div key={k.id} className="rounded-2xl border border-border/70 bg-card shadow-xs overflow-hidden">
                 <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor} bg-muted/20`}>
                   <span className={`font-narrow uppercase tracking-[0.18em] text-[10.5px] font-semibold ${
-                    k.id === 'must' ? 'text-primary' : 'text-accent'}`}>
+                    k.id === 'must' ? 'text-primary' : 'text-foreground'}`}>
                     {k.label}
                   </span>
                   <span className="font-mono text-[12px] tabular-nums text-muted-foreground font-medium">
@@ -331,7 +331,7 @@ export default function TablicaPubliczna() {
                         {m.image_url
                           ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                           : <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                              <MapPin className="w-4 h-4 text-primary/60" />
+                              <MapPin className="w-4 h-4 text-muted-foreground" />
                               <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">miejsce</span>
                             </div>}
                       </div>
@@ -351,7 +351,7 @@ export default function TablicaPubliczna() {
                           title="Głosuj na to miejsce"
                           className={`inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-full border shadow-xs transition-all ${
                             mojeGlosy.has(m.id)
-                              ? 'border-accent bg-accent/15 text-accent font-medium scale-105'
+                              ? 'border-accent bg-accent/15 text-foreground font-medium scale-105'
                               : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
                           }`}
                         >

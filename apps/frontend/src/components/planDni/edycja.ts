@@ -11,7 +11,7 @@
  * Przeniesienie przesuwa kolejne punkty dnia docelowego tylko o tyle, o ile
  * nowy punkt na nie faktycznie nachodzi.
  */
-import { czyBaza, czyPrzystanek, metryMiedzy, type BazaWyjazdu } from '../tripProjects/helpers';
+import { czyBaza, czyPrzystanek, metryMiedzy, type BazaWyjazdu, minutPieszo } from '../tripProjects/helpers';
 
 export interface Pozycja {
   time: string;
@@ -70,7 +70,7 @@ function punkt(it: Pozycja | undefined, baza: BazaWyjazdu | null): { lat: number
 function pieszo(a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null): number {
   if (!a || !b) return 0;
   const m = metryMiedzy(a, b);
-  return m ? Math.max(1, Math.round(m / 80)) : 0;
+  return m ? minutPieszo(m) : 0;
 }
 
 /** Zmiana dnia unieważnia zmierzony przebieg — dotyczył innej listy punktów. */

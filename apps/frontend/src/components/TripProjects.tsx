@@ -43,14 +43,14 @@ import type { AktualizacjaProjektu, TripProject, Priority, PinnedPlace, Discover
 import {
   jakoPriorytet, jakoMiejsce, formatMinutes, ZONES, CATEGORY_ICON, SUGGESTION_SETS,
   czyPrzystanek, kmBetween, metryMiedzy, opisDystansu, medianOf,
-  czyBaza, punktyDnia, type BazaWyjazdu,
-} from './tripProjects/helpers';
+  czyBaza, punktyDnia, type BazaWyjazdu, minutPieszo, MINUT_NA_KM } from './tripProjects/helpers';
 import KrokiPlanu from '@/components/planDni/KrokiPlanu';
 import WersjePlanu from '@/components/planDni/WersjePlanu';
 import UlozPlanDialog from '@/components/planDni/UlozPlanDialog';
 import CoDalej from '@/components/planDni/CoDalej';
 import { usunPozycje, przeniesPozycje, koniecDnia, czasNaMinuty, minutyNaCzas } from '@/components/planDni/edycja';
 import { gpxDnia, gpxTras, nazwaPliku, pobierzPlik } from '@/lib/gpx';
+import { formatujGodziny } from '@/lib/godziny';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -1835,7 +1835,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             <Popover defaultOpen>
                               <PopoverTrigger asChild>
                                 <Button variant="outline" className="justify-start font-normal text-sm h-10 min-w-[220px]">
-                                  <CalendarDays className="w-4 h-4 mr-2 text-primary shrink-0" />
+                                  <CalendarDays className="w-4 h-4 mr-2 text-muted-foreground shrink-0" />
                                   {terminOd
                                     ? (terminDo && terminDo !== terminOd
                                         ? `${format(parse(terminOd, 'yyyy-MM-dd', new Date()), 'd MMM', { locale: pl })} – ${format(parse(terminDo, 'yyyy-MM-dd', new Date()), 'd MMM yyyy', { locale: pl })}`
@@ -1908,7 +1908,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       <div className="rounded-md border bg-muted/30 px-4 py-3">
                         <div className="flex items-baseline justify-between gap-3 mb-2">
                           <span className="text-sm font-medium">{t('tablica.ile_czasu_zaplanowac')}</span>
-                          <span className="text-sm font-semibold text-primary tabular-nums">
+                          <span className="text-sm font-semibold text-foreground tabular-nums">
                             {active.fill_percent ?? 70}%
                           </span>
                         </div>
@@ -2090,11 +2090,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     <div className="space-y-4">
                       <div className="flex items-center justify-between pb-2 border-b border-border">
                         <h3 className="text-sm font-semibold flex items-center gap-2">
-                          <CalendarDays className="w-4 h-4 text-primary" />
+                          <CalendarDays className="w-4 h-4 text-muted-foreground" />
                           Wydarzenia w: {active.destination}
                         </h3>
                         <button onClick={refreshEvents} disabled={eventsBusy}
-                          className="text-xs text-primary hover:underline disabled:opacity-60 flex items-center gap-1">
+                          className="text-xs text-foreground underline underline-offset-2 hover:no-underline disabled:opacity-60 flex items-center gap-1">
                           {eventsBusy ? <><Loader2 className="w-3 h-3 animate-spin" /> Szukam…</> : <>{events.length > 0 ? 'Odśwież' : 'Sprawdź'}</>}
                         </button>
                       </div>
@@ -2109,17 +2109,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             const juzNaTablicy = places.some((p) => p.name.toLowerCase() === ev.name.toLowerCase());
                             return (
                               <div key={ev.id || ev.name} className="py-2.5">
-                                <div className="font-mono text-[11px] text-primary">{zakresDat(ev.start_date, ev.end_date)}</div>
+                                <div className="font-mono text-[11px] text-muted-foreground">{zakresDat(ev.start_date, ev.end_date)}</div>
                                 <div className="font-medium text-sm leading-snug mt-0.5">{ev.name}</div>
                                 {ev.description && <div className="text-xs text-muted-foreground mt-0.5">{ev.description}</div>}
                                 <div className="flex items-center justify-between mt-2">
                                   {ev.url && (
-                                    <a href={ev.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                                    <a href={ev.url} target="_blank" rel="noreferrer" className="text-xs text-foreground underline underline-offset-2 hover:no-underline inline-flex items-center gap-1">
                                       <ExternalLink className="w-3 h-3" /> Strona
                                     </a>
                                   )}
                                   <button onClick={() => wydarzenieNaTablice(ev)} disabled={juzNaTablicy}
-                                    className="text-xs text-primary hover:underline ml-auto disabled:opacity-50">
+                                    className="text-xs text-foreground underline underline-offset-2 hover:no-underline ml-auto disabled:opacity-50">
                                     {juzNaTablicy ? 'Jest na tablicy' : '+ Dodaj'}
                                   </button>
                                 </div>
@@ -2149,7 +2149,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 disabled={publishing || wybrana}
                                 onClick={() => { if (!wybrana) togglePublic(); }}
                                 className={`h-9 rounded-full text-[13px] transition-colors ${
-                                  wybrana ? 'bg-foreground text-background font-medium' : 'text-secondary hover:bg-card'
+                                  wybrana ? 'bg-foreground text-background font-medium' : 'text-muted-foreground hover:bg-card'
                                 }`}>
                                 {etykieta}
                               </button>
@@ -2323,7 +2323,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                     {p.image_url
                                       ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                       : <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                                          <Icon className="w-5 h-5 text-primary/60" />
+                                          <Icon className="w-5 h-5 text-muted-foreground" />
                                           <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">miejsce</span>
                                         </div>}
                                   </div>
@@ -2342,7 +2342,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                         </button>
                                       </div>
                                       <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
-                                        {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, p.opening_hours]
+                                        {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, formatujGodziny(p.opening_hours)]
                                           .filter(Boolean).join(' · ') || '—'}
                                       </div>
                                       {p.description && (
@@ -2375,7 +2375,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                         title="Głos uczestników na to miejsce"
                                         className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border shadow-xs transition-all ${
                                           mojeGlosy.has(p.id)
-                                            ? 'border-accent bg-accent/15 text-accent font-medium scale-105'
+                                            ? 'border-accent bg-accent/15 text-foreground font-medium scale-105'
                                             : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
                                         }`}
                                       >
@@ -2401,7 +2401,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 <button onClick={() => navigate(`/odkrywaj?wyjazd=${active.id}`)}
                                   className="w-full h-[104px] rounded-md border border-dashed border-border
                                              flex flex-col items-center justify-center gap-1.5 text-muted-foreground
-                                             hover:border-primary/50 hover:text-primary transition-colors">
+                                             hover:border-foreground/30 hover:text-foreground transition-colors">
                                   <Plus className="w-5 h-5" />
                                   <span className="text-[12px]">{t('tablica.dodaj_miejsca')}</span>
                                 </button>
@@ -2475,7 +2475,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             <div className="flex items-center justify-between gap-3 border-t pt-4 flex-wrap">
               <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1.5 font-medium text-foreground">
-                  <MapPin className="w-4 h-4 text-primary" />{active.destination}
+                  <MapPin className="w-4 h-4 text-muted-foreground" />{active.destination}
                 </span>
                 {active.days && active.hours_per_day && (
                   <>
@@ -2629,7 +2629,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 )}
                 {duplicates.length > 0 && (
                   <p className="text-xs text-warning-foreground">
-                    <strong>{t('tablica.mozliwe_duplikaty')}</strong> {duplicates.join('; ')} — to samo miejsce pod dwiema nazwami.
+                    <strong>{t('tablica.mozliwe_duplikaty')}</strong> {duplicates.join('; ')} {t('tablica.duplikaty_opis')}
                   </p>
                 )}
               </div>
@@ -2755,8 +2755,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   <div key={day.day} className="rounded-md border border-border bg-card overflow-hidden">
                     {/* Teal na krawędzi nagłówka dnia i na linku „Zrób trasę" łamał jedyną
                         regułę tego koloru — oznacza „na pewno", nie ozdobę ani akcję. */}
-                    <div className="bg-muted/60 px-4 py-2.5 flex items-center justify-between gap-2">
-                      <span className="flex items-baseline gap-2.5">
+                    <div className="bg-muted/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <span className="flex items-baseline gap-2.5 whitespace-nowrap">
                         <span className="font-display text-[17px]">{t('plan.dzien', { nr: day.day })}</span>
                         {day.date && (
                           <span className="text-[13px] text-foreground/70">
@@ -2764,7 +2764,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           </span>
                         )}
                       </span>
-                      <span className="flex items-center gap-3 text-[12px] text-foreground/70">
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-foreground/70">
                         <span className="inline-flex items-center gap-1.5">
                           <span className="w-2.5 h-2.5 rounded-full bg-primary" aria-hidden />{t('plan.legenda_tablica')}
                         </span>
@@ -2848,7 +2848,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             ) : (
                               <>
                                 {km > 0 && <span>{t('tablica.do_przejscia')} <strong className="font-mono tabular-nums text-foreground">ok. {dziesietna(km)} km</strong></span>}
-                                {km > 0 && <span>Marsz: <strong className="font-mono tabular-nums text-foreground">ok. {Math.round((km / 4.5) * 60)} min</strong></span>}
+                                {km > 0 && <span>Marsz: <strong className="font-mono tabular-nums text-foreground">ok. {Math.round(km * MINUT_NA_KM)} min</strong></span>}
                               </>
                             )}
                             <span>{t('tablica.punktow')} <strong className="font-mono tabular-nums text-foreground">{przystankiDnia.length}</strong></span>
@@ -2910,7 +2910,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 <span className="w-px h-[22px] bg-border" />
                               </span>
                               <span className="font-mono text-[11px] tabular-nums">
-                                {Math.max(1, Math.round(metry / 80))} min pieszo · {opisDystansu(metry)}
+                                {minutPieszo(metry)} min pieszo · {opisDystansu(metry)}
                               </span>
                             </div>
                           )}

@@ -77,7 +77,7 @@ export default function PunktStartowy({
   if (nazwa && !edytuje) {
     return (
       <div className="flex flex-wrap items-center gap-2.5">
-        <MapPin className="w-4 h-4 text-primary shrink-0" />
+        <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
         <span className="text-sm min-w-0 flex-1 truncate">
           {nazwa}
           {bezPolozenia && (

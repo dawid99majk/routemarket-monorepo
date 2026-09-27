@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { LANGUAGES } from '@/lib/languages';
 import RoutePreferences from '@/components/RoutePreferences';
 import { useQuery } from '@tanstack/react-query';
+import SEO from '@/components/SEO';
 import {
   ArrowLeft, User, Mail, Shield, Loader2, Package, MapPin, CalendarDays, Pencil, Check, X, LogOut, Globe, CheckCircle2, AlertCircle,
 } from 'lucide-react';
@@ -110,7 +111,7 @@ export default function UserProfile() {
   };
 
   if (authLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
   }
 
   if (!user) {
@@ -118,13 +119,14 @@ export default function UserProfile() {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <User className="w-16 h-16 text-muted-foreground/30" />
         <h2 className="text-xl font-semibold text-muted-foreground">{t('profile.login_to_view')}</h2>
-        <Button onClick={() => navigate('/auth')} className="bg-accent hover:bg-accent/90 text-accent-foreground">{t('common.login')}</Button>
+        <Button onClick={() => navigate('/auth')} className="bg-foreground hover:bg-foreground/90 text-background">{t('common.login')}</Button>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title={t('seo.profil.title')} url="/profile" noIndex />
       <header className="sticky top-0 z-40 bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
@@ -139,7 +141,7 @@ export default function UserProfile() {
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <h1 className="text-2xl font-bold">{t('profile.title')}</h1>
         <div className="bg-card rounded-md p-6 shadow-token-sm">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> {t('profile.account_info')}</h2>
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-muted-foreground" /> {t('profile.account_info')}</h2>
           <div className="space-y-4">
             {/* Display name */}
             <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
@@ -150,7 +152,7 @@ export default function UserProfile() {
                   <div className="flex items-center gap-2 mt-1">
                     <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="h-8 text-sm" placeholder={t('profile.username_placeholder')} maxLength={50} />
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={saveDisplayName} disabled={savingName}>
-                      {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 text-primary" />}
+                      {savingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 text-foreground" />}
                     </Button>
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingName(false)}><X className="w-4 h-4" /></Button>
                   </div>
@@ -172,7 +174,7 @@ export default function UserProfile() {
                   <div className="flex items-center gap-2 mt-1">
                     <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="h-8 text-sm" placeholder={t('profile.new_email_placeholder')} type="email" />
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={saveEmail} disabled={savingEmail}>
-                      {savingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 text-primary" />}
+                      {savingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 text-foreground" />}
                     </Button>
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setEditingEmail(false); setNewEmail(''); }}><X className="w-4 h-4" /></Button>
                   </div>
@@ -223,9 +225,9 @@ export default function UserProfile() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { icon: Package, label: 'Wyjazdy', value: String(liczby?.tablice ?? '—'), color: 'bg-primary/10 text-primary' },
+            { icon: Package, label: 'Wyjazdy', value: String(liczby?.tablice ?? '—'), color: 'bg-muted text-foreground' },
             { icon: MapPin, label: 'Zebrane miejsca', value: String(liczby?.miejsca ?? '—'), color: 'bg-dusty-blue/10 text-dusty-blue' },
-            { icon: CalendarDays, label: 'Ułożone plany', value: String(liczby?.plany ?? '—'), color: 'bg-accent/10 text-accent' },
+            { icon: CalendarDays, label: 'Ułożone plany', value: String(liczby?.plany ?? '—'), color: 'bg-muted text-foreground' },
           ].map(({ icon: I, label, value, color }) => (
             <div key={label} className="bg-card rounded-md p-5 shadow-token-sm">
               <div className="flex items-center gap-3">

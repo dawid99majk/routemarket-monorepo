@@ -6,7 +6,7 @@
     ./waznosc.py --od-nowa       kasuje wszystko i liczy jeszcze raz
     ./waznosc.py --cron          jak bez argumentów, ale milczy, gdy nie ma czego liczyć
 
-Z crona co 15 minut (od 27.09.2026). Wcześniej skrypt odpalało się ręcznie i nowe
+Z crona co 5 minut (od 27.09.2026). Wcześniej skrypt odpalało się ręcznie i nowe
 miasto zostawało bez ważności: feed Torunia sortował się wtedy po dacie dodania,
 więc Ratusz był 14., Dom Kopernika 21., a Zamek Krzyżacki 26.
 

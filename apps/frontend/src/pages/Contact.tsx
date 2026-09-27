@@ -111,15 +111,15 @@ export default function Contact() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8 sm:py-12">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-md bg-primary/10 flex items-center justify-center">
-            <Mail className="w-7 h-7 text-primary" />
+          <div className="w-14 h-14 mx-auto mb-4 rounded-md bg-muted flex items-center justify-center">
+            <Mail className="w-7 h-7 text-foreground" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">Kontakt</h1>
           <p className="text-muted-foreground">
             Masz pytanie? Napisz do nas — odpowiemy najszybciej jak to możliwe.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            Możesz też napisać bezpośrednio: <a href="mailto:contact@routemarket.io" className="text-primary hover:underline font-medium">contact@routemarket.io</a>
+            Możesz też napisać bezpośrednio: <a href="mailto:contact@routemarket.io" className="text-foreground underline underline-offset-2 hover:no-underline font-medium">contact@routemarket.io</a>
           </p>
         </div>
 

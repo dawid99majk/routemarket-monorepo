@@ -132,10 +132,10 @@ export default function PasekKart({
                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {zbierane && (
-          <div className="shrink-0 w-[170px] rounded-xl border border-primary/40 bg-primary/5
+          <div className="shrink-0 w-[170px] rounded-xl border border-border bg-card
                           overflow-hidden" aria-live="polite">
             <div className="h-[86px] flex items-center justify-center">
-              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
             </div>
             <div className="px-3 py-2">
               <p className="font-display text-[14px] leading-tight truncate">{zbierane}</p>
@@ -156,8 +156,8 @@ export default function PasekKart({
               aria-pressed={wybrana}
               className={`shrink-0 w-[170px] text-left rounded-xl overflow-hidden border transition-all ${
                 wybrana
-                  ? 'border-primary bg-primary/5 shadow-token-sm -translate-y-0.5'
-                  : 'border-border bg-card hover:border-primary/40'
+                  ? 'border-foreground bg-card shadow-token-sm -translate-y-0.5'
+                  : 'border-border bg-card hover:border-foreground/30'
               }`}
             >
               <div className="h-[86px] bg-placeholder-photo">
@@ -184,7 +184,7 @@ export default function PasekKart({
           <button
             onClick={onWszystkieWyjazdy}
             className="shrink-0 w-[170px] rounded-xl border border-border bg-card
-                       hover:border-primary/40 transition-colors
+                       hover:border-foreground/30 transition-colors
                        flex flex-col items-center justify-center gap-1 py-6"
           >
             <span className="font-display text-[15px]">+{tablice.length - doPokazania.length}</span>
@@ -196,7 +196,7 @@ export default function PasekKart({
           <button
             onClick={onNowyWyjazd}
             className="shrink-0 w-[170px] rounded-xl border border-dashed border-border
-                       hover:border-primary/50 hover:bg-muted/40 transition-colors
+                       hover:border-foreground/30 hover:bg-muted/40 transition-colors
                        flex flex-col items-center justify-center gap-1.5 py-6 text-muted-foreground"
           >
             <Plus className="w-4 h-4" />
@@ -215,8 +215,8 @@ export default function PasekKart({
               aria-pressed={wybrane}
               className={`shrink-0 w-[170px] text-left rounded-xl overflow-hidden border transition-all ${
                 wybrane
-                  ? 'border-primary bg-primary/5 shadow-token-sm -translate-y-0.5'
-                  : 'border-border bg-card hover:border-primary/40'
+                  ? 'border-foreground bg-card shadow-token-sm -translate-y-0.5'
+                  : 'border-border bg-card hover:border-foreground/30'
               }`}
             >
               <div className="h-[86px] bg-placeholder-photo">

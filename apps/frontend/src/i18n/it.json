@@ -245,6 +245,7 @@
     "szukaj_plaza_ruiny_deszczowy_dzien": "Cerca: spiaggia, rovine, giorno di pioggia…",
     "ta_przegladarka_nie_udostepnia_po": "Questo browser non condivide la posizione",
     "tablica": "Bacheca",
+    "tuz_obok": "Proprio accanto: {{nazwa}}",
     "twoj_hotel_parking_dworzec": "Il tuo hotel, parcheggio, stazione…",
     "twoje_wyjazdy": "I tuoi viaggi",
     "wyczysc_fraze": "Cancella frase",
@@ -461,9 +462,21 @@
     "zoo": "Zoo"
   },
   "seo": {
+    "auth": {
+      "title": "Accedi"
+    },
     "contact": {
-      "description": "Contatta il team RouteMarket. Supporto tecnico, richieste creatori e acquirenti.",
+      "description": "Contatta il team di RouteMarket — domande sulla pianificazione dei viaggi, sul tuo account e sul servizio.",
       "title": "Contatti — RouteMarket"
+    },
+    "glowna": {
+      "title": "RouteMarket — raccogli luoghi, pianifica viaggi"
+    },
+    "kolekcje": {
+      "title": "Collezione"
+    },
+    "nie_ma": {
+      "title": "Pagina non trovata"
     },
     "odkrywaj": {
       "title": "Scopri luoghi"
@@ -471,8 +484,17 @@
     "plany": {
       "title": "I tuoi viaggi"
     },
+    "profil": {
+      "title": "Profilo"
+    },
+    "start": {
+      "title": "Nuovo viaggio"
+    },
     "tablice": {
       "title": "Bacheche di viaggiatori"
+    },
+    "zapisane": {
+      "title": "Luoghi salvati"
     }
   },
   "start": {
@@ -504,6 +526,7 @@
     "dodaj_do_tablicy": "Aggiungi alla bacheca",
     "dodaj_miejsca": "Aggiungi luoghi",
     "dodano_dostep_tablica_pojawi_sie": "Accesso aggiunto - la bacheca apparirà a questa persona dopo aver effettuato l'accesso con questo indirizzo. Non inviamo notifiche, inviale tu il link.",
+    "duplikaty_opis": "— a meno di 50 m l’uno dall’altro; verifica che non sia un’unica visita.",
     "ile_czasu_zaplanowac": "Quanto tempo pianificare",
     "kiedy_jedziecie": "Quando partite?",
     "koniec_nie_moze_byc_przed": "La fine non può essere prima dell'inizio",

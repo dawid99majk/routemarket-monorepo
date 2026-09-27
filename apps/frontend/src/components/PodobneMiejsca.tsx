@@ -115,7 +115,7 @@ export default function PodobneMiejsca({ idKatalogu, pomin, tablica, onOtworz, o
 
   return (
     <div className="border-t border-border pt-3.5">
-      <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-secondary mb-2.5">
+      <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground mb-2.5">
         Jeśli to Ci się podoba
       </p>
 
@@ -155,7 +155,7 @@ export default function PodobneMiejsca({ idKatalogu, pomin, tablica, onOtworz, o
                               justify-center transition-colors ${
                     juzDodane
                       ? 'bg-accent text-accent-foreground'
-                      : 'bg-card/90 border border-border text-secondary hover:bg-accent hover:text-accent-foreground hover:border-accent'
+                      : 'bg-card/90 border border-border text-muted-foreground hover:bg-accent/20 hover:text-foreground hover:border-accent'
                   }`}>
                   {juzDodane ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                 </button>

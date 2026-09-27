@@ -248,6 +248,7 @@
     "szukaj_plaza_ruiny_deszczowy_dzien": "Search: beach, ruins, rainy day…",
     "ta_przegladarka_nie_udostepnia_po": "This browser does not provide location",
     "tablica": "Board",
+    "tuz_obok": "Right next to: {{nazwa}}",
     "twoj_hotel_parking_dworzec": "Your hotel, parking, station…",
     "twoje_wyjazdy": "Your trips",
     "wyczysc_fraze": "Clear phrase",
@@ -457,9 +458,21 @@
     "zoo": "Zoo"
   },
   "seo": {
+    "auth": {
+      "title": "Sign in"
+    },
     "contact": {
-      "description": "Get in touch with the RouteMarket team. Technical support, creator and buyer enquiries.",
+      "description": "Contact the RouteMarket team — questions about trip planning, your account and how the service works.",
       "title": "Contact — RouteMarket"
+    },
+    "glowna": {
+      "title": "RouteMarket — collect places, plan trips"
+    },
+    "kolekcje": {
+      "title": "Collection"
+    },
+    "nie_ma": {
+      "title": "Page not found"
     },
     "odkrywaj": {
       "title": "Discover places"
@@ -467,8 +480,17 @@
     "plany": {
       "title": "Your trips"
     },
+    "profil": {
+      "title": "Profile"
+    },
+    "start": {
+      "title": "New trip"
+    },
     "tablice": {
       "title": "Boards from travellers"
+    },
+    "zapisane": {
+      "title": "Saved places"
     }
   },
   "start": {
@@ -500,6 +522,7 @@
     "dodaj_do_tablicy": "Add to board",
     "dodaj_miejsca": "Add places",
     "dodano_dostep_tablica_pojawi_sie": "Access added — the board will appear to this person after logging in with this address. We do not send notifications, please send them the link yourself.",
+    "duplikaty_opis": "— less than 50 m apart; check whether it is really one visit.",
     "ile_czasu_zaplanowac": "How much time to plan",
     "kiedy_jedziecie": "When are you going?",
     "koniec_nie_moze_byc_przed": "End cannot be before start",

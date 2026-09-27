@@ -251,6 +251,7 @@
     "szukaj_plaza_ruiny_deszczowy_dzien": "Szukaj: plaża, ruiny, deszczowy dzień…",
     "ta_przegladarka_nie_udostepnia_po": "Ta przeglądarka nie udostępnia położenia",
     "tablica": "Tablica",
+    "tuz_obok": "Tuż obok: {{nazwa}}",
     "twoj_hotel_parking_dworzec": "Twój hotel, parking, dworzec…",
     "twoje_wyjazdy": "Twoje wyjazdy",
     "wyczysc_fraze": "Wyczyść frazę",
@@ -475,9 +476,21 @@
     "zoo": "Zoo"
   },
   "seo": {
+    "auth": {
+      "title": "Logowanie"
+    },
     "contact": {
-      "description": "Skontaktuj się z zespołem RouteMarket. Pomoc techniczna, pytania dla twórców tras i kupujących.",
+      "description": "Skontaktuj się z zespołem RouteMarket — pytania o planowanie wyjazdów, konto i działanie serwisu.",
       "title": "Kontakt — RouteMarket"
+    },
+    "glowna": {
+      "title": "RouteMarket — zbieraj miejsca, układaj wyjazdy"
+    },
+    "kolekcje": {
+      "title": "Kolekcja"
+    },
+    "nie_ma": {
+      "title": "Nie ma takiej strony"
     },
     "odkrywaj": {
       "title": "Odkrywaj miejsca"
@@ -485,8 +498,17 @@
     "plany": {
       "title": "Twoje wyjazdy"
     },
+    "profil": {
+      "title": "Profil"
+    },
+    "start": {
+      "title": "Nowy wyjazd"
+    },
     "tablice": {
       "title": "Tablice od podróżników"
+    },
+    "zapisane": {
+      "title": "Zapisane miejsca"
     }
   },
   "start": {
@@ -518,6 +540,7 @@
     "dodaj_do_tablicy": "Dodaj do tablicy",
     "dodaj_miejsca": "Dodaj miejsca",
     "dodano_dostep_tablica_pojawi_sie": "Dodano dostęp — tablica pojawi się tej osobie po zalogowaniu tym adresem. Powiadomienia nie wysyłamy, prześlij jej odnośnik sam.",
+    "duplikaty_opis": "— stoją niecałe 50 m od siebie; sprawdź, czy to nie jedna wizyta.",
     "ile_czasu_zaplanowac": "Ile czasu zaplanować",
     "kiedy_jedziecie": "Kiedy jedziecie?",
     "koniec_nie_moze_byc_przed": "Koniec nie może być przed początkiem",

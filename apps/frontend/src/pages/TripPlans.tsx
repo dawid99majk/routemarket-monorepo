@@ -370,7 +370,7 @@ export default function TripPlans() {
                         : dniW >= celW ? 'Plan gotowy' : 'W układaniu';
                     return (
                       <div key={w.id} className="relative group rounded-2xl border border-border bg-card overflow-hidden
-                                                  shadow-sm hover:shadow-xl hover:border-primary/50 hover:-translate-y-1 transition-all duration-300 flex flex-col">
+                                                  shadow-sm hover:shadow-xl hover:border-foreground/30 hover:-translate-y-1 transition-all duration-300 flex flex-col">
                       {!w.is_example && (
                         <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(w); }}
                           aria-label="Usuń wyjazd"
@@ -467,9 +467,9 @@ export default function TripPlans() {
                     onClick={() => navigate('/start')}
                     className="rounded-2xl border-2 border-dashed border-border/80 min-h-[280px]
                                flex flex-col items-center justify-center gap-2.5 text-muted-foreground
-                               hover:border-primary/50 hover:text-primary transition-all duration-300 group bg-muted/20"
+                               hover:border-foreground/30 hover:text-foreground transition-all duration-300 group bg-muted/20"
                   >
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground group-hover:scale-110 transition-transform">
                       <Plus className="w-5 h-5" />
                     </div>
                     <span className="text-sm font-medium">Zacznij nowy wyjazd</span>

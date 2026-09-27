@@ -13,6 +13,7 @@ import Logo from '@/components/Logo';
 import contour from '@/assets/patterns/contour.svg';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
+import SEO from '@/components/SEO';
 import { useTranslation } from 'react-i18next';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
@@ -67,7 +68,7 @@ interface Tablica {
 export default function Index() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: sesjaWczytywana } = useAuth();
   const [cel, setCel] = useState('');
   const [klimat, setKlimat] = useState('family');
   const [tablice, setTablice] = useState<Tablica[]>([]);
@@ -243,6 +244,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title={t('seo.glowna.title')} url="/" />
       {/* Zalogowany dostaje ten sam pasek co w całej aplikacji. Wcześniej strona
           główna miała własną nawigację kotwicową, więc po wejściu tutaj z planera
           znikały wszystkie zakładki i trzeba było szukać drogi powrotnej.
@@ -253,8 +255,12 @@ export default function Index() {
           w Odkrywaj. Dwa miejsca do wybrania tego samego to dwa miejsca, w
           ktorych mozna sie pomylic. */}
       {user && <PlannerHeader />}
-
-      {!user && (
+      {/* Do czasu odczytania sesji pasek bez przycisków. Wcześniej zalogowany
+          widział przez chwilę „Zaloguj się”, a potem pasek podmieniał się sam. */}
+      {!user && sesjaWczytywana && (
+        <div className="h-[74px] border-b border-border bg-surface/90" aria-hidden />
+      )}
+      {!user && !sesjaWczytywana && (
       <header className="sticky top-0 z-30 h-[74px] border-b border-border bg-surface/90 backdrop-blur-[8px]">
         <div className="max-w-[1280px] mx-auto h-full px-5 sm:px-10 flex items-center gap-4 sm:gap-8">
           <Logo size="md" />
@@ -347,7 +353,7 @@ export default function Index() {
           <div aria-hidden className="hidden xl:flex absolute left-[126px] top-[606px] w-[210px] rotate-[-3deg]
                           rounded-[9px] bg-card px-[14px] py-[11px] items-center gap-[11px] shadow-token-lg">
             <span className="w-[30px] h-[30px] rounded-[7px] bg-muted flex items-center justify-center
-                             text-[13px] text-secondary shrink-0">↓</span>
+                             text-[13px] text-muted-foreground shrink-0">↓</span>
             <span className="min-w-0">
               <span className="block font-mono text-[12px] leading-[1.2] truncate">durres-dzien-1.gpx</span>
               <span className="block font-mono text-[10px] leading-[1.2] text-muted-foreground mt-[3px]">3,8 km · +46 m</span>
@@ -373,7 +379,7 @@ export default function Index() {
 
           <div aria-hidden className="hidden xl:block absolute right-[242px] top-[368px] w-[126px] rotate-[7deg]
                           rounded-full bg-card px-[14px] py-[8px] shadow-token-sm
-                          font-mono text-[11px] text-secondary text-center">870 m pieszo</div>
+                          font-mono text-[11px] text-muted-foreground text-center">870 m pieszo</div>
 
           {/* ── wypełnienie 2 z 2: terakota, i jedyna karta z pełnym zdaniem ── */}
           <div aria-hidden className="hidden xl:block absolute right-[88px] top-[454px] w-[214px] rotate-[-4deg]
@@ -390,7 +396,7 @@ export default function Index() {
               <div className="flex items-center gap-[9px] rounded-full bg-card/70 border border-border
                               px-[15px] py-[7px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                <span className="text-[12px] text-secondary">
+                <span className="text-[12px] text-muted-foreground">
                   {ileWKatalogu.toLocaleString('pl-PL')} miejsc z OpenStreetMap
                 </span>
               </div>
@@ -424,7 +430,7 @@ export default function Index() {
                     className={`rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
                       klimat === k.id
                         ? 'bg-foreground text-background'
-                        : 'text-secondary hover:bg-muted'
+                        : 'text-muted-foreground hover:bg-muted'
                     }`}>
                     {t(k.klucz)}
                   </button>
@@ -461,7 +467,7 @@ export default function Index() {
           <div className="mt-12 border-t border-border grid [grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))]">
             {KROKI.map((nr, i) => (
               <div key={nr} className={`pt-6 pb-2 px-6 ${i > 0 ? 'md:border-l border-border' : 'md:pl-0'}`}>
-                <span className="font-mono text-[13px] tabular-nums text-primary">{nr}</span>
+                <span className="font-mono text-[13px] tabular-nums text-foreground">{nr}</span>
                 <h3 className="font-display text-[20px] mt-3 leading-snug">{t(`landing.krok.${nr}.tytul`)}</h3>
                 <p className="text-[14px] leading-relaxed text-muted-foreground mt-2.5 text-pretty">{t(`landing.krok.${nr}.opis`)}</p>
               </div>
@@ -474,7 +480,7 @@ export default function Index() {
       <section id="przyklad" className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
         <div className="lg:sticky lg:top-[100px] max-w-[460px]">
-          <p className="font-narrow uppercase tracking-[0.24em] text-[11px] text-primary font-semibold">{t('landing.przyklad_nadtytul')}</p>
+          <p className="font-narrow uppercase tracking-[0.24em] text-[11px] text-muted-foreground font-semibold">{t('landing.przyklad_nadtytul')}</p>
           <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
             Trzy popołudnia w Durrës, z sześciolatkiem
           </h2>
@@ -516,7 +522,7 @@ export default function Index() {
         <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-[88px]
                         grid gap-12 [grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start">
           <div>
-            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary-light">{t('landing.nav.gpx')}</p>
+            <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary-foreground/70">{t('landing.nav.gpx')}</p>
             <h2 className="font-display font-light mt-3 text-[clamp(30px,3.1vw,40px)] leading-tight text-balance">
               Plan kończy się plikiem, nie zakładką w przeglądarce
             </h2>
@@ -535,7 +541,7 @@ export default function Index() {
 
           <div className="rounded-md bg-primary-foreground/[0.05] border border-primary-foreground/15 overflow-hidden">
             <div className="px-5 py-3 border-b border-primary-foreground/15 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-mono text-[12px] text-primary-light">durres-dzien-1.gpx</span>
+              <span className="font-mono text-[12px] text-primary-foreground/80">durres-dzien-1.gpx</span>
               {/* Podpis, bo bez niego wycinek pliku czyta się jak kod, który wyciekł
                   na stronę, zamiast jak dowód, że plan wychodzi w otwartym formacie. */}
               <span className="text-[12px] text-primary-foreground/55">
@@ -581,7 +587,7 @@ export default function Index() {
                   }}
                   placeholder={t('landing.szukaj_tablicy')}
                   className="h-10 w-full sm:w-[220px] rounded-full border border-border bg-card pl-9 pr-4
-                             text-sm outline-none focus:border-primary transition-colors"
+                             text-sm outline-none focus:border-foreground/50 transition-colors"
                 />
               </div>
               <Button variant="outline" onClick={() =>

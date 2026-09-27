@@ -670,7 +670,7 @@ ${lokaleDnia}` : ''}
 BILANS DNIA: kotwice to ok. ${Math.round(minutyWizyt / 60 * 10) / 10} h, a całe okno to ${Math.round(k.minutNaDzien / 60 * 10) / 10} h.
 
 WYPEŁNIENIE DNIA: ${k.fillPercent}%. Zaplanuj ok. ${Math.round(budzetDnia / 60 * 10) / 10} h konkretnych punktów, a POZOSTAŁE ${Math.round((k.minutNaDzien - budzetDnia) / 60 * 10) / 10} h ZOSTAW PUSTE Z ROZMYSŁU. To nie jest czas do zapełnienia — użytkownik świadomie poprosił o luz na włóczenie się, przypadkowe przystanki i dłuższe siedzenie tam, gdzie mu się spodoba.${k.fillPercent <= 40 ? ' Przy tak niskim wypełnieniu wybierz TYLKO najważniejsze kotwice i nie dokładaj propozycji z listy.' : ''}${k.fillPercent >= 90 ? ' Przy tak wysokim wypełnieniu możesz zagęścić dzień i dołożyć propozycje z listy.' : ''}
-W polu "summary" napisz jednym zdaniem, ile czasu zostaje wolnego i co można w nim zrobić w tej okolicy. Doliczaj jeszcze przejścia między miejscami (pieszo ok. 15 min na kilometr) oraz przerwy.
+W polu "summary" napisz jednym zdaniem, co można zrobić w wolnej chwili w tej okolicy. NIE podawaj w nim liczby godzin ani minut — czas wolny policzy aplikacja po doliczeniu przejść. Godziny pozycji układaj z przejściami między miejscami (pieszo ok. 15 min na kilometr) i przerwami.
 
 ZASADY:
 1. KOTWICE PRZED PROPOZYCJAMI — reguła nadrzędna wobec wszystkich pozostałych.
@@ -941,9 +941,16 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   // modelu o wyciętym miejscu przeczyłaby temu, co o nim napisze kod.
   const przesiane = przesiejOstrzezeniaModelu(k, numer, ostrzezeniaModelu, dzien.items);
   dzien.warnings = [...przesiane, ...(dzien.warnings ?? [])];
+  // Godziny z dojściami PRZED strażnikiem godzin otwarcia: sprawdzać trzeba
+  // godzinę, o której człowiek naprawdę dojdzie, a nie tę z modelu.
+  przeliczGodziny(k, dzien);
   // Kolejność ma znaczenie: strażnik dokłada wpisy do not_scheduled, więc musi
   // zadziałać przed filtrem, który zostawia tam wyłącznie kotwice tego dnia.
   odsiejZamkniete(k, dzien, numer);
+  // Strażnik mógł przesunąć wejście albo wstawić zastępstwo — oś jeszcze raz.
+  przeliczGodziny(k, dzien);
+  przytnijDoOkna(k, dzien);
+  for (const it of dzien.items) delete (it as any).__zOdstepu;
   // Na końcu, żeby żaden wcześniejszy krok nie przesunął ani nie wyciął noclegu.
   dopnijBazeDoDnia(k, dzien);
 
@@ -1045,6 +1052,9 @@ function uzupelnijBraki(k: KontekstPlanu, dzien: DzienPlanu): void {
       item.minutes = zOdstepu > 0 && zOdstepu <= 240
         ? zOdstepu
         : (znane?.minuty && znane.minuty > 0 ? znane.minuty : 45);
+      // Czas wzięty z odstępu do następnej pozycji zawiera już dojście do niej —
+      // przeliczenie osi dnia nie może go doliczyć drugi raz.
+      if (zOdstepu > 0 && zOdstepu <= 240) (item as any).__zOdstepu = true;
     }
   });
 }
@@ -1308,6 +1318,67 @@ export function dopnijBazeDoDnia(k: KontekstPlanu, dzien: DzienPlanu): void {
 }
 
 /**
+ * Oś dnia z przejściami.
+ *
+ * Model stawiał kolejne punkty jeden po drugim, bez minuty na dojście: w planie
+ * Lublina dzień 1 zakładał 0 min między punktami, choć marsz wynosił ok. 92 min,
+ * więc realnie kończył się o 17:40, a nie o 16:10 — i podsumowanie obiecywało
+ * dwie godziny wolnego, których nie było. Ostrzeżenie łapało tylko odcinki od
+ * 1,5 km; krótsze sumowały się po cichu.
+ *
+ * Pozycja nie może zacząć się wcześniej, niż kończy się poprzednia plus dojście.
+ * Przesuwamy wyłącznie w przód: luz zostawiony przez model zostaje luzem.
+ */
+export function przeliczGodziny(k: KontekstPlanu, dzien: DzienPlanu): void {
+  let poprzedni: PozycjaDnia | null = null;
+  for (const it of dzien.items) {
+    if (!GODZINA.test(it.time)) continue;
+    if (poprzedni) {
+      const koniec = czasNaMinuty(poprzedni.time) + (poprzedni.minutes || 0);
+      // Przejście wpisane jako osobna pozycja ma już swój czas, a czas wizyty
+      // wzięty z odstępu obejmuje dojście do następnego punktu.
+      const zPunktami = maPunkt(poprzedni) && maPunkt(it) && !poprzedni.approx && !it.approx;
+      const dojscie = zPunktami && !(poprzedni as any).__zOdstepu
+        ? dojsciePieszo({ lat: poprzedni.lat!, lng: poprzedni.lng! }, it) : 0;
+      if (zPunktami && dojscie >= 30 && !it.baza && !poprzedni.baza) {
+        const km = kmOd({ lat: poprzedni.lat!, lng: poprzedni.lng! }, it) * 1.3;
+        const tekst = `Z „${poprzedni.name}” do „${it.name}” jest ok. ${km.toFixed(1).replace('.', ',')} km — `
+          + `w planie ${dojscie} min pieszo; komunikacją będzie szybciej.`;
+        if (!(dzien.warnings ?? []).includes(tekst)) (dzien.warnings ??= []).push(tekst);
+      }
+      if (czasNaMinuty(it.time) < koniec + dojscie) it.time = minutyNaCzas(koniec + dojscie);
+    }
+    poprzedni = it;
+  }
+}
+
+const POSILEK_LUB_WIECZOR = /^(restaurant|cafe|fast_food|food_court|food|ice_cream|bar|pub|nightclub|nightlife|biergarten)$/;
+
+/**
+ * Doliczone przejścia potrafią wypchnąć koniec dnia poza okno. Propozycje agenta
+ * z końca dnia to wypełniacz — odpadają pierwsze, zanim plan wyjdzie za okno.
+ * Miejsca użytkownika i posiłki zostają zawsze; gdy to one się nie mieszczą,
+ * plan pokaże koniec po oknie, a nie potnie cudzych decyzji.
+ */
+export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu): void {
+  const koniecOkna = czasNaMinuty(k.zadanie.window.end);
+  if (!Number.isFinite(koniecOkna)) return;
+  for (let proba = 0; proba < 6; proba++) {
+    const przystanki = dzien.items.filter((it) => it.kind !== 'walk' && !it.baza && GODZINA.test(it.time));
+    const ostatni = przystanki[przystanki.length - 1];
+    if (!ostatni) return;
+    let koniec = czasNaMinuty(ostatni.time) + (ostatni.minutes || 0);
+    if (k.baza && maPunkt(ostatni) && !ostatni.approx) koniec += dojsciePieszo(k.baza, ostatni);
+    if (koniec <= koniecOkna + 15) return;
+    if (ostatni.source !== 'suggested' || POSILEK_LUB_WIECZOR.test(String(ostatni.kind || ''))) return;
+    const i = dzien.items.indexOf(ostatni);
+    // Przejście prowadzące do wyciętej propozycji wychodzi razem z nią.
+    const od = i > 0 && dzien.items[i - 1].kind === 'walk' ? i - 1 : i;
+    dzien.items.splice(od, i - od + 1);
+  }
+}
+
+/**
  * Deterministyczna kontrola geografii dnia — ta sama zasada co przy godzinach
  * otwarcia: reguła w prompcie była, a mimo to plan kazał przejść osiem kilometrów
  * w pół godziny.
@@ -1343,20 +1414,6 @@ export function sprawdzOdleglosci(k: KontekstPlanu, dzien: DzienPlanu, numer: nu
     }
   }
 
-  const punkty = dzien.items.filter((it) =>
-    it.kind !== 'walk' && typeof it.lat === 'number' && typeof it.lng === 'number' && !it.approx);
-  for (let i = 1; i < punkty.length; i++) {
-    const a = punkty[i - 1];
-    const b = punkty[i];
-    if (!GODZINA.test(a.time) || !GODZINA.test(b.time)) continue;
-    const km = kmOd({ lat: a.lat!, lng: a.lng! }, b) * 1.3;
-    if (km < 1.5) continue;
-    const naPrzejscie = Math.max(0, czasNaMinuty(b.time) - (czasNaMinuty(a.time) + (a.minutes || 0)));
-    const pieszo = Math.round(km * 15);
-    if (pieszo <= naPrzejscie + 15) continue;
-    (dzien.warnings ??= []).push(
-      `Z „${a.name}" do „${b.name}" jest ok. ${km.toFixed(1).replace('.', ',')} km — pieszo to ok. ${pieszo} min, `
-      + `a plan zostawia na przejście ${naPrzejscie} min. Podjedź komunikacją albo przesuń godziny.`
-    );
-  }
+  // Porównanie czasu przejścia z odstępem w planie robi teraz przeliczGodziny:
+  // zamiast ostrzegać, że plan zostawia 0 min na 1,6 km, dolicza te minuty.
 }

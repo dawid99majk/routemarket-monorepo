@@ -1,5 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import SEO from '@/components/SEO';
+import i18n from '@/i18n';
 import BrandGlyph from "@/components/BrandGlyph";
 
 /**
@@ -19,9 +21,10 @@ const NotFound = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background bg-contour-soft">
+      <SEO title={i18n.t('seo.nie_ma.title')} noIndex />
       <div className="text-center px-6">
         <BrandGlyph name="compass" size={56} className="mx-auto mb-6 opacity-70" />
-        <p className="font-mono text-[12px] text-accent mb-3">404 · poza szlakiem</p>
+        <p className="font-mono text-[12px] text-muted-foreground mb-3">404 · poza szlakiem</p>
         <h1 className="font-display font-light mb-3 text-5xl tracking-tight">Tej ścieżki nie ma na mapie.</h1>
         <p className="mb-8 text-base text-muted-foreground max-w-[46ch] mx-auto text-pretty">
           Strona, której szukasz, nie istnieje lub została przeniesiona.

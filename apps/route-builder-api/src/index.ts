@@ -173,6 +173,7 @@ Zwróć 6-10 propozycji. Dla każdej podaj:
 - "why": jedno zdanie, dlaczego to miejsce odpowiada zapytaniu użytkownika — konkretnie, bez superlatyw
 - "visit_minutes": ile realnie zajmuje zwiedzenie/pobyt (liczba minut)
 - "price_hint": orientacyjny koszt wstępu lub przedział cenowy (krótki tekst, np. "wstęp wolny", "średnia półka", "~40 zł", inaczej null)
+- "address": ulica i numer budynku z wyników wyszukiwania (np. "Grodzka 11"), inaczej null
 
 ${STYL_OPISU}
 
@@ -186,7 +187,9 @@ WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, b
         // Model 2.5 zużywa część budżetu wyjścia na rozumowanie + wyszukiwanie —
         // bez jawnego limitu bywało to niedokumentowane ograniczenie dostawcy,
         // które ucinało JSON w połowie (ten sam mechanizm co w /plan-trip).
-        generationConfig: { maxOutputTokens: 16384 }
+        // Budżet rozumowania jak w planerze: bez limitu model myślał dłużej, niż
+        // szukał — w Lublinie (27.09) 23 s na odpowiedź przy ~40 s całego wyszukania.
+        generationConfig: { maxOutputTokens: 16384, thinkingConfig: { thinkingBudget: 1024 } }
       },
       { operation: 'discover-places', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
     );
@@ -281,14 +284,22 @@ WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, b
         let lat = matched?.lat ?? null;
         let lng = matched?.lng ?? null;
 
-        if (lat == null) {
+        // Adres przed nazwą: lokal bez obiektu w OSM geokoder zna tylko jako budynek
+        // przy ulicy. W Lublinie trzy z ośmiu propozycji (m.in. „Pierogarnia
+        // u Dziadka”) odpadały bez położenia, choć model podawał je z wyszukiwarki.
+        const zapytania = [
+          typeof pl.address === 'string' && pl.address.trim() ? `${pl.address.trim()}, ${destination}` : null,
+          pl.name,
+        ].filter(Boolean) as string[];
+        for (const zapytanie of zapytania) {
+          if (lat != null) break;
           try {
-            const geo = await geocodingService.geocodeSinglePoint(pl.name, { lat: center.lat, lng: center.lng }, KM_LIMIT);
+            const geo = await geocodingService.geocodeSinglePoint(zapytanie, { lat: center.lat, lng: center.lng }, KM_LIMIT);
             if (geo && kmFromCenter(geo.lat, geo.lng) <= KM_LIMIT) {
               lat = geo.lat;
               lng = geo.lng;
             }
-          } catch { /* nierozpoznana nazwa — odsiewamy niżej */ }
+          } catch { /* nierozpoznany adres albo nazwa — próbujemy dalej, potem odsiewamy */ }
         }
         if (lat == null || lng == null) {
           console.log(`[discover] Odrzucone (brak położenia): "${pl.name}"`);

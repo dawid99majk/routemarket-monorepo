@@ -386,7 +386,7 @@ export default function PlacePage() {
                     </select>
                   ) : (
                     <button onClick={() => navigate('/zapisane')}
-                      className="text-[12px] text-muted-foreground hover:text-primary transition-colors">
+                      className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
                       Zapisane · załóż pierwszą kolekcję ↗
                     </button>
                   )}
@@ -400,7 +400,7 @@ export default function PlacePage() {
                 <p className="text-sm leading-relaxed mt-2.5 text-foreground/85">{agentTip}</p>
               ) : (
                 <button onClick={fetchTip} disabled={tipLoading}
-                  className="mt-2.5 text-sm text-primary hover:underline disabled:opacity-60 flex items-center gap-1.5">
+                  className="mt-2.5 text-sm text-foreground underline underline-offset-2 hover:no-underline disabled:opacity-60 flex items-center gap-1.5">
                   {tipLoading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sprawdzam…</> : 'Zapytaj o wskazówkę'}
                 </button>
               )}
@@ -409,7 +409,7 @@ export default function PlacePage() {
               </p>
               {place.website && (
                 <a href={place.website} target="_blank" rel="noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-2">
+                  className="text-xs text-foreground underline underline-offset-2 hover:no-underline flex items-center gap-1 mt-2">
                   Strona miejsca <ExternalLink className="w-3 h-3" />
                 </a>
               )}
@@ -428,7 +428,7 @@ export default function PlacePage() {
                         {n.photos?.[0] && <Zdjecie src={n.photos[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[13px] font-medium truncate group-hover:text-primary transition-colors">{n.name}</div>
+                        <div className="text-[13px] font-medium truncate group-hover:underline">{n.name}</div>
                         <div className="font-mono text-[11px] text-muted-foreground tabular-nums">
                           {formatDuration(n.visit_minutes)} · {kmBetween(place, n).toFixed(1)} km
                         </div>

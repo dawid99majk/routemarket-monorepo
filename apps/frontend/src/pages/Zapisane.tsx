@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import PlannerHeader from '@/components/PlannerHeader';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { odmien } from '@/lib/odmiana';
+import SEO from '@/components/SEO';
 import { useTranslation } from 'react-i18next';
 
 interface Kolekcja { id: string; name: string; slug: string; is_public: boolean }
@@ -229,6 +230,7 @@ export default function Zapisane() {
   return (
     <div className="min-h-screen bg-background">
       <PlannerHeader initials={inicjaly} />
+      <SEO title={t('seo.zapisane.title')} url="/zapisane" noIndex />
 
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -279,8 +281,8 @@ export default function Zapisane() {
         )}
 
         {propozycjeTablic.length > 0 && (
-          <section className="mt-8 rounded-md border border-primary/20 bg-primary/5 px-5 py-4">
-            <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-primary">
+          <section className="mt-8 rounded-md border border-border bg-muted/40 px-5 py-4">
+            <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
               Z tego zrobi się wyjazd
             </p>
             <p className="text-[13.5px] text-muted-foreground mt-1.5 max-w-[62ch]">
@@ -293,13 +295,13 @@ export default function Zapisane() {
                   key={miasto}
                   onClick={() => zlozTablice(miasto, lista, istniejaca)}
                   disabled={!!skladam}
-                  className="inline-flex items-center gap-2 rounded-full border border-primary/30
-                             bg-background px-4 py-2 text-[13px] hover:bg-primary/10
+                  className="inline-flex items-center gap-2 rounded-full border border-border
+                             bg-background px-4 py-2 text-[13px] hover:bg-muted
                              disabled:opacity-50 transition-colors"
                 >
                   {skladam === miasto
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Plus className="w-3.5 h-3.5 text-primary" />}
+                    : <Plus className="w-3.5 h-3.5 text-foreground" />}
                   <span className="font-medium">{miasto}</span>
                   <span className="font-mono text-[11px] text-muted-foreground">
                     {lista.length} {odmien(lista.length, 'miejsce', 'miejsca', 'miejsc')}

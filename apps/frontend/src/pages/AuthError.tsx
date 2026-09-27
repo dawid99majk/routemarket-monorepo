@@ -25,7 +25,7 @@ export default function AuthError() {
         <h1 className="text-2xl font-bold">Authentication Error</h1>
         <p className="text-muted-foreground">{errorMessage}</p>
         <p className="text-sm text-muted-foreground">
-          {countdown > 0 ? <>Redirecting in <span className="text-primary font-semibold">{countdown}</span> seconds</> : 'Redirecting...'}
+          {countdown > 0 ? <>Redirecting in <span className="text-foreground font-semibold">{countdown}</span> seconds</> : 'Redirecting...'}
         </p>
         <Button onClick={() => { window.location.href = '/'; }}>Return to Home</Button>
       </div>

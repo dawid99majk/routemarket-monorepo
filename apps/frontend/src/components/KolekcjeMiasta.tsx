@@ -31,7 +31,7 @@ export default function KolekcjeMiasta({ miejsca, onWybierz }: Props) {
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <p className="font-narrow uppercase tracking-[0.2em] text-[10.5px] font-semibold text-primary">
+        <p className="font-narrow uppercase tracking-[0.2em] text-[10.5px] font-semibold text-muted-foreground">
           Od czego zacząć
         </p>
         <span className="text-xs text-muted-foreground">
@@ -48,7 +48,7 @@ export default function KolekcjeMiasta({ miejsca, onWybierz }: Props) {
               key={kolekcja.id}
               onClick={() => onWybierz(kolekcja)}
               className="group text-left rounded-2xl border border-border/70 bg-card overflow-hidden
-                         hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 w-[230px] shrink-0 snap-start shadow-xs flex flex-col"
+                         hover:border-foreground/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 w-[230px] shrink-0 snap-start shadow-xs flex flex-col"
             >
               <div className="grid grid-cols-2 grid-rows-2 gap-0.5 bg-border/40 aspect-[16/10] overflow-hidden">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -62,7 +62,7 @@ export default function KolekcjeMiasta({ miejsca, onWybierz }: Props) {
               </div>
               <div className="p-3.5 flex-1 flex flex-col justify-between">
                 <div>
-                  <p className="font-display text-[15px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                  <p className="font-display text-[15px] font-semibold leading-snug text-foreground group-hover:underline decoration-foreground/30 underline-offset-4 line-clamp-1">
                     {kolekcja.nazwa}
                   </p>
                   <p className="text-[12px] text-muted-foreground leading-snug mt-1 line-clamp-1">

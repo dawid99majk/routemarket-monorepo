@@ -244,7 +244,7 @@ export default function Marketing() {
       <PlannerHeader />
 
       <main className="w-full max-w-[1180px] mx-auto px-4 sm:px-8 py-8 sm:py-12">
-        <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-primary">Warsztat</p>
+        <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground">Warsztat</p>
         <h1 className="font-display font-light mt-3 text-[clamp(28px,3vw,38px)] leading-tight">
           Materiały promocyjne
         </h1>
@@ -273,7 +273,7 @@ export default function Marketing() {
                 value={wybrana ?? ''}
                 onChange={(e) => { setWybrana(e.target.value); setWarianty([]); }}
                 className="mt-2 w-full h-11 rounded-md border border-border bg-card px-3 text-sm
-                           outline-none focus:border-primary transition-colors"
+                           outline-none focus:border-foreground/50 transition-colors"
               >
                 {tablice.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -294,8 +294,8 @@ export default function Marketing() {
                     onClick={() => { setKanal(k.id); setWarianty([]); }}
                     className={`text-left rounded-md border px-3 py-3 transition-colors ${
                       kanal === k.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border bg-card hover:border-primary/40'
+                        ? 'border-foreground bg-card'
+                        : 'border-border bg-card hover:border-foreground/30'
                     }`}
                   >
                     <span className="text-sm font-medium">{k.label}</span>
@@ -361,8 +361,8 @@ export default function Marketing() {
                     onClick={() => setFormat(f.id)}
                     className={`rounded-full border px-3 h-8 text-[12px] transition-colors ${
                       format === f.id
-                        ? 'border-primary bg-primary/5 text-foreground'
-                        : 'border-border bg-card text-muted-foreground hover:border-primary/40'
+                        ? 'border-foreground bg-card text-foreground'
+                        : 'border-border bg-card text-muted-foreground hover:border-foreground/30'
                     }`}
                   >
                     {f.label}

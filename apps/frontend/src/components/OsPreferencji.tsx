@@ -66,8 +66,8 @@ export default function OsPreferencji({
           <SliderPrimitive.Thumb
             aria-label={tytul}
             className={`block h-4 w-4 rounded-full border-2 bg-background transition-colors
-                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
-              wlasna ? 'border-primary' : 'border-muted-foreground/50'
+                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 ${
+              wlasna ? 'border-foreground' : 'border-muted-foreground/50'
             }`}
           />
         </SliderPrimitive.Root>

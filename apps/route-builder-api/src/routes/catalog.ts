@@ -142,6 +142,32 @@ catalogRouter.post('/catalog/translate-descriptions', async (c) => {
  * pustą półką, a treść musi skądś przyjść — bierzemy ją z OSM (fakty i
  * współrzędne) plus jedno wywołanie modelu na opisy i znaczniki dla całej partii.
  */
+/**
+ * Zdjęcia dla świeżo zebranych miejsc, poza odpowiedzią /catalog/seed.
+ * Partiami po pięć z przerwą — Commons przycina ruch przy kilkudziesięciu
+ * zapytaniach pod rząd (ta sama zasada co w /catalog/refresh-photos).
+ */
+async function dociagnijZdjecia(
+  city: string,
+  lista: { id: string; name: string; lat: number; lng: number; wikipedia?: string | null }[],
+): Promise<void> {
+  const t0 = Date.now();
+  let zdjecia = 0;
+  for (let i = 0; i < lista.length; i += 5) {
+    const batch = lista.slice(i, i + 5);
+    const zestawy = await Promise.all(batch.map((m) =>
+      fetchNearbyPhotos(m.name, m.lat, m.lng, 3, city, m.wikipedia ?? undefined).catch(() => [] as string[])));
+    await Promise.all(batch.map(async (m, j) => {
+      if (!zestawy[j]?.length) return;
+      zdjecia++;
+      await repo.updateCatalogPlace(m.id, { photos: zestawy[j], updated_at: new Date().toISOString() })
+        .catch((err: any) => console.warn(`[catalog/seed] Zdjęcia "${m.name}": ${err.message}`));
+    }));
+    if (i + 5 < lista.length) await new Promise((r) => setTimeout(r, 300));
+  }
+  console.log(`[catalog/seed] ${city}: zdjęcia w tle dla ${zdjecia} z ${lista.length} miejsc w ${Date.now() - t0} ms`);
+}
+
 catalogRouter.post('/catalog/seed', async (c) => {
   try {
     const { city, limit } = await c.req.json() as { city: string; limit?: number };
@@ -226,14 +252,19 @@ catalogRouter.post('/catalog/seed', async (c) => {
     // Fakty z OpenStreetMap wystarczą, żeby pokazać karty; opisy dochodzą osobno
     // przez /catalog/enrich.
 
-    // Zdjęcia partiami: Commons nie lubi czterdziestu równoległych zapytań
+    // Zapis BEZ zdjęć, zdjęcia w tle. Pomiar Lublina (27.09): zbieranie trwało
+    // 42 s, z czego 31,5 s to Commons — Overpass zajął 10 s. Przez cały ten czas
+    // użytkownik patrzył na „zbieram miejsca”, choć nazwy, godziny i położenie
+    // były gotowe. Opisy od dawna dochodzą osobno (/catalog/enrich); zdjęcia
+    // dochodzą teraz tak samo, a front i tak przeładowuje listę po każdej partii
+    // opisów, więc galerie pojawiają się same.
     const saved: any[] = [];
+    const doZdjec: { id: string; name: string; lat: number; lng: number; wikipedia?: string | null }[] = [];
     tEtap = Date.now();
-    const BATCH = 5;
+    const BATCH = 10;
     for (let i = 0; i < candidates.length; i += BATCH) {
       const batch = candidates.slice(i, i + BATCH);
-      const photoSets = await Promise.all(batch.map((p) => fetchNearbyPhotos(p.name, p.lat, p.lng, 3, city, p.wikipedia)));
-      await Promise.all(batch.map(async (p, j) => {
+      await Promise.all(batch.map(async (p) => {
         const slug = placeSlug(p.name, city, p.lat, p.lng);
         const row = {
           slug,
@@ -245,7 +276,7 @@ catalogRouter.post('/catalog/seed', async (c) => {
           category: kategoriaZRodzaju(p.kind),
           kind: p.kind,
           description: '',
-          photos: photoSets[j] || [],
+          photos: [] as string[],
           opening_hours: p.openingHours ?? null,
           website: p.website ?? null,
           // Tag trafia do bazy od razu: bez niego odświeżanie zdjęć szuka po
@@ -260,20 +291,25 @@ catalogRouter.post('/catalog/seed', async (c) => {
           const existing = await repo.findCatalogPlace(p.id, slug);
           if (existing) {
             const patch: Record<string, unknown> = { updated_at: row.updated_at };
-            if ((!existing.photos || existing.photos.length === 0) && row.photos.length) patch.photos = row.photos;
             if (!existing.wikipedia && row.wikipedia) patch.wikipedia = row.wikipedia;
             await repo.updateCatalogPlace(existing.id, patch);
             saved.push(existing);
+            if (!existing.photos || existing.photos.length === 0) {
+              doZdjec.push({ id: existing.id, name: p.name, lat: p.lat, lng: p.lng, wikipedia: existing.wikipedia ?? p.wikipedia });
+            }
           } else {
-            saved.push(await repo.insertCatalogPlace(row));
+            const nowy = await repo.insertCatalogPlace(row);
+            saved.push(nowy);
+            doZdjec.push({ id: nowy.id, name: p.name, lat: p.lat, lng: p.lng, wikipedia: p.wikipedia });
           }
         } catch (err: any) {
           console.warn(`[catalog/seed] Pominięte "${p.name}": ${err.message}`);
         }
       }));
     }
+    void dociagnijZdjecia(city, doZdjec);
 
-    etapy.zdjecia_i_zapis = Date.now() - tEtap;
+    etapy.zapis = Date.now() - tEtap;
     console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc `
       + `(zwiedzanie ${zwiedzanie.length}, jedzenie ${jedzenie.length}, `
       + `wieczory ${wieczory.length}, noclegi ${noclegi.length}) `

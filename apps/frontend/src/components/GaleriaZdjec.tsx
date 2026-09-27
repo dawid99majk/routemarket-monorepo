@@ -94,13 +94,13 @@ export default function GaleriaZdjec({
   if (ile === 0) {
     return (
       <div className={`rounded-xl bg-gradient-to-br from-primary/10 via-muted/40 to-accent/10 ${aspectRatio} border border-border/60 flex flex-col items-center justify-center p-4 text-center ${className}`}>
-        <MapPin className="w-8 h-8 text-primary/50 mb-2" />
+        <MapPin className="w-8 h-8 text-muted-foreground mb-2" />
         <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Zdjęcia w przygotowaniu</span>
         <a
           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nazwaMiejsca)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+          className="mt-3 text-xs text-foreground font-medium underline underline-offset-2 hover:no-underline inline-flex items-center gap-1"
         >
           Zobacz zdjęcia w Google ↗
         </a>
@@ -204,7 +204,7 @@ export default function GaleriaZdjec({
               aria-label={`Przełącz na zdjęcie ${i + 1}`}
               className={`relative h-12 flex-1 min-w-[50px] max-w-[80px] rounded-lg overflow-hidden border transition-all duration-200 cursor-pointer ${
                 i === teraz
-                  ? 'border-primary ring-2 ring-primary/40 scale-[1.03] shadow-xs'
+                  ? 'border-foreground ring-2 ring-foreground/30 scale-[1.03] shadow-xs'
                   : 'border-border/80 opacity-60 hover:opacity-100 hover:scale-[1.01]'
               }`}
             >

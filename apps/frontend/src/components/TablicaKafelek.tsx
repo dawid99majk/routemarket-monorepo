@@ -22,7 +22,7 @@ interface TablicaKafelekProps {
 }
 
 /** Trzy tinty z palety, dobierane nazwą — ta sama tablica zawsze wygląda tak samo. */
-const TINTY = ['bg-primary/15', 'bg-dusty-blue/20', 'bg-accent/20'];
+const TINTY = ['bg-muted', 'bg-dusty-blue/20', 'bg-dusty-blue/10'];
 
 function tint(nazwa: string, i: number) {
   let suma = 0;
@@ -57,7 +57,7 @@ export default function TablicaKafelek({
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       className={`rounded-2xl border bg-card overflow-hidden transition-all duration-300 ${
         onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
-      } ${aktywny ? 'border-primary shadow-xs' : 'border-border/70 shadow-xs'}`}
+      } ${aktywny ? 'border-foreground shadow-xs' : 'border-border/70 shadow-xs'}`}
     >
       <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-[132px]">
         {pola.map((zdj, i) => (
@@ -79,9 +79,9 @@ export default function TablicaKafelek({
         {(autor || przyklad || akcja) && (
           <div className="flex items-center gap-2.5 mt-3.5">
             {przyklad ? (
-              <span className="inline-flex items-center rounded-full border border-primary/35
-                               bg-primary/8 px-2.5 py-0.5 font-narrow uppercase tracking-[0.14em]
-                               text-[10px] text-primary shrink-0">
+              <span className="inline-flex items-center rounded-full border border-border
+                               bg-muted px-2.5 py-0.5 font-narrow uppercase tracking-[0.14em]
+                               text-[10px] text-foreground shrink-0">
                 {etykietaPrzykladu}
               </span>
             ) : autor ? (

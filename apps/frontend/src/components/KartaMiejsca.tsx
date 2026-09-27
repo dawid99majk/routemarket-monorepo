@@ -138,8 +138,8 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
               )}
 
               {miejsce.wyroznik && (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2.5">
-                  <span className="font-mono uppercase tracking-wider text-[10px] text-primary font-semibold shrink-0 mt-0.5 border border-primary/30 rounded-full px-2 py-0.5 bg-background shadow-2xs">
+                <div className="rounded-lg border border-border bg-muted/40 p-3 flex items-start gap-2.5">
+                  <span className="font-mono uppercase tracking-wider text-[10px] text-muted-foreground font-semibold shrink-0 mt-0.5 border border-border rounded-full px-2 py-0.5 bg-background shadow-2xs">
                     Wyróżnik
                   </span>
                   <p className="text-[13.5px] leading-snug text-foreground/90 text-pretty font-medium">
@@ -161,7 +161,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
               {/* Wskazówka Agenta */}
               {miejsce.note && (
                 <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 flex items-start gap-2.5">
-                  <span className="font-mono uppercase tracking-wider text-[10px] text-accent font-semibold shrink-0 mt-0.5 border border-accent/30 rounded-full px-2 py-0.5 bg-background shadow-2xs">
+                  <span className="font-mono uppercase tracking-wider text-[10px] text-foreground/80 font-semibold shrink-0 mt-0.5 border border-accent/40 rounded-full px-2 py-0.5 bg-background shadow-2xs">
                     Wskazówka
                   </span>
                   <p className="text-[13px] leading-relaxed text-foreground/90 text-pretty">
@@ -176,13 +176,13 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
               <div className="font-mono text-[12px] tabular-nums text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-2">
                 {czas(miejsce.visit_minutes) && (
                   <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-primary/70" />
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>Czas: {czas(miejsce.visit_minutes)}</span>
                   </span>
                 )}
                 {sformatowaneGodziny ? (
                   <span className="flex items-center gap-1.5 min-w-0" title={miejsce.opening_hours || ''}>
-                    <CalendarDays className="w-3.5 h-3.5 text-primary/70" />
+                    <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="truncate">{sformatowaneGodziny}</span>
                   </span>
                 ) : (
@@ -190,7 +190,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-accent hover:underline"
+                    className="flex items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
                   >
                     <span>Godziny: sprawdź w Google ↗</span>
                   </a>
@@ -200,7 +200,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                   href={miejsce.website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-primary hover:underline ml-auto text-[11.5px] font-sans"
+                  className="flex items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline ml-auto text-[11.5px] font-sans"
                 >
                   <span>{miejsce.website ? 'Strona obiektu ↗' : 'Otwórz na mapie ↗'}</span>
                 </a>
@@ -220,7 +220,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                               ? id === 'must' ? 'bg-primary text-primary-foreground font-medium'
                                 : id === 'nice' ? 'bg-accent text-accent-foreground font-medium'
                                   : 'bg-muted text-muted-foreground line-through'
-                              : 'bg-muted/60 hover:bg-muted text-secondary hover:text-foreground'
+                              : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                           }`}>
                           {etykieta}
                         </button>

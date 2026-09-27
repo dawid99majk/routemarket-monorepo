@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { Input } from '@/components/ui/input';
+import SEO from '@/components/SEO';
 import { useTranslation } from 'react-i18next';
 
 interface Collection {
@@ -202,6 +203,7 @@ export default function Collections() {
   return (
     <div className="min-h-screen bg-background">
       <PlannerHeader initials={inicjaly} />
+      <SEO title={t('seo.kolekcje.title')} noIndex />
 
       <main className="max-w-[1400px] mx-auto px-6 py-8 space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-2">
@@ -252,7 +254,7 @@ export default function Collections() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{col.name}</span>
                   {col.is_public
-                    ? <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+                    ? <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     : <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
                 </div>
                 <span className="text-xs text-muted-foreground">

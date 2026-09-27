@@ -216,6 +216,18 @@ export function metryMiedzy(a: any, b: any): number | null {
   return Math.round(R * 2 * Math.asin(Math.sqrt(s)) * 1.3);
 }
 
+/**
+ * Tempo marszu po mieście — to samo co w planerze (15 min/km, services/planer.ts).
+ * Oś dnia liczyła 80 m/min, statystyka dnia 4,5 km/h, a ostrzeżenia planera
+ * 15 min/km: te same 1,6 km wychodziły raz jako 20, raz jako 24 minuty.
+ */
+export const MINUT_NA_KM = 15;
+
+/** Minuty pieszo dla dystansu w metrach (już z doliczonymi 30% na ulice). */
+export function minutPieszo(metry: number): number {
+  return Math.max(1, Math.round((metry / 1000) * MINUT_NA_KM));
+}
+
 /** Dystans po polsku: przecinek dziesiętny, metry poniżej kilometra. */
 export function opisDystansu(m: number): string {
   return m >= 1000 ? `${(m / 1000).toFixed(1).replace('.', ',')} km` : `${m} m`;

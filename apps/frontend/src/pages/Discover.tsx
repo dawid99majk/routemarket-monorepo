@@ -438,6 +438,26 @@ export default function Discover() {
     })();
   }, [activeBoard]);
 
+  /**
+   * Atrakcja stojąca niecałe 50 m od wyżej ocenionej. Zamek w Lublinie, Muzeum
+   * Narodowe i Kaplica Trójcy Świętej to trzy karty jednej wizyty — ale Dwór
+   * Artusa i Fontanna Neptuna też stoją obok siebie, a są osobnymi miejscami.
+   * Dlatego karta mówi fakt („tuż obok”), zamiast chować którąś jako duplikat.
+   */
+  const tuzObok = useMemo(() => {
+    const wynik: Record<string, string> = {};
+    const atrakcje = places.filter((m) => m.category === 'attraction' && m.lat != null && m.lng != null);
+    atrakcje.forEach((m, i) => {
+      for (let j = 0; j < i; j++) {
+        const q = atrakcje[j];
+        const dLat = (m.lat - q.lat) * 111_000;
+        const dLng = (m.lng - q.lng) * 111_000 * Math.cos((m.lat * Math.PI) / 180);
+        if (Math.hypot(dLat, dLng) < 50) { wynik[m.id] = q.name; break; }
+      }
+    });
+    return wynik;
+  }, [places]);
+
   /** Filtrowanie na bieżąco, filtr i wyszukiwarka działają łącznie. */
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -515,8 +535,16 @@ export default function Discover() {
   const pokazKolekcje = !kolekcja && !query.trim() && filter === 'all'
     && kategoria === 'wszystkie' && wynikiAgenta.length === 0 && places.length > 0;
 
-  const savedCount = Object.values(marks).filter((m) => m === 'must').length;
-  const maybeCount = Object.values(marks).filter((m) => m === 'nice').length;
+  // Miejsca dopięte z wyników agenta nie mają catalog_id, więc nie ma ich w `marks`.
+  // Licznik pokazywał „0 na pewno” przy lokalu leżącym już na tablicy.
+  const spozaKatalogu = Object.values({
+    ...naTablicyPoNazwie,
+    ...Object.fromEntries(Object.entries(dopinane).map(([n, b]) => [kluczNazwy(n), b])),
+  });
+  const savedCount = Object.values(marks).filter((m) => m === 'must').length
+    + spozaKatalogu.filter((m) => m === 'must').length;
+  const maybeCount = Object.values(marks).filter((m) => m === 'nice').length
+    + spozaKatalogu.filter((m) => m === 'nice').length;
 
   /**
    * Licznik i miniatura na karcie wyjazdu. Liczone raz przy wejściu, więc karta
@@ -840,8 +868,9 @@ export default function Discover() {
       await load(data.city || city, true);
 
       // Opisy dochodzą osobno, bo to zapytanie do modelu trwa dwadzieścia kilka
-      // sekund. Karty stoją już z nazwami, godzinami i zdjęciami; treść dosypuje
-      // się do nich w tle, bez blokowania ekranu.
+      // sekund. Karty stoją już z nazwami i godzinami; opisy i zdjęcia (te
+      // dociąga serwer w tle po /catalog/seed) dosypują się przy każdym
+      // przeładowaniu listy w pętli poniżej, bez blokowania ekranu.
       if (data.needs_enrich) {
         setOpisyWToku(true);
         const miasto = data.city || city.trim();
@@ -936,8 +965,8 @@ export default function Discover() {
               {t('odkrywaj.tablica')}
             </Button>
             <Button size="sm" className="rounded-full h-9 px-4 text-xs bg-foreground text-background hover:bg-foreground/90 shadow-xs cursor-pointer"
-              onClick={() => navigate(`/plany/${board.id}?widok=plan`)}>
-              Zbuduj plan <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
+              onClick={() => navigate(`/plany/${board.id}?widok=plan&uloz=1`)}>
+              Ułóż plan <ArrowUpRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </div>
         )}
@@ -1204,7 +1233,7 @@ export default function Discover() {
                   <p className="text-[13px] text-muted-foreground">{kolekcja.podpis}</p>
                 </div>
                 <button onClick={() => setKolekcja(null)}
-                  className="text-[13px] text-secondary hover:text-foreground transition-colors shrink-0">
+                  className="text-[13px] text-muted-foreground hover:text-foreground transition-colors shrink-0">
                   Wszystkie miejsca
                 </button>
               </div>
@@ -1330,6 +1359,11 @@ export default function Discover() {
                             ? 'text-foreground font-medium' : 'text-muted-foreground'
                         }`}>
                           {p.city}{p.country ? ` / ${p.country}` : ''}
+                        </p>
+                      )}
+                      {tuzObok[p.id] && (
+                        <p className="font-mono text-[11px] mt-0.5 text-muted-foreground">
+                          {t('odkrywaj.tuz_obok', { nazwa: tuzObok[p.id] })}
                         </p>
                       )}
                       {wyroznikMiejsca(p) ? (

@@ -248,6 +248,7 @@
     "szukaj_plaza_ruiny_deszczowy_dzien": "Buscar: playa, ruinas, día lluvioso…",
     "ta_przegladarka_nie_udostepnia_po": "Este navegador no comparte la ubicación",
     "tablica": "Tablero",
+    "tuz_obok": "Justo al lado: {{nazwa}}",
     "twoj_hotel_parking_dworzec": "Tu hotel, aparcamiento, estación…",
     "twoje_wyjazdy": "Tus viajes",
     "wyczysc_fraze": "Borrar frase",
@@ -464,9 +465,21 @@
     "zoo": "Zoo"
   },
   "seo": {
+    "auth": {
+      "title": "Iniciar sesión"
+    },
     "contact": {
-      "description": "Contacta con el equipo de RouteMarket. Soporte técnico, consultas de creadores y compradores.",
+      "description": "Contacta con el equipo de RouteMarket: preguntas sobre la planificación de viajes, tu cuenta y el servicio.",
       "title": "Contacto — RouteMarket"
+    },
+    "glowna": {
+      "title": "RouteMarket — reúne lugares, planifica viajes"
+    },
+    "kolekcje": {
+      "title": "Colección"
+    },
+    "nie_ma": {
+      "title": "Página no encontrada"
     },
     "odkrywaj": {
       "title": "Descubre lugares"
@@ -474,8 +487,17 @@
     "plany": {
       "title": "Tus viajes"
     },
+    "profil": {
+      "title": "Perfil"
+    },
+    "start": {
+      "title": "Nuevo viaje"
+    },
     "tablice": {
       "title": "Tableros de viajeros"
+    },
+    "zapisane": {
+      "title": "Lugares guardados"
     }
   },
   "start": {
@@ -507,6 +529,7 @@
     "dodaj_do_tablicy": "Añadir al tablero",
     "dodaj_miejsca": "Añadir lugares",
     "dodano_dostep_tablica_pojawi_sie": "Acceso añadido — el tablero aparecerá a esta persona después de iniciar sesión con esta dirección. No enviamos notificaciones, envíale el enlace tú mismo.",
+    "duplikaty_opis": "— a menos de 50 m; comprueba si no es una sola visita.",
     "ile_czasu_zaplanowac": "¿Cuánto tiempo planificar?",
     "kiedy_jedziecie": "¿Cuándo viajáis?",
     "koniec_nie_moze_byc_przed": "El final no puede ser antes del inicio",

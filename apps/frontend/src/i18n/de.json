@@ -248,6 +248,7 @@
     "szukaj_plaza_ruiny_deszczowy_dzien": "Suchen: Strand, Ruinen, Regentag…",
     "ta_przegladarka_nie_udostepnia_po": "Dieser Browser teilt den Standort nicht",
     "tablica": "Board",
+    "tuz_obok": "Direkt daneben: {{nazwa}}",
     "twoj_hotel_parking_dworzec": "Ihr Hotel, Parkplatz, Bahnhof…",
     "twoje_wyjazdy": "Deine Reisen",
     "wyczysc_fraze": "Phrase löschen",
@@ -457,9 +458,21 @@
     "zoo": "Zoo"
   },
   "seo": {
+    "auth": {
+      "title": "Anmelden"
+    },
     "contact": {
-      "description": "Kontaktieren Sie das RouteMarket-Team. Support, Anfragen für Ersteller und Käufer.",
+      "description": "Kontakt zum RouteMarket-Team — Fragen zur Reiseplanung, zum Konto und zum Dienst.",
       "title": "Kontakt — RouteMarket"
+    },
+    "glowna": {
+      "title": "RouteMarket — Orte sammeln, Reisen planen"
+    },
+    "kolekcje": {
+      "title": "Sammlung"
+    },
+    "nie_ma": {
+      "title": "Seite nicht gefunden"
     },
     "odkrywaj": {
       "title": "Orte entdecken"
@@ -467,8 +480,17 @@
     "plany": {
       "title": "Deine Reisen"
     },
+    "profil": {
+      "title": "Profil"
+    },
+    "start": {
+      "title": "Neue Reise"
+    },
     "tablice": {
       "title": "Boards von Reisenden"
+    },
+    "zapisane": {
+      "title": "Gespeicherte Orte"
     }
   },
   "start": {
@@ -500,6 +522,7 @@
     "dodaj_do_tablicy": "Zur Pinnwand hinzufügen",
     "dodaj_miejsca": "Orte hinzufügen",
     "dodano_dostep_tablica_pojawi_sie": "Zugriff hinzugefügt – die Pinnwand wird dieser Person nach der Anmeldung mit dieser Adresse angezeigt. Wir senden keine Benachrichtigung, senden Sie ihr den Link selbst.",
+    "duplikaty_opis": "— weniger als 50 m voneinander entfernt; prüfe, ob es nicht ein Besuch ist.",
     "ile_czasu_zaplanowac": "Wie viel Zeit einplanen",
     "kiedy_jedziecie": "Wann reisen Sie?",
     "koniec_nie_moze_byc_przed": "Ende darf nicht vor Anfang sein",

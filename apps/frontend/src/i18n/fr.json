@@ -248,6 +248,7 @@
     "szukaj_plaza_ruiny_deszczowy_dzien": "Rechercher : plage, ruines, jour de pluie…",
     "ta_przegladarka_nie_udostepnia_po": "Ce navigateur ne fournit pas de localisation",
     "tablica": "Tableau",
+    "tuz_obok": "Juste à côté : {{nazwa}}",
     "twoj_hotel_parking_dworzec": "Votre hôtel, parking, gare…",
     "twoje_wyjazdy": "Tes voyages",
     "wyczysc_fraze": "Effacer la phrase",
@@ -464,9 +465,21 @@
     "zoo": "Zoo"
   },
   "seo": {
+    "auth": {
+      "title": "Connexion"
+    },
     "contact": {
-      "description": "Contactez l'équipe RouteMarket. Support technique, questions créateurs et acheteurs.",
+      "description": "Contactez l’équipe RouteMarket — questions sur la planification, votre compte et le fonctionnement du service.",
       "title": "Contact — RouteMarket"
+    },
+    "glowna": {
+      "title": "RouteMarket — rassemblez des lieux, planifiez vos voyages"
+    },
+    "kolekcje": {
+      "title": "Collection"
+    },
+    "nie_ma": {
+      "title": "Page introuvable"
     },
     "odkrywaj": {
       "title": "Découvrir des lieux"
@@ -474,8 +487,17 @@
     "plany": {
       "title": "Tes voyages"
     },
+    "profil": {
+      "title": "Profil"
+    },
+    "start": {
+      "title": "Nouveau voyage"
+    },
     "tablice": {
       "title": "Tableaux de voyageurs"
+    },
+    "zapisane": {
+      "title": "Lieux enregistrés"
     }
   },
   "start": {
@@ -507,6 +529,7 @@
     "dodaj_do_tablicy": "Ajouter au tableau",
     "dodaj_miejsca": "Ajouter des lieux",
     "dodano_dostep_tablica_pojawi_sie": "Accès ajouté — le tableau apparaîtra à cette personne après s'être connectée avec cette adresse. Nous n'envoyons pas de notifications, veuillez lui envoyer le lien vous-même.",
+    "duplikaty_opis": "— à moins de 50 m l’un de l’autre ; vérifiez s’il ne s’agit pas d’une seule visite.",
     "ile_czasu_zaplanowac": "Combien de temps prévoir",
     "kiedy_jedziecie": "Quand partez-vous ?",
     "koniec_nie_moze_byc_przed": "La fin ne peut pas être avant le début",

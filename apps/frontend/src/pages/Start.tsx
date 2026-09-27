@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import PlannerHeader from '@/components/PlannerHeader';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { TRIP_PRESETS, EMPTY_AXES } from '@/lib/tripPresets';
+import SEO from '@/components/SEO';
 import { useTranslation } from 'react-i18next';
 
 type Priority = 'must' | 'nice' | 'rejected';
@@ -358,18 +359,18 @@ export default function Start() {
 
   const noweWyjazdPanel = (
     <div className="rounded-md bg-foreground text-background p-7 flex flex-col">
-      <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-primary-light">{t('start.nowy_wyjazd')}</p>
+      <p className="font-narrow uppercase tracking-[0.32em] text-[10px] text-primary-foreground/70">{t('start.nowy_wyjazd')}</p>
       <h2 className="font-display font-light text-[26px] leading-tight mt-2.5">{t('start.dokad_tym_razem')}</h2>
 
       <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={t('start.miasto_lub_region')}
         className="mt-6 w-full rounded-sm bg-primary-foreground/[0.07] border border-primary-foreground/20
                    px-3.5 h-11 text-background placeholder:text-primary-foreground/45
-                   focus:outline-none focus:border-primary-light transition-colors" />
+                   focus:outline-none focus:border-primary-foreground/60 transition-colors" />
       <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t('start.termin_np_12_14_wrzesnia')}
         onKeyDown={(e) => e.key === 'Enter' && startTrip()}
         className="mt-3 w-full rounded-sm bg-primary-foreground/[0.07] border border-primary-foreground/20
                    px-3.5 h-11 text-background placeholder:text-primary-foreground/45
-                   focus:outline-none focus:border-primary-light transition-colors" />
+                   focus:outline-none focus:border-primary-foreground/60 transition-colors" />
 
       <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-primary-foreground/60 mt-6">
         Klimat wyjazdu
@@ -379,7 +380,7 @@ export default function Start() {
           <button key={id} onClick={() => setClimate(id)}
             className={`rounded-full px-3.5 py-1.5 text-[13px] border transition-colors ${
               climate === id
-                ? 'bg-primary-light border-primary-light text-foreground'
+                ? 'bg-background border-background text-foreground'
                 : 'border-primary-foreground/20 text-primary-foreground/80 hover:border-primary-foreground/40'
             }`}>
             {climateLabel(id)}
@@ -400,6 +401,7 @@ export default function Start() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title={t('seo.start.title')} url="/start" noIndex />
       <PlannerHeader
         context={active ? [active.destination, active.days ? `${active.days} dni` : null,
           active.trip_type ? climateLabel(active.trip_type).toLowerCase() : null].filter(Boolean).join(' · ') : null}

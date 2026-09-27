@@ -84,7 +84,7 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
           <button
             type="button"
             onClick={() => { onNowy(); setOtwarty(false); }}
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Nowy</span>
@@ -175,7 +175,7 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
         <button
           type="button"
           onClick={() => { onNowy(); setOtwarty(false); }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left font-medium"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-foreground hover:bg-muted transition-colors cursor-pointer text-left font-medium"
         >
           <Plus className="w-4 h-4 shrink-0" />
           <span>{t('odkrywaj.nowy_wyjazd_lista')}</span>

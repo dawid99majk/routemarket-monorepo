@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import SEO from '@/components/SEO';
 import { Map as MapIcon, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 function safeRedirect(value: string | null) {
@@ -80,6 +81,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <SEO title={t('seo.auth.title')} url="/auth" noIndex />
       <Logo size="lg" className="mb-8" />
 
       <Card className="w-full max-w-md">

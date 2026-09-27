@@ -180,7 +180,7 @@ export default function Tablice() {
                   key={tab.id}
                   onClick={() => navigate(`/tablica/${tab.id}`)}
                   className="group text-left rounded-2xl bg-card border border-border overflow-hidden shadow-sm
-                             hover:shadow-xl hover:border-primary/50 hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                             hover:shadow-xl hover:border-foreground/30 hover:-translate-y-1 transition-all duration-300 flex flex-col"
                 >
                   <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
                     {tab.photos?.[0] ? (
@@ -209,7 +209,7 @@ export default function Tablice() {
                                       rounded-full px-2.5 py-1 text-[11px] font-mono tabular-nums
                                       backdrop-blur-md shadow-xs border border-white/20 ${
                       moje.has(tab.id)
-                        ? 'bg-accent/20 text-accent font-medium'
+                        ? 'bg-accent/20 text-foreground font-medium'
                         : 'bg-background/85 text-muted-foreground'}`}>
                       <Heart className={`w-3.5 h-3.5 ${moje.has(tab.id) ? 'fill-accent text-accent' : ''}`} />
                       {tab.like_count ?? 0}
@@ -218,7 +218,7 @@ export default function Tablice() {
 
                   <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="font-display text-[17px] sm:text-[18px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                      <h3 className="font-display text-[17px] sm:text-[18px] font-semibold leading-snug text-foreground group-hover:underline decoration-foreground/30 underline-offset-4 line-clamp-1">
                         {tab.name}
                       </h3>
                       {tab.days && (
@@ -231,14 +231,14 @@ export default function Tablice() {
                     <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/50">
                       {autor ? (
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center
+                          <span className="w-6 h-6 rounded-full bg-muted text-foreground flex items-center justify-center
                                            text-[11px] font-semibold shrink-0">
                             {autor.slice(0, 1).toUpperCase()}
                           </span>
                           <span className="text-[12.5px] text-muted-foreground truncate">{autor}</span>
                         </div>
                       ) : (
-                        <span className="font-medium text-[11px] text-primary bg-primary/8 px-2 py-0.5 rounded-full">
+                        <span className="font-medium text-[11px] text-foreground bg-muted px-2 py-0.5 rounded-full">
                           RouteMarket
                         </span>
                       )}

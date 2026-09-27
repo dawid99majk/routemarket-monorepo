@@ -125,7 +125,7 @@ export default function NavigationLauncher() {
                     setActive(route);
                     setPicking(false);
                   }}
-                  className="w-full text-left rounded-md border p-3 hover:border-primary hover:bg-muted/50 transition-colors"
+                  className="w-full text-left rounded-md border p-3 hover:border-foreground/40 hover:bg-muted/50 transition-colors"
                 >
                   <div className="font-medium text-sm">{route.title}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{route.track.length} punktów śladu</div>
