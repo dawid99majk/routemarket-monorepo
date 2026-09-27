@@ -26,6 +26,7 @@ import {
 } from './services/planer.js';
 import { fetchWikiCard, fetchNearbyPhotos, COMMONS_UA } from './services/photos.js';
 import { placeSlug, VIBE_TAGS, kategoriaZRodzaju } from './services/katalog-helpers.js';
+import { STYL_OPISU } from './services/styl-opisow.js';
 import { placesRouter } from './routes/places.js';
 import { chatInterviewRouter } from './routes/chat-interview.js';
 import { routeProjectsRouter } from './routes/route-projects.js';
@@ -159,19 +160,21 @@ app.post('/discover-places', async (c) => {
     // stronie klienta, więc tutaj dostajemy gotową, jedną prawdę.
     const prefHints = opiszPreferencje(creator_preferences);
 
-    const prompt = `Jesteś kuratorem i przewodnikiem po mieście ${destination} dla wymagających podróżników (styl Monocle, Conde Nast Traveler). Użytkownik szuka: "${query}".
+    const prompt = `Jesteś przewodnikiem po mieście ${destination}. Użytkownik szuka: "${query}".
 ${prefHints.length ? `\nZNANE PREFERENCJE TEGO UŻYTKOWNIKA (uwzględnij przy doborze i kolejności):\n${prefHints.map((h) => `- ${h}`).join('\n')}\n` : ''}
-Użyj wyszukiwarki Google, aby znaleźć REALNE, aktualnie działające i magnetyczne miejsca odpowiadające temu zapytaniu. Wybieraj miejsca z klimatem, autentycznością i charakterem (unikaj nudnych, generycznych pułapek turystycznych i surowych biurowców).
+Użyj wyszukiwarki Google, aby znaleźć REALNE, aktualnie działające miejsca odpowiadające temu zapytaniu. Wybieraj miejsca z charakterem, a omijaj generyczne pułapki turystyczne i biurowce.
 
 ${poiList ? `Miejsca potwierdzone w OpenStreetMap (jeśli któreś pasuje, użyj DOKŁADNIE tej nazwy):\n${poiList}` : ''}
 
 Zwróć 6-10 propozycji. Dla każdej podaj:
 - "name": dokładna nazwa (jeśli jest na liście powyżej — skopiuj stamtąd znak w znak)
 - "category": jedna z: attraction, food, nightlife, hotel, other
-- "description": 2 zdania żywego opisu: jaka tam panuje atmosfera, co tam poczujesz i zjesz/zobaczysz. Unikaj suchych roczników i encyklopedyzmu.
-- "why": jedno intrygujące zdanie, dlaczego to miejsce idealnie odpowiada zapytaniu użytkownika
+- "description": 2 zdania: co to za miejsce i co tam zjesz, zobaczysz albo zrobisz.
+- "why": jedno zdanie, dlaczego to miejsce odpowiada zapytaniu użytkownika — konkretnie, bez superlatyw
 - "visit_minutes": ile realnie zajmuje zwiedzenie/pobyt (liczba minut)
 - "price_hint": orientacyjny koszt wstępu lub przedział cenowy (krótki tekst, np. "wstęp wolny", "średnia półka", "~40 zł", inaczej null)
+
+${STYL_OPISU}
 
 WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, bez podsumowania, bez zdania powitalnego przed ani po. Sam JSON, nic więcej.`;
 
@@ -548,16 +551,16 @@ app.post('/points-details', async (c) => {
       return c.json({ details });
     }
 
-    const prompt = `Jesteś autorem inspirujących przewodników w stylu Monocle, Lonely Planet i Conde Nast Traveler. Dla każdego z poniższych miejsc napisz magnetyczny opis, orientacyjne godziny otwarcia i jedną praktyczną wskazówkę (insider tip).
-Skup się na zmysłach, klimacie, energii i tym, dlaczego to miejsce zapada w pamięć. UNIKAJ encyklopedyzmu i metryk budowlanych ("zbudowany w roku...", "charakteryzuje się...").
+    const prompt = `Dla każdego z poniższych miejsc napisz krótki opis, orientacyjne godziny otwarcia i jedną praktyczną wskazówkę.
+${STYL_OPISU}
 
 Miejsca:
 ${list.map((p, i) => `${i + 1}. ${p.name}${p.lat ? ` (${p.lat.toFixed(4)}, ${p.lng?.toFixed(4)})` : ''}`).join('\n')}
 
 Dla każdego zwróć obiekt z polami:
 - "name": nazwa DOKŁADNIE tak, jak podano wyżej
-- "description": 2-3 zdania wciągającego opisu: jaki tam panuje klimat, co tam poczujesz i dlaczego warto tam wejść (dźwięki, światło, atmosfera, widok, zapach). Pokaż żywe doświadczenie zamiast lekcji historii.
-- "recommendation": jedno zdanie genialnego "Insider Tip" (np. o której godzinie przyjść by ominąć kolejkę, co zamówić, gdzie usiąść, sekretny punkt widokowy).
+- "description": 2-3 zdania: czym jest to miejsce i co tam realnie robisz.
+- "recommendation": jedno zdanie praktycznej wskazówki (np. o której przyjść, żeby ominąć kolejkę, co zamówić, skąd jest najlepszy widok).
 - "opening_hours": orientacyjne godziny otwarcia (np. "wt-nd 10:00-19:00" lub "całodobowo / na zewnątrz"), jeśli znane, inaczej null
 
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;

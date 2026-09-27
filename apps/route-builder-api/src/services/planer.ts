@@ -25,7 +25,7 @@
 import { callGeminiTracked } from './ai-usage.js';
 import { geocodingService } from './geocoding.js';
 import { poiService, type PoiCandidate } from './poi.js';
-import { describeAvailability, isOpenDuring } from './opening-hours.js';
+import { describeAvailability, isOpenDuring, openIntervalsOn } from './opening-hours.js';
 import { instrukcjaJezyka, type KodJezyka } from './jezyki.js';
 
 export interface MiejsceWejscie {
@@ -694,7 +694,7 @@ ZASADY:
    Uwzględnij preferencje użytkownika co do jedzenia, jeśli je podano.
 8. Nie upychaj na siłę ponad ramy czasowe. Jeśli coś naprawdę się nie mieści, zostaw to w "not_scheduled" z konkretnym powodem.
    "not_scheduled" DOTYCZY WYŁĄCZNIE KOTWIC TEGO DNIA. Niewykorzystanych propozycji NIE WYPISUJ TAM.
-9. W "warnings" napisz rzeczy, o których użytkownik musi wiedzieć (np. "Muzeum X dziś zamknięte", "do zamknięcia zostanie 20 minut — trzeba się streszczać").
+9. W "warnings" napisz tylko to, czego nie widać w godzinach otwarcia (np. "trzeba zarezerwować stolik", "strome podejście"). O GODZINACH OTWARCIA I ZAMKNIĘCIA NIE PISZ w "warnings" — sprawdza je osobny mechanizm na podstawie danych. Skróconą wizytę opisz w "note" pozycji (zasada 5).
 
 ZWIĘZŁOŚĆ: "note" najwyżej 80 znaków, "summary" najwyżej 120 znaków, "reason" najwyżej 80 znaków. Żadnych rozbudowanych opisów — to harmonogram, nie przewodnik.
 
@@ -723,35 +723,163 @@ ${instrukcjaJezyka(k.jezyk)}`;
  */
 function odsiejZamkniete(k: KontekstPlanu, dzien: DzienPlanu, numer: number): void {
   const info = k.dni[numer - 1];
-  const klucz = (s: string) =>
-    String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-
-  const godziny = new Map<string, string>();
-  for (const pl of k.zadanie.places) {
-    if (pl.opening_hours) godziny.set(klucz(pl.name), pl.opening_hours);
-  }
-  for (const c of [...k.zabytki, ...k.lokale]) {
-    if ((c as any).openingHours) godziny.set(klucz(c.name), (c as any).openingHours);
-  }
+  const godziny = mapaGodzin(k);
   if (!godziny.size) return;
 
+  // Wyrzucenie zamkniętego lokalu zostawiało dziurę: w planie Torunia gospoda
+  // wypadła w sobotę i dzień 2 został bez żadnego posiłku, z półtorej godziny
+  // pustego czasu w środku. Szukamy więc zastępstwa w tej samej puli (lokal za
+  // lokal, zabytek za zabytek), otwartego w tej samej porze i nie dalej niż
+  // kilometr z kawałkiem od miejsca, które wypadło. Bierzemy tylko wycinek tego
+  // dnia — pule dni są rozłączne, więc zastępstwo nie zdubluje innego dnia.
+  const zajete = new Set<string>([
+    ...dzien.items.map((p) => kluczGodzin(p.name)),
+    ...k.grupy.flat().map((p) => kluczGodzin(p.name)),
+  ]);
+  const nazwyLokali = new Set(k.lokale.map((c) => kluczGodzin(c.name)));
+  const jestLokalem = (poz: PozycjaDnia) =>
+    nazwyLokali.has(kluczGodzin(poz.name))
+    || /^(restaurant|cafe|fast_food|ice_cream|bar|pub|biergarten|food|nightlife)$/.test(String(poz.kind || ''))
+    || k.zadanie.places.some((p) => kluczGodzin(p.name) === kluczGodzin(poz.name)
+      && /^(food|nightlife)$/.test(String(p.category || '')));
+
+  const zastepstwo = (poz: PozycjaDnia, wejscie: number): PozycjaDnia | null => {
+    const pula = (jestLokalem(poz) ? k.lokaleDnia : k.zabytkiDnia)[numer - 1] ?? [];
+    const minuty = poz.minutes || 60;
+    const POSILEK = /^(restaurant|fast_food|food_court)$/;
+    const podobny = (kind?: string) => !!kind && (kind === poz.kind
+      || (POSILEK.test(kind) && (POSILEK.test(String(poz.kind || '')) || minuty >= 45)));
+    const punkt = typeof poz.lat === 'number' && typeof poz.lng === 'number'
+      ? { lat: poz.lat, lng: poz.lng } : null;
+    const wybor = pula
+      .filter((c) => typeof c.lat === 'number' && !zajete.has(kluczGodzin(c.name)))
+      .map((c) => ({
+        c,
+        otwarte: isOpenDuring(c.openingHours, info.dateObj, wejscie, minuty),
+        km: punkt ? kmOd(punkt, c) : 0,
+      }))
+      // Zastępstwo z nieznanymi godzinami jest lepsze niż dziura, ale pewnie
+      // otwarte wygrywa z każdym niepewnym, nawet bliższym.
+      .filter((x) => x.otwarte !== false && x.km <= 1.5)
+      // Ten sam rodzaj przed innym: w planie Torunia gospodę na obiad zastąpiła
+      // lodziarnia, bo stała najbliżej. Obiad ma zastąpić obiad.
+      .sort((a, b) => Number(b.otwarte === true) - Number(a.otwarte === true)
+        || Number(podobny(b.c.kind)) - Number(podobny(a.c.kind))
+        || a.km - b.km)[0];
+    if (!wybor) return null;
+    zajete.add(kluczGodzin(wybor.c.name));
+    return {
+      time: poz.time,
+      name: wybor.c.name,
+      kind: wybor.c.kind,
+      minutes: poz.minutes,
+      source: 'suggested',
+      lat: wybor.c.lat,
+      lng: wybor.c.lng,
+      note: `Zamiast „${poz.name}” — tam o ${poz.time} zamknięte.`.slice(0, 80),
+    };
+  };
+
   const zostaja: PozycjaDnia[] = [];
+  let wyciete = 0;
   for (const poz of dzien.items) {
-    const spec = godziny.get(klucz(poz.name));
+    const spec = godziny.get(kluczGodzin(poz.name));
     const wejscie = czasNaMinuty(poz.time);
+    // Otwierają za kwadrans: przesuwamy wejście, zamiast wyrzucać miejsce. Model
+    // postawił obiad w gospodzie na 12:45 przy otwarciu o 13:00, a strażnik
+    // wymieniał ją wtedy na lodziarnię obok. Pół godziny czekania mieści się
+    // w luzie każdego dnia; wizyta skraca się o tyle, o ile przesunęło się wejście.
     if (spec && wejscie > 0 && isOpenDuring(spec, info.dateObj, wejscie, 1) === false) {
-      (dzien.warnings ??= []).push(
-        `${poz.name}: o ${poz.time} jest zamknięte, więc wypadło z planu — ${describeAvailability(spec, info.dateObj)}.`
-      );
+      const minuty = poz.minutes || 60;
+      const otwarcie = (openIntervalsOn(spec, info.dateObj) ?? [])
+        .find((i) => i.from > wejscie && i.from - wejscie <= 30 && i.from < wejscie + minuty);
+      if (otwarcie) {
+        const czas = minutyNaCzas(otwarcie.from);
+        (dzien.warnings ??= []).push(`${poz.name}: otwierają o ${czas} — wejście przesunięte z ${poz.time}.`);
+        zostaja.push({ ...poz, time: czas, ...(poz.minutes ? { minutes: poz.minutes - (otwarcie.from - wejscie) } : {}) });
+        continue;
+      }
+    }
+    if (spec && wejscie > 0 && isOpenDuring(spec, info.dateObj, wejscie, 1) === false) {
+      wyciete++;
+      const zamiast = zastepstwo(poz, wejscie);
+      // „ZAMKNIĘTE tego dnia” wielkimi literami jest dla modelu; tu czyta człowiek.
+      const powod = (openIntervalsOn(spec, info.dateObj) ?? []).length === 0
+        ? 'tego dnia nieczynne'
+        : `o ${poz.time} zamknięte (${describeAvailability(spec, info.dateObj)})`;
+      (dzien.warnings ??= []).push(zamiast
+        ? `${poz.name}: ${powod}. W to miejsce: ${zamiast.name}.`
+        : `${poz.name}: ${powod}, więc wypadło z planu.`);
       (dzien.not_scheduled ??= []).push({ name: poz.name, reason: 'zamknięte o zaplanowanej godzinie' });
+      if (zamiast) zostaja.push(zamiast);
       continue;
+    }
+    // Wejście przy otwartych drzwiach, ale wyjście po zamknięciu: pozycja
+    // zostaje (zasada 5 — lepiej godzina niż nic), tylko mówimy to wprost,
+    // z godziną z danych, a nie z pamięci modelu.
+    if (spec && wejscie > 0 && poz.minutes && isOpenDuring(spec, info.dateObj, wejscie, poz.minutes) === false) {
+      const przedzial = (openIntervalsOn(spec, info.dateObj) ?? []).find((i) => wejscie >= i.from && wejscie < i.to);
+      if (przedzial) {
+        (dzien.warnings ??= []).push(
+          `${poz.name}: zamykają o ${minutyNaCzas(przedzial.to)} — na zwiedzanie zostaje ${przedzial.to - wejscie} z ${poz.minutes} min.`
+        );
+      }
     }
     zostaja.push(poz);
   }
 
-  const wyciete = dzien.items.length - zostaja.length;
   if (wyciete) console.warn(`[planer] dzień ${numer}: wycięto ${wyciete} poz. zaplanowanych na zamknięte godziny`);
   dzien.items = zostaja;
+}
+
+const kluczGodzin = (s: string) =>
+  String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+
+/** Nazwa → zapis godzin, z miejsc użytkownika i z puli propozycji. */
+function mapaGodzin(k: KontekstPlanu): Map<string, string> {
+  const godziny = new Map<string, string>();
+  for (const pl of k.zadanie.places) {
+    if (pl.opening_hours) godziny.set(kluczGodzin(pl.name), pl.opening_hours);
+  }
+  for (const c of [...k.zabytki, ...k.lokale]) {
+    if ((c as any).openingHours) godziny.set(kluczGodzin(c.name), (c as any).openingHours);
+  }
+  return godziny;
+}
+
+const O_GODZINACH = /zamk|zamyk|otwar|czynn|godzin|clos|open|hours|geschlossen|geöffnet|öffnungs|schlie|cerrad|abiert|horario|cierra|ferm|ouvert|horaire|chius|apert|orari|chiude/i;
+const SLOWA_RODZAJOWE = new Set(['muzeum', 'museum', 'kosciol', 'katedra', 'bazylika', 'restauracja',
+  'restaurant', 'kawiarnia', 'gospoda', 'galeria', 'gallery', 'zamek', 'castle', 'palac', 'teatr',
+  'theatre', 'church', 'cathedral', 'pomnik', 'brama', 'park']);
+
+/**
+ * Uwagi modelu o godzinach sprawdzamy danymi, zanim trafią do „Do sprawdzenia”.
+ *
+ * Interfejs pokazuje ostrzeżenia modelu tak samo jak liczone w kodzie, a model
+ * potrafił napisać „Dom Kopernika zamyka się o 16:00, zaplanowano wizytę od
+ * 11:15” przy wizycie mieszczącej się z zapasem. Przy gospodzie stały z kolei dwie
+ * sprzeczne uwagi: jego „otwarta od 13:00” i nasze „zamknięte”. Dla miejsc,
+ * których godziny umiemy odczytać, mówi wyłącznie kod — uwaga modelu o godzinach
+ * takiego miejsca odpada. Reszta uwag (rezerwacje, podejścia) zostaje.
+ */
+function przesiejOstrzezeniaModelu(
+  k: KontekstPlanu, numer: number, ostrzezenia: unknown[], pozycje: PozycjaDnia[],
+): string[] {
+  const info = k.dni[numer - 1];
+  const godziny = mapaGodzin(k);
+  const znaneGodziny = pozycje
+    .filter((p) => {
+      const spec = godziny.get(kluczGodzin(p.name));
+      return !!spec && openIntervalsOn(spec, info.dateObj) !== null;
+    })
+    .map((p) => nameTokens(p.name).filter((t) => t.length >= 5 && !SLOWA_RODZAJOWE.has(t)));
+  return ostrzezenia
+    .filter((w): w is string => typeof w === 'string' && !!w.trim())
+    .filter((w) => {
+      if (!O_GODZINACH.test(w)) return true;
+      const slowa = new Set(nameTokens(w));
+      return !znaneGodziny.some((tokeny) => tokeny.some((t) => slowa.has(t)));
+    });
 }
 
 /** Jeden dzień: wywołanie modelu, parsowanie, uzupełnienie współrzędnych. */
@@ -798,8 +926,9 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
     summary: surowy.summary,
     items: Array.isArray(surowy.items) ? surowy.items : [],
     not_scheduled: Array.isArray(surowy.not_scheduled) ? surowy.not_scheduled : [],
-    warnings: Array.isArray(surowy.warnings) ? surowy.warnings : [],
+    warnings: [],
   };
+  const ostrzezeniaModelu: unknown[] = Array.isArray(surowy.warnings) ? surowy.warnings : [];
 
   uzupelnijBraki(k, dzien);
   // Przejścia i nocleg rozpoznajemy PRZED szukaniem współrzędnych: inaczej
@@ -808,6 +937,10 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   przypnijBaze(k, dzien);
   uzupelnijWspolrzedne(k, dzien);
   sprawdzOdleglosci(k, dzien, numer);
+  // Przesiewamy na pełnej liście, zanim strażnik godzin cokolwiek wytnie — uwaga
+  // modelu o wyciętym miejscu przeczyłaby temu, co o nim napisze kod.
+  const przesiane = przesiejOstrzezeniaModelu(k, numer, ostrzezeniaModelu, dzien.items);
+  dzien.warnings = [...przesiane, ...(dzien.warnings ?? [])];
   // Kolejność ma znaczenie: strażnik dokłada wpisy do not_scheduled, więc musi
   // zadziałać przed filtrem, który zostawia tam wyłącznie kotwice tego dnia.
   odsiejZamkniete(k, dzien, numer);
@@ -1091,6 +1224,12 @@ export function przypnijBaze(k: KontekstPlanu, dzien: DzienPlanu): void {
     item.kind = 'hotel';
     item.baza = true;
     delete item.approx;
+    // Model wpisywał noclegowi „suggested” i 15 albo 45 minut — w planie Torunia
+    // hotel w dniu 1 miał etykietę „Propozycja agenta”, a w dniu 2 (dopisany
+    // przez dopnijBazeDoDnia) nie miał ani etykiety, ani czasu. Punkt startowy
+    // to ustawienie wyjazdu, a w noclegu nic się nie zwiedza.
+    delete item.source;
+    delete item.minutes;
     if (k.baza) {
       item.lat = k.baza.lat;
       item.lng = k.baza.lng;

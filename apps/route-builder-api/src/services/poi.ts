@@ -137,7 +137,10 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
     'nwr["highway"="pedestrian"]["area"="yes"]["name"]',
     'node["amenity"="fountain"]["name"]',
     'nwr["amenity"~"^(theatre|marketplace)$"]["name"]',
-    'nwr["amenity"="place_of_worship"]["wikipedia"]["name"]'
+    'nwr["amenity"="place_of_worship"]["wikipedia"]["name"]',
+    // Krzywa Wieża w Toruniu ma tylko `man_made=tower` i artykuł w Wikipedii —
+    // bez tego wiersza żaden selektor jej nie widział.
+    'nwr["man_made"="tower"]["wikipedia"]["name"]'
   ]
 };
 
@@ -220,12 +223,21 @@ function scoreElement(tags: Record<string, string>): number {
   if (tags.wikipedia || tags['wikipedia:pl']) score += 3;
   if (tags.wikidata) score += 2;
   if (tags['name:en']) score += 1;
-  if (tags.tourism === 'attraction') score += 1;
+  if (tags.tourism === 'attraction' || tags.tourism === 'museum') score += 1;
   if (tags.heritage) score += 1;
   return score;
 }
 
+// Rodzaj decyduje o kategorii w katalogu, więc kolejność tagów ma znaczenie.
+// Pub w zabytkowej kamienicy niesie zwykle i `tourism=attraction`, i
+// `amenity=pub` — przy turystyce na pierwszym miejscu „Pub Mentzen” trafiał do
+// atrakcji. Noclegi idą przed gastronomią, bo hotel z restauracją to nadal hotel.
+const NOCLEG = /^(hotel|hostel|guest_house|apartment|motel)$/;
+const LOKAL = /^(restaurant|cafe|fast_food|ice_cream|bar|pub|nightclub|biergarten|food_court)$/;
+
 function kindOf(tags: Record<string, string>): string {
+  if (tags.tourism && NOCLEG.test(tags.tourism)) return tags.tourism;
+  if (tags.amenity && LOKAL.test(tags.amenity)) return tags.amenity;
   return (
     tags.natural ||
     tags.tourism ||
@@ -234,6 +246,10 @@ function kindOf(tags: Record<string, string>): string {
     tags.waterway ||
     tags.leisure ||
     tags.amenity ||
+    // Piekarnie i cukiernie przychodzą z zapytania o jedzenie jako `shop`;
+    // bez tego wiersza dostawały rodzaj „poi” i lądowały w atrakcjach.
+    tags.shop ||
+    (tags.man_made === 'tower' ? 'tower' : '') ||
     'poi'
   );
 }

@@ -7,6 +7,7 @@ import { jezykZadania, JEZYKI_UI, type KodJezyka } from '../services/jezyki.js';
 import { przetlumaczPaczke } from '../services/tlumaczenia.js';
 import { fetchNearbyPhotos, odczytajNieudaneCommons, wyzerujNieudaneCommons } from '../services/photos.js';
 import { placeSlug, VIBE_TAGS, kategoriaZRodzaju } from '../services/katalog-helpers.js';
+import { STYL_OPISU } from '../services/styl-opisow.js';
 
 export const catalogRouter = new Hono<{ Variables: { user: any, userId: string } }>();
 
@@ -247,6 +248,9 @@ catalogRouter.post('/catalog/seed', async (c) => {
           photos: photoSets[j] || [],
           opening_hours: p.openingHours ?? null,
           website: p.website ?? null,
+          // Tag trafia do bazy od razu: bez niego odświeżanie zdjęć szuka po
+          // nazwie i okolicy, a to bierze zdjęcie sąsiedniego budynku.
+          wikipedia: p.wikipedia ?? null,
           visit_minutes: null,
           osm_id: p.id,
           vibe_tags: [] as string[],
@@ -257,6 +261,7 @@ catalogRouter.post('/catalog/seed', async (c) => {
           if (existing) {
             const patch: Record<string, unknown> = { updated_at: row.updated_at };
             if ((!existing.photos || existing.photos.length === 0) && row.photos.length) patch.photos = row.photos;
+            if (!existing.wikipedia && row.wikipedia) patch.wikipedia = row.wikipedia;
             await repo.updateCatalogPlace(existing.id, patch);
             saved.push(existing);
           } else {
@@ -386,6 +391,10 @@ Zasady:
 - Wskazuj na autentyczną cechę: klimat, widok, unikalne danie, rodzaj doświadczenia (interaktywne vs tradycyjne, kameralne vs monumentalne), sekretne wejście, specyfikę pory dnia.
 - ZAKAZANE słowa: wyjątkowy, niesamowity, magiczny, klejnot, perła, must-see, "warto zobaczyć", "nie do przegapienia".
 - NIE POWTARZAJ faktów z opisu.
+- Konkret, nie nastrój: co tam jest albo co tam robisz. Bez „szeptów historii”,
+  ruin, które „opowiadają”, „oaz ciszy” i „tętniącego życiem” placu.
+- NIE KOŃCZ zdania dopiskiem „w odróżnieniu od innych …” / „w przeciwieństwie do
+  innych …” — skoro zdanie podaje różnicę, dopisek niczego nie dodaje.
 - Jedno zdanie, najwyżej 25 słów. Nie zaczynaj od "Wybierz", "Odwiedź", "Zobacz".
 
 Dobre zdania:
@@ -458,7 +467,12 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [{"name": "...", "wyroznik": "..
       // a nazwa źródłowa jest wtedy przedrostkiem.
       const d = wgNazwy.get(klucz)
         ?? wynik.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
-      const zdanie = String(d?.wyroznik ?? '').trim();
+      // Model dokleja na końcu „, w odróżnieniu od innych muzeów.” mimo zakazu
+      // w prompcie — w Toruniu co drugie zdanie. Dopisek bez nazwy niczego nie
+      // porównuje, więc go ucinamy; zdanie przed nim zostaje.
+      const zdanie = String(d?.wyroznik ?? '').trim()
+        .replace(/,?\s*(w odróżnieniu|w przeciwieństwie) (od|do) (innych|pozostałych|okolicznych|typowych|tradycyjnych)[^.,;]*\.?$/i, '.')
+        .replace(/\.\.$/, '.');
       // Puste pole jest dozwoloną odpowiedzią: nie każde miejsce ma czym się
       // różnić i wolimy nie pokazać wiersza, niż pokazać pusty komunał.
       if (!zdanie) continue;
@@ -479,7 +493,7 @@ Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [{"name": "...", "wyroznik": "..
          na 411 gotowych zdań dwa przemyciły „barokowe perły" i „o jego
          wyjątkowości". Ta sama lekcja co przy powtórzeniach opisu — reguła,
          która ma obowiązywać, musi stać po stronie serwera. */
-      if (/wyj[ąa]tkow|niesamowit|magiczn|klejnot|per[łl][ayąe]|must-see|warto zobaczy[ćc]|nie do przegapienia/i.test(zdanie)) {
+      if (/wyj[ąa]tkow|niesamowit|magiczn|klejnot|per[łl][ayąe]|must-see|warto zobaczy[ćc]|nie do przegapienia|szepcz|niezapomnian|zachwyc|urzek|oaz[aęy] (ciszy|spokoju)|t[ęe]tni[ąa]c/i.test(zdanie)) {
         console.log(`[catalog/wyrozniki] odrzucone (zakazane słowo) "${m.name}": ${zdanie.slice(0, 90)}`);
         odrzucone++; continue;
       }
@@ -521,30 +535,22 @@ catalogRouter.post('/catalog/enrich', async (c) => {
     const doOpisania = brakujace.slice(0, limit);
     if (doOpisania.length === 0) return c.json({ city, enriched: 0, remaining: 0 });
 
-    const prompt = `Jesteś autorem inspirujących przewodników podróżniczych (styl Monocle, Lonely Planet, Conde Nast Traveler) po mieście ${city}. Tworzysz magnetyczne, pełne klimatu i zmysłów opisy miejsc dla podróżników. Piszesz PO POLSKU niezależnie od kraju.
+    const prompt = `Piszesz praktyczny przewodnik po mieście ${city} dla ludzi, którzy układają plan wyjazdu. Piszesz PO POLSKU niezależnie od kraju.
 
 Miejsca (nazwy skopiuj DOKŁADNIE):
 ${doOpisania.map((p: any, i: number) => `${i + 1}. ${p.name}${p.kind ? ` (${p.kind})` : ''}`).join('\n')}
 
 Dla każdego zwróć:
 - "name": nazwa dokładnie jak wyżej
-- "description": 3-4 zdania żywego, wciągającego opisu. Pokaż atmosferę, energię miejsca, światło, widoki, zapachy i to, co sprawia, że człowiek natychmiast chce tam pójść. UNIKAJ encyklopedycznego żargonu (daty budowy, wysokości w metrach, style architektoniczne, zwroty typu "charakteryzuje się", "warto zobaczyć"). Skup się na autentycznym doświadczeniu podróżnika i tym, co poczuje na miejscu.
+- "description": 2-3 zdania: czym jest to miejsce, co tam realnie robisz i dla kogo to jest. Daty budowy i style architektoniczne tylko wtedy, gdy to z ich powodu ludzie tam idą.
 
-  Pierwsze zdanie NIE MOŻE mieć tej samej konstrukcji co pierwsze zdanie miejsca
-  bezpośrednio wcześniej na liście — użytkownik czyta te karty jedna po drugiej
-  i identyczny wzorzec otwarcia zdradza szablon zamiast klimatu. Wybieraj za
-  każdym razem inny rodzaj otwarcia, np.:
-    a) zmysł — dźwięk, zapach, faktura, światło o konkretnej porze,
-    b) scena — co ludzie tam w tej chwili robią,
-    c) kontrast — czego człowiek się spodziewa, a co go tam zaskoczy,
-    d) pora — kiedy to miejsce żyje najmocniej,
-    e) detal — jeden konkretny, niearchitektoniczny szczegół, od którego zaczynasz.
-  Nie ograniczaj się do tej listy i nie nazywaj rodzaju w tekście — to ma być
-  naturalne zdanie, nie ćwiczenie ze wzoru.
+  Kolejne opisy nie mogą zaczynać się tą samą konstrukcją (zawsze od nazwy,
+  zawsze od „To miejsce…”) — użytkownik czyta karty jedna po drugiej i powtarzalne
+  otwarcie zdradza szablon.
 - "vibe_tags": 2-4 znaczniki WYŁĄCZNIE z tej listy: ${VIBE_TAGS.join(', ')}
 - "visit_minutes": ile realnie zajmuje pobyt
 
-Jeśli jakiegoś miejsca nie kojarzysz w 100%, opisz je z wyczuciem na podstawie jego rodzaju z naciskiem na atmosferę i energię — nie wymyślaj zmyślonych faktów.
+${STYL_OPISU}
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
     const data = await callGeminiTracked(

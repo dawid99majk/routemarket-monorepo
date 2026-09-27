@@ -4,6 +4,11 @@
 
     ./waznosc.py [miasto]        uzupełnia miejsca bez wartości
     ./waznosc.py --od-nowa       kasuje wszystko i liczy jeszcze raz
+    ./waznosc.py --cron          jak bez argumentów, ale milczy, gdy nie ma czego liczyć
+
+Z crona co 15 minut (od 27.09.2026). Wcześniej skrypt odpalało się ręcznie i nowe
+miasto zostawało bez ważności: feed Torunia sortował się wtedy po dacie dodania,
+więc Ratusz był 14., Dom Kopernika 21., a Zamek Krzyżacki 26.
 
 Katalog nie miał ŻADNEJ miary rozpoznawalności. `pin_count` jest zerem przy
 pięciu kontach, zdjęć każde miejsce ma po trzy (limit przy pobieraniu), opisy
@@ -295,8 +300,11 @@ def main():
         where %s %s order by city, name
     """ % ('true' if od_nowa else 'waznosc is null', warunek))
     if not miejsca:
-        print('Nie ma czego uzupełniać.')
+        if '--cron' not in argumenty:
+            print('Nie ma czego uzupełniać.')
         return
+    if '--cron' in argumenty:
+        print(time.strftime('%Y-%m-%d %H:%M'))
     print('Do sprawdzenia: %d miejsc' % len(miejsca))
 
     # 1. Tagi z OSM — paczkami, żeby nie męczyć Overpassa.

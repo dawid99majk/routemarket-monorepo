@@ -31,8 +31,8 @@ export const VIBE_TAGS = [
  */
 export function kategoriaZRodzaju(kind: string | null | undefined): string {
   if (!kind) return 'attraction';
-  if (/^(restaurant|cafe|fast_food|ice_cream|bakery)$/.test(kind)) return 'food';
+  if (/^(restaurant|cafe|fast_food|food_court|ice_cream|bakery|pastry|confectionery|deli)$/.test(kind)) return 'food';
   if (/^(bar|pub|nightclub|biergarten)$/.test(kind)) return 'nightlife';
-  if (/^(hotel|hostel|guest_house|apartment)$/.test(kind)) return 'hotel';
+  if (/^(hotel|hostel|guest_house|apartment|motel)$/.test(kind)) return 'hotel';
   return 'attraction';
 }

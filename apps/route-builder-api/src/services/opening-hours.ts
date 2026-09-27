@@ -68,7 +68,17 @@ export function openIntervalsOn(spec: string | null | undefined, date: Date): Op
   let intervals: OpenInterval[] | null = null;
   let understoodAnything = false;
 
-  for (const rawRule of value.split(';')) {
+  // OSM dopuszcza przecinek jako separator reguł („We,Su 13:00-20:00, Fr,Sa
+  // 13:00-24:00”). Czytany jak zwykły tekst zlewał kilka reguł w jedną i sobota
+  // wychodziła zamknięta. Przecinek po godzinie albo „closed”, za którym stoi
+  // dzień lub miesiąc, traktujemy więc jak średnik; przecinek między dwoma
+  // przedziałami godzin („10:00-12:00,13:00-18:00”) zostaje nietknięty.
+  const reguly = value.replace(
+    /(\d{1,2}:\d{2}|closed|off)\s*,\s*(?=(?:mo|tu|we|th|fr|sa|su|ph|sh|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b)/gi,
+    '$1; ',
+  );
+
+  for (const rawRule of reguly.split(';')) {
     const rule = rawRule.trim();
     if (!rule) continue;
 
