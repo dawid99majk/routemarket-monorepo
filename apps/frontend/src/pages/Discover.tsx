@@ -17,6 +17,7 @@ import PrzelacznikWyjazdu, { type WyjazdDoPrzelaczenia } from '@/components/Prze
 import PasekKart, { type KartaMiasta, type ZakladkaPaska } from '@/components/PasekKart';
 import FormularzNowejTablicy, { type UstawieniaNowejTablicy } from '@/components/FormularzNowejTablicy';
 import type { AxisValues } from '@/lib/tripPresets';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -367,8 +368,7 @@ export default function Discover() {
         supabase.from('place_favorites').select('place_id').eq('user_id', userData.user.id),
         supabase.from('trip_projects')
           .select('id, name, destination, days, start_name, start_lat, start_lng, start_date, end_date, trip_type')
-          // Własne i udostępnione — bez cudzych tablic publicznych, na które i tak nie da się zapisać.
-          .or(`user_id.eq.${userData.user.id},is_public.eq.false`)
+          .or(mojeTablice(userData.user.id))
           .order('updated_at', { ascending: false }),
         // DISTINCT robi baza — wcześniej szło tu 500 surowych wierszy
         // i deduplikacja w przeglądarce, a miast powyżej limitu nie było wcale.

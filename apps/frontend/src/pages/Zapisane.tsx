@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, Loader2, MapPin, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PlannerHeader from '@/components/PlannerHeader';
@@ -55,7 +56,8 @@ export default function Zapisane() {
         .select('created_at, place_catalog(*)')
         .eq('user_id', userData.user.id)
         .order('created_at', { ascending: false }),
-      supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
+      supabase.from('trip_projects').select('id, name, destination')
+        .or(mojeTablice(userData.user.id)).order('updated_at', { ascending: false }),
       supabase.from('collections').select('id, name, slug, is_public')
         .eq('user_id', userData.user.id).order('created_at', { ascending: false }),
     ]);

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Heart, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { supabase } from '@/integrations/supabase/client';
 import { utworzWyjazd } from '@/lib/newTrip';
 import PlannerHeader from '@/components/PlannerHeader';
@@ -127,6 +128,7 @@ export default function Index() {
     (async () => {
       const { data } = await supabase.from('trip_projects')
         .select('id, name, destination, days, start_date, end_date, trip_type')
+        .or(mojeTablice(user.id))
         .order('updated_at', { ascending: false }).limit(12);
       if (!data?.length) { setMojeWyjazdy([]); return; }
 

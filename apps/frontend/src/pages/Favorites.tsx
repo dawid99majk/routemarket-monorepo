@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
 
@@ -27,7 +28,8 @@ export default function Favorites() {
         .select('created_at, place_catalog(*)')
         .eq('user_id', userData.user.id)
         .order('created_at', { ascending: false }),
-      supabase.from('trip_projects').select('id, name').order('updated_at', { ascending: false })
+      supabase.from('trip_projects').select('id, name')
+        .or(mojeTablice(userData.user.id)).order('updated_at', { ascending: false })
     ]);
     setPlaces((data ?? []).map((r: any) => r.place_catalog).filter(Boolean));
     setBoards(projs ?? []);

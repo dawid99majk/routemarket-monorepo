@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { apiPost } from '@/lib/api';
 import { utworzWyjazd } from '@/lib/newTrip';
 import { nazwaUzytkownika, inicjalyUzytkownika } from '@/lib/uzytkownik';
@@ -116,16 +117,20 @@ export default function Start() {
     setImie(nazwa?.split(/\s+/)[0] ?? null);
     setInitials(await inicjalyUzytkownika());
 
-    const [{ data: pr }, { data: pl }, { data: sp }] = await Promise.all([
+    const [{ data: pr }, { data: sp }] = await Promise.all([
       supabase.from('trip_projects')
         .select('id, name, destination, days, hours_per_day, trip_type, updated_at')
+        .or(mojeTablice(u.id))
         .order('updated_at', { ascending: false }),
-      supabase.from('trip_project_places')
-        .select('id, project_id, name, priority, image_url, visit_minutes, opening_hours, catalog_id'),
       supabase.from('trip_plans')
         .select('project_id, start_date, plan, created_at')
         .order('created_at', { ascending: false }),
     ]);
+    // Miejsca tylko z moich tablic — bez warunku przychodziły też wszystkie
+    // miejsca z cudzych tablic publicznych.
+    const { data: pl } = await supabase.from('trip_project_places')
+      .select('id, project_id, name, priority, image_url, visit_minutes, opening_hours, catalog_id')
+      .in('project_id', (pr ?? []).map((p) => p.id));
     setProjects(pr ?? []);
     // Priorytet jest w bazie zwyklym tekstem; zawezamy go tutaj, zamiast
     // rzutowac cala tablice i zgadywac, ze kolumna trzyma tylko trzy wartosci.

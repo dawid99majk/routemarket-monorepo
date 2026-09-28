@@ -17,6 +17,7 @@ import AgentDymek from '@/components/AgentDymek';
 import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
 import FormularzNowejTablicy, { type UstawieniaNowejTablicy } from '@/components/FormularzNowejTablicy';
 import type { AxisValues } from '@/lib/tripPresets';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { etykietaRodzaju } from '@/lib/rodzaj';
 import SEO from '@/components/SEO';
 
@@ -147,10 +148,8 @@ export default function PlacePage() {
     const [{ data: fav }, { data: projs }, { data: piny }, { data: pref }] = await Promise.all([
       supabase.from('place_favorites').select('place_id')
         .eq('user_id', uid).eq('place_id', data.id).maybeSingle(),
-      // Własne i udostępnione. Bez filtra przychodziły też cudze tablice
-      // publiczne, na których zapis i tak odbija się od uprawnień.
       supabase.from('trip_projects').select('id, name, destination')
-        .or(`user_id.eq.${uid},is_public.eq.false`)
+        .or(mojeTablice(uid))
         .order('updated_at', { ascending: false }),
       supabase.from('trip_project_places').select('project_id, priority').eq('catalog_id', data.id),
       supabase.from('route_preferences')
@@ -331,6 +330,76 @@ export default function PlacePage() {
     const cel = zCelem && b.destination && !klucz(b.name).includes(klucz(b.destination)) ? ` · ${b.destination}` : '';
     return <option key={b.id} value={b.id}>{b.name}{cel}{pin ? ` · ${OPIS_DECYZJI[pin]}` : ''}</option>;
   };
+
+  /* Karta decyzji jest renderowana dwa razy: na komputerze w bocznej kolumnie,
+     na telefonie zaraz pod tytułem — wcześniej na telefonie stała na samym
+     dole, pod podobnymi miejscami. Stan jest wspólny, więc obie są zgodne. */
+  const kartaDoTablicy = (
+    <div className="rounded-2xl bg-card p-5 shadow-token-md">
+      <h2 className="text-[12px] font-semibold text-muted-foreground">Do tablicy</h2>
+      {boards.length > 0 && (
+        <div className="relative mt-2">
+          <select value={activeBoard ?? ''} onChange={(e) => wybierzTablice(e.target.value)}
+            aria-label="Tablica, na którą zapisujesz decyzję"
+            className="w-full h-10 [@media(pointer:coarse)]:h-11 appearance-none rounded-md bg-secondary pl-3 pr-9
+                       text-[14px] font-medium outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-ring">
+            {!activeBoard && <option value="" disabled>Wybierz tablicę</option>}
+            {tabliceTutaj.length > 0 && tabliceInne.length > 0 ? (
+              <>
+                <optgroup label={`Wyjazdy: ${place.city}`}>{tabliceTutaj.map((b) => opcjaTablicy(b, false))}</optgroup>
+                <optgroup label="Inne wyjazdy">{tabliceInne.map((b) => opcjaTablicy(b, true))}</optgroup>
+              </>
+            ) : (
+              boards.map((b) => opcjaTablicy(b, tabliceTutaj.length === 0))
+            )}
+            <option value="__nowa">+ Nowa tablica{place.city ? `: ${place.city}` : ''}</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        </div>
+      )}
+      {zalogowany && !activeBoard && (
+        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+          {place.city ? 'Nie masz jeszcze wyjazdu do tego miasta' : 'Nie masz jeszcze tablicy'} — pierwsza decyzja założy nową.
+        </p>
+      )}
+      {/* Ta sama pigułka decyzji co w Odkrywaj i na tablicy. */}
+      <PrzelacznikDecyzji rozmiar="lg" className="mt-3" stan={mark}
+        onDecyzja={(k) => setBucket(k as Bucket)} />
+      <button onClick={toggleFavorite}
+        className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <Heart className={`w-3.5 h-3.5 ${favorite ? 'fill-foreground text-foreground' : ''}`} />
+        {favorite ? 'Zapisane' : 'Zapisz na później'}
+      </button>
+
+      {poZapisie && (
+        <div className="mt-2 rounded-md border border-border bg-muted/50 px-3 py-2
+                        animate-in fade-in slide-in-from-top-1 duration-200">
+          {kolekcje.length > 0 ? (
+            <select value=""
+              onChange={async (e) => {
+                if (!e.target.value || !place) return;
+                const { error } = await supabase.from('collection_places')
+                  .insert({ collection_id: e.target.value, place_id: place.id });
+                e.target.value = '';
+                if (error) return toast.error(error.message);
+                toast.success(t('miejsce.od_ozone_do_kolekcji'));
+                setPoZapisie(false);
+              }}
+              aria-label={t('miejsce.od_oz_do_kolekcji')}
+              className="w-full text-[12px] bg-transparent outline-none cursor-pointer">
+              <option value="">{t('miejsce.zapisane_od_oz_do_kolekcji')}</option>
+              {kolekcje.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          ) : (
+            <button onClick={() => navigate('/zapisane')}
+              className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+              Zapisane · załóż pierwszą kolekcję ↗
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
   return (
     <div className="min-h-screen bg-background">
       {/* Tytuł karty przeglądarki i opis muszą zmieniać się przy nawigacji.
@@ -385,6 +454,7 @@ export default function PlacePage() {
             <h1 className="font-display font-light text-[42px] leading-[1.05] tracking-[-0.02em] mt-3">
               {place.name}
             </h1>
+            <div className="lg:hidden mt-6">{kartaDoTablicy}</div>
 
             {wyroznikMiejsca(place) && (
               <p className="mt-5 max-w-[60ch] border-l-2 border-foreground/25 pl-4
@@ -462,71 +532,9 @@ export default function PlacePage() {
           </div>
 
           {/* Kolumna boczna, przyklejona */}
-          <aside className="lg:sticky lg:top-[88px] space-y-5">
-            <div className="rounded-2xl bg-card p-5 shadow-token-md">
-              <h2 className="text-[12px] font-semibold text-muted-foreground">Do tablicy</h2>
-              {boards.length > 0 && (
-                <div className="relative mt-2">
-                  <select value={activeBoard ?? ''} onChange={(e) => wybierzTablice(e.target.value)}
-                    aria-label="Tablica, na którą zapisujesz decyzję"
-                    className="w-full h-10 [@media(pointer:coarse)]:h-11 appearance-none rounded-md bg-secondary pl-3 pr-9
-                               text-[14px] font-medium outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-ring">
-                    {!activeBoard && <option value="" disabled>Wybierz tablicę</option>}
-                    {tabliceTutaj.length > 0 && tabliceInne.length > 0 ? (
-                      <>
-                        <optgroup label={`Wyjazdy: ${place.city}`}>{tabliceTutaj.map((b) => opcjaTablicy(b, false))}</optgroup>
-                        <optgroup label="Inne wyjazdy">{tabliceInne.map((b) => opcjaTablicy(b, true))}</optgroup>
-                      </>
-                    ) : (
-                      boards.map((b) => opcjaTablicy(b, tabliceTutaj.length === 0))
-                    )}
-                    <option value="__nowa">+ Nowa tablica{place.city ? `: ${place.city}` : ''}</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                </div>
-              )}
-              {zalogowany && !activeBoard && (
-                <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
-                  {place.city ? 'Nie masz jeszcze wyjazdu do tego miasta' : 'Nie masz jeszcze tablicy'} — pierwsza decyzja założy nową.
-                </p>
-              )}
-              {/* Ta sama pigułka decyzji co w Odkrywaj i na tablicy. */}
-              <PrzelacznikDecyzji rozmiar="lg" className="mt-3" stan={mark}
-                onDecyzja={(k) => setBucket(k as Bucket)} />
-              <button onClick={toggleFavorite}
-                className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <Heart className={`w-3.5 h-3.5 ${favorite ? 'fill-foreground text-foreground' : ''}`} />
-                {favorite ? 'Zapisane' : 'Zapisz na później'}
-              </button>
-
-              {poZapisie && (
-                <div className="mt-2 rounded-md border border-border bg-muted/50 px-3 py-2
-                                animate-in fade-in slide-in-from-top-1 duration-200">
-                  {kolekcje.length > 0 ? (
-                    <select value=""
-                      onChange={async (e) => {
-                        if (!e.target.value || !place) return;
-                        const { error } = await supabase.from('collection_places')
-                          .insert({ collection_id: e.target.value, place_id: place.id });
-                        e.target.value = '';
-                        if (error) return toast.error(error.message);
-                        toast.success(t('miejsce.od_ozone_do_kolekcji'));
-                        setPoZapisie(false);
-                      }}
-                      aria-label={t('miejsce.od_oz_do_kolekcji')}
-                      className="w-full text-[12px] bg-transparent outline-none cursor-pointer">
-                      <option value="">{t('miejsce.zapisane_od_oz_do_kolekcji')}</option>
-                      {kolekcje.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-                    </select>
-                  ) : (
-                    <button onClick={() => navigate('/zapisane')}
-                      className="text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                      Zapisane · załóż pierwszą kolekcję ↗
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+          <aside className="lg:sticky lg:top-[88px] flex flex-col gap-5">
+            {/* Na komputerze tutaj; na telefonie ta sama karta stoi pod tytułem. */}
+            <div className="max-lg:hidden">{kartaDoTablicy}</div>
 
             <div className="rounded-2xl bg-card p-5 shadow-token-md">
               <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">{t('miejsce.agent_radzi')}</h2>

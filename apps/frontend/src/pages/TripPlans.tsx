@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { mojeTablice } from '@/lib/mojeTablice';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -99,9 +100,12 @@ export default function TripPlans() {
 
   const wczytajListe = useCallback(async () => {
     setLadowanie(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setWyjazdy([]); setLadowanie(false); return; }
     const { data } = await supabase
       .from('trip_projects')
       .select('id, name, destination, days, trip_type, updated_at, created_at, start_date, end_date, is_example')
+      .or(mojeTablice(u.user.id))
       .order('updated_at', { ascending: false });
     setWyjazdy(data ?? []);
 
