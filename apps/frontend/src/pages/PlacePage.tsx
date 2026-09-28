@@ -221,7 +221,7 @@ export default function PlacePage() {
   const board = boards.find((b) => b.id === activeBoard) ?? null;
   const buckets: [Bucket, string, string][] = [
     ['must', 'Na pewno', 'bg-primary text-primary-foreground border-primary'],
-    ['nice', 'Być może', 'bg-dusty-blue text-dusty-blue-foreground border-dusty-blue'],
+    ['nice', 'Być może', 'bg-accent text-accent-foreground border-accent'],
     ['rejected', 'Nie tym razem', 'bg-clay text-clay-foreground border-clay'],
   ];
 
@@ -330,7 +330,7 @@ export default function PlacePage() {
                             informacja, która decyduje, czy propozycja ma sens. */}
                         {(sp.city || sp.country) && (
                           <div className={`font-mono text-[11px] mt-0.5 truncate ${
-                            sp.city && sp.city === place.city ? 'text-muted-foreground' : 'text-clay'
+                            sp.city && sp.city === place.city ? 'text-muted-foreground' : 'text-foreground font-medium'
                           }`}>
                             {[sp.city, sp.country].filter(Boolean).join(' / ')}
                           </div>
@@ -361,7 +361,7 @@ export default function PlacePage() {
               </div>
               <button onClick={toggleFavorite}
                 className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <Heart className={`w-3.5 h-3.5 ${favorite ? 'fill-accent text-accent' : ''}`} />
+                <Heart className={`w-3.5 h-3.5 ${favorite ? 'fill-foreground text-foreground' : ''}`} />
                 {favorite ? 'Zapisane' : 'Zapisz na później'}
               </button>
 

@@ -317,23 +317,19 @@ export default function Index() {
 
           {/* ── plan środkowy ── */}
           <div aria-hidden className="hidden xl:block absolute left-[198px] top-[150px] w-[172px] rotate-[-4deg]
-                          rounded-[10px] bg-card p-[9px] shadow-token-md">
-            <div className="h-[112px] rounded-[7px] overflow-hidden bg-placeholder-photo">
+                          rounded-[18px] bg-card overflow-hidden shadow-token-md">
+            <div className="h-[128px] overflow-hidden bg-placeholder-photo">
               {zdjeciaHero[2] && <Zdjecie src={zdjeciaHero[2]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
             </div>
-            <div className="text-[13px] leading-[1.3] font-medium mt-[9px] mx-[2px]">Wieża Wenecka</div>
           </div>
 
           {/* ── plan bliski, przycięty lewą krawędzią ── */}
           <div aria-hidden className="hidden xl:block absolute left-[-58px] top-[238px] w-[272px] rotate-[-6deg]
-                          rounded-[10px] bg-card p-[11px] shadow-token-lg">
-            <div className="h-[178px] rounded-[7px] overflow-hidden bg-placeholder-photo">
+                          rounded-[22px] bg-card overflow-hidden shadow-token-lg">
+            <div className="h-[200px] overflow-hidden bg-placeholder-photo">
               {zdjeciaHero[3] && <Zdjecie src={zdjeciaHero[3]} gdzie="karta" alt="" className="w-full h-full object-cover" />}
             </div>
-            <div className="text-[17px] leading-[1.3] font-medium mt-[13px] mx-[3px]">Amfiteatr w Durrës</div>
-            <div className="font-mono text-[11px] leading-[1.3] text-muted-foreground mt-[7px] mx-[3px]">
-              1 g 30 min · rzymski · cień po 15:00
-            </div>
+            
           </div>
 
           {/* ── wypełnienie 1 z 2: orzech ── */}
@@ -345,7 +341,7 @@ export default function Index() {
               <span className="text-[11px] text-background/50">na pewno</span>
             </div>
             <div className="h-[3px] rounded-full bg-background/15 mt-[12px] overflow-hidden">
-              <div className="w-[70%] h-full bg-accent" />
+              <div className="w-[70%] h-full bg-primary-light" />
             </div>
           </div>
 
@@ -383,9 +379,9 @@ export default function Index() {
 
           {/* ── wypełnienie 2 z 2: terakota, i jedyna karta z pełnym zdaniem ── */}
           <div aria-hidden className="hidden xl:block absolute right-[88px] top-[454px] w-[214px] rotate-[-4deg]
-                          rounded-[10px] bg-accent px-[17px] py-[16px] shadow-token-lg">
-            <div className="font-narrow uppercase tracking-[0.26em] text-[9px] text-accent-foreground">Agent zauważa</div>
-            <div className="text-[14px] leading-[1.45] text-accent-foreground mt-[9px] text-pretty">
+                          rounded-[18px] bg-agent px-[17px] py-[16px] shadow-token-lg">
+            <div className="text-[12px] font-bold text-agent-foreground">Agent zauważa</div>
+            <div className="text-[14px] leading-[1.45] text-agent-foreground mt-[7px] text-pretty">
               Czwarty punkt by się zmieścił, ale to dużo schodów jak na jedno popołudnie.
             </div>
           </div>
@@ -395,7 +391,7 @@ export default function Index() {
             {ileWKatalogu != null && (
               <div className="flex items-center gap-[9px] rounded-full bg-card/70 border border-border
                               px-[15px] py-[7px]">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
                 <span className="text-[12px] text-muted-foreground">
                   {ileWKatalogu.toLocaleString('pl-PL')} miejsc z OpenStreetMap
                 </span>

@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -15,8 +15,8 @@ const buttonVariants = cva(
         // decyzji; obrys i ghost podświetlały się bursztynem jak propozycja agenta.
         default: "bg-foreground text-background shadow-token-xs hover:bg-foreground/90 hover:shadow-token-sm active:scale-[0.98]",
         destructive: "bg-destructive text-destructive-foreground shadow-token-xs hover:bg-destructive/90 hover:shadow-token-sm active:scale-[0.98]",
-        outline: "border border-input bg-background shadow-token-xs hover:bg-muted hover:text-foreground hover:shadow-token-sm active:scale-[0.98]",
-        secondary: "bg-secondary text-secondary-foreground shadow-token-xs hover:bg-secondary/80 hover:shadow-token-sm active:scale-[0.98]",
+        outline: "border border-border bg-card shadow-token-sm hover:bg-secondary hover:text-foreground active:scale-[0.98]",
+        secondary: "bg-muted text-foreground hover:bg-muted/70 active:scale-[0.98]",
         ghost: "hover:bg-muted hover:text-foreground active:scale-[0.98]",
         link: "text-foreground underline underline-offset-4 decoration-foreground/40 hover:decoration-foreground",
         success: "bg-success text-success-foreground shadow-token-xs hover:bg-success/90 hover:shadow-token-sm active:scale-[0.98]",
@@ -24,10 +24,10 @@ const buttonVariants = cva(
         danger: "bg-danger text-danger-foreground shadow-token-xs hover:bg-danger/90 hover:shadow-token-sm active:scale-[0.98]",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-sm px-3 text-body-sm",
-        lg: "h-11 rounded-sm px-8 text-base",
-        icon: "h-10 w-10",
+        default: "h-11 px-5 py-2",
+        sm: "h-9 rounded-full px-4 text-body-sm",
+        lg: "h-12 rounded-full px-7 text-base",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: {

@@ -88,7 +88,7 @@ export default function LocationSearch({ value, onChange, onSelect, placeholder,
           {suggestions.map((item) => (
             <li
               key={item.place_id}
-              className="px-3 py-2.5 text-sm cursor-pointer hover:bg-accent/10 transition-colors flex items-start gap-2"
+              className="px-3 py-2.5 text-sm cursor-pointer hover:bg-secondary transition-colors flex items-start gap-2"
               onMouseDown={() => handleSelect(item)}
             >
               <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />

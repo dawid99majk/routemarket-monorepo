@@ -89,7 +89,7 @@ function Licznik({ ile, limit, co }: { ile: number; limit: number; co: string })
   const zaDlugi = ile > limit;
   return (
     <p className={`font-mono text-[11px] tabular-nums mt-1.5 ${
-      zaDlugi ? 'text-clay' : 'text-muted-foreground'
+      zaDlugi ? 'text-destructive' : 'text-muted-foreground'
     }`}>
       {co} {ile}/{limit}{zaDlugi ? ` · o ${ile - limit} za dużo, wyszukiwarka utnie` : ''}
     </p>
@@ -340,7 +340,7 @@ export default function Marketing() {
                     <p className="mt-3 text-[15px] leading-relaxed whitespace-pre-wrap">{w.tekst}</p>
                     {kanal === 'seo' && <Licznik ile={w.tekst.length} limit={155} co="opis" />}
                     {w.hashtagi.length > 0 && (
-                      <p className="mt-3 font-mono text-[12px] text-dusty-blue break-words">
+                      <p className="mt-3 font-mono text-[12px] text-muted-foreground break-words">
                         {w.hashtagi.map((h) => (kanal === 'seo' ? h : `#${h}`)).join(kanal === 'seo' ? ' · ' : ' ')}
                       </p>
                     )}

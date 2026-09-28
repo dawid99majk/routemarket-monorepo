@@ -75,16 +75,16 @@ export default function Logo({ showName = true, signature = true, size = 'md', c
       <RMMark size={s.mark} />
       {showName && (
         <span className="flex flex-col leading-none">
+          {/* Pocztówka: znak słowny małymi literami, krojem tytułów. */}
           <span
-            className={`font-narrow ${s.text} text-foreground uppercase`}
-            style={{ fontWeight: 700, letterSpacing: '0.04em' }}
+            className={`font-display ${s.text} text-foreground`}
+            style={{ fontWeight: 700, letterSpacing: '-0.02em' }}
           >
-            Route<span className="text-accent">/</span>Market
+            routemarket
           </span>
           {signature && (
             <span
-              className={`font-mono ${s.sub} text-muted-foreground mt-1 uppercase`}
-              style={{ letterSpacing: '0.32em' }}
+              className={`${s.sub} text-muted-foreground mt-1 font-semibold`}
             >
               zbieraj · układaj · jedź
             </span>

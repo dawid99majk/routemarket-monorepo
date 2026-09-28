@@ -49,7 +49,7 @@ const token = (nazwa: string, zapas: string) => {
 const kolorTla = (wyroznione: boolean, kubelek?: string | null) => {
   if (wyroznione) return token('--primary', 'hsl(158 28% 32%)');
   if (kubelek === 'must') return token('--primary', 'hsl(158 28% 32%)');
-  if (kubelek === 'nice') return token('--accent', 'hsl(17 42% 47%)');
+  if (kubelek === 'nice') return token('--accent-strong', 'hsl(24 78% 73%)');
   if (kubelek === 'rejected') return token('--muted-foreground', 'hsl(27 13% 39%)');
   return token('--foreground', 'hsl(20 26% 18%)');
 };
@@ -59,9 +59,10 @@ function pinIcon(numer: number, wyroznione: boolean, kubelek?: string | null) {
   return L.divIcon({
     className: '',
     html: `<div style="width:${rozmiar}px;height:${rozmiar}px;border-radius:50%;
-      background:${kolorTla(wyroznione, kubelek)};color:${token('--card', 'hsl(40 100% 99%)')};
+      background:${kolorTla(wyroznione, kubelek)};color:${kubelek === 'nice' && !wyroznione
+        ? token('--accent-foreground', 'hsl(27 64% 18%)') : token('--card', 'hsl(40 100% 99%)')};
       display:flex;align-items:center;justify-content:center;
-      font:500 ${wyroznione ? 13 : 11}px/1 ui-sans-serif,system-ui;
+      font:700 ${wyroznione ? 13 : 11}px/1 Figtree,ui-sans-serif,system-ui;
       border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
       box-shadow:0 ${wyroznione ? 3 : 1}px ${wyroznione ? 10 : 4}px rgba(0,0,0,.3);
       transition:all .15s">${numer}</div>`,
@@ -140,7 +141,7 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
           className: '',
           html: `<div style="position:relative;width:30px;height:38px">
             <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
-              background:${token('--accent', 'hsl(17 42% 47%)')};border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
+              background:${token('--foreground', 'hsl(243 23% 18%)')};border:2px solid ${token('--card', 'hsl(40 100% 99%)')};
               box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>
             <div style="position:absolute;top:7px;left:9px;width:12px;height:12px;border-radius:50%;
               background:${token('--card', 'hsl(40 100% 99%)')}"></div>

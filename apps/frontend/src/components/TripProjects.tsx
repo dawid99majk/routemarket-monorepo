@@ -51,6 +51,8 @@ import CoDalej from '@/components/planDni/CoDalej';
 import { usunPozycje, przeniesPozycje, koniecDnia, czasNaMinuty, minutyNaCzas } from '@/components/planDni/edycja';
 import { gpxDnia, gpxTras, nazwaPliku, pobierzPlik } from '@/lib/gpx';
 import { formatujGodziny } from '@/lib/godziny';
+import AgentDymek from '@/components/AgentDymek';
+import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -1717,10 +1719,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Lekka pigułka statusu agenta Co-pilot */}
             {places.filter((p) => p.priority !== 'rejected').length > 0 && (
               <div className="flex items-center justify-between flex-wrap gap-3 py-1">
-                <div className="inline-flex items-start gap-2.5 px-4 py-2 rounded-full bg-accent/15 border border-accent/40 text-xs text-foreground/85 shadow-2xs">
-                  <Sparkles className="w-3.5 h-3.5 text-foreground/70 shrink-0 mt-px" />
-                  <span>{uwagaAgenta?.tekst}</span>
-                </div>
+                <AgentDymek maly className="max-w-[760px]">{uwagaAgenta?.tekst}</AgentDymek>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
                   {active.start_name && (
                     <span className="hidden sm:inline">Start: <strong className="text-foreground">{active.start_name}</strong></span>
@@ -2264,28 +2263,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           const id = e.dataTransfer.getData('text/plain');
                           if (id) movePlace(id, zone.id);
                         }}
-                        className={`rounded-md min-h-[160px] border border-border transition-colors ${
-                          zone.id === 'rejected' ? 'bg-muted/30' : 'bg-card'
-                        }`}
+                        className="rounded-lg min-h-[160px] bg-muted transition-colors"
                       >
-                        {/* Podkreślenie 2 px w kolorze decyzji zamiast kropki (Z3).
-                            "Być może" jest terakotą, nie dusty-blue: w kierunku
-                            „Wyprawa" --accent znaczy dokładnie dwie rzeczy --
-                            „być może" i głos agenta -- więc trzeci niebieski
-                            odcień rozbijałby ten sygnał. */}
-                        <div className={`flex items-center justify-between px-4 py-3.5 border-b-2 ${
-                          zone.id === 'must' ? 'border-primary'
-                            : zone.id === 'nice' ? 'border-accent' : 'border-border'
-                        }`}>
-                          <span className="flex items-center gap-2.5">
-                            <span className={`font-narrow uppercase tracking-[0.18em] text-[11px] font-semibold ${
-                              zone.id === 'must' ? 'text-primary'
-                                : zone.id === 'nice' ? 'text-foreground' : 'text-muted-foreground'
-                            }`}>
-                              {zone.label}
-                            </span>
-                          </span>
-                          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
+                        {/* Kolumna decyzji: kropka i licznik w kolorze kubełka, reszta atramentem. */}
+                        <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
+                          <span aria-hidden className={`w-2.5 h-2.5 rounded-full ${
+                            zone.id === 'must' ? 'bg-primary' : zone.id === 'nice' ? 'bg-accent-strong' : 'bg-clay'}`} />
+                          <h3 className="font-display text-[18px] font-bold">{zone.label}</h3>
+                          <span className="flex-1" />
+                          <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold tabular-nums ${
+                            zone.id === 'must' ? 'bg-primary text-primary-foreground'
+                              : zone.id === 'nice' ? 'bg-accent text-accent-foreground' : 'bg-clay text-foreground'}`}>
                             {zonePlaces.length}
                           </span>
                         </div>
@@ -2295,10 +2283,10 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           <div key={group.cat} className="space-y-2">
                             {grouped && group.label && (
                               <div className="flex items-center justify-between px-1 pt-1">
-                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <span className="text-[12px] font-bold text-muted-foreground">
                                   {group.label}
                                 </span>
-                                <span className="text-[10px] text-muted-foreground">{group.items.length}</span>
+                                <span className="text-[12px] font-bold text-muted-foreground tabular-nums">{group.items.length}</span>
                               </div>
                             )}
                           {group.items.map((p) => {
@@ -2315,77 +2303,57 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                   const id = e.dataTransfer.getData('text/plain');
                                   if (id && id !== p.id) movePlace(id, zone.id, p.id);
                                 }}
-                                className={`group rounded-lg border border-border/80 bg-card p-3.5 cursor-grab
-                                            active:cursor-grabbing shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:border-border transition-all duration-200`}
+                                className="group rounded-md bg-card p-2 cursor-grab active:cursor-grabbing
+                                           shadow-token-xs hover:shadow-token-md focus-within:shadow-token-md transition-shadow duration-200"
                               >
-                                <div className="flex gap-3.5">
-                                  <div className="w-[96px] h-[86px] sm:w-[104px] sm:h-[90px] rounded-md bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 shrink-0 overflow-hidden border border-border/40 shadow-xs flex items-center justify-center">
+                                <div className="flex gap-3 items-center">
+                                  <div className="w-14 h-14 rounded-[12px] bg-placeholder-photo shrink-0 overflow-hidden flex items-center justify-center">
                                     {p.image_url
-                                      ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                                      : <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                                          <Icon className="w-5 h-5 text-muted-foreground" />
-                                          <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">miejsce</span>
-                                        </div>}
+                                      ? <Zdjecie src={p.image_url} gdzie={140} alt="" className="w-full h-full object-cover" />
+                                      : <Icon className="w-5 h-5 text-muted-foreground" />}
                                   </div>
-                                  <div className="min-w-0 flex-1 flex flex-col justify-between">
-                                    <div>
-                                      <div className="flex items-start gap-1.5">
-                                        <button onClick={() => openPlaceCard(p)}
-                                          className="font-display text-[15px] font-medium leading-snug text-left flex-1
-                                                     hover:text-primary transition-colors">
-                                          {p.name}
-                                        </button>
-                                        <button onClick={() => unpin(p.id)} aria-label={t('tablica.usun_z_tablicy')}
-                                          className="text-muted-foreground/50 hover:text-destructive shrink-0
-                                                     opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                      <div className="font-mono text-[11px] tabular-nums text-muted-foreground mt-1 truncate">
-                                        {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, formatujGodziny(p.opening_hours)]
-                                          .filter(Boolean).join(' · ') || '—'}
-                                      </div>
-                                      {p.description && (
-                                        <p className="text-[12px] text-foreground/75 mt-1.5 line-clamp-2 leading-relaxed text-pretty">
-                                          {p.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                    {/* Waga przestawiana wprost na karcie. Przeciąganie zostaje, ale
-                                        wymaga celowania w kolumnę, a to jest jedno kliknięcie. */}
-                                    <div className="flex items-center justify-between gap-1.5 mt-2.5">
-                                      <div className="flex gap-1.5">
-                                        {ZONES.map((z) => (
-                                          <button key={z.id} onClick={() => movePlace(p.id, z.id)}
-                                            className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                                              p.priority === z.id
-                                                ? z.id === 'must' ? 'bg-primary text-primary-foreground font-medium'
-                                                  : z.id === 'nice' ? 'bg-accent text-accent-foreground font-medium'
-                                                  : 'bg-clay text-clay-foreground'
-                                                : 'text-muted-foreground hover:bg-muted'
-                                            }`}>
-                                            {z.short}
-                                          </button>
-                                        ))}
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => glosuj(p.id)}
-                                        aria-label="Głos uczestników na to miejsce"
-                                        title="Głos uczestników na to miejsce"
-                                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border shadow-xs transition-all ${
-                                          mojeGlosy.has(p.id)
-                                            ? 'border-accent bg-accent/15 text-foreground font-medium scale-105'
-                                            : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
-                                        }`}
-                                      >
-                                        <Heart className={`w-3 h-3 ${mojeGlosy.has(p.id) ? 'fill-accent' : ''}`} />
-                                        {(p.vote_count ?? 0) > 0 ? (
-                                          <span className="font-mono tabular-nums font-medium">{p.vote_count}</span>
-                                        ) : null}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-start gap-1.5">
+                                      <button onClick={() => openPlaceCard(p)}
+                                        className="text-[15px] font-semibold leading-snug text-left flex-1
+                                                   hover:underline decoration-foreground/30 underline-offset-2">
+                                        {p.name}
+                                      </button>
+                                      <button onClick={() => unpin(p.id)} aria-label={t('tablica.usun_z_tablicy')}
+                                        className="text-muted-foreground hover:text-destructive shrink-0 mt-0.5
+                                                   opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                        <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
+                                    <div className="text-[12.5px] tabular-nums text-muted-foreground mt-0.5 truncate">
+                                      {[p.visit_minutes ? formatMinutes(p.visit_minutes) : null, formatujGodziny(p.opening_hours)]
+                                        .filter(Boolean).join(' · ') || '—'}
+                                    </div>
                                   </div>
+                                </div>
+                                {/* Decyzja pojawia się pod kursorem albo przy fokusie z klawiatury —
+                                    pięć kart w kolumnie nie powtarza pięć razy tych samych przycisków.
+                                    Na ekranie dotykowym (bez „hover”) jest zawsze widoczna. */}
+                                <div className="mt-2 flex items-center gap-1.5 [@media(hover:hover)]:hidden
+                                                [@media(hover:hover)]:group-hover:flex [@media(hover:hover)]:group-focus-within:flex">
+                                  <PrzelacznikDecyzji rozmiar="sm" className="flex-1" stan={p.priority}
+                                    onDecyzja={(k) => movePlace(p.id, k)} />
+                                  <button
+                                    type="button"
+                                    onClick={() => glosuj(p.id)}
+                                    aria-label="Głos uczestników na to miejsce"
+                                    title="Głos uczestników na to miejsce"
+                                    className={`inline-flex items-center gap-1 h-9 px-2.5 rounded-full text-[12px] transition-colors ${
+                                      mojeGlosy.has(p.id)
+                                        ? 'bg-accent text-accent-foreground font-bold'
+                                        : 'bg-secondary text-muted-foreground hover:text-foreground'
+                                    }`}
+                                  >
+                                    <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(p.id) ? 'fill-current' : ''}`} />
+                                    {(p.vote_count ?? 0) > 0 ? (
+                                      <span className="tabular-nums font-bold">{p.vote_count}</span>
+                                    ) : null}
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -2423,13 +2391,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       zajęła mapa: przy kurowaniu tablicy najczęściej pada pytanie „czy to się
                       w ogóle da obejść w jeden dzień", a na to odpowiada geografia, nie lista.
                       Pozostałe dwie kolumny zachowują dotychczasową szerokość. */}
-                  <div className="rounded-md border border-border bg-card overflow-hidden flex flex-col
+                  <div className="rounded-lg bg-card shadow-token-md overflow-hidden flex flex-col
                              self-start md:sticky md:top-[88px]">
-                    <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
-                      <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                        Rozrzut miejsc
-                      </span>
-                      <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <h3 className="font-display text-[18px] font-bold">Na mapie</h3>
+                      <span className="text-[12.5px] font-semibold tabular-nums text-muted-foreground">
                         {naMapie.length} z {places.length}
                       </span>
                     </div>
@@ -2443,11 +2409,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             const m = places.find((x) => x.id === id);
                             if (m) openPlaceCard(m);
                           }} />
-                        <div className="flex items-center gap-4 px-3 py-2 border-t border-border">
+                        <div className="flex items-center gap-4 px-4 py-2.5">
                           {[['must', 'na pewno'], ['nice', 'być może']].map(([id, etykieta]) => (
                             <span key={id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               <span className={`w-2.5 h-2.5 rounded-full ${
-                                id === 'must' ? 'bg-primary' : 'bg-accent'}`} />
+                                id === 'must' ? 'bg-primary' : 'bg-accent-strong'}`} />
                               {etykieta}
                             </span>
                           ))}
@@ -2462,7 +2428,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   </div>
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-3">
-                  Wagę zmienisz pigułką na kartce. Przeciąganie też działa — upuść kartkę
+                  Najedź na kartkę, żeby zmienić decyzję. Przeciąganie też działa — upuść kartkę
                   na inną, żeby ustawić kolejność w kolumnie.
                 </p>
               </div>
@@ -2769,7 +2735,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           <span className="w-2.5 h-2.5 rounded-full bg-primary" aria-hidden />{t('plan.legenda_tablica')}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="w-2.5 h-2.5 rounded-full bg-accent" aria-hidden />{t('plan.legenda_agent')}
+                          <span className="w-2.5 h-2.5 rounded-full bg-agent-dot" aria-hidden />{t('plan.legenda_agent')}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <House className="w-3 h-3" aria-hidden />{t('plan.legenda_nocleg')}
@@ -2942,7 +2908,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               <span className={`w-6 h-6 rounded-full shrink-0 mt-0.5 flex items-center justify-center
                                                 text-[12px] font-medium ${
                                 suggested
-                                  ? 'bg-accent text-accent-foreground'
+                                  ? 'bg-agent text-agent-foreground ring-1 ring-agent-dot'
                                   : 'bg-primary text-primary-foreground'
                               }`}>
                                 {nrNaMapie}
@@ -2962,7 +2928,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 {suggested && (
                                   // Bursztyn jako tło pod ciemnym napisem — jako kolor tekstu
                                   // na jasnym tle ma kontrast 2,13 i był nieczytelny.
-                                  <span className="font-sans text-[11px] font-normal text-accent-foreground bg-accent rounded-full px-2 py-0.5">
+                                  <span className="font-sans text-[11px] font-semibold text-agent-foreground bg-agent rounded-full px-2 py-0.5">
                                     {t('plan.legenda_agent')}
                                   </span>
                                 )}
@@ -3167,9 +3133,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 </div>
 
                 {plan.question && (
-                  <div className="rounded-md border border-accent/40 bg-accent/10 p-3 text-sm text-foreground">
-                    {plan.question}
-                  </div>
+                  <AgentDymek>{plan.question}</AgentDymek>
                 )}
               </div>
             )}

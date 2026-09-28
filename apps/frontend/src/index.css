@@ -1,5 +1,5 @@
-/* ── Routemarket — Modern Breathable Travel UI — Webfonts ── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400;1,9..40,500&family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* ── RouteMarket — Pocztówka — kroje: Bricolage Grotesque (tytuły), Figtree (tekst i liczby) ── */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400..800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,88 +7,104 @@
 
 @layer base {
   :root {
-    /* ── Nordic Horizon (Domyślny) — Szmaragd, Świeża Biel, Arktyczna Przestrzeń ── */
-    --background: 214 24% 96%;      /* #F1F5F9  świeży, wyrazisty arktyczny canvas dający głębię białym kartom */
-    --surface: 0 0% 100%;           /* #FFFFFF  czysta biel paneli */
+    /* ── Pocztówka (od 28.09.2026) ──────────────────────────────────────────
+       Ciepłe jasne tło, atrament, miękkie karty. Trzy kolory znaczą trzy rzeczy
+       i nic więcej:
+         --primary  butelkowa zieleń  = „na pewno”
+         --accent   brzoskwinia       = „być może”
+         --agent    lawenda           = głos agenta i jego propozycje
+       Akcje główne są atramentowe (bg-foreground text-background). */
+    --background: 33 31% 94%;        /* #F5F1EC */
+    --surface: 0 0% 100%;
     --surface-top: 0 0% 100%;
-    --surface-bottom: 214 24% 96%;
-    --card: 0 0% 100%;              /* #FFFFFF  czysta biel kart */
+    --surface-bottom: 33 31% 94%;
+    --card: 0 0% 100%;
     --popover: 0 0% 100%;
     --surface-card: 0 0% 100%;
-    --muted: 214 25% 92%;           /* #E2E8F0 */
-    --secondary: 214 25% 92%;
+    --muted: 34 31% 90%;             /* #EDE6DD — kolumny tablicy, tory przełączników */
+    --secondary: 33 31% 94%;         /* #F5F1EC — tło pól i kafelków faktów na białym */
 
-    --foreground: 222 47% 11%;      /* #0F172A  głęboki, czytelny antracyt */
-    --ink: 222 47% 11%;
-    --card-foreground: 222 47% 11%;
-    --popover-foreground: 222 47% 11%;
-    --secondary-foreground: 222 47% 11%;
-    --text-primary: 222 47% 11%;
-    --text-secondary: 215 16% 47%;  /* #64748B */
-    --text-muted: 215 16% 60%;      /* #94A3B8 */
-    --muted-foreground: 215 16% 43%;
-    --neutral: 215 16% 47%;
+    --foreground: 243 23% 18%;       /* #25243A atrament — 13,4:1 na tle */
+    --ink: 243 23% 18%;
+    --card-foreground: 243 23% 18%;
+    --popover-foreground: 243 23% 18%;
+    --secondary-foreground: 243 23% 18%;
+    --text-primary: 243 23% 18%;
+    --text-secondary: 243 10% 41%;
+    --text-muted: 243 10% 41%;
+    --muted-foreground: 243 10% 41%; /* #5F5E72 — 5,6:1 na tle, 5,1:1 na kolumnie */
+    --neutral: 243 10% 41%;
+    --neutral-foreground: 0 0% 100%;
 
-    --primary: 173 80% 27%;         /* #0F766E  głęboki szmaragd / teal */
+    --primary: 153 40% 30%;          /* #2E6B50 — WYŁĄCZNIE „na pewno”; biały napis 6,3:1 */
     --primary-foreground: 0 0% 100%;
-    --primary-light: 173 58% 45%;
+    --primary-light: 153 30% 62%;
 
-    --accent: 38 92% 50%;           /* #F59E0B  ciepłe bursztynowe złoto */
-    --accent-foreground: 28 85% 18%; /* #451A03  głęboki brąz/bursztyn dający kontrast 7:1+ */
-    --tan: 38 92% 50%;
-    --burnt-orange: 38 92% 50%;
-    --tan-foreground: 28 85% 18%;
+    --accent: 27 80% 82%;            /* #F6CFAE — WYŁĄCZNIE „być może”, zawsze jako tło */
+    --accent-foreground: 27 64% 18%; /* #4A2A10 — 8,9:1 na brzoskwini */
+    --accent-strong: 24 78% 73%;     /* #F0B084 — kropki i obrysy „być może” */
 
-    --destructive: 0 84% 60%;
+    --agent: 255 71% 95%;            /* #ECE7FB — dymek agenta */
+    --agent-foreground: 248 47% 26%; /* #2B2360 — 11,5:1 na lawendzie */
+    --agent-strong: 249 46% 33%;     /* #3A2E7C — awatar „A” */
+    --agent-dot: 250 53% 66%;        /* #8A7BD6 — propozycje agenta na osi dnia i mapie */
+
+    /* Aliasy po starych motywach — trzymane, dopóki kod ich używa. */
+    --tan: 27 80% 82%;
+    --tan-foreground: 27 64% 18%;
+    --burnt-orange: 27 80% 82%;
+    --burnt-orange-foreground: 27 64% 18%;
+    --forest: 153 40% 30%;
+    --forest-foreground: 0 0% 100%;
+    --forest-deep: 153 45% 22%;
+    --forest-deep-foreground: 0 0% 100%;
+    --sage: 153 40% 30%;
+    --sage-foreground: 0 0% 100%;
+    --moss: 153 40% 30%;
+    --moss-foreground: 0 0% 100%;
+    --clay: 36 10% 70%;              /* „odrzucone” — ciepła szarość pod atramentem */
+    --clay-foreground: 243 23% 18%;
+    --dusty-blue: 34 31% 80%;
+    --dusty-blue-foreground: 243 23% 18%;
+
+    --destructive: 0 65% 45%;
     --destructive-foreground: 0 0% 100%;
-    --success: 158 64% 40%;
+    --success: 153 40% 30%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
-    --warning-foreground: 28 85% 18%; /* #451A03  głęboki brąz na tłach ostrzegawczych/łososiowych (bg-warning/15) */
-    --danger: 0 84% 60%;
+    --warning-foreground: 28 85% 18%;
+    --danger: 0 65% 45%;
     --danger-foreground: 0 0% 100%;
 
-    --forest: 173 80% 28%;
-    --forest-foreground: 0 0% 100%;
-    --forest-deep: 173 84% 20%;
-    --forest-deep-foreground: 0 0% 100%;
-    --sage: 173 80% 28%;
-    --sage-foreground: 0 0% 100%;
-    --dusty-blue: 217 91% 60%;
-    --dusty-blue-foreground: 0 0% 100%;
-    --clay: 173 80% 28%;
-    --clay-foreground: 0 0% 100%;
-    --moss: 158 64% 40%;
-    --moss-foreground: 0 0% 100%;
-
-    --border: 214 26% 88%;          /* #D8E0EA  wyraźniejsza, precyzyjna krawędź karty */
-    --input: 214 26% 88%;
-    --ring: 173 80% 28%;
+    --border: 34 22% 87%;            /* #E6E0D8 */
+    --input: 34 22% 87%;
+    --ring: 243 23% 18%;
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 173 80% 28%;
+    --sidebar-foreground: 243 23% 18%;
+    --sidebar-primary: 243 23% 18%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 26% 88%;
-    --sidebar-ring: 173 80% 28%;
+    --sidebar-accent: 33 31% 94%;
+    --sidebar-accent-foreground: 243 23% 18%;
+    --sidebar-border: 34 22% 87%;
+    --sidebar-ring: 243 23% 18%;
 
-    --radius: 1rem;                 /* 16px */
-    --radius-sm: 0.375rem;
-    --radius-md: 0.625rem;
-    --radius-lg: 0.875rem;
-    --radius-xl: 1.25rem;
+    --radius: 1.375rem;
+    --radius-sm: 0.625rem;           /* 10 px — drobne pola */
+    --radius-md: 1rem;               /* 16 px — karty w kolumnach, pola formularzy */
+    --radius-lg: 1.375rem;           /* 22 px — karty i panele */
+    --radius-xl: 1.75rem;            /* 28 px — okna dialogowe */
     --radius-full: 9999px;
 
-    --shadow-sm: 0 2px 8px -1px rgba(15, 23, 42, 0.08), 0 1px 3px -1px rgba(15, 23, 42, 0.05);
-    --shadow-md: 0 6px 18px -3px rgba(15, 23, 42, 0.10), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
-    --shadow-lg: 0 14px 28px -4px rgba(15, 23, 42, 0.14), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
-    --shadow-xl: 0 22px 38px -6px rgba(15, 23, 42, 0.18), 0 8px 16px -4px rgba(15, 23, 42, 0.08);
+    --shadow-xs: 0 1px 2px rgba(37, 36, 58, 0.05);
+    --shadow-sm: 0 2px 10px rgba(37, 36, 58, 0.06);
+    --shadow-md: 0 8px 24px rgba(37, 36, 58, 0.08);
+    --shadow-lg: 0 14px 34px rgba(37, 36, 58, 0.12);
+    --shadow-xl: 0 24px 60px rgba(20, 18, 40, 0.28);
 
-    --placeholder-photo: 210 40% 96%;
-    --strikethrough: 215 16% 65%;
-    --hairline: 214 32% 91%;
+    --placeholder-photo: 33 33% 86%; /* #E7DCCF */
+    --strikethrough: 36 10% 60%;
+    --hairline: 34 22% 90%;
   }
 
 
@@ -183,8 +199,8 @@
     background: hsl(var(--background));
     background-attachment: fixed;
     min-height: 100vh;
-    font-family: 'Inter', system-ui, sans-serif;
-    letter-spacing: -0.005em;
+    font-family: 'Figtree', system-ui, sans-serif;
+    letter-spacing: 0;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -196,21 +212,20 @@
 
   /* ── Typography scale — editorial display + humanist body ── */
   h1, h2, h3, h4 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-variation-settings: 'opsz' 64, 'SOFT' 30;
-    letter-spacing: -0.015em;
+    font-family: 'Bricolage Grotesque', 'Figtree', sans-serif;
+    letter-spacing: -0.02em;
   }
   h1 {
-    @apply text-3xl tracking-tight sm:text-4xl;
-    font-weight: 350;
+    @apply text-3xl sm:text-4xl;
+    font-weight: 700;
   }
   h2 {
-    @apply text-2xl tracking-tight;
-    font-weight: 400;
+    @apply text-2xl;
+    font-weight: 700;
   }
   h3 {
     @apply text-xl;
-    font-weight: 500;
+    font-weight: 700;
   }
   .text-body {
     @apply text-base leading-relaxed;
@@ -221,32 +236,29 @@
 
   /* Editorial display (hero) — Fraunces light, magazine feel */
   .h-display {
-    font-family: 'Fraunces', Georgia, serif;
-    font-variation-settings: 'opsz' 144, 'SOFT' 50;
-    font-weight: 300;
+    font-family: 'Bricolage Grotesque', 'Figtree', sans-serif;
+    font-weight: 700;
     line-height: 1.04;
     letter-spacing: -0.02em;
   }
   .h-display-italic {
-    font-family: 'Fraunces', Georgia, serif;
-    font-style: italic;
-    font-variation-settings: 'opsz' 144, 'SOFT' 80;
-    font-weight: 300;
+    font-family: 'Bricolage Grotesque', 'Figtree', sans-serif;
+    font-weight: 700;
   }
 
   /* Condensed eyebrow / category label */
   .eyebrow, .h-condensed {
-    font-family: 'Archivo Narrow', 'Archivo', sans-serif;
-    font-weight: 600;
+    font-family: 'Figtree', sans-serif;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.06em;
     font-size: 0.6875rem;
     color: hsl(var(--muted-foreground));
   }
 
   /* Mono — technical data (GPX, distance, elevation) */
   .mono, code, kbd, samp, pre {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    font-family: 'Figtree', sans-serif;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
   }
@@ -317,10 +329,17 @@
   }
 
   /* ── Brand fonts ── */
-  .font-display { font-family: 'Fraunces', Georgia, serif; }
-  .font-display-italic { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
-  .font-narrow { font-family: 'Archivo Narrow', 'Archivo', sans-serif; }
-  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  /* Pocztówka ma dwa kroje. `font-narrow` i `font-mono` zostają jako nazwy klas
+     (etykiety i liczby), ale rysują Figtree — liczby z cyframi tabelarycznymi. */
+  .font-display { font-family: 'Bricolage Grotesque', 'Figtree', sans-serif; letter-spacing: -0.02em; }
+  .font-display-italic { font-family: 'Bricolage Grotesque', 'Figtree', sans-serif; }
+  .font-narrow { font-family: 'Figtree', sans-serif; }
+  .font-mono { font-family: 'Figtree', sans-serif; font-variant-numeric: tabular-nums; }
+  /* Tytuły były pisane cienkim szeryfem (font-light). W tym kroju tytuł jest
+     zawsze wyraźny; dwie klasy razem przebijają pojedynczą klasę wagi. */
+  .font-display.font-light, .font-display.font-normal { font-weight: 700; }
+  /* Etykiety wersalikami: mniejszy rozstrzał niż w kroju wąskim, pełna waga. */
+  .font-narrow.uppercase { letter-spacing: 0.06em; font-weight: 700; }
 
   /* Soft horizontal divider — editorial accent */
   .divider-soft {

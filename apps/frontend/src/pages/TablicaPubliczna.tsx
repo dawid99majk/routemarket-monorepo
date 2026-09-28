@@ -261,7 +261,7 @@ export default function TablicaPubliczna() {
                               transition-colors ${polubiona
                                 ? 'border-accent bg-accent/10 text-foreground'
                                 : 'border-border bg-card hover:bg-muted'}`}>
-                  <Heart className={`w-4 h-4 ${polubiona ? 'fill-accent' : ''}`} />
+                  <Heart className={`w-4 h-4 ${polubiona ? 'fill-foreground' : ''}`} />
                   {tablica.like_count ?? 0}
                 </button>
                 {jaId === tablica.user_id ? (
@@ -355,7 +355,7 @@ export default function TablicaPubliczna() {
                               : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
                           }`}
                         >
-                          <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(m.id) ? 'fill-accent' : ''}`} />
+                          <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(m.id) ? 'fill-foreground' : ''}`} />
                           {(m.vote_count ?? 0) > 0 ? (
                             <span className="font-mono tabular-nums font-medium">{m.vote_count}</span>
                           ) : null}

@@ -264,7 +264,7 @@ export default function TripPlans() {
                     {p?.zdjecia?.[0] ? (
                       <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/40 to-accent/10 text-muted-foreground">
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-placeholder-photo text-muted-foreground">
                         <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">W trakcie</span>
                       </div>
                     )}
@@ -402,7 +402,7 @@ export default function TripPlans() {
                             <Zdjecie src={zdjeciaW[0]} gdzie="kafelek" alt=""
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 text-muted-foreground">
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-placeholder-photo text-muted-foreground">
                               <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Tablica</span>
                             </div>
                           )}

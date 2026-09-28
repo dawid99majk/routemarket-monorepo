@@ -28,6 +28,8 @@ import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
 import { odmien } from '@/lib/odmiana';
 import { etykietaRodzaju } from '@/lib/rodzaj';
+import AgentDymek from '@/components/AgentDymek';
+import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
 import { formatujGodziny } from '@/lib/godziny';
 
 const KLUCZ_OSTATNIE = 'rm_ostatnie_miasta';
@@ -1137,10 +1139,9 @@ export default function Discover() {
         {/* Znalezione przez agenta: propozycje spoza katalogu, na konkretne
             pytanie. Osobny pasek, żeby nie udawały części zbioru miasta. */}
         {wynikiAgenta.length > 0 && (
-          <div className="mt-4 rounded-md border border-accent/40 bg-accent/10 p-4 sm:p-5">
+          <div className="mt-4 rounded-lg bg-agent/70 p-4 sm:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              {/* Bursztyn to tło pod głosem agenta; jako kolor napisu miał kontrast 2,13. */}
-              <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-foreground/75">
+              <span className="text-[13px] font-bold text-agent-foreground">
                 Agent znalazł · {wynikiAgenta.length}{pytanieAgenta ? ` · „${pytanieAgenta}”` : ''}
               </span>
               <button onClick={() => setWynikiAgenta([])}
@@ -1159,7 +1160,7 @@ export default function Discover() {
                 const rodzaj = etykietaRodzaju(zKatalogu?.kind ?? p.category);
                 return (
                   <div key={`${p.name}-${i}`}
-                    className="rounded-md border border-border bg-card p-3.5 flex flex-col">
+                    className="rounded-md bg-card p-3.5 flex flex-col shadow-token-xs">
                     {/* Klikalna treść, przyciski decyzji jako rodzeństwo pod spodem --
                         ten sam układ co karty katalogu, żeby jedno nie blokowało drugiego. */}
                     <button onClick={() => setKartaAgenta(p)} className="text-left">
@@ -1176,9 +1177,8 @@ export default function Discover() {
                         </p>
                       )}
                     </button>
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/60 text-[12px]">
-                      <PrzyciskiDecyzji stan={stan} onDecyzja={(b) => dopnijZAgenta(p, b)} />
-                    </div>
+                    <PrzelacznikDecyzji className="mt-3" rozmiar="sm" zOdrzuceniem={false}
+                      stan={stan} onDecyzja={(b) => dopnijZAgenta(p, b as Bucket)} />
                   </div>
                 );
               })}
@@ -1189,8 +1189,7 @@ export default function Discover() {
         {/* Pasek agenta Co-pilot */}
         {board && places.length > 0 && (
           <div className="mt-5 flex justify-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/15 border border-accent/40 text-xs text-foreground/85 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-foreground/70 shrink-0" />
+            <AgentDymek maly>
               <span>
                 {savedCount === 0
                   ? 'Zacznij od kilku kotwic — resztę dobiorę tak, żeby dzień się spinał.'
@@ -1204,7 +1203,7 @@ export default function Discover() {
                   Ułóż plan ↗
                 </button>
               )}
-            </div>
+            </AgentDymek>
           </div>
         )}
 
@@ -1310,22 +1309,31 @@ export default function Discover() {
                   onMouseEnter={() => setAktywne(p.id)}
                   onFocus={() => setAktywne(p.id)}
                   onMouseLeave={() => setAktywne(null)}
-                  className={`group mb-6 break-inside-avoid rounded-2xl border bg-card overflow-hidden
-                             transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-0.5 ${
-                    aktywne === p.id ? 'border-foreground/50 shadow-md' : 'border-border hover:border-foreground/30'
+                  className={`group mb-6 break-inside-avoid rounded-2xl bg-card overflow-hidden
+                             transition-shadow duration-200 shadow-token-md hover:shadow-token-lg ${
+                    aktywne === p.id ? 'ring-2 ring-foreground/30' : ''
                   }`}
                 >
                   <button onClick={() => setKarta(p)} className="block w-full text-left">
-                    <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
+                    <div className="relative w-full aspect-[16/10] bg-placeholder-photo overflow-hidden">
                       {p.photos?.[0] && (
                         <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       )}
-                      {pokazMape && (
-                        <span className="absolute left-3 top-3 w-6 h-6 rounded-full bg-foreground text-background
-                                         flex items-center justify-center text-[11px] font-medium shadow-xs">
-                          {idx + 1}
-                        </span>
-                      )}
+                      {/* Numer pinezki i stan decyzji na zdjęciu — widać je bez czytania stopki. */}
+                      <span className="absolute left-3 top-3 flex items-center gap-1.5">
+                        {pokazMape && (
+                          <span className="w-7 h-7 rounded-full bg-foreground text-background
+                                           flex items-center justify-center text-[12px] font-bold shadow-token-sm">
+                            {idx + 1}
+                          </span>
+                        )}
+                        {mk === 'must' && (
+                          <span className="rounded-full bg-primary text-primary-foreground px-2.5 py-1 text-[12px] font-bold">Na pewno</span>
+                        )}
+                        {mk === 'nice' && (
+                          <span className="rounded-full bg-accent text-accent-foreground px-2.5 py-1 text-[12px] font-bold">Być może</span>
+                        )}
+                      </span>
                       {etykietaRodzaju(p.kind) && (
                         <span className="absolute left-3 bottom-3 font-medium text-[10.5px]
                                          bg-background/85 backdrop-blur-md px-2.5 py-0.5 rounded-full shadow-xs border border-white/20">
@@ -1344,12 +1352,12 @@ export default function Discover() {
                         className="absolute right-3 bottom-3 w-7 h-7 rounded-full bg-background/85 backdrop-blur-md
                                    flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
                       >
-                        <Heart className={`w-3.5 h-3.5 ${favorites.has(p.id) ? 'fill-accent text-accent' : 'text-muted-foreground'}`} />
+                        <Heart className={`w-3.5 h-3.5 ${favorites.has(p.id) ? 'fill-foreground text-foreground' : 'text-muted-foreground'}`} />
                       </button>
                     </div>
 
                     <div className="p-4">
-                      <h3 className="font-display text-[16.5px] font-semibold leading-snug">{p.name}</h3>
+                      <h3 className="font-display text-[19px] font-bold leading-snug">{p.name}</h3>
                       {/* Skąd to miejsce jest. Feed pokazuje też katalog z innych
                           wyjazdów, więc bez tego wiersza atrakcja z Wrocławia wygląda
                           przy albańskiej tak samo — a to zupełnie inna decyzja. */}
@@ -1385,32 +1393,9 @@ export default function Discover() {
                     </div>
                   </button>
 
-                  {/* Stopka: jedna akcja główna jako pigułka, reszta jako tekst.
-                      Podjęta decyzja jest widoczna kolorem — szałwia „na pewno",
-                      terakota „być może" — więc widać ją bez czytania etykiet. */}
-                  <div className="flex items-center gap-2 border-t border-border px-3 py-2.5 text-[12px]">
-                    {mk === 'rejected' ? (
-                      <>
-                        <span className="rounded-full bg-muted text-muted-foreground px-3 py-1 line-through">
-                          Nie tym razem
-                        </span>
-                        <button onClick={(e) => { e.stopPropagation(); mark(p, 'must' as Bucket); }}
-                          className="text-muted-foreground hover:text-foreground transition-colors">
-                          Przywróć
-                        </button>
-                      </>
-                    ) : (
-                      <PrzyciskiDecyzji stan={mk} onDecyzja={(b) => mark(p, b)} />
-                    )}
-                    {mk !== 'rejected' && (
-                      <button onClick={(e) => { e.stopPropagation(); mark(p, 'rejected' as Bucket); }}
-                        aria-label="Nie tym razem"
-                        className="ml-auto w-6 h-6 rounded-full text-muted-foreground
-                                   hover:bg-muted hover:text-foreground transition-colors">
-                        ×
-                      </button>
-                    )}
-                  </div>
+                  {/* Stopka: jedna pigułka decyzji w stałej kolejności (PrzelacznikDecyzji). */}
+                  <PrzelacznikDecyzji className="mx-3 mb-3" stan={mk}
+                    onDecyzja={(b) => mark(p, b as Bucket)} />
                 </article>
               );
             })}
@@ -1486,35 +1471,5 @@ export default function Discover() {
         )}
       </main>
     </div>
-  );
-}
-
-/**
- * Stopka decyzji — ta sama w karcie katalogu i w wynikach agenta.
- *
- * Kolejność stoi w miejscu: „Na pewno” zawsze pierwsze, „Być może” drugie.
- * Wcześniej wybrany kubełek wskakiwał na początek, więc po „Być może” przyciski
- * zamieniały się miejscami pod kursorem. Aktywna pigułka jest klikalna — drugi
- * klik zdejmuje decyzję, tak jak mówi `mark`.
- */
-function PrzyciskiDecyzji({ stan, onDecyzja }: { stan?: Bucket; onDecyzja: (b: Bucket) => void }) {
-  const klik = (b: Bucket) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); onDecyzja(b); };
-  return (
-    <>
-      <button onClick={klik('must' as Bucket)} aria-pressed={stan === 'must'}
-        title={stan === 'must' ? 'Kliknij, żeby cofnąć' : undefined}
-        className={`rounded-full px-3 py-1 font-medium transition-colors ${
-          stan === 'must' ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                          : 'bg-muted text-foreground hover:bg-primary/15'}`}>
-        Na pewno
-      </button>
-      <button onClick={klik('nice' as Bucket)} aria-pressed={stan === 'nice'}
-        title={stan === 'nice' ? 'Kliknij, żeby cofnąć' : undefined}
-        className={`rounded-full px-3 py-1 transition-colors ${
-          stan === 'nice' ? 'bg-accent text-accent-foreground font-medium hover:bg-accent/85'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/20'}`}>
-        Być może
-      </button>
-    </>
   );
 }

@@ -282,7 +282,7 @@ export default function FormularzNowejTablicy({
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-border bg-background px-7 py-4
+        <div className="shrink-0 border-t border-border bg-card px-7 py-4
                         flex flex-wrap items-center justify-end gap-2">
           <Button variant="ghost" className="h-10 px-4" onClick={onOdmowa} disabled={zapisywanie}>
             Nie teraz

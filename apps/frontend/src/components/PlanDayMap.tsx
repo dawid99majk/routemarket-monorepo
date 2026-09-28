@@ -175,8 +175,9 @@ function PlanDayMapInner({
         icon: L.divIcon({
           className: '',
           html: `<div style="width:26px;height:26px;border-radius:50%;
-                 background:hsl(var(${p.propozycja ? '--accent' : '--primary'}));
-                 color:hsl(var(${p.propozycja ? '--accent-foreground' : '--primary-foreground'}));
+                 background:hsl(var(${p.propozycja ? '--agent' : '--primary'}));
+                 color:hsl(var(${p.propozycja ? '--agent-foreground' : '--primary-foreground'}));
+                 ${p.propozycja ? 'border:2px solid hsl(var(--agent-dot));box-sizing:border-box;' : ''}
                  display:flex;align-items:center;justify-content:center;
                  font:500 12px/1 ui-sans-serif,system-ui;box-shadow:0 1px 4px rgba(0,0,0,.3);
                  ${klikalna ? 'cursor:pointer' : ''}">${p.nr}</div>`,

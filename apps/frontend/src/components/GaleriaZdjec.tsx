@@ -93,7 +93,7 @@ export default function GaleriaZdjec({
 
   if (ile === 0) {
     return (
-      <div className={`rounded-xl bg-gradient-to-br from-primary/10 via-muted/40 to-accent/10 ${aspectRatio} border border-border/60 flex flex-col items-center justify-center p-4 text-center ${className}`}>
+      <div className={`rounded-lg bg-placeholder-photo ${aspectRatio} border border-border/60 flex flex-col items-center justify-center p-4 text-center ${className}`}>
         <MapPin className="w-8 h-8 text-muted-foreground mb-2" />
         <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Zdjęcia w przygotowaniu</span>
         <a
@@ -112,7 +112,7 @@ export default function GaleriaZdjec({
     <div className={`flex flex-col gap-2 select-none ${className}`}>
       {/* ── Główny kadr zdjęcia na karcie ── */}
       <div
-        className={`group relative rounded-xl overflow-hidden bg-muted ${aspectRatio} border border-border/70 shadow-xs select-none`}
+        className={`group relative rounded-lg overflow-hidden bg-placeholder-photo ${aspectRatio} border border-border/70 shadow-xs select-none`}
       >
         <Zdjecie
           src={zdjecia[teraz]}
@@ -202,7 +202,7 @@ export default function GaleriaZdjec({
               type="button"
               onClick={() => setFoto(i)}
               aria-label={`Przełącz na zdjęcie ${i + 1}`}
-              className={`relative h-12 flex-1 min-w-[50px] max-w-[80px] rounded-lg overflow-hidden border transition-all duration-200 cursor-pointer ${
+              className={`relative h-12 flex-1 min-w-[50px] max-w-[80px] rounded-sm overflow-hidden border transition-all duration-200 cursor-pointer ${
                 i === teraz
                   ? 'border-foreground ring-2 ring-foreground/30 scale-[1.03] shadow-xs'
                   : 'border-border/80 opacity-60 hover:opacity-100 hover:scale-[1.01]'

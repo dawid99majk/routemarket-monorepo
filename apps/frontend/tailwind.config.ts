@@ -18,10 +18,10 @@ export default {
         secondary: "hsl(var(--text-secondary))",
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
-        narrow: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans: ['Figtree', 'system-ui', 'sans-serif'],
+        display: ['"Bricolage Grotesque"', 'Figtree', 'sans-serif'],
+        narrow: ['Figtree', 'sans-serif'],
+        mono: ['Figtree', 'sans-serif'],
       },
       fontSize: {
         "display": ["2.25rem", { lineHeight: "2.5rem", fontWeight: "800" }],
@@ -66,6 +66,14 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+          strong: "hsl(var(--accent-strong))",
+        },
+        // Głos agenta i jego propozycje — osobno od „być może”.
+        agent: {
+          DEFAULT: "hsl(var(--agent))",
+          foreground: "hsl(var(--agent-foreground))",
+          strong: "hsl(var(--agent-strong))",
+          dot: "hsl(var(--agent-dot))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -159,6 +167,8 @@ export default {
         sm: "var(--radius-sm)",
         xl: "var(--radius-xl)",
         full: "var(--radius-full)",
+        "2xl": "var(--radius-lg)",
+        "3xl": "var(--radius-xl)",
       },
       boxShadow: {
         "token-xs": "var(--shadow-xs)",

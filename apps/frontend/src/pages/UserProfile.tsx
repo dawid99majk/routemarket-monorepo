@@ -226,7 +226,7 @@ export default function UserProfile() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { icon: Package, label: 'Wyjazdy', value: String(liczby?.tablice ?? '—'), color: 'bg-muted text-foreground' },
-            { icon: MapPin, label: 'Zebrane miejsca', value: String(liczby?.miejsca ?? '—'), color: 'bg-dusty-blue/10 text-dusty-blue' },
+            { icon: MapPin, label: 'Zebrane miejsca', value: String(liczby?.miejsca ?? '—'), color: 'bg-muted text-foreground' },
             { icon: CalendarDays, label: 'Ułożone plany', value: String(liczby?.plany ?? '—'), color: 'bg-muted text-foreground' },
           ].map(({ icon: I, label, value, color }) => (
             <div key={label} className="bg-card rounded-md p-5 shadow-token-sm">

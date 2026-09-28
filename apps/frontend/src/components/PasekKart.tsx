@@ -132,7 +132,7 @@ export default function PasekKart({
                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {zbierane && (
-          <div className="shrink-0 w-[170px] rounded-xl border border-border bg-card
+          <div className="shrink-0 w-[170px] rounded-lg border border-border bg-card
                           overflow-hidden" aria-live="polite">
             <div className="h-[86px] flex items-center justify-center">
               <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
@@ -154,7 +154,7 @@ export default function PasekKart({
               ref={wybrana ? wybranaRef : undefined}
               onClick={() => onWybierzTablice(w.id)}
               aria-pressed={wybrana}
-              className={`shrink-0 w-[170px] text-left rounded-xl overflow-hidden border transition-all ${
+              className={`shrink-0 w-[170px] text-left rounded-lg overflow-hidden border transition-all ${
                 wybrana
                   ? 'border-foreground bg-card shadow-token-sm -translate-y-0.5'
                   : 'border-border bg-card hover:border-foreground/30'
@@ -183,7 +183,7 @@ export default function PasekKart({
         {czynna === 'tablice' && tablice.length > doPokazania.length && (
           <button
             onClick={onWszystkieWyjazdy}
-            className="shrink-0 w-[170px] rounded-xl border border-border bg-card
+            className="shrink-0 w-[170px] rounded-lg border border-border bg-card
                        hover:border-foreground/30 transition-colors
                        flex flex-col items-center justify-center gap-1 py-6"
           >
@@ -195,7 +195,7 @@ export default function PasekKart({
         {czynna === 'tablice' && (
           <button
             onClick={onNowyWyjazd}
-            className="shrink-0 w-[170px] rounded-xl border border-dashed border-border
+            className="shrink-0 w-[170px] rounded-lg border border-dashed border-border
                        hover:border-foreground/30 hover:bg-muted/40 transition-colors
                        flex flex-col items-center justify-center gap-1.5 py-6 text-muted-foreground"
           >
@@ -213,7 +213,7 @@ export default function PasekKart({
               ref={wybrane ? wybranaRef : undefined}
               onClick={() => onWybierzMiasto(m.miasto)}
               aria-pressed={wybrane}
-              className={`shrink-0 w-[170px] text-left rounded-xl overflow-hidden border transition-all ${
+              className={`shrink-0 w-[170px] text-left rounded-lg overflow-hidden border transition-all ${
                 wybrane
                   ? 'border-foreground bg-card shadow-token-sm -translate-y-0.5'
                   : 'border-border bg-card hover:border-foreground/30'

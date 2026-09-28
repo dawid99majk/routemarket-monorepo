@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import Zdjecie from '@/components/Zdjecie';
 import PodobneMiejsca, { type PodobneMiejsce } from '@/components/PodobneMiejsca';
 import { formatujGodziny } from '@/lib/godziny';
+import AgentDymek from '@/components/AgentDymek';
+import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
 import GaleriaZdjec from '@/components/GaleriaZdjec';
 
 export type Decyzja = 'must' | 'nice' | 'rejected';
@@ -98,8 +100,8 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
           }
         }}
       >
-        <DialogHeader className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-border/60 shrink-0 bg-background flex items-center justify-between">
-          <DialogTitle className="flex items-center gap-2.5 pr-8 font-display text-lg sm:text-xl font-medium tracking-tight">
+        <DialogHeader className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-border/60 shrink-0 bg-card flex items-center justify-between">
+          <DialogTitle className="flex items-center gap-2.5 pr-8 font-display text-xl sm:text-[24px] font-bold">
             {miejsce.nr != null && (
               <span className="w-5 h-5 rounded-full bg-foreground text-background shrink-0
                                flex items-center justify-center text-[11px] font-medium font-sans">
@@ -111,13 +113,13 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+          <div className="flex flex-col gap-5">
           {/* Kolumna lewa: Galeria zdjęć i powiązane */}
-          <div className="md:col-span-5 flex flex-col justify-between gap-2">
+          <div className="flex flex-col gap-2">
             <GaleriaZdjec
               zdjecia={zdjecia}
               nazwaMiejsca={miejsce.name}
-              aspectRatio="aspect-[16/11]"
+              aspectRatio="aspect-[16/7]"
             />
 
             {miejsce.slug && (
@@ -129,7 +131,7 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
           </div>
 
           {/* Kolumna prawa: Treść, wyróżnik, godziny, decyzje */}
-          <div className="md:col-span-7 flex flex-col justify-between gap-4">
+          <div className="flex flex-col gap-4">
             <div className="space-y-3.5">
               {ladowanie && !miejsce.description && (
                 <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -138,8 +140,8 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
               )}
 
               {miejsce.wyroznik && (
-                <div className="rounded-lg border border-border bg-muted/40 p-3 flex items-start gap-2.5">
-                  <span className="font-mono uppercase tracking-wider text-[10px] text-muted-foreground font-semibold shrink-0 mt-0.5 border border-border rounded-full px-2 py-0.5 bg-background shadow-2xs">
+                <div className="rounded-md bg-secondary p-3.5 flex items-start gap-2.5">
+                  <span className="text-[12px] font-bold text-muted-foreground shrink-0 mt-0.5">
                     Wyróżnik
                   </span>
                   <p className="text-[13.5px] leading-snug text-foreground/90 text-pretty font-medium">
@@ -158,30 +160,21 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                 </p>
               )}
 
-              {/* Wskazówka Agenta */}
-              {miejsce.note && (
-                <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 flex items-start gap-2.5">
-                  <span className="font-mono uppercase tracking-wider text-[10px] text-foreground/80 font-semibold shrink-0 mt-0.5 border border-accent/40 rounded-full px-2 py-0.5 bg-background shadow-2xs">
-                    Wskazówka
-                  </span>
-                  <p className="text-[13px] leading-relaxed text-foreground/90 text-pretty">
-                    {miejsce.note}
-                  </p>
-                </div>
-              )}
+              {/* Wskazówka agenta — jego głos, więc jego dymek. */}
+              {miejsce.note && <AgentDymek maly>{miejsce.note}</AgentDymek>}
             </div>
 
             <div className="pt-3 border-t border-border/80 space-y-3">
               {/* Metadane: godziny, czas, www */}
-              <div className="font-mono text-[12px] tabular-nums text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-2">
+              <div className="text-[13px] tabular-nums flex flex-wrap items-stretch gap-2">
                 {czas(miejsce.visit_minutes) && (
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-2 rounded-md bg-secondary px-3.5 py-2.5 font-semibold">
                     <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>Czas: {czas(miejsce.visit_minutes)}</span>
                   </span>
                 )}
                 {sformatowaneGodziny ? (
-                  <span className="flex items-center gap-1.5 min-w-0" title={miejsce.opening_hours || ''}>
+                  <span className="flex items-center gap-2 min-w-0 rounded-md bg-secondary px-3.5 py-2.5 font-semibold" title={miejsce.opening_hours || ''}>
                     <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="truncate">{sformatowaneGodziny}</span>
                   </span>
@@ -190,43 +183,26 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
+                    className="flex items-center gap-1 rounded-md bg-secondary px-3.5 py-2.5 font-semibold text-foreground underline underline-offset-2 hover:no-underline"
                   >
                     <span>Godziny: sprawdź w Google ↗</span>
                   </a>
                 )}
-                {miejsce.price_hint && <span className="min-w-0 truncate">Koszt: {miejsce.price_hint}</span>}
+                {miejsce.price_hint && <span className="min-w-0 truncate rounded-md bg-secondary px-3.5 py-2.5 font-semibold">Koszt: {miejsce.price_hint}</span>}
                 <a
                   href={miejsce.website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(miejsce.name)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline ml-auto text-[11.5px] font-sans"
+                  className="flex items-center gap-1 self-center text-foreground underline underline-offset-2 hover:no-underline ml-auto text-[13px] font-semibold"
                 >
                   <span>{miejsce.website ? 'Strona obiektu ↗' : 'Otwórz na mapie ↗'}</span>
                 </a>
               </div>
 
-              {/* Przyciski decyzyjne */}
+              {/* Decyzja — ta sama pigułka co w Odkrywaj i na tablicy. */}
               {onDecyzja && (
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  {([['must', 'Na pewno'], ['nice', 'Być może'], ['rejected', 'Nie tym razem']] as const)
-                    .map(([id, etykieta]) => {
-                      const wybrane = decyzja === id;
-                      return (
-                        <button key={id} onClick={() => onDecyzja(id)}
-                          aria-pressed={wybrane}
-                          className={`rounded-full px-4 py-1.5 text-[13px] transition-all shadow-2xs ${
-                            wybrane
-                              ? id === 'must' ? 'bg-primary text-primary-foreground font-medium'
-                                : id === 'nice' ? 'bg-accent text-accent-foreground font-medium'
-                                  : 'bg-muted text-muted-foreground line-through'
-                              : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                          }`}>
-                          {etykieta}
-                        </button>
-                      );
-                    })}
-                </div>
+                <PrzelacznikDecyzji rozmiar="lg" className="max-w-[440px]" stan={decyzja}
+                  onDecyzja={(k) => onDecyzja(k as Decyzja)} />
               )}
             </div>
           </div>

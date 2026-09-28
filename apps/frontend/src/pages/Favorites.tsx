@@ -99,7 +99,7 @@ export default function Favorites() {
                       aria-label="Usuń z ulubionych"
                       className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur flex items-center justify-center"
                     >
-                      <Heart className="w-4 h-4 fill-accent text-accent" />
+                      <Heart className="w-4 h-4 fill-foreground text-foreground" />
                     </button>
                   </div>
                   <div className="p-3">

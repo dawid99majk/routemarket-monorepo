@@ -191,7 +191,7 @@ export default function Tablice() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/30 to-accent/10 text-muted-foreground">
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-placeholder-photo text-muted-foreground">
                         <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">RouteMarket</span>
                       </div>
                     )}
@@ -211,7 +211,7 @@ export default function Tablice() {
                       moje.has(tab.id)
                         ? 'bg-accent/20 text-foreground font-medium'
                         : 'bg-background/85 text-muted-foreground'}`}>
-                      <Heart className={`w-3.5 h-3.5 ${moje.has(tab.id) ? 'fill-accent text-accent' : ''}`} />
+                      <Heart className={`w-3.5 h-3.5 ${moje.has(tab.id) ? 'fill-foreground text-foreground' : ''}`} />
                       {tab.like_count ?? 0}
                     </span>
                   </div>

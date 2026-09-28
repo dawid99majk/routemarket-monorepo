@@ -77,7 +77,7 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
   };
 
   return (
-    <header className="sticky top-0 z-20 h-[66px] border-b border-border bg-background/85 backdrop-blur-[8px]">
+    <header className="sticky top-0 z-20 h-[72px] bg-background/90 backdrop-blur-[8px]">
       <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-6 flex items-center gap-3 sm:gap-5">
         {/* Logotyp prowadzi na stronę główną — tak działa wszędzie i tego się po nim
             spodziewamy. Bez sygnatury: w aplikacji miejsce obok zajmuje przełącznik
@@ -91,15 +91,15 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
             flex nie kurczy sie ponizej szerokosci tresci, wiec zakladki nie
             przewijaly sie, tylko wychodzily poza ekran (przy 375 px siegaly
             x=558), a ikony po prawej rysowaly sie na nich. */}
-        <nav className="flex items-center gap-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="flex items-center gap-1 min-w-0 overflow-x-auto rounded-full bg-card p-1 shadow-token-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Zmienna nazywa się `zakladka`, nie `t` — inaczej przesłoniłaby funkcję
               tłumaczenia i wewnątrz mapy nie dałoby się wywołać t(). */}
           {zakladki(tripId).map((zakladka) => (
             <button key={zakladka.klucz} onClick={() => navigate(zakladka.path)}
-              className={`px-3.5 py-1.5 text-sm rounded-full transition-colors ${
+              className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap transition-colors ${
                 isActive(zakladka.path)
-                  ? 'bg-foreground text-background font-medium'
-                  : 'text-foreground/70 hover:bg-muted/60'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}>
               {t(zakladka.klucz)}
             </button>
@@ -108,10 +108,10 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
               warunek zamiast stałej pozycji dla wszystkich. */}
           {isAdmin && (
             <button onClick={() => navigate('/marketing')}
-              className={`px-3.5 py-1.5 text-sm rounded-full transition-colors ${
+              className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap transition-colors ${
                 pathname === '/marketing'
-                  ? 'bg-foreground text-background font-medium'
-                  : 'text-foreground/70 hover:bg-muted/60'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}>
               {t('naglowek.warsztat')}
             </button>
@@ -120,7 +120,7 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
 
         <div className="ml-auto flex items-center gap-4">
           {context && (
-            <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground hidden md:block">
+            <span className="text-[13px] font-semibold text-muted-foreground hidden md:block">
               {context}
             </span>
           )}
@@ -128,15 +128,15 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
               zbiorem, więc dwa przyciski obok siebie pytały użytkownika o różnicę,
               której nie ma. */}
           <button onClick={() => navigate('/zapisane')} title={t('naglowek.zapisane_miejsca')} aria-label={t('naglowek.zapisane')}
-            className="h-8 inline-flex items-center gap-1.5 rounded-full bg-muted px-3
-                       hover:bg-tan/25 transition-colors">
+            className="h-9 inline-flex items-center gap-1.5 rounded-full px-3
+                       hover:bg-card transition-colors">
             <Heart className="w-4 h-4 text-muted-foreground" />
-            <span className="text-[13px] text-muted-foreground hidden sm:inline">{t('naglowek.zapisane')}</span>
+            <span className="text-[14px] font-semibold text-muted-foreground hidden sm:inline">{t('naglowek.zapisane')}</span>
           </button>
           {initials && (
             <button onClick={() => navigate('/profile')}
-              className="w-9 h-9 rounded-full bg-tan/30 border border-border flex items-center justify-center
-                         text-[12px] font-medium hover:bg-tan/45 transition-colors">
+              className="w-9 h-9 rounded-full bg-accent text-accent-foreground flex items-center justify-center
+                         text-[13px] font-bold hover:bg-accent-strong transition-colors">
               {initials}
             </button>
           )}
