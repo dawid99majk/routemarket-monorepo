@@ -132,7 +132,7 @@ export default function PasekKart({
                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {zbierane && (
-          <div className="shrink-0 w-[170px] rounded-lg border border-border bg-card
+          <div className="shrink-0 w-[170px] rounded-lg bg-card shadow-token-sm
                           overflow-hidden" aria-live="polite">
             <div className="h-[86px] flex items-center justify-center">
               <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
@@ -183,7 +183,7 @@ export default function PasekKart({
         {czynna === 'tablice' && tablice.length > doPokazania.length && (
           <button
             onClick={onWszystkieWyjazdy}
-            className="shrink-0 w-[170px] rounded-lg border border-border bg-card
+            className="shrink-0 w-[170px] rounded-lg bg-card shadow-token-sm
                        hover:border-foreground/30 transition-colors
                        flex flex-col items-center justify-center gap-1 py-6"
           >

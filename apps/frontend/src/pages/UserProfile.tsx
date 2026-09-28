@@ -127,7 +127,7 @@ export default function UserProfile() {
   return (
     <div className="min-h-screen bg-background">
       <SEO title={t('seo.profil.title')} url="/profile" noIndex />
-      <header className="sticky top-0 z-40 bg-card border-b border-border">
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-[8px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
             <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mr-4"><ArrowLeft className="w-4 h-4 mr-1" /> {t('common.home')}</Button>
@@ -144,7 +144,7 @@ export default function UserProfile() {
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-muted-foreground" /> {t('profile.account_info')}</h2>
           <div className="space-y-4">
             {/* Display name */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+            <div className="flex items-center gap-3 p-3.5 bg-secondary rounded-md">
               <User className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t('profile.username')}</p>
@@ -166,7 +166,7 @@ export default function UserProfile() {
             </div>
 
             {/* Email */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+            <div className="flex items-center gap-3 p-3.5 bg-secondary rounded-md">
               <Mail className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t('profile.email')}</p>
@@ -188,7 +188,7 @@ export default function UserProfile() {
             </div>
 
             {/* Primary language */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+            <div className="flex items-center gap-3 p-3.5 bg-secondary rounded-md">
               <Globe className="w-5 h-5 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-xs text-muted-foreground">{t('profile.primary_language')}</p>
@@ -210,7 +210,7 @@ export default function UserProfile() {
             </div>
 
             {/* Role */}
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-md">
+            <div className="flex items-center gap-3 p-3.5 bg-secondary rounded-md">
               <Shield className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">{t('profile.role')}</p>

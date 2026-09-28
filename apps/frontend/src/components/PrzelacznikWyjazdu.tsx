@@ -239,7 +239,7 @@ export default function PrzelacznikWyjazdu({ aktywny, wszystkie, onZmien, onNowy
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+    <div className="rounded-2xl bg-card shadow-token-md p-5">
       <div className="flex items-center gap-2 mb-2">
         <span className="font-narrow uppercase tracking-[0.24em] text-[10px] font-semibold text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border border-border/60">
           {t('odkrywaj.pracujesz_nad_wyjazdem')}

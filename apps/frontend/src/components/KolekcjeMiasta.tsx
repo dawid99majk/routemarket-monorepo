@@ -47,15 +47,15 @@ export default function KolekcjeMiasta({ miejsca, onWybierz }: Props) {
             <button
               key={kolekcja.id}
               onClick={() => onWybierz(kolekcja)}
-              className="group text-left rounded-2xl border border-border/70 bg-card overflow-hidden
-                         hover:border-foreground/30 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 w-[230px] shrink-0 snap-start shadow-xs flex flex-col"
+              className="group text-left rounded-2xl bg-card overflow-hidden shadow-token-md
+                         hover:shadow-token-md transition-all duration-200 w-[230px] shrink-0 snap-start shadow-xs flex flex-col"
             >
               <div className="grid grid-cols-2 grid-rows-2 gap-0.5 bg-border/40 aspect-[16/10] overflow-hidden">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="bg-muted overflow-hidden">
                     {fotki[i] && (
                       <Zdjecie src={fotki[i]} gdzie="kafelek" alt=""
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                     )}
                   </div>
                 ))}

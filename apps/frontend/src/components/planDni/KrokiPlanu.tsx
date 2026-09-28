@@ -54,7 +54,7 @@ export default function KrokiPlanu({ naPewno, dniUlozone, dniZTrasa = 0, onTabli
 
   return (
     <ol aria-label={t('plan.kroki_aria')}
-      className="grid grid-cols-3 rounded-md border border-border bg-card overflow-hidden">
+      className="grid grid-cols-3 rounded-2xl bg-card shadow-token-sm overflow-hidden">
       {kroki.map((k, i) => {
         const tresc: ReactNode = (
           <>

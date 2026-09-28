@@ -118,11 +118,11 @@ export default function GaleriaZdjec({
           src={zdjecia[teraz]}
           gdzie="bohater"
           alt={nazwaMiejsca}
-          className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-200 ease-out group-hover:scale-105"
         />
 
         {/* Cieniowanie przy najechaniu */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
 
         {/* Przycisk „Powiększ” w prawym górnym rogu */}
         <button

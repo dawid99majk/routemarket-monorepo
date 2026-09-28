@@ -1406,7 +1406,7 @@ export default function Discover() {
             <aside className="hidden lg:block lg:sticky lg:top-[88px] space-y-3">
               {/* Punkt startowy nad mapą: patrząc na pinezki najczęściej chce się
                   wiedzieć, jak daleko to od miejsca, w którym się nocuje. */}
-              <div className="rounded-md border border-border bg-card px-3.5 py-3">
+              <div className="rounded-md bg-card shadow-token-sm px-3.5 py-3">
                 <PunktStartowy
                   nazwa={(board as any)?.start_name}
                   bezPolozenia={!!(board as any)?.start_name && (board as any)?.start_lat == null}
@@ -1417,7 +1417,7 @@ export default function Discover() {
                 />
               </div>
 
-              <label className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3.5 py-2.5
+              <label className="flex items-center gap-2.5 rounded-md bg-card shadow-token-sm px-3.5 py-2.5
                                 text-[13px] cursor-pointer select-none">
                 <input type="checkbox" checked={tylkoZObszaru}
                   onChange={(e) => setTylkoZObszaru(e.target.checked)}

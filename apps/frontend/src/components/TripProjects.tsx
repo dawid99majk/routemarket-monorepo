@@ -1424,7 +1424,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         <Skeleton className="h-12 w-full rounded-md" />
         <div className="grid gap-3 md:grid-cols-2">
           {[0, 1].map((k) => (
-            <div key={k} className="rounded-md border border-border bg-card overflow-hidden">
+            <div key={k} className="rounded-2xl bg-card shadow-token-md overflow-hidden">
               <Skeleton className="h-12 w-full rounded-none" />
               <div className="p-3 space-y-3">
                 {[0, 1, 2].map((j) => (
@@ -1779,7 +1779,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   {zakladkaPanelu === 'logistyka' && (
                     <div className="space-y-4">
                       {/* Start */}
-                      <div className="rounded-md border border-border bg-card p-4">
+                      <div className="rounded-md bg-card shadow-token-sm p-4">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           Punkt startowy
                         </p>
@@ -1793,7 +1793,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       </div>
 
                       {/* Termin */}
-                      <div className="rounded-md border border-border bg-card p-4">
+                      <div className="rounded-md bg-card shadow-token-sm p-4">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           Termin
                         </p>
@@ -1874,7 +1874,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       </div>
 
                       {/* Charakter */}
-                      <div className="rounded-md border border-border bg-card p-4">
+                      <div className="rounded-md bg-card shadow-token-sm p-4">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           Charakter
                         </p>
@@ -1995,7 +1995,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       </div>
 
                       {/* Odnośnik Google Maps */}
-                      <div className="rounded-md border border-border bg-card p-3.5 space-y-2">
+                      <div className="rounded-md bg-card shadow-token-sm p-3.5 space-y-2">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           {t('tablica.odnosnik_z_map_google')}
                         </p>
@@ -2034,7 +2034,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       </div>
 
                       {/* Wklejony tekst */}
-                      <div className="rounded-md border border-border bg-card p-3.5 space-y-2">
+                      <div className="rounded-md bg-card shadow-token-sm p-3.5 space-y-2">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           Wklejona treść lub notatki
                         </p>
@@ -2133,7 +2133,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   {/* Zakładka 5: Dostęp */}
                   {zakladkaPanelu === 'dostep' && (
                     <div className="space-y-4">
-                      <div className="rounded-md border border-border bg-card p-4">
+                      <div className="rounded-md bg-card shadow-token-sm p-4">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           Widoczność tablicy
                         </p>
@@ -2164,7 +2164,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         )}
                       </div>
 
-                      <div className="rounded-md border border-border bg-card p-4 space-y-2">
+                      <div className="rounded-md bg-card shadow-token-sm p-4 space-y-2">
                         <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                           Udostępnij znajomym
                         </p>
@@ -2629,7 +2629,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* Postęp układania stał pod formularzem na dole strony — przy ponownym
                 układaniu, uruchamianym z nagłówka, nie było go widać wcale. */}
             {planning && (
-              <div className="rounded-md border border-border bg-card px-4 py-3.5 flex items-start gap-3" role="status">
+              <div className="rounded-2xl bg-card shadow-token-sm px-4 py-3.5 flex items-start gap-3" role="status">
                 <Loader2 className="w-4 h-4 animate-spin text-foreground shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-[14px]">
@@ -2718,7 +2718,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 {(plan.days || [])
                   .filter((_: any, i: number) => i === Math.min(planDay, (plan.days || []).length - 1))
                   .map((day: any) => (
-                  <div key={day.day} className="rounded-md border border-border bg-card overflow-hidden">
+                  <div key={day.day} className="rounded-2xl bg-card shadow-token-md overflow-hidden">
                     {/* Teal na krawędzi nagłówka dnia i na linku „Zrób trasę" łamał jedyną
                         regułę tego koloru — oznacza „na pewno", nie ozdobę ani akcję. */}
                     <div className="bg-muted/60 px-4 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -3142,7 +3142,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                 jeszcze czego pokazać" — więc mówimy, czego brakuje i dajemy
                 przycisk, zamiast zostawiać białą stronę. */}
             {!plan && savedPlans.length === 0 && !planning && (
-              <div className="rounded-md border border-border bg-card px-6 py-16 text-center">
+              <div className="rounded-2xl bg-card shadow-token-md px-6 py-16 text-center">
                 <h2 className="font-display font-light text-[24px]">{t('tablica.planu_jeszcze_nie_ma')}</h2>
                 <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
                   {mustCount > 0

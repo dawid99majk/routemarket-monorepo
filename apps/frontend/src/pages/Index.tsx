@@ -14,6 +14,7 @@ import contour from '@/assets/patterns/contour.svg';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
+import AgentDymek from '@/components/AgentDymek';
 import { useTranslation } from 'react-i18next';
 
 /** Klimaty w brzmieniu z landingu; identyfikatory te same, co w presetach planera. */
@@ -230,7 +231,7 @@ export default function Index() {
   );
 
   const poleDestynacji = (
-    <div className="flex flex-col sm:flex-row gap-2 rounded-md bg-card border border-border shadow-token-sm p-2 max-w-[560px]">
+    <div className="flex flex-col sm:flex-row gap-2 rounded-2xl bg-card shadow-token-md p-2 max-w-[560px]">
       <input value={cel} onChange={(e) => setCel(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && zacznij()}
         placeholder={t('landing.dokad')}
@@ -303,14 +304,14 @@ export default function Index() {
 
           {/* ── plan daleki: samo zdjęcie, bez tytułu, shadow-sm ── */}
           <div aria-hidden className="hidden xl:block absolute left-[56px] top-[58px] w-[132px] rotate-[5deg]
-                          rounded-[9px] bg-card p-[7px] shadow-token-sm">
-            <div className="h-[84px] rounded-[6px] overflow-hidden bg-placeholder-photo">
+                          rounded-[16px] bg-card overflow-hidden shadow-token-sm">
+            <div className="h-[96px] overflow-hidden bg-placeholder-photo">
               {zdjeciaHero[0] && <Zdjecie src={zdjeciaHero[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
             </div>
           </div>
           <div aria-hidden className="hidden xl:block absolute right-[250px] top-[74px] w-[140px] rotate-[-5deg]
-                          rounded-[9px] bg-card p-[7px] shadow-token-sm">
-            <div className="h-[90px] rounded-[6px] overflow-hidden bg-placeholder-photo">
+                          rounded-[16px] bg-card overflow-hidden shadow-token-sm">
+            <div className="h-[100px] overflow-hidden bg-placeholder-photo">
               {zdjeciaHero[1] && <Zdjecie src={zdjeciaHero[1]} gdzie="kafelek" alt="" className="w-full h-full object-cover" />}
             </div>
           </div>
@@ -495,7 +496,7 @@ export default function Index() {
 
         <div className="space-y-4">
           {DNI.map((d) => (
-            <div key={d.nr} className="rounded-md bg-card border border-border p-6">
+            <div key={d.nr} className="rounded-2xl bg-card shadow-token-md p-6">
               <h3 className="font-display text-[20px] leading-snug">{t(`landing.dzien.${d.nr}.tytul`)}</h3>
               <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-1.5">{t(`landing.dzien.${d.nr}.meta`)}</p>
               <div className="flex flex-wrap gap-1.5 mt-4">
@@ -503,11 +504,7 @@ export default function Index() {
                   <span key={p} className="rounded-full bg-muted px-3 py-1 text-[12px] text-foreground/75">{p}</span>
                 ))}
               </div>
-              <div className="mt-5 rounded-md bg-warning/15 border border-warning/30 px-4 py-3.5 flex items-start gap-3">
-                <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-warning-foreground font-semibold
-                                 border border-warning-foreground/25 rounded-full px-2.5 py-1 shrink-0">{t('landing.realizm')}</span>
-                <p className="text-[13px] leading-relaxed text-warning-foreground font-medium text-pretty">{t(`landing.dzien.${d.nr}.realizm`)}</p>
-              </div>
+              <AgentDymek maly className="mt-5">{t(`landing.dzien.${d.nr}.realizm`)}</AgentDymek>
             </div>
           ))}
         </div>
@@ -608,7 +605,7 @@ export default function Index() {
                   <button key={tb.id} onClick={() => navigate(`/tablica/${tb.id}`)}
                     style={{ width: w, marginLeft: ml, marginTop: mt, zIndex: 5 - i }}
                     className={`relative shrink-0 text-left rounded-[10px] bg-card p-2.5 ${cien} ${obrot}
-                                transition-transform hover:-translate-y-1`}>
+                                transition-transform`}>
                     <div className="rounded-[7px] overflow-hidden bg-placeholder-photo"
                          style={{ height: hFoto }}>
                       {tb.photos?.[0] && (
@@ -692,7 +689,7 @@ export default function Index() {
 
       <footer className="border-t border-border">
         <div className="max-w-[1280px] mx-auto px-5 sm:px-10 py-11 flex flex-wrap items-center gap-6">
-          <span className="font-display text-[18px] font-medium">Routemarket</span>
+          <span className="font-display text-[18px] font-bold">routemarket</span>
           <nav className="flex flex-wrap items-center gap-5">
             <a href="#jak-to-dziala" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Jak to działa</a>
             <a href="#gpx" className="text-sm text-muted-foreground hover:text-foreground transition-colors">GPX</a>

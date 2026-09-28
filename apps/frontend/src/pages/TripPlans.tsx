@@ -200,14 +200,14 @@ export default function TripPlans() {
         {ladowanie ? (
           <div className="mt-8" aria-busy="true" aria-label="Wczytuję wyjazdy">
             <Skeleton className="h-[190px] w-full rounded-2xl" />
-            <div className="mt-8 rounded-2xl bg-card border border-border/60 p-6 sm:p-8">
+            <div className="mt-8 rounded-2xl bg-card shadow-token-md p-6 sm:p-8">
               <div className="flex items-baseline justify-between gap-3">
                 <Skeleton className="h-4 w-28 rounded-full" />
                 <Skeleton className="h-4 w-40 rounded-full" />
               </div>
               <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {[0, 1, 2].map((i) => (
-                  <div key={i} className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+                  <div key={i} className="rounded-2xl bg-card shadow-token-md overflow-hidden">
                     <Skeleton className="h-[170px] w-full rounded-none" />
                     <div className="p-4 space-y-2.5">
                       <Skeleton className="h-5 w-3/4 rounded-md" />
@@ -220,7 +220,7 @@ export default function TripPlans() {
             </div>
           </div>
         ) : wyjazdy.length === 0 ? (
-          <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
+          <div className="rounded-2xl bg-card shadow-token-md px-6 py-16 text-center mt-8">
             <h2 className="font-display font-light text-[24px]">Nie masz jeszcze żadnego wyjazdu</h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-[44ch] mx-auto text-pretty">
               Zacznij od miasta — resztę, łącznie z pierwszymi miejscami, podsunie agent.
@@ -247,8 +247,8 @@ export default function TripPlans() {
             return (
               <>
                 {/* Wyjazd w trakcie: elegancki, wyniesiony ponad tło */}
-                <div className="relative group mt-8 rounded-2xl border border-border bg-card overflow-hidden
-                                 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="relative group mt-8 rounded-2xl bg-card shadow-token-md overflow-hidden
+                                 shadow-sm hover:shadow-token-md transition-all duration-200">
                 {!wTrakcie.is_example && (
                   <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(wTrakcie); }}
                     aria-label="Usuń wyjazd"
@@ -262,7 +262,7 @@ export default function TripPlans() {
                   className="w-full text-left flex flex-col sm:flex-row">
                   <div className="w-full sm:w-[260px] h-[190px] shrink-0 bg-muted overflow-hidden">
                     {p?.zdjecia?.[0] ? (
-                      <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <Zdjecie src={p.zdjecia[0]} gdzie="kafelek" alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-placeholder-photo text-muted-foreground">
                         <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">W trakcie</span>
@@ -308,7 +308,7 @@ export default function TripPlans() {
                         <div className="flex gap-1">
                           {Array.from({ length: dniCel }).map((_, i) => (
                             <span key={i} className={`h-1.5 flex-1 rounded-full ${
-                              i < dniGotowe ? 'bg-primary' : 'bg-muted'}`} />
+                              i < dniGotowe ? 'bg-foreground' : 'bg-muted'}`} />
                           ))}
                         </div>
                       ) : (
@@ -369,8 +369,8 @@ export default function TripPlans() {
                       : dniW === 0 ? 'Same miejsca'
                         : dniW >= celW ? 'Plan gotowy' : 'W układaniu';
                     return (
-                      <div key={w.id} className="relative group rounded-2xl border border-border bg-card overflow-hidden
-                                                  shadow-sm hover:shadow-xl hover:border-foreground/30 hover:-translate-y-1 transition-all duration-300 flex flex-col">
+                      <div key={w.id} className="relative group rounded-2xl bg-card shadow-token-md overflow-hidden
+                                                  shadow-sm hover:shadow-token-lg hover:border-foreground/30 transition-all duration-200 flex flex-col">
                       {!w.is_example && (
                         <button onClick={(e) => { e.stopPropagation(); setDoUsuniecia(w); }}
                           aria-label="Usuń wyjazd"
@@ -400,7 +400,7 @@ export default function TripPlans() {
                             </div>
                           ) : zdjeciaW[0] ? (
                             <Zdjecie src={zdjeciaW[0]} gdzie="kafelek" alt=""
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center bg-placeholder-photo text-muted-foreground">
                               <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Tablica</span>
@@ -441,7 +441,7 @@ export default function TripPlans() {
                                 <div className="flex gap-1">
                                   {Array.from({ length: celW }).map((_, i) => (
                                     <span key={i} className={`h-1 flex-1 rounded-full ${
-                                      i < dniW ? 'bg-primary' : 'bg-muted'}`} />
+                                      i < dniW ? 'bg-foreground' : 'bg-muted'}`} />
                                   ))}
                                 </div>
                                 <p className="font-mono text-[10.5px] tabular-nums text-muted-foreground mt-1.5 truncate">
@@ -467,7 +467,7 @@ export default function TripPlans() {
                     onClick={() => navigate('/start')}
                     className="rounded-2xl border-2 border-dashed border-border/80 min-h-[280px]
                                flex flex-col items-center justify-center gap-2.5 text-muted-foreground
-                               hover:border-foreground/30 hover:text-foreground transition-all duration-300 group bg-muted/20"
+                               hover:border-foreground/30 hover:text-foreground transition-all duration-200 group bg-muted/20"
                   >
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground group-hover:scale-110 transition-transform">
                       <Plus className="w-5 h-5" />

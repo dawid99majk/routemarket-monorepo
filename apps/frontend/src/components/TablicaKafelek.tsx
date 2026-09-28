@@ -55,8 +55,8 @@ export default function TablicaKafelek({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-      className={`rounded-2xl border bg-card overflow-hidden transition-all duration-300 ${
-        onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''
+      className={`rounded-2xl border bg-card overflow-hidden transition-all duration-200 ${
+        onClick ? 'cursor-pointer hover:shadow-token-md' : ''
       } ${aktywny ? 'border-foreground shadow-xs' : 'border-border/70 shadow-xs'}`}
     >
       <div className="grid grid-cols-[2fr_1fr] grid-rows-2 gap-0.5 h-[132px]">

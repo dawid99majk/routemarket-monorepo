@@ -57,7 +57,7 @@ export default function OsPreferencji({
             <SliderPrimitive.Range className="absolute h-full bg-transparent" />
             <div
               className={`absolute h-full rounded-full transition-colors ${
-                wlasna ? 'bg-primary' : 'bg-muted-foreground/40'
+                wlasna ? 'bg-foreground' : 'bg-muted-foreground/40'
               }`}
               style={{ left: start, width: szerokosc }}
               aria-hidden

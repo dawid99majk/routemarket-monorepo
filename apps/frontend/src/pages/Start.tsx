@@ -13,6 +13,9 @@ import PlannerHeader from '@/components/PlannerHeader';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { TRIP_PRESETS, EMPTY_AXES } from '@/lib/tripPresets';
 import SEO from '@/components/SEO';
+import AgentDymek from '@/components/AgentDymek';
+import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
+import { formatujGodziny } from '@/lib/godziny';
 import { useTranslation } from 'react-i18next';
 
 type Priority = 'must' | 'nice' | 'rejected';
@@ -234,7 +237,7 @@ export default function Start() {
       return `Zajmie ${formatMinutes(p.visit_minutes)} z ${okno} h dnia — po nim zmieści się już niewiele.`;
     }
     if (p.opening_hours) {
-      return `Godziny otwarcia: ${p.opening_hours}. Sprawdź, czy mieszczą się w Waszym oknie.`;
+      return `Godziny otwarcia: ${formatujGodziny(p.opening_hours)}. Sprawdź, czy mieszczą się w Waszym oknie.`;
     }
     return 'Dopóki jest w „być może”, agent pomija to miejsce przy układaniu planu.';
   };
@@ -363,12 +366,12 @@ export default function Start() {
       <h2 className="font-display font-light text-[26px] leading-tight mt-2.5">{t('start.dokad_tym_razem')}</h2>
 
       <input value={city} onChange={(e) => setCity(e.target.value)} placeholder={t('start.miasto_lub_region')}
-        className="mt-6 w-full rounded-sm bg-primary-foreground/[0.07] border border-primary-foreground/20
+        className="mt-6 w-full rounded-md bg-primary-foreground/[0.07] border border-primary-foreground/20
                    px-3.5 h-11 text-background placeholder:text-primary-foreground/45
                    focus:outline-none focus:border-primary-foreground/60 transition-colors" />
       <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t('start.termin_np_12_14_wrzesnia')}
         onKeyDown={(e) => e.key === 'Enter' && startTrip()}
-        className="mt-3 w-full rounded-sm bg-primary-foreground/[0.07] border border-primary-foreground/20
+        className="mt-3 w-full rounded-md bg-primary-foreground/[0.07] border border-primary-foreground/20
                    px-3.5 h-11 text-background placeholder:text-primary-foreground/45
                    focus:outline-none focus:border-primary-foreground/60 transition-colors" />
 
@@ -389,8 +392,8 @@ export default function Start() {
       </div>
 
       <button onClick={startTrip} disabled={creating}
-        className="mt-7 w-full rounded-sm bg-primary-light text-foreground py-3 text-sm font-medium
-                   hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2">
+        className="mt-7 w-full rounded-full bg-background text-foreground py-3.5 text-sm font-bold
+                   hover:bg-background/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
         {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> {t('start.zak_adam')}</> : <>{t('start.zacznij_planowac')} <ArrowRight className="w-4 h-4" /></>}
       </button>
       <p className="text-[12px] text-primary-foreground/70 mt-3 leading-relaxed">
@@ -426,9 +429,9 @@ export default function Start() {
           <div className="mt-8 max-w-[640px]">{noweWyjazdPanel}</div>
         ) : (
           <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_400px] gap-5 items-stretch">
-            <div className="rounded-md bg-card border border-border p-7 flex flex-col">
+            <div className="rounded-2xl bg-card shadow-token-md p-7 flex flex-col">
               <p className="flex items-center gap-2.5">
-                <span className="w-[7px] h-[7px] rounded-full bg-primary" />
+                <span className="w-[7px] h-[7px] rounded-full bg-foreground" />
                 <span className="font-narrow uppercase tracking-[0.32em] text-[10px] text-muted-foreground">
                   {activePlan ? 'Plan gotowy' : 'Trwa planowanie'}
                 </span>
@@ -466,13 +469,7 @@ export default function Start() {
               )}
 
               {agentNote && (
-                <div className="flex items-start gap-3 mt-5 rounded-md bg-muted px-4 py-3.5">
-                  <span className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground
-                                   border border-border rounded-full px-2.5 py-1 shrink-0 bg-background">
-                    Agent
-                  </span>
-                  <p className="text-[14px] leading-relaxed text-foreground/85 text-pretty">{agentNote}</p>
-                </div>
+                <AgentDymek className="mt-5">{agentNote}</AgentDymek>
               )}
 
               <div className="flex flex-wrap gap-2.5 mt-auto pt-6">
@@ -493,7 +490,7 @@ export default function Start() {
             więc karty prowadzą do szczegółów, a zapisywanie zaczyna się dopiero
             w Odkrywaj — po założeniu wyjazdu przyciskiem obok. */}
         {city.trim().length >= 3 && (
-          <section className="mt-5 rounded-md bg-card border border-border px-7 py-6">
+          <section className="mt-5 rounded-2xl bg-card shadow-token-md px-7 py-6">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <h2 className="font-display text-[18px]">
                 {podglad.length > 0 ? `Klasyki w: ${podglad[0].city ?? city.trim()}` : `Miejsca w: ${city.trim()}`}
@@ -548,7 +545,7 @@ export default function Start() {
         )}
 
         {active && (
-          <section className="mt-5 rounded-md bg-card border border-border">
+          <section className="mt-5 rounded-2xl bg-card shadow-token-md">
             <div className="flex items-start justify-between gap-4 px-7 pt-6 pb-5">
               <div>
                 <h2 className="font-display text-[18px]">{t('start.wymaga_decyzji')}</h2>
@@ -587,8 +584,8 @@ export default function Start() {
                       {decisionNote(p)}
                     </p>
                     <div className="flex gap-2 mt-4">
-                      <Button size="sm" variant="outline" onClick={() => decide(p, 'must')}>{t('start.na_pewno')}</Button>
-                      <Button size="sm" variant="outline" onClick={() => decide(p, 'rejected')}>{t('start.nie_tym_razem')}</Button>
+                      <PrzelacznikDecyzji rozmiar="sm" className="w-full max-w-[300px]" stan="nice"
+                        onDecyzja={(k) => { if (k !== 'nice') decide(p, k); }} />
                     </div>
                   </div>
                 ))}

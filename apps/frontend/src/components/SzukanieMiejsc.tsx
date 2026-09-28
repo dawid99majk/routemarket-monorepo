@@ -65,7 +65,7 @@ export default function SzukanieMiejsc({ miasto, sekundy }: SzukanieMiejscProps)
           zamiast pulsować wszystkim naraz. */}
       <div className="mt-10 [column-gap:20px] columns-1 sm:columns-2 lg:columns-3 xl:columns-4">
         {WYSOKOSCI.map((h, i) => (
-          <div key={i} className="mb-5 break-inside-avoid rounded-md border border-border bg-card overflow-hidden">
+          <div key={i} className="mb-5 break-inside-avoid rounded-2xl bg-card shadow-token-md overflow-hidden">
             <div className="rm-shimmer bg-muted" style={{ height: h, animationDelay: `${i * 160}ms` }} />
             <div className="p-3.5 space-y-2">
               <div className="rm-shimmer h-3.5 rounded bg-muted" style={{ animationDelay: `${i * 160 + 80}ms` }} />

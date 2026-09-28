@@ -124,7 +124,7 @@ export default function PodobneMiejsca({ idKatalogu, pomin, tablica, onOtworz, o
           const foto = (m.photos ?? []).filter(Boolean)[0] as string | undefined;
           const juzDodane = dodane.has(m.id);
           return (
-            <div key={m.id} className="group relative rounded-md border border-border bg-card overflow-hidden">
+            <div key={m.id} className="group relative rounded-md bg-card overflow-hidden shadow-token-sm">
               <button onClick={() => onOtworz(m)} className="block w-full text-left">
                 <div className="aspect-[4/3] bg-placeholder-photo">
                   {foto && (

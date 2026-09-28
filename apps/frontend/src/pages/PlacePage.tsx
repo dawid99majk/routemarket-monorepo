@@ -13,6 +13,9 @@ import i18n from '@/i18n';
 import { useTranslation } from 'react-i18next';
 import { jakoZdjecia } from '@/lib/zBazy';
 import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
+import AgentDymek from '@/components/AgentDymek';
+import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
+import { etykietaRodzaju } from '@/lib/rodzaj';
 import SEO from '@/components/SEO';
 
 interface CatalogPlace {
@@ -219,12 +222,6 @@ export default function PlacePage() {
   );
 
   const board = boards.find((b) => b.id === activeBoard) ?? null;
-  const buckets: [Bucket, string, string][] = [
-    ['must', 'Na pewno', 'bg-primary text-primary-foreground border-primary'],
-    ['nice', 'Być może', 'bg-accent text-accent-foreground border-accent'],
-    ['rejected', 'Nie tym razem', 'bg-clay text-clay-foreground border-clay'],
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       {/* Tytuł karty przeglądarki i opis muszą zmieniać się przy nawigacji.
@@ -261,7 +258,7 @@ export default function PlacePage() {
             )}
 
             <p className="font-narrow uppercase tracking-[0.32em] text-[11px] text-muted-foreground mt-8">
-              {[place.kind || place.category,
+              {[etykietaRodzaju(place.kind) ?? etykietaRodzaju(place.category),
                 [place.city, place.country].filter(Boolean).join(' / ')].filter(Boolean).join(' · ')}
             </p>
             <h1 className="font-display font-light text-[42px] leading-[1.05] tracking-[-0.02em] mt-3">
@@ -345,20 +342,13 @@ export default function PlacePage() {
 
           {/* Kolumna boczna, przyklejona */}
           <aside className="lg:sticky lg:top-[88px] space-y-5">
-            <div className="rounded-md border border-border bg-card p-4">
+            <div className="rounded-2xl bg-card p-5 shadow-token-md">
               <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                 Do tablicy{board ? ` · ${board.destination}` : ''}
               </h2>
-              <div className="mt-3 space-y-2">
-                {buckets.map(([b, label, active]) => (
-                  <button key={b} onClick={() => setBucket(b)}
-                    className={`w-full rounded-sm border py-2 text-sm transition-colors ${
-                      mark === b ? active : 'border-border hover:bg-muted text-foreground/80'
-                    }`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {/* Ta sama pigułka decyzji co w Odkrywaj i na tablicy. */}
+              <PrzelacznikDecyzji rozmiar="lg" className="mt-3" stan={mark}
+                onDecyzja={(k) => setBucket(k as Bucket)} />
               <button onClick={toggleFavorite}
                 className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <Heart className={`w-3.5 h-3.5 ${favorite ? 'fill-foreground text-foreground' : ''}`} />
@@ -394,10 +384,10 @@ export default function PlacePage() {
               )}
             </div>
 
-            <div className="rounded-md bg-muted border border-border p-4">
+            <div className="rounded-2xl bg-card p-5 shadow-token-md">
               <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">{t('miejsce.agent_radzi')}</h2>
               {agentTip ? (
-                <p className="text-sm leading-relaxed mt-2.5 text-foreground/85">{agentTip}</p>
+                <AgentDymek maly className="mt-3">{agentTip}</AgentDymek>
               ) : (
                 <button onClick={fetchTip} disabled={tipLoading}
                   className="mt-2.5 text-sm text-foreground underline underline-offset-2 hover:no-underline disabled:opacity-60 flex items-center gap-1.5">
@@ -416,7 +406,7 @@ export default function PlacePage() {
             </div>
 
             {nearby.length > 0 && (
-              <div className="rounded-md border border-border bg-card p-4">
+              <div className="rounded-2xl bg-card p-5 shadow-token-md">
                 <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
                   W okolicy · do 2 km
                 </h2>
@@ -430,7 +420,7 @@ export default function PlacePage() {
                       <div className="min-w-0">
                         <div className="text-[13px] font-medium truncate group-hover:underline">{n.name}</div>
                         <div className="font-mono text-[11px] text-muted-foreground tabular-nums">
-                          {formatDuration(n.visit_minutes)} · {kmBetween(place, n).toFixed(1)} km
+                          {formatDuration(n.visit_minutes)} · {kmBetween(place, n).toFixed(1).replace('.', ',')} km
                         </div>
                       </div>
                     </button>

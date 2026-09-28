@@ -127,7 +127,7 @@ export default function RoutePreferences() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <SlidersHorizontal className="w-5 h-5 text-primary" />
+          <SlidersHorizontal className="w-5 h-5 text-muted-foreground" />
           Preferencje tras
         </CardTitle>
         <CardDescription>

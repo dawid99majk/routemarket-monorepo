@@ -250,8 +250,7 @@
   .eyebrow, .h-condensed {
     font-family: 'Figtree', sans-serif;
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0;
     font-size: 0.6875rem;
     color: hsl(var(--muted-foreground));
   }
@@ -335,11 +334,23 @@
   .font-display-italic { font-family: 'Bricolage Grotesque', 'Figtree', sans-serif; }
   .font-narrow { font-family: 'Figtree', sans-serif; }
   .font-mono { font-family: 'Figtree', sans-serif; font-variant-numeric: tabular-nums; }
+  /* Prawdziwy kod (fragment pliku GPX) zostaje w kroju o stałej szerokości. */
+  pre.font-mono, code.font-mono, pre, code, kbd, samp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   /* Tytuły były pisane cienkim szeryfem (font-light). W tym kroju tytuł jest
      zawsze wyraźny; dwie klasy razem przebijają pojedynczą klasę wagi. */
   .font-display.font-light, .font-display.font-normal { font-weight: 700; }
-  /* Etykiety wersalikami: mniejszy rozstrzał niż w kroju wąskim, pełna waga. */
-  .font-narrow.uppercase { letter-spacing: 0.06em; font-weight: 700; }
+  /* Pocztówka nie używa wersalików. Etykiety sekcji to zdanie małymi literami,
+     pogrubione, 12 px („Atrakcje · 4”, „Agent zauważa”). Teksty w kodzie są
+     pisane normalnie, a wersaliki dokładała tylko klasa — więc jedna reguła
+     przestawia wszystkie ~70 etykiet naraz, łącznie z tymi z tłumaczeń. */
+  .font-narrow.uppercase,
+  .uppercase[class*="tracking-"] {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1.4;
+  }
 
   /* Soft horizontal divider — editorial accent */
   .divider-soft {

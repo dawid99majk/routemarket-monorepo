@@ -15,7 +15,7 @@ import SEO from '@/components/SEO';
 
 const KUBELKI = [
   { id: 'must', label: 'Na pewno', kolor: 'border-primary' },
-  { id: 'nice', label: 'Być może', kolor: 'border-accent' },
+  { id: 'nice', label: 'Być może', kolor: 'border-accent-strong' },
 ] as const;
 
 /**
@@ -257,11 +257,11 @@ export default function TablicaPubliczna() {
               <>
                 <button onClick={przelaczPolubienie}
                   aria-pressed={polubiona}
-                  className={`h-10 inline-flex items-center gap-2 rounded-full border px-4 text-sm
+                  className={`h-10 inline-flex items-center gap-2 rounded-full px-4 text-sm font-bold
                               transition-colors ${polubiona
-                                ? 'border-accent bg-accent/10 text-foreground'
-                                : 'border-border bg-card hover:bg-muted'}`}>
-                  <Heart className={`w-4 h-4 ${polubiona ? 'fill-foreground' : ''}`} />
+                                ? 'bg-foreground text-background'
+                                : 'bg-card shadow-token-sm hover:bg-secondary'}`}>
+                  <Heart className={`w-4 h-4 ${polubiona ? 'fill-current' : ''}`} />
                   {tablica.like_count ?? 0}
                 </button>
                 {jaId === tablica.user_id ? (
@@ -296,8 +296,8 @@ export default function TablicaPubliczna() {
               </>
             ) : (
               <>
-                <span className="h-10 inline-flex items-center gap-2 rounded-full border border-border
-                                 bg-muted/40 px-4 text-sm text-muted-foreground font-mono tabular-nums">
+                <span className="h-10 inline-flex items-center gap-2 rounded-full bg-card shadow-token-sm
+                                 px-4 text-sm font-bold text-muted-foreground tabular-nums">
                   <Heart className="w-4 h-4" /> {tablica.like_count ?? 0}
                 </span>
                 <Button onClick={() => navigate(`/auth?redirect=/tablica/${id}`)}
@@ -309,72 +309,62 @@ export default function TablicaPubliczna() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mt-8">
+        <div className="grid gap-4 md:grid-cols-3 mt-8 items-start">
           {KUBELKI.map((k) => {
             const swoje = miejsca.filter((m) => m.priority === k.id);
             if (swoje.length === 0) return null;
             return (
-              <div key={k.id} className="rounded-2xl border border-border/70 bg-card shadow-xs overflow-hidden">
-                <div className={`flex items-center justify-between px-4 py-3 border-b-2 ${k.kolor} bg-muted/20`}>
-                  <span className={`font-narrow uppercase tracking-[0.18em] text-[10.5px] font-semibold ${
-                    k.id === 'must' ? 'text-primary' : 'text-foreground'}`}>
-                    {k.label}
-                  </span>
-                  <span className="font-mono text-[12px] tabular-nums text-muted-foreground font-medium">
+              <section key={k.id} className="rounded-2xl bg-muted p-3.5 flex flex-col gap-2">
+                <div className="flex items-center gap-2 px-1 pb-1">
+                  <span aria-hidden className={`w-2.5 h-2.5 rounded-full ${
+                    k.id === 'must' ? 'bg-primary' : k.id === 'nice' ? 'bg-accent-strong' : 'bg-clay'}`} />
+                  <h2 className="font-display text-[18px] font-bold">{k.label}</h2>
+                  <span className="flex-1" />
+                  <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold tabular-nums ${
+                    k.id === 'must' ? 'bg-primary text-primary-foreground'
+                      : k.id === 'nice' ? 'bg-accent text-accent-foreground' : 'bg-clay text-foreground'}`}>
                     {swoje.length}
                   </span>
                 </div>
-                <div className="divide-y divide-border/60">
-                  {swoje.map((m) => (
-                    <div key={m.id} className="p-3.5 flex gap-3.5 hover:bg-muted/15 transition-colors group">
-                      <div className="w-[84px] h-[72px] sm:w-[96px] sm:h-[76px] rounded-xl overflow-hidden bg-muted shrink-0 border border-border/40 shadow-xs">
-                        {m.image_url
-                          ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                          : <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/60 gap-1">
-                              <MapPin className="w-4 h-4 text-muted-foreground" />
-                              <span className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground">miejsce</span>
-                            </div>}
-                      </div>
-                      <div className="min-w-0 flex-1 flex flex-col justify-center">
-                        <div className="font-display text-[15px] font-medium leading-snug text-foreground">{m.name}</div>
-                        {m.description && (
-                          <div className="text-[12px] text-foreground/75 line-clamp-2 mt-1 leading-relaxed">
-                            {m.description}
-                          </div>
-                        )}
-                      </div>
-                      <div className="shrink-0 self-start mt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => glosuj(m.id)}
-                          aria-label="Głosuj na to miejsce"
-                          title="Głosuj na to miejsce"
-                          className={`inline-flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-full border shadow-xs transition-all ${
-                            mojeGlosy.has(m.id)
-                              ? 'border-accent bg-accent/15 text-foreground font-medium scale-105'
-                              : 'border-border/80 bg-background text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:bg-muted/40'
-                          }`}
-                        >
-                          <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(m.id) ? 'fill-foreground' : ''}`} />
-                          {(m.vote_count ?? 0) > 0 ? (
-                            <span className="font-mono tabular-nums font-medium">{m.vote_count}</span>
-                          ) : null}
-                        </button>
-                      </div>
+                {swoje.map((m) => (
+                  <div key={m.id} className="rounded-md bg-card p-2 flex gap-3 items-center shadow-token-xs">
+                    <div className="w-14 h-14 rounded-[12px] overflow-hidden bg-placeholder-photo shrink-0 flex items-center justify-center">
+                      {m.image_url
+                        ? <Zdjecie src={m.image_url} gdzie="kafelek" alt="" className="w-full h-full object-cover" />
+                        : <MapPin className="w-5 h-5 text-muted-foreground" />}
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[15px] font-semibold leading-snug">{m.name}</div>
+                      {m.description && (
+                        <div className="text-[12.5px] text-muted-foreground line-clamp-1 mt-0.5">{m.description}</div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => glosuj(m.id)}
+                      aria-label="Głosuj na to miejsce"
+                      title="Głosuj na to miejsce"
+                      className={`shrink-0 self-center inline-flex items-center gap-1 h-9 px-2.5 rounded-full text-[12px] transition-colors ${
+                        mojeGlosy.has(m.id)
+                          ? 'bg-foreground text-background font-bold'
+                          : 'bg-secondary text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Heart className={`w-3.5 h-3.5 ${mojeGlosy.has(m.id) ? 'fill-current' : ''}`} />
+                      {(m.vote_count ?? 0) > 0 ? (
+                        <span className="tabular-nums font-bold">{m.vote_count}</span>
+                      ) : null}
+                    </button>
+                  </div>
+                ))}
+              </section>
             );
           })}
 
           {naMapie.length > 0 && (
-            <div className="rounded-2xl border border-border/70 bg-card overflow-hidden shadow-xs
+            <div className="rounded-2xl bg-card overflow-hidden shadow-token-md
                             flex flex-col self-start md:sticky md:top-[88px]">
-              <div className="px-3 py-2.5 border-b border-border font-narrow uppercase
-                              tracking-[0.18em] text-[10px] text-muted-foreground">
-                Rozrzut miejsc
-              </div>
+              <h2 className="px-4 py-3 font-display text-[18px] font-bold">Na mapie</h2>
               <DiscoverMap places={naMapie} doKadru={naMapie} className="h-[420px]" />
             </div>
           )}

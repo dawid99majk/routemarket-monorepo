@@ -281,7 +281,7 @@ export default function Zapisane() {
         )}
 
         {propozycjeTablic.length > 0 && (
-          <section className="mt-8 rounded-md border border-border bg-muted/40 px-5 py-4">
+          <section className="mt-8 rounded-2xl bg-card shadow-token-md px-5 py-4">
             <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
               Z tego zrobi się wyjazd
             </p>
@@ -318,7 +318,7 @@ export default function Zapisane() {
             <Loader2 className="w-4 h-4 animate-spin" /> Wczytuję…
           </p>
         ) : places.length === 0 ? (
-          <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
+          <div className="rounded-2xl bg-card shadow-token-md px-6 py-16 text-center mt-8">
             <Heart className="w-9 h-9 text-muted-foreground/40 mx-auto" />
             <h2 className="font-display font-light text-[24px] mt-4">{t('zapisane.nic_tu_jeszcze_nie_ma')}</h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-[46ch] mx-auto text-pretty">
@@ -330,7 +330,7 @@ export default function Zapisane() {
             </Button>
           </div>
         ) : widoczne.length === 0 ? (
-          <div className="rounded-md border border-border bg-card px-6 py-16 text-center mt-8">
+          <div className="rounded-2xl bg-card shadow-token-md px-6 py-16 text-center mt-8">
             <p className="text-sm text-muted-foreground">
               Ta kolekcja jest pusta. Odłóż tu coś przyciskiem pod kartką.
             </p>
@@ -338,10 +338,10 @@ export default function Zapisane() {
         ) : (
           <div className="mt-6 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,248px),1fr))]">
             {widoczne.map((p) => (
-              <div key={p.id} className="rounded-md overflow-hidden border border-border bg-card
-                                         hover:shadow-token-md transition-shadow flex flex-col">
+              <div key={p.id} className="rounded-2xl overflow-hidden bg-card shadow-token-md
+                                         hover:shadow-token-lg transition-shadow flex flex-col">
                 <button onClick={() => navigate(`/miejsce/${p.slug}`)} className="text-left">
-                  <div className="h-40 bg-muted relative">
+                  <div className="h-40 bg-placeholder-photo relative">
                     {p.photos?.[0] ? (
                       <Zdjecie src={p.photos[0]} gdzie="kafelek" alt={p.name} className="w-full h-full object-cover" />
                     ) : (
@@ -351,13 +351,13 @@ export default function Zapisane() {
                     )}
                     <button onClick={(e) => { e.stopPropagation(); usun(p.id); }}
                       aria-label={t('zapisane.usun_z_zapisanych')}
-                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-ink/40 hover:bg-ink/60
-                                 backdrop-blur flex items-center justify-center">
+                      className="absolute top-2 right-2 w-9 h-9 rounded-full bg-card/90 hover:bg-card
+                                 shadow-token-sm flex items-center justify-center">
                       <Heart className="w-4 h-4 fill-foreground text-foreground" />
                     </button>
                   </div>
                   <div className="p-3">
-                    <div className="font-medium text-sm leading-snug line-clamp-2">{p.name}</div>
+                    <div className="font-display text-[17px] font-bold leading-snug line-clamp-2">{p.name}</div>
                     {(p.city || p.country) && (
                       <div className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">
                         {[p.city, p.country].filter(Boolean).join(' / ')}

@@ -150,7 +150,7 @@ export default function Tablice() {
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8"
             aria-busy="true" aria-label="Wczytuję tablice">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="rounded-2xl border border-border/70 bg-card overflow-hidden shadow-xs">
+              <div key={i} className="rounded-2xl bg-card overflow-hidden shadow-token-md">
                 <Skeleton className="w-full aspect-[16/10] rounded-none" />
                 <div className="p-4 sm:p-5 space-y-3">
                   <Skeleton className="h-5 w-4/5 rounded-md" />
@@ -163,7 +163,7 @@ export default function Tablice() {
             ))}
           </div>
         ) : widoczne.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-card px-6 py-16 text-center mt-8 shadow-xs">
+          <div className="rounded-2xl bg-card shadow-token-md px-6 py-16 text-center mt-8">
             <h2 className="font-display font-light text-[24px]">
               {szukaj ? t('galeria.brak_wynikow') : t('galeria.brak_tablic')}
             </h2>
@@ -179,20 +179,20 @@ export default function Tablice() {
                 <button
                   key={tab.id}
                   onClick={() => navigate(`/tablica/${tab.id}`)}
-                  className="group text-left rounded-2xl bg-card border border-border overflow-hidden shadow-sm
-                             hover:shadow-xl hover:border-foreground/30 hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                  className="group text-left rounded-2xl bg-card overflow-hidden shadow-token-md
+                             hover:shadow-token-lg transition-shadow duration-200 flex flex-col"
                 >
-                  <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
+                  <div className="relative w-full aspect-[16/10] bg-placeholder-photo overflow-hidden">
                     {tab.photos?.[0] ? (
                       <Zdjecie
                         src={tab.photos[0]}
                         gdzie="kafelek"
                         alt={tab.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-placeholder-photo text-muted-foreground">
-                        <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">RouteMarket</span>
+                        <span className="font-display text-[17px] font-bold text-muted-foreground">{tab.destination || 'routemarket'}</span>
                       </div>
                     )}
 
