@@ -938,7 +938,7 @@ export default function Discover() {
           przez co ta sama zakładka robiła co innego zależnie od tego, skąd się
           w nią kliknęło. */}
       <PlannerHeader
-        context={board ? [board.destination, board.days ? `${board.days} dni` : null].filter(Boolean).join(' · ') : null}
+        context={board ? [board.destination, board.days ? `${board.days} ${odmien(board.days, 'dzień', 'dni', 'dni')}` : null].filter(Boolean).join(' · ') : null}
         initials={initials}
       />
 

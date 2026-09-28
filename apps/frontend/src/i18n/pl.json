@@ -121,7 +121,7 @@
         "pytanie": "Co z aplikacją na telefon?"
       },
       "poza_europa": {
-        "odpowiedz": "Tak. Planer jest globalny, interfejs dostępny w kilku językach, a odległości i czasy liczone lokalnym transportem.",
+        "odpowiedz": "Tak. Katalog miejsc powstaje z OpenStreetMap i Wikipedii dla każdego miasta, które tam jest, a plany dostajesz w sześciu językach. Przejścia między punktami liczymy pieszo — przy dłuższym odcinku plan zaznacza, że komunikacją będzie szybciej.",
         "pytanie": "Czy działa poza Europą?"
       },
       "przeciazenie": {
@@ -129,7 +129,7 @@
         "pytanie": "Czy agent nie wciśnie mi za dużo na jeden dzień?"
       },
       "zrodla": {
-        "odpowiedz": "Z otwartych baz danych o atrakcjach, opinii podróżników i tablic publikowanych przez użytkowników. Godziny otwarcia i czas zwiedzania są weryfikowane przed pokazaniem w feedzie.",
+        "odpowiedz": "Z OpenStreetMap i Wikipedii oraz z tablic publikowanych przez użytkowników. Godziny otwarcia pochodzą z OpenStreetMap i na nich planer sprawdza, czy zdążysz wejść przed zamknięciem. Nie każde miejsce ma je wpisane — takie warto sprawdzić przed wyjazdem.",
         "pytanie": "Skąd biorą się miejsca?"
       }
     },
@@ -138,7 +138,7 @@
     "hero": {
       "opis": "Wyszukujesz atrakcje i wrzucasz je na tablicę wyjazdu — „na pewno\", „być może\", „nie\". Agent układa z nich plan na każdy dzień, z realnymi godzinami i czasem dojazdu, i oddaje gotowy plik GPX do zegarka albo nawigacji.",
       "tytul": "Zbierz miejsca. Resztę ułoży agent.",
-      "zapewnienia": "Bez karty · plan gotowy w kilka minut · działa też offline w terenie"
+      "zapewnienia": "Bez karty · plan gotowy w kilka minut · plik GPX do zegarka i nawigacji"
     },
     "jade": "Jadę",
     "kanal": {
@@ -147,8 +147,8 @@
         "tytul": "Twoja aplikacja mapowa"
       },
       "nawigacja": {
-        "opis": "Wbudowane prowadzenie od punktu do punktu, z godzinami z planu. Mapa pobiera się przed wyjazdem i działa bez zasięgu.",
-        "tytul": "Nawigacja Routemarket"
+        "opis": "Plan dnia z godzinami i mapą otwierasz w przeglądarce telefonu. Tam, gdzie nie ma zasięgu, poprowadzi Cię plik GPX w aplikacji z mapą offline — własne aplikacje iOS i Android są w przygotowaniu.",
+        "tytul": "Plan w telefonie"
       },
       "zegarek": {
         "opis": "Garmin, Suunto, Coros, Wahoo — standardowy GPX z punktami trasy i śladem.",
@@ -188,12 +188,20 @@
       "tablice": "Tablice"
     },
     "przegladaj": "Przeglądaj wszystkie",
-    "przyklad_nadtytul": "Prawdziwy przykład",
+    "przyklad_nadtytul": "Przykład planu",
     "realizm": "Realizm",
     "stopka_kontakt": "Kontakt",
     "stopka_prywatnosc": "Prywatność",
     "szukaj_tablicy": "Szukaj tablicy po mieście",
-    "zakladam": "Zakładam…"
+    "zakladam": "Zakładam…",
+    "ile_miejsc_one": "{{count}} miejsce",
+    "ile_miejsc_few": "{{count}} miejsca",
+    "ile_miejsc_many": "{{count}} miejsc",
+    "ile_miejsc_other": "{{count}} miejsca",
+    "miejsc_z_osm_one": "{{count}} miejsce z OpenStreetMap",
+    "miejsc_z_osm_few": "{{count}} miejsca z OpenStreetMap",
+    "miejsc_z_osm_many": "{{count}} miejsc z OpenStreetMap",
+    "miejsc_z_osm_other": "{{count}} miejsca z OpenStreetMap"
   },
   "legal": {
     "all_rights_reserved": "Wszelkie prawa zastrzeżone.",

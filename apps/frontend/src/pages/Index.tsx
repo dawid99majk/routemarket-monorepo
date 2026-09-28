@@ -15,6 +15,7 @@ import contour from '@/assets/patterns/contour.svg';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
+import { odmien } from '@/lib/odmiana';
 import AgentDymek from '@/components/AgentDymek';
 import { useTranslation } from 'react-i18next';
 
@@ -155,20 +156,24 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from('trip_projects')
-        .select('id, name, destination, author_display, copy_count, like_count')
-        .eq('is_public', true).limit(12);
+        .select('id, name, destination, author_display, copy_count, like_count, is_example')
+        .eq('is_public', true).limit(60);
       if (!data?.length) return setTablice([]);
       const { data: miejsca } = await supabase.from('trip_project_places')
         .select('project_id, image_url').in('project_id', data.map((b: any) => b.id));
       const popularnosc = (b: any) => (b.like_count ?? 0) + (b.copy_count ?? 0) * 2;
-      setTablice([...data].sort((a: any, b: any) => popularnosc(b) - popularnosc(a)).map((b: any) => {
+      setTablice(data.map((b: any) => {
         const swoje = (miejsca ?? []).filter((m: any) => m.project_id === b.id);
         return {
           ...b,
+          author_display: b.is_example ? 'Przykład RouteMarket' : b.author_display,
           place_count: swoje.length,
           photos: swoje.filter((m: any) => m.image_url).slice(0, 3).map((m: any) => m.image_url),
         };
-      }));
+      })
+        .filter((b: any) => b.place_count >= 5 && b.photos.length > 0)
+        .sort((a: any, b: any) => popularnosc(b) - popularnosc(a) || b.place_count - a.place_count)
+        .slice(0, 12));
     })();
   }, []);
 
@@ -396,7 +401,7 @@ export default function Index() {
                               px-[15px] py-[7px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
                 <span className="text-[12px] text-muted-foreground">
-                  {ileWKatalogu.toLocaleString('pl-PL')} miejsc z OpenStreetMap
+                  {t('landing.miejsc_z_osm', { count: ileWKatalogu })}
                 </span>
               </div>
             )}
@@ -491,8 +496,8 @@ export default function Index() {
             Przylądek Rodonit sam wypadł z planu — godzina drogi w jedną stronę nie mieści się
             w takim popołudniu. Agent to napisał wprost, zamiast wcisnąć go na siłę.
           </p>
-          <Button variant="outline" className="mt-7" onClick={() => navigate(user ? '/plany?widok=plan' : '/auth')}>
-            Zobacz cały plan <ArrowUpRight className="w-4 h-4 ml-1.5" />
+          <Button variant="outline" className="mt-7" onClick={() => navigate('/tablice')}>
+            Zobacz gotowe tablice <ArrowUpRight className="w-4 h-4 ml-1.5" />
           </Button>
         </div>
 
@@ -617,7 +622,7 @@ export default function Index() {
                     </div>
                     <div className="text-[15px] leading-[1.3] font-medium mt-3 mx-0.5 truncate">{tb.name}</div>
                     <div className="font-mono text-[11px] leading-[1.3] text-muted-foreground mt-1.5 mx-0.5 truncate">
-                      {[`${tb.place_count} miejsc`, tb.author_display || 'Podróżnik'].join(' · ')}
+                      {[t('landing.ile_miejsc', { count: tb.place_count }), tb.author_display || 'Podróżnik'].join(' · ')}
                     </div>
                   </button>
                 );
@@ -634,7 +639,7 @@ export default function Index() {
                 <div key={t.id} className="w-[290px] shrink-0 snap-start">
                   <TablicaKafelek
                     nazwa={t.name}
-                    meta={[t.destination, `${t.place_count} miejsc`].filter(Boolean).join(' · ')}
+                    meta={[t.destination, `${t.place_count} ${odmien(t.place_count, 'miejsce', 'miejsca', 'miejsc')}`].filter(Boolean).join(' · ')}
                     zdjecia={t.photos ?? []}
                     autor={t.author_display || 'Podróżnik'}
                     odznaka={

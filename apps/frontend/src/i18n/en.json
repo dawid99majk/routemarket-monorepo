@@ -121,7 +121,7 @@
         "pytanie": "What about the phone app?"
       },
       "poza_europa": {
-        "odpowiedz": "Yes. The planner is global, the interface is available in several languages, and distances and times are calculated using local transport.",
+        "odpowiedz": "Yes. The place catalogue is built from OpenStreetMap and Wikipedia for any city they cover, and plans come in six languages. Transfers between stops are calculated on foot — on a longer stretch the plan notes that public transport will be faster.",
         "pytanie": "Does it work outside Europe?"
       },
       "przeciazenie": {
@@ -129,7 +129,7 @@
         "pytanie": "Will the agent not cram too much into one day?"
       },
       "zrodla": {
-        "odpowiedz": "From open databases of attractions, traveler reviews, and boards published by users. Opening hours and visiting times are verified before being shown in the feed.",
+        "odpowiedz": "From OpenStreetMap and Wikipedia, and from boards published by users. Opening hours come from OpenStreetMap, and the planner uses them to check that you get in before closing. Not every place has them listed — check those before you go.",
         "pytanie": "Where do the places come from?"
       }
     },
@@ -138,7 +138,7 @@
     "hero": {
       "opis": "Search for attractions and add them to your trip board — \"definitely\", \"maybe\", \"no\". The agent creates a daily plan with realistic times and travel durations, and provides a ready-to-use GPX file for your watch or navigation device.",
       "tytul": "Collect places. The agent will arrange the rest.",
-      "zapewnienia": "No card required · plan ready in minutes · also works offline in the field"
+      "zapewnienia": "No card required · plan ready in minutes · GPX file for your watch and navigation"
     },
     "jade": "I'm going",
     "kanal": {
@@ -147,8 +147,8 @@
         "tytul": "Your map app"
       },
       "nawigacja": {
-        "opis": "Built-in point-to-point guidance, with times from the plan. The map downloads before departure and works offline.",
-        "tytul": "Routemarket navigation"
+        "opis": "Open the day plan with times and a map in your phone browser. Where there is no signal, the GPX file guides you in an app with offline maps — our own iOS and Android apps are in preparation.",
+        "tytul": "The plan on your phone"
       },
       "zegarek": {
         "opis": "Garmin, Suunto, Coros, Wahoo – standard GPX with waypoints and track.",
@@ -188,12 +188,16 @@
       "tablice": "Boards"
     },
     "przegladaj": "Browse all",
-    "przyklad_nadtytul": "Real example",
+    "przyklad_nadtytul": "Example plan",
     "realizm": "Realism",
     "stopka_kontakt": "Contact",
     "stopka_prywatnosc": "Privacy",
     "szukaj_tablicy": "Search board by city",
-    "zakladam": "I assume..."
+    "zakladam": "I assume...",
+    "ile_miejsc_one": "{{count}} place",
+    "ile_miejsc_other": "{{count}} places",
+    "miejsc_z_osm_one": "{{count}} place from OpenStreetMap",
+    "miejsc_z_osm_other": "{{count}} places from OpenStreetMap"
   },
   "legal": {
     "all_rights_reserved": "All rights reserved.",

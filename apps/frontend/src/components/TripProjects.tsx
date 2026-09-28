@@ -207,7 +207,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
       ? (TRIP_PRESETS.find((p) => p.id === active.trip_type)?.label ?? active.trip_type).toLowerCase()
       : null;
     onContextChange(active
-      ? [active.destination, active.days ? `${active.days} dni` : null, charakter]
+      ? [active.destination, active.days ? `${active.days} ${odmien(active.days, 'dzień', 'dni', 'dni')}` : null, charakter]
           .filter(Boolean).join(' · ')
       : null);
   }, [active?.id, active?.destination, active?.days, active?.trip_type, onContextChange]);
@@ -526,7 +526,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         setWyluskane(d.places);
         setZLinku(null);
         if (d.places.length === 0) toast.info(t('tablica.w_tym_obszarze_nic_nie'));
-        else toast.success(`Znalazłem ${d.places.length} miejsc w tym obszarze`);
+        else toast.success(`Znalazłem ${d.places.length} ${odmien(d.places.length, 'miejsce', 'miejsca', 'miejsc')} w tym obszarze`);
       } else {
         setZLinku(d.place);
       }
@@ -1749,7 +1749,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       {active.name}
                     </SheetTitle>
                     <SheetDescription className="text-xs font-mono text-muted-foreground mt-1">
-                      {[active.destination, active.days ? `${active.days} dni` : null, active.trip_type ? (TRIP_PRESETS.find((p) => p.id === active.trip_type)?.label || active.trip_type) : null].filter(Boolean).join(' · ')}
+                      {[active.destination, active.days ? `${active.days} ${odmien(active.days, 'dzień', 'dni', 'dni')}` : null, active.trip_type ? (TRIP_PRESETS.find((p) => p.id === active.trip_type)?.label || active.trip_type) : null].filter(Boolean).join(' · ')}
                     </SheetDescription>
                   </div>
 

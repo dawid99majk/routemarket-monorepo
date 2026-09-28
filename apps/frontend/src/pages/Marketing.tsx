@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import PlannerHeader from '@/components/PlannerHeader';
+import { odmien } from '@/lib/odmiana';
 
 /**
  * Warsztat materiałów promocyjnych.
@@ -204,8 +205,8 @@ export default function Marketing() {
     // Metryka
     const dane = [
       aktywna.destination,
-      `${fakty?.ileMiejsc ?? '—'} miejsc`,
-      aktywna.days ? `${aktywna.days} dni` : null,
+      fakty ? `${fakty.ileMiejsc} ${odmien(fakty.ileMiejsc, 'miejsce', 'miejsca', 'miejsc')}` : '— miejsc',
+      aktywna.days ? `${aktywna.days} ${odmien(aktywna.days, 'dzień', 'dni', 'dni')}` : null,
     ].filter(Boolean).join('  ·  ');
     const sredni = Math.round(f.w * 0.024);
     ctx.font = `400 ${sredni}px "JetBrains Mono", ui-monospace, monospace`;

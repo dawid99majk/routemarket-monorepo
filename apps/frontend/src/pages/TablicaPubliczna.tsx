@@ -12,6 +12,7 @@ import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { useTranslation } from 'react-i18next';
 import SEO from '@/components/SEO';
+import { odmien } from '@/lib/odmiana';
 
 const KUBELKI = [
   { id: 'must', label: 'Na pewno', kolor: 'border-primary' },
@@ -242,9 +243,9 @@ export default function TablicaPubliczna() {
             </h1>
             <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-2">
               {[tablica.destination,
-                tablica.days ? `${tablica.days} dni` : null,
+                tablica.days ? `${tablica.days} ${odmien(tablica.days, 'dzień', 'dni', 'dni')}` : null,
                 tablica.start_date ? zakresDat(tablica.start_date, tablica.end_date) : null,
-                `${miejsca.length} miejsc`,
+                `${miejsca.length} ${odmien(miejsca.length, 'miejsce', 'miejsca', 'miejsc')}`,
               ].filter(Boolean).join(' · ')}
             </p>
           </div>

@@ -9,6 +9,7 @@ import PlannerHeader from '@/components/PlannerHeader';
 import SEO from '@/components/SEO';
 import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { useTranslation } from 'react-i18next';
+import { odmien } from '@/lib/odmiana';
 
 interface Publiczna {
   id: string; name: string; destination: string | null; days: number | null;
@@ -243,7 +244,7 @@ export default function Tablice() {
                         </span>
                       )}
                       <span className="font-mono text-[11.5px] tabular-nums text-muted-foreground shrink-0 font-medium">
-                        {tab.place_count} {tab.place_count === 1 ? 'miejsce' : tab.place_count < 5 ? 'miejsca' : 'miejsc'}
+                        {tab.place_count} {odmien(tab.place_count, 'miejsce', 'miejsca', 'miejsc')}
                       </span>
                     </div>
                   </div>

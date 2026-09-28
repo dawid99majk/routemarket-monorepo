@@ -452,7 +452,7 @@ export default function TripPlans() {
                                   {dniW === 0
                                     ? 'Plan jeszcze nie ułożony'
                                     : dniW >= celW
-                                      ? `Plan gotowy (${celW} dni)`
+                                      ? `Plan gotowy (${celW} ${odmiana(celW, 'dzień', 'dni', 'dni')})`
                                       : `Plan: dzień ${dniW} z ${celW}`}
                                 </p>
                               </>

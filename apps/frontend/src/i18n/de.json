@@ -121,7 +121,7 @@
         "pytanie": "Was ist mit der Handy-App?"
       },
       "poza_europa": {
-        "odpowiedz": "Ja. Der Planer ist global, die Benutzeroberfläche ist in mehreren Sprachen verfügbar und Entfernungen und Zeiten werden mit lokalen Verkehrsmitteln berechnet.",
+        "odpowiedz": "Ja. Der Ortskatalog entsteht aus OpenStreetMap und Wikipedia für jede Stadt, die dort erfasst ist, und Pläne gibt es in sechs Sprachen. Wege zwischen den Punkten rechnen wir zu Fuß — bei längeren Strecken vermerkt der Plan, dass öffentliche Verkehrsmittel schneller sind.",
         "pytanie": "Funktioniert es auch außerhalb Europas?"
       },
       "przeciazenie": {
@@ -129,7 +129,7 @@
         "pytanie": "Wird der Agent mir nicht zu viel für einen Tag aufdrängen?"
       },
       "zrodla": {
-        "odpowiedz": "Aus offenen Datenbanken mit Attraktionen, Reisebewertungen und von Nutzern veröffentlichten Boards. Öffnungszeiten und Besichtigungsdauer werden vor der Anzeige im Feed überprüft.",
+        "odpowiedz": "Aus OpenStreetMap und Wikipedia sowie aus Boards, die Nutzer veröffentlichen. Öffnungszeiten stammen aus OpenStreetMap, und daran prüft der Planer, ob du vor Schließung hineinkommst. Nicht jeder Ort hat sie eingetragen — diese prüfst du am besten vor der Reise.",
         "pytanie": "Woher kommen die Orte?"
       }
     },
@@ -138,7 +138,7 @@
     "hero": {
       "opis": "Sie suchen Attraktionen und fügen sie dem Reiseplan hinzu – „sicher“, „vielleicht“, „nein“. Der Agent erstellt daraus einen Tagesplan mit realen Zeiten und Fahrtzeiten und liefert eine fertige GPX-Datei für Ihre Uhr oder Navigation.",
       "tytul": "Orte sammeln. Den Rest erledigt der Agent.",
-      "zapewnienia": "Keine Karte · Plan in wenigen Minuten fertig · funktioniert auch offline im Gelände"
+      "zapewnienia": "Keine Karte nötig · Plan in wenigen Minuten · GPX-Datei für Uhr und Navi"
     },
     "jade": "Ich fahre",
     "kanal": {
@@ -147,8 +147,8 @@
         "tytul": "Ihre Karten-App"
       },
       "nawigacja": {
-        "opis": "Integrierte Punkt-zu-Punkt-Navigation mit Zeiten aus dem Plan. Die Karte wird vor der Reise heruntergeladen und funktioniert ohne Empfang.",
-        "tytul": "Routemarket Navigation"
+        "opis": "Den Tagesplan mit Uhrzeiten und Karte öffnest du im Browser deines Handys. Ohne Empfang führt dich die GPX-Datei in einer App mit Offline-Karten — eigene Apps für iOS und Android sind in Vorbereitung.",
+        "tytul": "Der Plan auf dem Handy"
       },
       "zegarek": {
         "opis": "Garmin, Suunto, Coros, Wahoo – Standard-GPX mit Wegpunkten und Track.",
@@ -188,12 +188,16 @@
       "tablice": "Boards"
     },
     "przegladaj": "Alle durchsuchen",
-    "przyklad_nadtytul": "Echtes Beispiel",
+    "przyklad_nadtytul": "Beispielplan",
     "realizm": "Realismus",
     "stopka_kontakt": "Kontakt",
     "stopka_prywatnosc": "Datenschutz",
     "szukaj_tablicy": "Suche Tafel nach Stadt",
-    "zakladam": "Ich nehme an…"
+    "zakladam": "Ich nehme an…",
+    "ile_miejsc_one": "{{count}} Ort",
+    "ile_miejsc_other": "{{count}} Orte",
+    "miejsc_z_osm_one": "{{count}} Ort aus OpenStreetMap",
+    "miejsc_z_osm_other": "{{count}} Orte aus OpenStreetMap"
   },
   "legal": {
     "all_rights_reserved": "Alle Rechte vorbehalten.",

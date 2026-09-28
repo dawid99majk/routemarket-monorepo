@@ -121,7 +121,7 @@
         "pytanie": "Qué hay de la aplicación móvil?"
       },
       "poza_europa": {
-        "odpowiedz": "Sí. El planificador es global, la interfaz está disponible en varios idiomas y las distancias y tiempos se calculan con transporte local.",
+        "odpowiedz": "Sí. El catálogo de lugares se crea a partir de OpenStreetMap y Wikipedia para cualquier ciudad que figure allí, y los planes llegan en seis idiomas. Los trayectos entre paradas se calculan a pie — en un tramo más largo el plan indica que en transporte público será más rápido.",
         "pytanie": "Funciona fuera de Europa?"
       },
       "przeciazenie": {
@@ -129,7 +129,7 @@
         "pytanie": "El agente no me meterá demasiado en un día?"
       },
       "zrodla": {
-        "odpowiedz": "De bases de datos abiertas de atracciones, opiniones de viajeros y tableros publicados por los usuarios. Los horarios de apertura y el tiempo de visita se verifican antes de mostrarlos en el feed.",
+        "odpowiedz": "De OpenStreetMap y Wikipedia, y de los tableros que publican los usuarios. Los horarios de apertura vienen de OpenStreetMap y con ellos el planificador comprueba que llegas antes del cierre. No todos los lugares los tienen — conviene comprobar esos antes del viaje.",
         "pytanie": "De dónde vienen los lugares?"
       }
     },
@@ -138,7 +138,7 @@
     "hero": {
       "opis": "Buscas atracciones y las añades al tablero de tu viaje — \"definitivamente\", \"quizás\", \"no\". El agente organiza un plan diario con horarios reales y tiempo de viaje, y te entrega un archivo GPX listo para tu reloj o navegador.",
       "tytul": "Reúne los lugares. El agente se encarga del resto.",
-      "zapewnienia": "Sin tarjeta · plan listo en minutos · también funciona sin conexión en el campo"
+      "zapewnienia": "Sin tarjeta · plan listo en minutos · archivo GPX para el reloj y la navegación"
     },
     "jade": "Voy",
     "kanal": {
@@ -147,8 +147,8 @@
         "tytul": "Tu aplicación de mapas"
       },
       "nawigacja": {
-        "opis": "Guía integrada de punto a punto, con los horarios del plan. El mapa se descarga antes del viaje y funciona sin cobertura.",
-        "tytul": "Navegación Routemarket"
+        "opis": "El plan del día, con horarios y mapa, se abre en el navegador del móvil. Donde no hay cobertura, te guía el archivo GPX en una app con mapas sin conexión — nuestras apps para iOS y Android están en preparación.",
+        "tytul": "El plan en tu móvil"
       },
       "zegarek": {
         "opis": "Garmin, Suunto, Coros, Wahoo: GPX estándar con puntos de ruta y seguimiento.",
@@ -188,12 +188,16 @@
       "tablice": "Tableros"
     },
     "przegladaj": "Ver todo",
-    "przyklad_nadtytul": "Ejemplo real",
+    "przyklad_nadtytul": "Ejemplo de plan",
     "realizm": "Realismo",
     "stopka_kontakt": "Contacto",
     "stopka_prywatnosc": "Privacidad",
     "szukaj_tablicy": "Buscar tablero por ciudad",
-    "zakladam": "Asumo…"
+    "zakladam": "Asumo…",
+    "ile_miejsc_one": "{{count}} lugar",
+    "ile_miejsc_other": "{{count}} lugares",
+    "miejsc_z_osm_one": "{{count}} lugar de OpenStreetMap",
+    "miejsc_z_osm_other": "{{count}} lugares de OpenStreetMap"
   },
   "legal": {
     "all_rights_reserved": "Todos los derechos reservados.",

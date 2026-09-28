@@ -18,6 +18,7 @@ import AgentDymek from '@/components/AgentDymek';
 import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
 import { formatujGodziny } from '@/lib/godziny';
 import { useTranslation } from 'react-i18next';
+import { odmien } from '@/lib/odmiana';
 
 type Priority = 'must' | 'nice' | 'rejected';
 
@@ -288,7 +289,7 @@ export default function Start() {
         .order('waznosc', { ascending: false, nullsFirst: false })
         .order('pin_count', { ascending: false }).limit(8);
       setPodglad(data ?? []);
-      toast.success(`Zebrałem ${d.added} miejsc w: ${d.city}`);
+      toast.success(`Zebrałem ${d.added} ${odmien(d.added, 'miejsce', 'miejsca', 'miejsc')} w: ${d.city}`);
     } catch (e: any) {
       toast.error(e.message || 'Nie udało się zebrać miejsc');
     } finally {
@@ -411,7 +412,7 @@ export default function Start() {
     <div className="min-h-screen bg-background">
       <SEO title={t('seo.start.title')} url="/start" noIndex />
       <PlannerHeader
-        context={active ? [active.destination, active.days ? `${active.days} dni` : null,
+        context={active ? [active.destination, active.days ? `${active.days} ${odmien(active.days, 'dzień', 'dni', 'dni')}` : null,
           active.trip_type ? climateLabel(active.trip_type).toLowerCase() : null].filter(Boolean).join(' · ') : null}
         initials={initials}
       />

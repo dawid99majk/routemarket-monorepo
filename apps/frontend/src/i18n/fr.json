@@ -121,7 +121,7 @@
         "pytanie": "Qu'en est-il de l'application mobile?"
       },
       "poza_europa": {
-        "odpowiedz": "Oui. Le planificateur est global, l'interface est disponible en plusieurs langues, et les distances et les temps sont calculés en fonction des transports locaux.",
+        "odpowiedz": "Oui. Le catalogue de lieux est construit à partir d'OpenStreetMap et de Wikipédia pour toute ville qui y figure, et les plans sont disponibles en six langues. Les trajets entre les étapes sont calculés à pied — sur un tronçon plus long, le plan indique que les transports en commun seront plus rapides.",
         "pytanie": "Fonctionne-t-il en dehors de l'Europe?"
       },
       "przeciazenie": {
@@ -129,7 +129,7 @@
         "pytanie": "L'agent ne va-t-il pas me surcharger pour une journée?"
       },
       "zrodla": {
-        "odpowiedz": "À partir de bases de données ouvertes sur les attractions, des avis de voyageurs et des tableaux publiés par les utilisateurs. Les heures d'ouverture et le temps de visite sont vérifiés avant d'être affichés dans le flux.",
+        "odpowiedz": "D'OpenStreetMap et de Wikipédia, ainsi que des tableaux publiés par les utilisateurs. Les horaires d'ouverture viennent d'OpenStreetMap, et le planificateur s'en sert pour vérifier que vous arrivez avant la fermeture. Tous les lieux ne les indiquent pas — vérifiez ceux-là avant de partir.",
         "pytanie": "D'où viennent les lieux?"
       }
     },
@@ -138,7 +138,7 @@
     "hero": {
       "opis": "Recherchez des attractions et ajoutez-les à votre tableau de voyage – \"certainement\", \"peut-être\", \"non\". L'agent organise un plan quotidien avec des heures réelles et des temps de trajet, et vous fournit un fichier GPX prêt pour votre montre ou votre navigateur.",
       "tytul": "Rassemblez les lieux. L'agent s'occupe du reste.",
-      "zapewnienia": "Sans carte · plan prêt en quelques minutes · fonctionne aussi hors ligne sur le terrain"
+      "zapewnienia": "Sans carte bancaire · plan prêt en quelques minutes · fichier GPX pour montre et navigation"
     },
     "jade": "Je pars",
     "kanal": {
@@ -147,8 +147,8 @@
         "tytul": "Votre application de carte"
       },
       "nawigacja": {
-        "opis": "Guidage intégré point par point, avec les heures du plan. La carte se télécharge avant le départ et fonctionne sans réseau.",
-        "tytul": "Navigation Routemarket"
+        "opis": "Le plan du jour, avec horaires et carte, s'ouvre dans le navigateur de votre téléphone. Sans réseau, le fichier GPX vous guide dans une application à cartes hors ligne — nos applications iOS et Android sont en préparation.",
+        "tytul": "Le plan sur votre téléphone"
       },
       "zegarek": {
         "opis": "Garmin, Suunto, Coros, Wahoo — GPX standard avec points de route et trace.",
@@ -188,12 +188,16 @@
       "tablice": "Tableaux"
     },
     "przegladaj": "Tout parcourir",
-    "przyklad_nadtytul": "Exemple réel",
+    "przyklad_nadtytul": "Exemple de plan",
     "realizm": "Réalisme",
     "stopka_kontakt": "Contact",
     "stopka_prywatnosc": "Confidentialité",
     "szukaj_tablicy": "Rechercher un tableau par ville",
-    "zakladam": "Je suppose…"
+    "zakladam": "Je suppose…",
+    "ile_miejsc_one": "{{count}} lieu",
+    "ile_miejsc_other": "{{count}} lieux",
+    "miejsc_z_osm_one": "{{count}} lieu d'OpenStreetMap",
+    "miejsc_z_osm_other": "{{count}} lieux d'OpenStreetMap"
   },
   "legal": {
     "all_rights_reserved": "Tous droits réservés.",
