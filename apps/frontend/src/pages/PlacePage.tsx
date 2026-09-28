@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Zdjecie from '@/components/Zdjecie';
 import GaleriaZdjec from '@/components/GaleriaZdjec';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Heart, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ExternalLink, Heart, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { apiPost } from '@/lib/api';
@@ -15,6 +15,8 @@ import { jakoZdjecia } from '@/lib/zBazy';
 import { miniatura, SZEROKOSC } from '@/lib/zdjecia';
 import AgentDymek from '@/components/AgentDymek';
 import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
+import FormularzNowejTablicy, { type UstawieniaNowejTablicy } from '@/components/FormularzNowejTablicy';
+import type { AxisValues } from '@/lib/tripPresets';
 import { etykietaRodzaju } from '@/lib/rodzaj';
 import SEO from '@/components/SEO';
 
@@ -26,6 +28,17 @@ interface CatalogPlace {
   vibe_tags: string[]; pin_count: number;
 }
 type Bucket = 'must' | 'nice' | 'rejected';
+type Tablica = { id: string; name: string; destination: string };
+
+const OPIS_DECYZJI: Record<Bucket, string> = { must: 'na pewno', nice: 'być może', rejected: 'odrzucone' };
+
+/** „Kraków”, „krakow ” i „Kraków, Polska” to ten sam cel wyjazdu. */
+const klucz = (s: string | null | undefined) =>
+  (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const tenSamCel = (cel: string | null | undefined, miasto: string | null | undefined) => {
+  const m = klucz(miasto);
+  return !!m && klucz(cel).split(/[,·(/]/).some((czesc) => czesc.trim() === m);
+};
 
 function formatDuration(min: number | null): string {
   if (!min) return '—';
@@ -57,9 +70,16 @@ export default function PlacePage() {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const [favorite, setFavorite] = useState(false);
-  const [boards, setBoards] = useState<{ id: string; name: string; destination: string }[]>([]);
+  const [boards, setBoards] = useState<Tablica[]>([]);
   const [activeBoard, setActiveBoard] = useState<string | null>(null);
-  const [mark, setMark] = useState<Bucket | null>(null);
+  /** Decyzja o tym miejscu na każdej tablicy — zmiana tablicy nie potrzebuje zapytania. */
+  const [pinezki, setPinezki] = useState<Record<string, Bucket>>({});
+  const mark = activeBoard ? pinezki[activeBoard] ?? null : null;
+  const [zalogowany, setZalogowany] = useState(false);
+  const [preferencjeKonta, setPreferencjeKonta] = useState<Partial<AxisValues> | null>(null);
+  /** Decyzja czekająca na założenie tablicy — nie ma jeszcze wyjazdu do tego miasta. */
+  const [nowaTablica, setNowaTablica] = useState<{ wykonaj: (id: string) => void } | null>(null);
+  const [tworzeTablice, setTworzeTablice] = useState(false);
   const [nearby, setNearby] = useState<CatalogPlace[]>([]);
   const [similar, setSimilar] = useState<CatalogPlace[]>([]);
   const [kolekcje, setKolekcje] = useState<{ id: string; name: string }[]>([]);
@@ -122,21 +142,46 @@ export default function PlacePage() {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
 
-    const [{ data: fav }, { data: projs }] = await Promise.all([
+    const uid = userData.user.id;
+    setZalogowany(true);
+    const [{ data: fav }, { data: projs }, { data: piny }, { data: pref }] = await Promise.all([
       supabase.from('place_favorites').select('place_id')
-        .eq('user_id', userData.user.id).eq('place_id', data.id).maybeSingle(),
-      supabase.from('trip_projects').select('id, name, destination').order('updated_at', { ascending: false }),
+        .eq('user_id', uid).eq('place_id', data.id).maybeSingle(),
+      // Własne i udostępnione. Bez filtra przychodziły też cudze tablice
+      // publiczne, na których zapis i tak odbija się od uprawnień.
+      supabase.from('trip_projects').select('id, name, destination')
+        .or(`user_id.eq.${uid},is_public.eq.false`)
+        .order('updated_at', { ascending: false }),
+      supabase.from('trip_project_places').select('project_id, priority').eq('catalog_id', data.id),
+      supabase.from('route_preferences')
+        .select('pace, popularity, wandering, dining, effort, crowds')
+        .eq('user_id', uid).maybeSingle(),
     ]);
     setFavorite(!!fav);
-    setBoards(projs ?? []);
-    const boardId = (projs ?? [])[0]?.id ?? null;
-    setActiveBoard(boardId);
+    if (pref) setPreferencjeKonta(pref as Partial<AxisValues>);
+    const lista: Tablica[] = projs ?? [];
+    setBoards(lista);
+    const mapa: Record<string, Bucket> = {};
+    for (const p of piny ?? []) if (p.priority) mapa[p.project_id] = p.priority as Bucket;
+    setPinezki(mapa);
 
-    if (boardId) {
-      const { data: pinned } = await supabase.from('trip_project_places')
-        .select('priority').eq('project_id', boardId).eq('catalog_id', data.id).maybeSingle();
-      setMark((pinned?.priority as Bucket) ?? null);
-    }
+    /* Która tablica? Wcześniej zawsze ostatnio zmieniana — Wieża Trynitarska
+       w Lublinie lądowała na tablicy „Haga”. Teraz: tablica, na której miejsce
+       już jest; ostatnio otwarta, jeśli to wyjazd do tego miasta; najnowszy
+       wyjazd do tego miasta. Innego miasta nie podstawiamy nigdy — wtedy
+       pierwsza decyzja zakłada tablicę. */
+    let ostatnia: string | null = null;
+    try { ostatnia = localStorage.getItem('rm_ostatnia_tablica'); } catch { /* bez pamięci przeglądarki */ }
+    const tutaj = (b: Tablica) => tenSamCel(b.destination, data.city);
+    const zPinezka = lista.filter((b) => mapa[b.id]);
+    const wybrana =
+      zPinezka.find((b) => b.id === ostatnia)
+      ?? zPinezka.find(tutaj)
+      ?? zPinezka[0]
+      ?? lista.find((b) => b.id === ostatnia && tutaj(b))
+      ?? lista.find(tutaj)
+      ?? null;
+    setActiveBoard(wybrana?.id ?? null);
   }, [slug]);
 
   useEffect(() => { load(); }, [load]);
@@ -159,29 +204,84 @@ export default function PlacePage() {
 
   const photos = useMemo(() => (place?.photos ?? []).filter((u) => !broken.has(u)), [place, broken]);
 
+  /** Zapis na wskazaną tablicę; drugi klik w tę samą decyzję ją zdejmuje. */
+  const zapiszNaTablicy = async (idTablicy: string, bucket: Bucket, obecna: Bucket | null) => {
+    if (!place) return;
+    const ustaw = (b: Bucket | null) => setPinezki((p) => {
+      const n = { ...p };
+      if (b) n[idTablicy] = b; else delete n[idTablicy];
+      return n;
+    });
+    if (obecna === bucket) {
+      ustaw(null);
+      const { error } = await supabase.from('trip_project_places')
+        .delete().eq('project_id', idTablicy).eq('catalog_id', place.id);
+      if (error) { ustaw(obecna); toast.error(error.message); }
+      return;
+    }
+    ustaw(bucket);
+    const { error } = obecna
+      ? await supabase.from('trip_project_places')
+          .update({ priority: bucket }).eq('project_id', idTablicy).eq('catalog_id', place.id)
+      : await supabase.from('trip_project_places').insert({
+          project_id: idTablicy, catalog_id: place.id, name: place.name, category: place.category,
+          priority: bucket, lat: place.lat, lng: place.lng, description: place.description,
+          opening_hours: place.opening_hours, visit_minutes: place.visit_minutes,
+          image_url: place.photos?.[0] ?? null, source: 'catalog',
+        });
+    if (error) { ustaw(obecna); toast.error(error.message); }
+  };
+
   const setBucket = async (bucket: Bucket) => {
     if (!place) return;
-    if (!activeBoard) return toast.error(t('miejsce.najpierw_za_oz_wyjazd_do'));
-    if (mark === bucket) {
-      setMark(null);
-      await supabase.from('trip_project_places')
-        .delete().eq('project_id', activeBoard).eq('catalog_id', place.id);
+    if (!zalogowany) {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) navigate('/auth');
       return;
     }
-    const had = mark;
-    setMark(bucket);
-    if (had) {
-      await supabase.from('trip_project_places')
-        .update({ priority: bucket }).eq('project_id', activeBoard).eq('catalog_id', place.id);
+    // Nie ma wyjazdu do tego miasta: ten sam formularz co w Odkrywaj,
+    // a decyzja zapisuje się zaraz po założeniu tablicy.
+    if (!activeBoard) {
+      setNowaTablica({ wykonaj: (id) => { void zapiszNaTablicy(id, bucket, null); } });
       return;
     }
-    const { error } = await supabase.from('trip_project_places').insert({
-      project_id: activeBoard, catalog_id: place.id, name: place.name, category: place.category,
-      priority: bucket, lat: place.lat, lng: place.lng, description: place.description,
-      opening_hours: place.opening_hours, visit_minutes: place.visit_minutes,
-      image_url: place.photos?.[0] ?? null, source: 'catalog',
+    await zapiszNaTablicy(activeBoard, bucket, mark);
+  };
+
+  const utworzTablice = async (u2: UstawieniaNowejTablicy) => {
+    if (!nowaTablica || tworzeTablice) return;
+    const { wykonaj } = nowaTablica;
+    setTworzeTablice(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setTworzeTablice(false); setNowaTablica(null); navigate('/auth'); return; }
+    const { data: nowa, error } = await (supabase as any).from('trip_projects').insert({
+      user_id: u.user.id,
+      name: u2.nazwa,
+      destination: place?.city || u2.nazwa,
+      days: u2.dni,
+      hours_per_day: u2.godzinDziennie,
+      fill_percent: u2.wypelnienie,
+      start_date: u2.dataOd,
+      end_date: u2.dataDo,
+      trip_type: u2.charakter,
+      ...u2.osie,
+    }).select('id, name, destination').single();
+    setTworzeTablice(false);
+    if (error) { toast.error(error.message); return; }
+    setBoards((prev) => [nowa as Tablica, ...prev]);
+    setActiveBoard(nowa.id);
+    try { localStorage.setItem('rm_ostatnia_tablica', nowa.id); } catch { /* bez pamięci przeglądarki */ }
+    setNowaTablica(null);
+    wykonaj(nowa.id);
+    toast.success(`Tablica „${nowa.name}" gotowa`, {
+      action: { label: 'Otwórz', onClick: () => navigate(`/plany/${nowa.id}`) },
     });
-    if (error) { setMark(had); toast.error(error.message); }
+  };
+
+  const wybierzTablice = (id: string) => {
+    if (id === '__nowa') { setNowaTablica({ wykonaj: () => {} }); return; }
+    setActiveBoard(id);
+    try { localStorage.setItem('rm_ostatnia_tablica', id); } catch { /* bez pamięci przeglądarki */ }
   };
 
   const toggleFavorite = async () => {
@@ -222,6 +322,15 @@ export default function PlacePage() {
   );
 
   const board = boards.find((b) => b.id === activeBoard) ?? null;
+  // Wyjazdy do tego miasta na górze listy, reszta osobno — przy kilkudziesięciu
+  // tablicach właściwa nie może ginąć między Hagą a Porto.
+  const tabliceTutaj = boards.filter((b) => tenSamCel(b.destination, place.city));
+  const tabliceInne = boards.filter((b) => !tabliceTutaj.includes(b));
+  const opcjaTablicy = (b: Tablica, zCelem: boolean) => {
+    const pin = pinezki[b.id];
+    const cel = zCelem && b.destination && !klucz(b.name).includes(klucz(b.destination)) ? ` · ${b.destination}` : '';
+    return <option key={b.id} value={b.id}>{b.name}{cel}{pin ? ` · ${OPIS_DECYZJI[pin]}` : ''}</option>;
+  };
   return (
     <div className="min-h-screen bg-background">
       {/* Tytuł karty przeglądarki i opis muszą zmieniać się przy nawigacji.
@@ -239,6 +348,18 @@ export default function PlacePage() {
           tablicę ani do planu bez cofania się. */}
       <PlannerHeader
         context={board ? `${board.name} · ${board.destination}` : null}
+      />
+      <FormularzNowejTablicy
+        otwarte={!!nowaTablica}
+        miasto={place.city || place.name}
+        preferencjeKonta={preferencjeKonta}
+        zapisywanie={tworzeTablice}
+        onZamknij={() => setNowaTablica(null)}
+        onOdmowa={() => {
+          setNowaTablica(null);
+          toast.info('Bez tablicy odłożysz miejsce sercem — znajdziesz je w „Zapisane".');
+        }}
+        onUtworz={utworzTablice}
       />
       <main className="max-w-[1160px] mx-auto px-6 pt-8 pb-24">
         <button onClick={() => navigate('/odkrywaj')}
@@ -343,9 +464,32 @@ export default function PlacePage() {
           {/* Kolumna boczna, przyklejona */}
           <aside className="lg:sticky lg:top-[88px] space-y-5">
             <div className="rounded-2xl bg-card p-5 shadow-token-md">
-              <h2 className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
-                Do tablicy{board ? ` · ${board.destination}` : ''}
-              </h2>
+              <h2 className="text-[12px] font-semibold text-muted-foreground">Do tablicy</h2>
+              {boards.length > 0 && (
+                <div className="relative mt-2">
+                  <select value={activeBoard ?? ''} onChange={(e) => wybierzTablice(e.target.value)}
+                    aria-label="Tablica, na którą zapisujesz decyzję"
+                    className="w-full h-10 [@media(pointer:coarse)]:h-11 appearance-none rounded-md bg-secondary pl-3 pr-9
+                               text-[14px] font-medium outline-none cursor-pointer focus-visible:ring-2 focus-visible:ring-ring">
+                    {!activeBoard && <option value="" disabled>Wybierz tablicę</option>}
+                    {tabliceTutaj.length > 0 && tabliceInne.length > 0 ? (
+                      <>
+                        <optgroup label={`Wyjazdy: ${place.city}`}>{tabliceTutaj.map((b) => opcjaTablicy(b, false))}</optgroup>
+                        <optgroup label="Inne wyjazdy">{tabliceInne.map((b) => opcjaTablicy(b, true))}</optgroup>
+                      </>
+                    ) : (
+                      boards.map((b) => opcjaTablicy(b, tabliceTutaj.length === 0))
+                    )}
+                    <option value="__nowa">+ Nowa tablica{place.city ? `: ${place.city}` : ''}</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
+              {zalogowany && !activeBoard && (
+                <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+                  {place.city ? 'Nie masz jeszcze wyjazdu do tego miasta' : 'Nie masz jeszcze tablicy'} — pierwsza decyzja założy nową.
+                </p>
+              )}
               {/* Ta sama pigułka decyzji co w Odkrywaj i na tablicy. */}
               <PrzelacznikDecyzji rozmiar="lg" className="mt-3" stan={mark}
                 onDecyzja={(k) => setBucket(k as Bucket)} />
