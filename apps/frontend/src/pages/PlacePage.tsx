@@ -246,7 +246,7 @@ export default function PlacePage() {
           <ArrowLeft className="w-3.5 h-3.5" /> Wróć do odkrywania
         </button>
 
-        <div className="mt-6 grid lg:grid-cols-[1fr_380px] gap-10 items-start">
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10 items-start">
           {/* Kolumna główna */}
           <div>
             {photos.length > 0 && (

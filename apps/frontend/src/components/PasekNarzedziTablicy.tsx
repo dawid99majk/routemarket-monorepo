@@ -62,7 +62,7 @@ export default function PasekNarzedziTablicy({
 
   return (
     <div ref={kotwica} className="scroll-mt-20">
-      <div role="tablist" aria-label={t('narzedzia.narzedzia_tablicy')} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div role="tablist" aria-label={t('narzedzia.narzedzia_tablicy')} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {narzedzia.map((n) => {
           const czyAktywne = n.id === otwarte;
           return (

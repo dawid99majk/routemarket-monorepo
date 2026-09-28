@@ -77,6 +77,13 @@ function EmptyState({ query }: { query: string }) {
 
 export default function GuideHub() {
   const [open, setOpen] = useState(false);
+  // Na telefonie pomoc otwiera ikona w nagłówku — dwa przyciski pływające
+  // zasłaniały zakładki tablicy i menu pozycji planu.
+  useEffect(() => {
+    const otworz = () => setOpen(true);
+    window.addEventListener('rm:pomoc', otworz);
+    return () => window.removeEventListener('rm:pomoc', otworz);
+  }, []);
   const [activeArticle, setActiveArticle] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -144,7 +151,7 @@ export default function GuideHub() {
       {/* Expandable FAB — icon-only, expands on hover/focus */}
       <button
         onClick={() => setOpen(true)}
-        className="group fixed right-4 bottom-[5.5rem] md:bottom-4 z-[1300] flex items-center h-14 rounded-full bg-foreground text-background shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="group fixed right-4 bottom-4 md:right-5 md:bottom-5 z-[1300] hidden md:flex [body:not(:has(.rm-dolny-pasek))_&]:flex items-center h-12 md:h-14 rounded-full bg-foreground text-background shadow-token-lg hover:shadow-token-xl transition-all duration-300 ease-out pl-4 pr-4 hover:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label="Otwórz pomoc"
       >
         <HelpCircle className="w-5 h-5 shrink-0" />

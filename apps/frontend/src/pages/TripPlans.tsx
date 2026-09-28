@@ -205,7 +205,7 @@ export default function TripPlans() {
                 <Skeleton className="h-4 w-28 rounded-full" />
                 <Skeleton className="h-4 w-40 rounded-full" />
               </div>
-              <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {[0, 1, 2].map((i) => (
                   <div key={i} className="rounded-2xl bg-card shadow-token-md overflow-hidden">
                     <Skeleton className="h-[170px] w-full rounded-none" />
@@ -354,7 +354,7 @@ export default function TripPlans() {
                     </div>
                   );
                 })()}
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {reszta.map((w) => {
                     const q = podglad[w.id];
                     const ile = q?.ile ?? 0;

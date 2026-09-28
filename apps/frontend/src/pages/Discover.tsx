@@ -189,6 +189,9 @@ export default function Discover() {
   /** Wybrany motyw. `null` znaczy: pokaż kafelki kolekcji zamiast wejścia w jedną. */
   const [kolekcja, setKolekcja] = useState<Kolekcja | null>(null);
   const [pokazMape, setPokazMape] = useState(true);
+  /** Telefon: lista albo mapa na całą szerokość. Mapa w kolumnie obok listy
+   *  byłaby węższa niż palec — dlatego to warstwa, nie kolumna. */
+  const [mapaMobilna, setMapaMobilna] = useState(false);
   const [kategoria, setKategoria] = useState<KategoriaId>('wszystkie');
   /** Miejsce pod kursorem albo wskazane pinezką — wiąże kartę z punktem na mapie. */
   const [aktywne, setAktywne] = useState<string | null>(null);
@@ -1039,7 +1042,7 @@ export default function Discover() {
           {/* Filtry jako napowietrzony, kontrastowy pasek pod wyszukiwarką */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
             {/* Grupa 1: Kategoria miejsca (wybór pojedynczy) */}
-            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-card border border-border/85 shadow-2xs">
+            <div className="inline-flex items-center gap-1 p-1 rounded-full bg-card shadow-token-sm max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {KATEGORIE.filter((k) => k.id === 'wszystkie'
                   || places.some((p) => (p.category ?? 'attraction') === k.id)).map((k) => (
                 <button
@@ -1086,7 +1089,7 @@ export default function Discover() {
               type="button"
               onClick={() => setPokazMape((v) => !v)}
               aria-pressed={pokazMape}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-all ml-1 border shadow-2xs flex items-center gap-1.5 cursor-pointer ${
+              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-all ml-1 border shadow-2xs hidden lg:flex items-center gap-1.5 cursor-pointer ${
                 pokazMape
                   ? 'bg-foreground text-background border-foreground shadow-xs'
                   : 'bg-card border-border/85 text-foreground hover:bg-muted/70 hover:border-foreground/30'
@@ -1096,6 +1099,31 @@ export default function Discover() {
             </button>
           </div>
         </div>
+
+        {/* Telefon: jeden przełącznik zamiast „Ukryj mapę”, który tu nic nie robił. */}
+        {places.length > 0 && (
+          <div className="lg:hidden fixed left-1/2 -translate-x-1/2 bottom-[calc(var(--dolny-pasek,0px)_+_16px)] z-[1200]
+                          flex rounded-full bg-foreground p-1 shadow-token-lg">
+            {([['lista', 'Lista'], ['mapa', 'Mapa']] as const).map(([id, etykieta]) => {
+              const aktywny = (id === 'mapa') === mapaMobilna;
+              return (
+                <button key={id} type="button" aria-pressed={aktywny}
+                  onClick={() => {
+                    setMapaMobilna(id === 'mapa');
+                    // Mapa stoi pod wyszukiwarką i filtrami — prowadzimy prosto do niej.
+                    setTimeout(() => {
+                      if (id === 'mapa') document.getElementById('mapa-odkrywaj')?.scrollIntoView({ block: 'start' });
+                      else window.scrollTo({ top: 0 });
+                    }, 60);
+                  }}
+                  className={`h-11 px-6 rounded-full text-[14px] font-bold transition-colors ${
+                    aktywny ? 'bg-background text-foreground' : 'text-background'}`}>
+                  {etykieta}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <KartaMiejsca
           miejsce={karta ? {
@@ -1150,7 +1178,7 @@ export default function Discover() {
               </button>
             </div>
 
-            <div className="mt-3.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {wynikiAgenta.map((p: any, i: number) => {
                 const stan = stanAgenta(p);
                 const zKatalogu = zKataloguPoNazwie(String(p.name));
@@ -1213,11 +1241,11 @@ export default function Discover() {
             <Loader2 className="w-4 h-4 animate-spin" /> Wczytuję miejsca…
           </p>
         ) : (
-          <div className={pokazMape ? 'mt-6 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,44%)] gap-6 items-start' : 'mt-6'}>
+          <div className={pokazMape ? 'mt-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,44%)] gap-6 items-start' : 'mt-6'}>
           {/* Przez całą szerokość, także gdy mapa dzieli układ na dwie kolumny.
               Nagłówek wybranej kolekcji stoi NAD pustką, nie pod nią — inaczej
               motyw bez wyników w kadrze mapy nie miałby jak zostać zamknięty. */}
-          <div className="lg:col-span-2">
+          <div className={`lg:col-span-2 min-w-0 ${mapaMobilna ? 'hidden lg:block' : ''}`}>
             {pokazKolekcje && (
               <KolekcjeMiasta
                 miejsca={places}
@@ -1296,9 +1324,9 @@ export default function Discover() {
             )}
           </div>
           ) : (
-          <div className={pokazMape
+          <div className={`${mapaMobilna ? 'hidden lg:block ' : ''}${pokazMape
             ? '[column-gap:20px] columns-1 sm:columns-2'
-            : '[column-gap:24px] columns-1 sm:columns-2 lg:columns-3'}>
+            : '[column-gap:24px] columns-1 sm:columns-2 lg:columns-3'}`}>
             {widoczne.map((p, idx) => {
               const mk = marks[p.id];
               const duration = formatDuration(p.visit_minutes);
@@ -1402,8 +1430,8 @@ export default function Discover() {
           </div>
           )}
 
-          {pokazMape && (
-            <aside className="hidden lg:block lg:sticky lg:top-[88px] space-y-3">
+          {(pokazMape || mapaMobilna) && (
+            <aside id="mapa-odkrywaj" className={`${mapaMobilna ? 'block' : 'hidden'} lg:block lg:sticky lg:top-[88px] space-y-3 min-w-0 scroll-mt-[76px]`}>
               {/* Punkt startowy nad mapą: patrząc na pinezki najczęściej chce się
                   wiedzieć, jak daleko to od miejsca, w którym się nocuje. */}
               <div className="rounded-md bg-card shadow-token-sm px-3.5 py-3">
@@ -1441,7 +1469,7 @@ export default function Discover() {
                   onObszar={setObszar}
                   doKadru={visible.filter((p) => p.lat != null && p.lng != null)
                     .map((p) => ({ lat: p.lat, lng: p.lng }))}
-                  className="h-[calc(100vh-160px)] w-full"
+                  className="h-[calc(100dvh-300px)] min-h-[360px] lg:h-[calc(100vh-160px)] w-full"
                 />
               </div>
             </aside>

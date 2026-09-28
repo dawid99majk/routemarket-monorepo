@@ -263,7 +263,7 @@ export default function Marketing() {
             Nie ma jeszcze żadnej publicznej tablicy. Opublikuj którąś, żeby było z czego pisać.
           </p>
         ) : (
-          <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px] items-start">
+          <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_400px] items-start">
             <div className="min-w-0">
               {/* Wybór tablicy */}
               <label className="font-narrow uppercase tracking-[0.2em] text-[11px] text-muted-foreground">
@@ -287,7 +287,7 @@ export default function Marketing() {
                                 block mt-7">
                 Kanał
               </label>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {KANALY.map((k) => (
                   <button
                     key={k.id}

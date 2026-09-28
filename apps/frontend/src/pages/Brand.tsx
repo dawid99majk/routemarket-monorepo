@@ -48,7 +48,7 @@ export default function Brand() {
         </div>
 
         {/* Logo previews + downloads */}
-        <section className="grid md:grid-cols-2 gap-6 mb-20">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-20">
           {FILES.map((f) => (
             <div key={f.label} className="rounded-md border border-border/60 overflow-hidden bg-card shadow-token-md">
               <div className={`${f.bg} p-10 flex items-center justify-center min-h-[200px] border-b border-border/60`}>

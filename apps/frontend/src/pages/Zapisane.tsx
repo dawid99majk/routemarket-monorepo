@@ -249,7 +249,7 @@ export default function Zapisane() {
           <div className="flex items-center gap-2">
             <Input value={nowaNazwa} onChange={(e) => setNowaNazwa(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && zalozKolekcje()}
-              placeholder={t('zapisane.nazwa_nowej_kolekcji')} className="w-[220px]" />
+              placeholder={t('zapisane.nazwa_nowej_kolekcji')} className="w-full min-w-0 sm:w-[220px]" />
             <Button variant="outline" onClick={zalozKolekcje} disabled={!nowaNazwa.trim() || zakladam}>
               <Plus className="w-4 h-4 mr-1.5" /> Kolekcja
             </Button>

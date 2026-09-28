@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Heart } from 'lucide-react';
+import { BookOpen, CalendarDays, Compass, Heart, HelpCircle, LayoutGrid } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import Logo from '@/components/Logo';
@@ -77,21 +77,21 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
   };
 
   return (
-    <header className="sticky top-0 z-20 h-[72px] bg-background/90 backdrop-blur-[8px]">
+    <>
+    <header className="sticky top-0 z-20 h-[64px] md:h-[72px] bg-background/90 backdrop-blur-[8px]">
       <div className="max-w-[1400px] mx-auto h-full px-4 sm:px-6 flex items-center gap-3 sm:gap-5">
         {/* Logotyp prowadzi na stronę główną — tak działa wszędzie i tego się po nim
             spodziewamy. Bez sygnatury: w aplikacji miejsce obok zajmuje przełącznik
             wyjazdu i zakładki produktu, nie hasło marketingowe. */}
         {/* Na mobile zostaje sam znak: nazwa zajmowala 137 z 375 px i nawigacji
             zostawalo 58 px widocznej szerokosci — mniej niz jedna zakladka. */}
-        <Logo showName signature={false} size="sm"
-          className="shrink-0 [&>span]:hidden sm:[&>span]:flex" />
+        <Logo showName signature={false} size="sm" className="shrink-0" />
 
         {/* min-w-0 jest tu warunkiem dzialania overflow-x-auto: bez niego element
             flex nie kurczy sie ponizej szerokosci tresci, wiec zakladki nie
             przewijaly sie, tylko wychodzily poza ekran (przy 375 px siegaly
             x=558), a ikony po prawej rysowaly sie na nich. */}
-        <nav className="flex items-center gap-1 min-w-0 overflow-x-auto rounded-full bg-card p-1 shadow-token-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="hidden md:flex items-center gap-1 min-w-0 overflow-x-auto rounded-full bg-card p-1 shadow-token-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Zmienna nazywa się `zakladka`, nie `t` — inaczej przesłoniłaby funkcję
               tłumaczenia i wewnątrz mapy nie dałoby się wywołać t(). */}
           {zakladki(tripId).map((zakladka) => (
@@ -128,10 +128,15 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
               zbiorem, więc dwa przyciski obok siebie pytały użytkownika o różnicę,
               której nie ma. */}
           <button onClick={() => navigate('/zapisane')} title={t('naglowek.zapisane_miejsca')} aria-label={t('naglowek.zapisane')}
-            className="h-9 inline-flex items-center gap-1.5 rounded-full px-3
+            className="h-9 hidden md:inline-flex items-center gap-1.5 rounded-full px-3
                        hover:bg-card transition-colors">
             <Heart className="w-4 h-4 text-muted-foreground" />
             <span className="text-[14px] font-semibold text-muted-foreground hidden sm:inline">{t('naglowek.zapisane')}</span>
+          </button>
+          <button onClick={() => window.dispatchEvent(new Event('rm:pomoc'))}
+            aria-label={t('naglowek.pomoc', 'Jak to działa')} title={t('naglowek.pomoc', 'Jak to działa')}
+            className="md:hidden w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-card">
+            <HelpCircle className="w-5 h-5" />
           </button>
           {initials && (
             <button onClick={() => navigate('/profile')}
@@ -143,5 +148,35 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
         </div>
       </div>
     </header>
+
+    {/* Telefon: zakładki na dole, w zasięgu kciuka. U góry mieściły się trzy
+        z pięciu, a „Inspiracje” i „Warsztat” trzeba było odkrywać przewijaniem. */}
+    <nav aria-label={t('naglowek.nawigacja', 'Nawigacja')}
+      className="rm-dolny-pasek md:hidden fixed bottom-0 inset-x-0 z-[1250] bg-card/95 backdrop-blur-[8px]
+                 shadow-[0_-4px_20px_rgba(37,36,58,0.08)] pb-[env(safe-area-inset-bottom)]">
+      <div className="flex items-stretch justify-around h-16 px-1">
+        {[
+          ...zakladki(tripId).map((z) => ({ ...z, ikona: z.path === '/odkrywaj' ? Compass
+            : z.path === '/tablice' ? BookOpen : z.path.includes('widok=plan') ? CalendarDays : LayoutGrid })),
+          { klucz: 'naglowek.zapisane', path: '/zapisane', ikona: Heart },
+        ].map(({ klucz, path, ikona: Ikona }) => {
+          const aktywna = path === '/zapisane' ? pathname === '/zapisane' : isActive(path);
+          return (
+            <button key={klucz} onClick={() => navigate(path)} aria-current={aktywna ? 'page' : undefined}
+              className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
+              <span className={`h-8 w-14 rounded-full flex items-center justify-center transition-colors ${
+                aktywna ? 'bg-foreground text-background' : 'text-muted-foreground'}`}>
+                <Ikona className="w-[18px] h-[18px]" />
+              </span>
+              <span className={`text-[11px] leading-none truncate max-w-full ${
+                aktywna ? 'font-bold text-foreground' : 'font-semibold text-muted-foreground'}`}>
+                {t(klucz)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+    </>
   );
 }

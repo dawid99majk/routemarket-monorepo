@@ -309,7 +309,7 @@ export default function TablicaPubliczna() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mt-8 items-start">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mt-8 items-start">
           {KUBELKI.map((k) => {
             const swoje = miejsca.filter((m) => m.priority === k.id);
             if (swoje.length === 0) return null;

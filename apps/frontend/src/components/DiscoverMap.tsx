@@ -85,6 +85,8 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
   /** Trzymamy w ref, żeby zmiana funkcji nie przepinała nasłuchu mapy. */
   const onObszarRef = useRef(onObszar);
   onObszarRef.current = onObszar;
+  /** Ostatni kadr pinezek — do odtworzenia, gdy ukryta mapa staje się widoczna. */
+  const ostatniKadr = useRef<L.LatLngBounds | null>(null);
 
   useEffect(() => {
     if (!boxRef.current || mapRef.current) return;
@@ -114,7 +116,17 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
     map.on('moveend', zglos);
     map.on('zoomend', zglos);
 
-    const ro = new ResizeObserver(() => map.invalidateSize());
+    // Na telefonie mapa czeka ukryta pod przełącznikiem „Lista / Mapa”. Kadr
+    // policzony w kontenerze o zerowym rozmiarze to widok całego świata, więc
+    // po odsłonięciu dopasowujemy go jeszcze raz do zapamiętanych pinezek.
+    let bylaUkryta = true;
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+      const r = map.getSize();
+      const widoczna = r.x >= 40 && r.y >= 40;
+      if (widoczna && bylaUkryta && ostatniKadr.current) map.fitBounds(ostatniKadr.current, { animate: false });
+      bylaUkryta = !widoczna;
+    });
     ro.observe(boxRef.current!);
     const t = setTimeout(() => map.invalidateSize(), 250);
 
@@ -180,7 +192,10 @@ function DiscoverMapInner({ places, start, aktywne, onPinClick, onPinHover, onOb
       map.invalidateSize();
       const punkty = kadrowe.map((p) => [p.lat, p.lng] as [number, number]);
       if (start && Number.isFinite(start.lat)) punkty.push([start.lat, start.lng]);
-      map.fitBounds(L.latLngBounds(punkty).pad(0.15), { animate: false });
+      if (punkty.length) {
+        ostatniKadr.current = L.latLngBounds(punkty).pad(0.15);
+        map.fitBounds(ostatniKadr.current, { animate: false });
+      }
     }
   }, [places, start, aktywne, onPinClick, onPinHover, doKadru]);
 

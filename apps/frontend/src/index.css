@@ -334,6 +334,16 @@
   .font-display-italic { font-family: 'Bricolage Grotesque', 'Figtree', sans-serif; }
   .font-narrow { font-family: 'Figtree', sans-serif; }
   .font-mono { font-family: 'Figtree', sans-serif; font-variant-numeric: tabular-nums; }
+  /* Dolny pasek zakładek na telefonie. Strona dostaje pod treścią tyle miejsca,
+     ile pasek zajmuje, a przyciski pływające ustawiają się nad nim przez
+     --dolny-pasek. Bez paska (strona główna dla gościa, logowanie) zmienna
+     nie istnieje i wszystko siedzi przy krawędzi ekranu. */
+  @media (max-width: 767px) {
+    body:has(.rm-dolny-pasek) {
+      --dolny-pasek: calc(64px + env(safe-area-inset-bottom));
+      padding-bottom: var(--dolny-pasek);
+    }
+  }
   /* Prawdziwy kod (fragment pliku GPX) zostaje w kroju o stałej szerokości. */
   pre.font-mono, code.font-mono, pre, code, kbd, samp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   /* Tytuły były pisane cienkim szeryfem (font-light). W tym kroju tytuł jest

@@ -428,7 +428,7 @@ export default function Start() {
         {!active ? (
           <div className="mt-8 max-w-[640px]">{noweWyjazdPanel}</div>
         ) : (
-          <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_400px] gap-5 items-stretch">
+          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-5 items-stretch">
             <div className="rounded-2xl bg-card shadow-token-md p-7 flex flex-col">
               <p className="flex items-center gap-2.5">
                 <span className="w-[7px] h-[7px] rounded-full bg-foreground" />
@@ -566,7 +566,7 @@ export default function Start() {
                 </p>
               </div>
             ) : (
-              <div className="border-t border-border grid md:grid-cols-2 lg:grid-cols-3">
+              <div className="border-t border-border grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {nice.slice(0, 3).map((p, i) => (
                   <div key={p.id} className={`px-6 py-5 ${i > 0 ? 'lg:border-l border-border' : ''}`}>
                     <div className="flex items-start gap-3.5">
@@ -603,7 +603,7 @@ export default function Start() {
         )}
 
         {projects.length > 0 && (
-          <div className="mt-10 grid lg:grid-cols-2 gap-5 items-start">
+          <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           <section>
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="font-display text-[18px]">{t('start.twoje_wyjazdy')}</h2>

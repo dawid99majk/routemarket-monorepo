@@ -115,10 +115,31 @@ Każdy ekran obsługuje: ładowanie (szkielet w kształcie treści, zaślepka zd
 `bg-placeholder-photo` #E7DCCF), pusto (jedno zdanie + jedna akcja), pusto po
 filtrach (co odfiltrowało + „Wyczyść filtry”), błąd (co nie wyszło + ponowienie).
 
-## Mobile
+## Mobile (od 28.09.2026)
 
-Ekrany są projektowane na desktop 1280–1440 px. Wersja mobilna nie jest jeszcze
-zaprojektowana — nie improwizuj breakpointów bez pytania. Cele dotyku ≥ 44 px.
+Poniżej `md` (768 px) obowiązują te wzorce — nie wymyślaj nowych:
+
+- **Nawigacja:** dolny pasek zakładek (`.rm-dolny-pasek` w `PlannerHeader`): Odkrywaj,
+  Tablica/Twoje wyjazdy, Plan dni, Inspiracje, Zapisane. U góry tylko znak słowny,
+  ikona pomocy „?” i awatar. Pasek ustawia zmienną `--dolny-pasek`; wszystko, co
+  pływa przy dole ekranu, liczy od niej: `bottom-[calc(var(--dolny-pasek,0px)_+_16px)]`.
+- **Jeden przycisk pływający** (nawigacja). Pomoc na telefonie otwiera ikona
+  w nagłówku (zdarzenie `rm:pomoc`).
+- **Mapa to warstwa, nie kolumna.** Odkrywaj: pływający przełącznik „Lista / Mapa”.
+  Tablica: zakładki „Na pewno · N / Być może · N / Mapa” — jedna kolumna naraz.
+  Mapa ukryta w chwili tworzenia sama dopasowuje kadr po odsłonięciu (DiscoverMap).
+- **Siatki zawsze z kolumną bazową:** `grid grid-cols-1 lg:grid-cols-[…]`. Bez
+  `grid-cols-1` kolumna rośnie do szerokości przewijanego paska w środku i cała
+  strona przewija się w poziomie (tak było w Odkrywaj: 1750 px na 375).
+- **Rzędy przycisków zawijają się** (`flex-wrap`), a pola w rzędzie mają `min-w-0`.
+- **Cele dotyku ≥ 44 px:** `PrzelacznikDecyzji` rośnie sam przy `pointer: coarse`;
+  na dotyku jest też zawsze widoczny (bez „hover”). Podpowiedzi o najeżdżaniu
+  kursorem ukrywaj przez `[@media(hover:none)]:hidden`.
+- **Okna** mają 12 px marginesu od krawędzi i zaokrąglenie 28 px; długie tytuły
+  zawijają się do dwóch wierszy, wyrównane do lewej.
+
+Test przed wdrożeniem zmiany układu: przy 375 px `document.documentElement.scrollWidth`
+musi równać się szerokości okna na każdym ekranie planera.
 
 ## Dostępność
 

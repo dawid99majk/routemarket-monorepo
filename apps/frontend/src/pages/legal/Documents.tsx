@@ -17,7 +17,7 @@ export default function Documents() {
       <h1>Documents</h1>
       <p className="text-muted-foreground mb-8">Everything governing how RouteMarket works and how your data is handled.</p>
 
-      <div className="grid gap-4 sm:grid-cols-2 not-prose">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 not-prose">
         {CORE_DOCS.map(({ to, icon: Icon, title, desc }) => (
           <Link key={to} to={to}>
             <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">

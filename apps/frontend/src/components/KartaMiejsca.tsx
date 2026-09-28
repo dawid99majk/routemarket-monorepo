@@ -100,15 +100,15 @@ export default function KartaMiejsca({ miejsce, onZamknij, decyzja, onDecyzja, l
           }
         }}
       >
-        <DialogHeader className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-border/60 shrink-0 bg-card flex items-center justify-between">
-          <DialogTitle className="flex items-center gap-2.5 pr-8 font-display text-xl sm:text-[24px] font-bold">
+        <DialogHeader className="px-5 py-3.5 sm:px-6 sm:py-4 border-b border-border/60 shrink-0 bg-card flex items-center justify-between text-left">
+          <DialogTitle className="flex items-center gap-2.5 pr-10 font-display text-xl sm:text-[24px] font-bold text-left">
             {miejsce.nr != null && (
               <span className="w-5 h-5 rounded-full bg-foreground text-background shrink-0
                                flex items-center justify-center text-[11px] font-medium font-sans">
                 {miejsce.nr}
               </span>
             )}
-            <span className="min-w-0 truncate">{miejsce.name}</span>
+            <span className="min-w-0 line-clamp-2 sm:line-clamp-1">{miejsce.name}</span>
           </DialogTitle>
         </DialogHeader>
 

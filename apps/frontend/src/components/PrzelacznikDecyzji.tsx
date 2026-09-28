@@ -1,7 +1,8 @@
 export type Kubelek = 'must' | 'nice' | 'rejected';
 
-const WYSOKOSC = { sm: 'h-9 text-[13px]', md: 'h-10 text-[13.5px]', lg: 'h-11 text-[15px]' } as const;
-const KOLKO = { sm: 'w-8 h-9', md: 'w-9 h-10', lg: 'w-11 h-11' } as const;
+// Na ekranie dotykowym każdy rozmiar rośnie do 44 px — palec to nie kursor.
+const WYSOKOSC = { sm: 'h-9 text-[13px] [@media(pointer:coarse)]:h-11', md: 'h-10 text-[13.5px] [@media(pointer:coarse)]:h-11', lg: 'h-11 text-[15px]' } as const;
+const KOLKO = { sm: 'w-8 h-9 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11', md: 'w-9 h-10 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:h-11', lg: 'w-11 h-11' } as const;
 
 /**
  * Decyzja o miejscu — jedna pigułka w Odkrywaj, na tablicy i w oknie miejsca.

@@ -83,6 +83,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [wyluskane, setWyluskane] = useState<any[] | null>(null);
   /** Jedno narzędzie naraz; otwieraniem zajmuje się pasek pod kubełkami. */
   const [narzedzie, setNarzedzie] = useState<NarzedzieId | null>(null);
+  /** Telefon: jedna kolumna decyzji naraz albo mapa. Trzy kolumny jedna pod drugą
+   *  kasowały sens porównywania kubełków, a mapa na końcu była nieosiągalna. */
+  const [kolumnaMobilna, setKolumnaMobilna] = useState<'must' | 'nice' | 'mapa'>('must');
   /** Grupowanie po kategoriach domyślnie wyłączone: przy jednej kategorii w kubełku
    *  podnagłówek powtarzał licznik kolumny tym samym numerem, tylko innym słowem. */
   /**
@@ -1422,7 +1425,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
          nie skacze, gdy dane dojdą, i widać z góry, że idą kolumny. */
       <div className="space-y-5" aria-busy="true" aria-label="Wczytuję tablicę">
         <Skeleton className="h-12 w-full rounded-md" />
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {[0, 1].map((k) => (
             <div key={k} className="rounded-2xl bg-card shadow-token-md overflow-hidden">
               <Skeleton className="h-12 w-full rounded-none" />
@@ -1557,7 +1560,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
 
       <div className="space-y-5">
         {creating && (
-          <div className="grid gap-2 sm:grid-cols-4 p-4 bg-muted/50 rounded-md">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4 p-4 bg-muted/50 rounded-md">
             <Input placeholder={t('tablica.nazwa_np_bukareszt_delegacja')} value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })} className="sm:col-span-2" />
             <Input placeholder={t('tablica.miasto')} value={form.destination}
@@ -1631,7 +1634,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
               </span>
             )}
           </button>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             {/* Współdzielenie w nagłówku, bo to informacja o wyjeździe, a nie czynność.
                 Zarządzanie osobami zostaje niżej, przy polu z adresem. */}
             {active && shares.length > 0 && (
@@ -1655,7 +1658,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
             {/* W planie dni „Nowa tablica" była trzecim przyciskiem bez związku z tym,
                 co się tu robi — zostaje w widoku tablicy. */}
             {view !== 'plan' && (
-              <Button variant="outline" onClick={() => setCreating((v) => !v)}>
+              <Button variant="outline" onClick={() => setCreating((v) => !v)} className="hidden sm:inline-flex">
                 <Plus className="w-4 h-4 mr-1" /> {t('tablica.nowa_tablica')}
               </Button>
             )}
@@ -2251,7 +2254,21 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     </div>
                   );
                 })()}
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="md:hidden mb-3 flex rounded-full bg-muted p-1">
+                  {([
+                    ['must', 'Na pewno', places.filter((p) => p.priority === 'must').length],
+                    ['nice', 'Być może', places.filter((p) => p.priority === 'nice').length],
+                    ['mapa', 'Mapa', null],
+                  ] as const).map(([id, etykieta, ile]) => (
+                    <button key={id} type="button" aria-pressed={kolumnaMobilna === id}
+                      onClick={() => setKolumnaMobilna(id)}
+                      className={`flex-1 h-11 rounded-full text-[14px] font-bold transition-colors ${
+                        kolumnaMobilna === id ? 'bg-card text-foreground shadow-token-sm' : 'text-muted-foreground'}`}>
+                      {etykieta}{ile != null && <span className="tabular-nums"> · {ile}</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   {ZONES.filter((z) => z.id !== 'rejected').map((zone) => {
                     const zonePlaces = places.filter((p) => p.priority === zone.id);
                     return (
@@ -2263,7 +2280,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                           const id = e.dataTransfer.getData('text/plain');
                           if (id) movePlace(id, zone.id);
                         }}
-                        className="rounded-lg min-h-[160px] bg-muted transition-colors"
+                        className={`${kolumnaMobilna === zone.id ? '' : 'hidden'} md:block rounded-lg min-h-[160px] bg-muted transition-colors min-w-0`}
                       >
                         {/* Kolumna decyzji: kropka i licznik w kolorze kubełka, reszta atramentem. */}
                         <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
@@ -2391,8 +2408,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       zajęła mapa: przy kurowaniu tablicy najczęściej pada pytanie „czy to się
                       w ogóle da obejść w jeden dzień", a na to odpowiada geografia, nie lista.
                       Pozostałe dwie kolumny zachowują dotychczasową szerokość. */}
-                  <div className="rounded-lg bg-card shadow-token-md overflow-hidden flex flex-col
-                             self-start md:sticky md:top-[88px]">
+                  <div className={`${kolumnaMobilna === 'mapa' ? 'flex' : 'hidden'} md:flex rounded-lg bg-card shadow-token-md overflow-hidden flex-col
+                             self-start md:sticky md:top-[88px] min-w-0`}>
                     <div className="flex items-center justify-between px-4 py-3">
                       <h3 className="font-display text-[18px] font-bold">Na mapie</h3>
                       <span className="text-[12.5px] font-semibold tabular-nums text-muted-foreground">
@@ -2427,7 +2444,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                     )}
                   </div>
                 </div>
-                <p className="text-[12px] text-muted-foreground mt-3">
+                <p className="text-[12px] text-muted-foreground mt-3 [@media(hover:none)]:hidden">
                   Najedź na kartkę, żeby zmienić decyzję. Przeciąganie też działa — upuść kartkę
                   na inną, żeby ustawić kolejność w kolumnie.
                 </p>
@@ -2713,7 +2730,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                   </div>
                 )}
 
-                <div className="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
                   <div className="space-y-4">
                 {(plan.days || [])
                   .filter((_: any, i: number) => i === Math.min(planDay, (plan.days || []).length - 1))

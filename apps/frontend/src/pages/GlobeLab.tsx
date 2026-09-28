@@ -51,7 +51,7 @@ export default function GlobeLab() {
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-md border border-border bg-card px-4 py-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Route className="h-4 w-4" />
