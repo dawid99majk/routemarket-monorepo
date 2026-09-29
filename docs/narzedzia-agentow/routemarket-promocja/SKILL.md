@@ -17,7 +17,8 @@ node fabryka.mjs tematy                   # tablice i miasta do wyboru
 node fabryka.mjs miasto "Rzym"            # paczka z katalogu miasta
 node fabryka.mjs tablica <id>             # paczka z publicznej tablicy
 node fabryka.mjs tydzien --od RRRR-MM-DD  # 3 tematy + kalendarz.csv (12 publikacji)
-node og.mjs && node marka.mjs             # obrazek podglądu linku, logo, awatar, favicon
+node og.mjs && node marka.mjs             # obrazek podglądu linku, logo, awatar, favicon, okładki FB i YT
+node zdjecia_licencje.mjs --raport        # licencje zdjęć w serwisie (na VPS; cron co godzinę)
 ```
 
 Paczka tygodniowa powstaje sama w piątek o 16:00 (launchd `io.routemarket.fabryka`,
@@ -51,6 +52,13 @@ i wykrzykników, ograniczenie mówione wprost, nazwy własne bez tłumaczenia.
 Liczby w materiałach składa kod z bazy (`lib/teksty.mjs`) — nie przepisywać ich
 modelem. Przypadki nazw miast: `PRZYPADKI` w `lib/formaty.mjs` („we Wrocławiu”);
 nowe miasto w katalogu = nowy wpis, inaczej zdania z dwukropkiem.
+
+## Konta i zestaw startowy
+
+`kit-kont.md` w fabryce: bio (limity policzone), tablice Pinteresta, szkice odpowiedzi na komentarze
+(prawdziwe na 29.09.2026 — stan produktu sprawdzić przed cytowaniem), zasady dla grup na Facebooku,
+konfiguracja Meta Business Suite i Buffera. Podpisy autorów zdjęć w samym serwisie: tabela
+`zdjecia_licencje`, komponenty `PodpisZdjecia` i `AutorzyZdjec`.
 
 ## Przegląd paczki przed oddaniem Dawidowi
 
