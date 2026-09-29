@@ -17,6 +17,20 @@ export const ROZMIARY = {
   pin: { w: 1000, h: 1500 },
 };
 
+/**
+ * Znak marki — ten sam romb „RM” z linią trasy co `RMMark` w Logo.tsx.
+ * Na ciemnym tle romb jest jasny, inaczej atrament znika w atramencie.
+ */
+export function znak(px = 40, ciemne = false) {
+  const romb = ciemne ? '#F5F1EC' : '#25243A';
+  const litery = ciemne ? '#25243A' : '#F5F1EC';
+  return `<svg width="${px}" height="${px}" viewBox="0 0 40 40" fill="none" style="flex:none">
+<g transform="rotate(45 20 20)"><rect x="4" y="4" width="32" height="32" rx="6" fill="${romb}"/></g>
+<path d="M6 30 Q 14 22, 20 20 T 34 10" stroke="#F6CFAE" stroke-width="2.25" stroke-linecap="round" fill="none"/>
+<circle cx="6" cy="30" r="2" fill="#F6CFAE"/><circle cx="34" cy="10" r="2.4" fill="${litery}" stroke="#F6CFAE" stroke-width="1.5"/>
+<text x="20" y="24" text-anchor="middle" font-family="Figtree, sans-serif" font-weight="700" font-size="11" letter-spacing="0.05em" fill="${litery}" opacity="0.92">RM</text></svg>`;
+}
+
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const src = (plik) => pathToFileURL(plik).href;
 
@@ -35,8 +49,6 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:${tlo};color:var
 font-family:Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 .display{font-family:'Bricolage Grotesque',Figtree,sans-serif;font-weight:700;letter-spacing:-0.02em;line-height:1.02;text-wrap:balance}
 .znak{display:inline-flex;align-items:center;gap:14px;font-weight:700;font-size:30px;letter-spacing:-0.01em}
-.znak i{width:40px;height:40px;border-radius:12px;background:var(--atrament);display:inline-block;position:relative}
-.znak i::after{content:"";position:absolute;inset:11px;border-radius:50%;border:4px solid var(--znak-srodek,var(--tlo))}
 .pigulka{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:12px 22px;font-size:26px;font-weight:600;background:var(--karta);box-shadow:0 2px 8px rgba(37,36,58,.08)}
 .pigulka.pewne{background:var(--zielen);color:#fff}
 .pigulka.moze{background:var(--brzoskwinia);color:var(--brzoskwinia-tekst)}
@@ -56,7 +68,7 @@ export function okladka({ w, h, zdjecie, nadtytul, tytul, fakty }) {
   return BAZA(w, h, '#1d1c2b') + `
 <div style="position:absolute;inset:0;background:url('${src(zdjecie.plik)}') center/cover"></div>
 <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(20,19,32,.35) 0%,rgba(20,19,32,0) 22%,rgba(20,19,32,0) 42%,rgba(20,19,32,.88) 100%)"></div>
-<div style="position:absolute;left:64px;top:64px" class="znak"><span style="color:#fff;display:inline-flex;gap:14px;align-items:center"><i style="background:#fff;--znak-srodek:var(--atrament)"></i>routemarket</span></div>
+<div style="position:absolute;left:64px;top:64px" class="znak"><span style="color:#fff;display:inline-flex;gap:14px;align-items:center">${znak(44, true)}routemarket</span></div>
 <div style="position:absolute;left:64px;right:64px;bottom:${pion ? 300 : 120}px;color:#fff">
   ${nadtytul ? `<div style="font-size:30px;font-weight:600;opacity:.9;margin-bottom:22px">${esc(nadtytul)}</div>` : ''}
   <div class="display" style="font-size:${tytul.length > 22 ? 104 : 124}px">${esc(tytul)}</div>
@@ -85,7 +97,7 @@ export function miejsce({ w, h, nr, razem, m, zdjecie, pewne }) {
   ${fakty.length ? `<div style="margin-top:24px;display:flex;flex-wrap:wrap;gap:12px">${fakty.map((f) => `<span class="pigulka">${esc(f)}</span>`).join('')}</div>` : ''}
   ${m.wyroznik ? `<div style="margin-top:28px;font-size:${pion ? 38 : 33}px;line-height:1.36;color:var(--atrament);max-width:940px">${esc(m.wyroznik)}</div>` : ''}
 </div>
-<div style="position:absolute;left:64px;bottom:${pion ? 250 : 44}px" class="znak"><i></i>routemarket</div>
+<div style="position:absolute;left:64px;bottom:${pion ? 250 : 44}px" class="znak">${znak(44)}routemarket</div>
 </body></html>`;
 }
 
@@ -97,7 +109,7 @@ export function agent({ w, h, tytul, tekst }) {
   <div class="display" style="font-size:${pion ? 96 : 78}px;margin-bottom:60px">${esc(tytul)}</div>
   <div class="dymek"><div class="a">A</div><div class="tresc"><div class="kto">Agent RouteMarket</div>${esc(tekst)}</div></div>
 </div>
-<div style="position:absolute;left:64px;bottom:${pion ? 250 : 56}px" class="znak"><i></i>routemarket</div>
+<div style="position:absolute;left:64px;bottom:${pion ? 250 : 56}px" class="znak">${znak(44)}routemarket</div>
 </body></html>`;
 }
 
@@ -106,7 +118,7 @@ export function cta({ w, h, tytul, tekst, adres }) {
   const pion = h / w > 1.5;
   return BAZA(w, h, 'var(--atrament)') + `
 <div style="position:absolute;left:64px;right:64px;top:${pion ? 520 : 150}px;color:#fff">
-  <div class="znak" style="color:#fff"><i style="background:#fff;--znak-srodek:var(--atrament)"></i>routemarket</div>
+  <div class="znak" style="color:#fff">${znak(44, true)}routemarket</div>
   <div class="display" style="font-size:112px;margin-top:70px">${esc(tytul)}</div>
   <div style="font-size:40px;line-height:1.35;margin-top:44px;opacity:.86;max-width:900px">${esc(tekst)}</div>
   <div style="margin-top:64px;display:inline-flex;border-radius:999px;background:#fff;color:var(--atrament);padding:26px 44px;font-size:40px;font-weight:700">${esc(adres)}</div>
@@ -129,7 +141,7 @@ export function zrodla({ w, h, linie, uwagaSA }) {
   </ol>
   ${uwagaSA ? `<div style="margin-top:22px;font-size:20px;color:var(--cichy)">${esc(uwagaSA)}</div>` : ''}
 </div>
-<div style="position:absolute;left:64px;bottom:44px" class="znak"><i></i>routemarket</div>
+<div style="position:absolute;left:64px;bottom:44px" class="znak">${znak(44)}routemarket</div>
 </body></html>`;
 }
 
@@ -147,7 +159,7 @@ ${c ? kafel(c, 'left:632px;top:434px;width:332px;height:382px') : ''}
   <div style="margin-top:26px;font-size:36px;line-height:1.35;color:var(--cichy)">${esc(podtytul)}</div>
 </div>
 <div style="position:absolute;left:56px;right:56px;bottom:56px;display:flex;justify-content:space-between;align-items:center">
-  <span class="znak"><i></i>routemarket</span>
+  <span class="znak">${znak(44)}routemarket</span>
   <span class="pigulka" style="background:var(--atrament);color:#fff">${esc(adres)}</span>
 </div>
 <div style="position:absolute;left:56px;right:56px;bottom:124px;font-size:15px;color:var(--cichy);line-height:1.3">${esc(zdjecia.map((z) => z.podpis.replace(/^Fot\. /, '')).join(' | '))}</div>
