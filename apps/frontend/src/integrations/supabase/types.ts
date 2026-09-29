@@ -1280,6 +1280,39 @@ export type Database = {
         }
         Relationships: []
       }
+      zdjecia_licencje: {
+        Row: {
+          autor: string | null
+          dozwolona: boolean
+          licencja: string | null
+          licencja_url: string | null
+          plik: string
+          rodzaj: string | null
+          sprawdzono_at: string
+          strona: string | null
+        }
+        Insert: {
+          autor?: string | null
+          dozwolona?: boolean
+          licencja?: string | null
+          licencja_url?: string | null
+          plik: string
+          rodzaj?: string | null
+          sprawdzono_at?: string
+          strona?: string | null
+        }
+        Update: {
+          autor?: string | null
+          dozwolona?: boolean
+          licencja?: string | null
+          licencja_url?: string | null
+          plik?: string
+          rodzaj?: string | null
+          sprawdzono_at?: string
+          strona?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       ai_usage_summary: {

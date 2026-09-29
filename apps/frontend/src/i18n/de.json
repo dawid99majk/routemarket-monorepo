@@ -609,5 +609,12 @@
     "blad_zakladania": "Ich konnte die Reise nicht anlegen.",
     "opis_seo": "{{miasto}}: {{ile}} mit Besichtigungsdauer und Öffnungszeiten. Insgesamt {{czas}} — bei 6 Stunden am Tag sind das {{dni}}.",
     "link_z_miejsca": "alle Orte mit Besichtigungsdauer"
+  },
+  "zdjecia": {
+    "fot": "Foto:",
+    "autor_nieznany": "Autor unbekannt",
+    "zrodlo_commons": "Foto: Wikimedia Commons (Autor und Lizenz auf der Dateiseite)",
+    "autorzy_tytul_one": "Bildnachweis ({{count}})",
+    "autorzy_tytul_other": "Bildnachweise ({{count}})"
   }
 }

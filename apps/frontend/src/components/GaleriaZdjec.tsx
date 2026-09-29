@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Zdjecie from '@/components/Zdjecie';
+import PodpisZdjecia from '@/components/PodpisZdjecia';
 import { ChevronLeft, ChevronRight, Maximize2, X, MapPin } from 'lucide-react';
 
 interface GaleriaZdjecProps {
@@ -193,6 +194,9 @@ export default function GaleriaZdjec({
         )}
       </div>
 
+      {/* Autor i licencja aktualnego zdjęcia — CC BY / CC BY-SA tego wymagają. */}
+      <PodpisZdjecia src={zdjecia[teraz]} className="text-muted-foreground -mt-0.5" />
+
       {/* ── Pasek miniatur pod kadrem ── */}
       {ile > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-none">
@@ -234,6 +238,7 @@ export default function GaleriaZdjec({
                 <span className="font-mono text-xs text-white/60 tabular-nums">
                   Zdjęcie {teraz + 1} z {ile}
                 </span>
+                <PodpisZdjecia src={zdjecia[teraz]} className="text-white/70 mt-1 pointer-events-auto" />
               </div>
 
               <div className="flex items-center gap-3 shrink-0">

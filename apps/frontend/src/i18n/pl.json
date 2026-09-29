@@ -635,5 +635,14 @@
     "blad_zakladania": "Nie udało mi się założyć wyjazdu.",
     "opis_seo": "{{miasto}}: {{ile}} z czasem zwiedzania i godzinami otwarcia. Razem {{czas}} — przy 6 godzinach dziennie to {{dni}}.",
     "link_z_miejsca": "wszystkie miejsca z czasem zwiedzania"
+  },
+  "zdjecia": {
+    "fot": "Fot.",
+    "autor_nieznany": "autor nieznany",
+    "zrodlo_commons": "Zdjęcie: Wikimedia Commons (autor i licencja na stronie pliku)",
+    "autorzy_tytul_one": "Autor zdjęcia ({{count}})",
+    "autorzy_tytul_few": "Autorzy zdjęć ({{count}})",
+    "autorzy_tytul_many": "Autorzy zdjęć ({{count}})",
+    "autorzy_tytul_other": "Autorzy zdjęć ({{count}})"
   }
 }

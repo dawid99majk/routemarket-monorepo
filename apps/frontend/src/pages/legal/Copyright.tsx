@@ -32,6 +32,13 @@ export default function Copyright() {
       <p>
         Map data comes from OpenStreetMap and is available under the Open Database Licence.
       </p>
+      <p>
+        Photographs come from Wikimedia Commons. Under each large photograph we show its
+        author, licence and a link to the file page; on pages with many photographs (a
+        city, a public board) the list of authors sits at the bottom of the page. The
+        licence data are read from Commons and refreshed regularly — if you find a
+        photograph with a wrong or missing credit, write to us and we will fix or remove it.
+      </p>
 
       <h2>3. Your own content</h2>
       <p>

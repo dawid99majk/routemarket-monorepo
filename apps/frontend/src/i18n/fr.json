@@ -618,5 +618,13 @@
     "blad_zakladania": "Je n'ai pas pu créer le voyage.",
     "opis_seo": "{{miasto}} : {{ile}} avec durée de visite et horaires. {{czas}} au total — à 6 heures par jour, cela fait {{dni}}.",
     "link_z_miejsca": "tous les lieux avec durée de visite"
+  },
+  "zdjecia": {
+    "fot": "Photo :",
+    "autor_nieznany": "auteur inconnu",
+    "zrodlo_commons": "Photo : Wikimedia Commons (auteur et licence sur la page du fichier)",
+    "autorzy_tytul_one": "Crédit photo ({{count}})",
+    "autorzy_tytul_many": "Crédits photo ({{count}})",
+    "autorzy_tytul_other": "Crédits photo ({{count}})"
   }
 }

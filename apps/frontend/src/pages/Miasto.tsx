@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import PlannerHeader from '@/components/PlannerHeader';
 import SEO from '@/components/SEO';
 import AgentDymek from '@/components/AgentDymek';
+import { AutorzyZdjec } from '@/components/PodpisZdjecia';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import Zdjecie from '@/components/Zdjecie';
 import { Button } from '@/components/ui/button';
@@ -300,6 +301,8 @@ export default function Miasto() {
             {t('miasto.cta_przycisk')} <ArrowUpRight className="w-4 h-4 ml-1.5" />
           </Button>
         </section>
+
+        <AutorzyZdjec zdjecia={miejsca.map((m) => m.photos?.[0])} className="mt-14" />
 
         {inneMiasta.length > 0 && (
           <nav className="mt-14" aria-labelledby="inne-miasta">

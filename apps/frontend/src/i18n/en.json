@@ -609,5 +609,12 @@
     "blad_zakladania": "I couldn't create the trip.",
     "opis_seo": "{{miasto}}: {{ile}} with visiting times and opening hours. {{czas}} in total — at 6 hours a day that is {{dni}}.",
     "link_z_miejsca": "all places with visiting times"
+  },
+  "zdjecia": {
+    "fot": "Photo:",
+    "autor_nieznany": "author unknown",
+    "zrodlo_commons": "Photo: Wikimedia Commons (author and licence on the file page)",
+    "autorzy_tytul_one": "Photo credit ({{count}})",
+    "autorzy_tytul_other": "Photo credits ({{count}})"
   }
 }

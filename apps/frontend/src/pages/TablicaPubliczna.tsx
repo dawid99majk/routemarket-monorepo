@@ -12,6 +12,7 @@ import { inicjalyUzytkownika } from '@/lib/uzytkownik';
 import { glosujNaMiejsce, wczytajMojeGlosy } from '@/lib/glosowanie';
 import { useTranslation } from 'react-i18next';
 import SEO from '@/components/SEO';
+import { AutorzyZdjec } from '@/components/PodpisZdjecia';
 import { odmien } from '@/lib/odmiana';
 
 const KUBELKI = [
@@ -370,6 +371,8 @@ export default function TablicaPubliczna() {
             </div>
           )}
         </div>
+
+        <AutorzyZdjec zdjecia={miejsca.map((m) => m.image_url)} className="mt-8" />
 
         {tablica.copy_count > 0 && (
           <p className="font-mono text-[12px] tabular-nums text-muted-foreground mt-6">
