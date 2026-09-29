@@ -518,7 +518,12 @@ export async function przygotujKontekst(
     center = await geocodingService.geocodeSettlement(zadanie.destination);
     const [sights, food] = await Promise.all([
       poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'city_walk', { limit: 40 }),
-      poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 15 }).catch(() => []),
+      // 60, nie 15: piętnaście najbliższych środkowi miasta to lokale z jednej strony
+      // (Kopenhaga: same z zachodu), a dzień z kotwicami na wschodzie (Christiania,
+      // 2 km dalej) nie miał w pobliżu żadnego — model wpisywał „Lunch w okolicy”.
+      // Lista jest z pamięci podręcznej, więc większy wycinek nic nie kosztuje;
+      // rozdzielPoi wybierze z niego lokale bliskie kotwicom każdego dnia.
+      poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 60 }).catch(() => []),
     ]);
     const przypiete = new Set(zadanie.places.map((p) => p.name.toLowerCase()));
     const nieprzypiete = (c: any) => !przypiete.has(c.name.toLowerCase());
@@ -883,11 +888,14 @@ function odsiejZamkniete(k: KontekstPlanu, dzien: DzienPlanu, numer: number): vo
         || a.km - b.km)[0];
     if (!wybor) return null;
     zajete.add(kluczGodzin(wybor.c.name));
+    // Kościół wstawiony za muzeum dostawał jego 105 minut (Kopenhaga: Helligåndskirken
+    // zamiast Thorvaldsens Museum). Obiekty „na chwilę” mają własny, krótki czas.
+    const KROTKIE = /^(church|chapel|place_of_worship|monument|memorial|statue|fountain|viewpoint|artwork|bridge|city_gate|square|poi)$/;
     return {
       time: poz.time,
       name: wybor.c.name,
       kind: wybor.c.kind,
-      minutes: poz.minutes,
+      minutes: KROTKIE.test(String(wybor.c.kind || '')) ? Math.min(poz.minutes || 40, 40) : poz.minutes,
       source: 'suggested',
       lat: wybor.c.lat,
       lng: wybor.c.lng,
@@ -1066,6 +1074,7 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   przypnijBaze(k, dzien);
   uzupelnijWspolrzedne(k, dzien);
   przywrocKotwice(k, dzien, numer);
+  zastapPosilekBezLokalu(k, dzien, numer);
   sprawdzOdleglosci(k, dzien, numer);
   // Przesiewamy na pełnej liście, zanim strażnik godzin cokolwiek wytnie — uwaga
   // modelu o wyciętym miejscu przeczyłaby temu, co o nim napisze kod.
@@ -1088,6 +1097,19 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
 
   // "Nie zmieściło się" ma mówić o tym, co użytkownik przypiął na ten dzień.
   const kotwice = new Set((k.grupy[numer - 1] ?? []).map((p) => p.name.trim().toLowerCase()));
+  // Powody od modelu o zamknięciu sprawdzamy danymi: Ny Carlsberg Glyptotek wypadł
+  // z „Muzeum jest zamknięte w niedzielę”, a w OSM ma `Fr-Su 10:00-17:00`. Gdy dane
+  // mówią, że tego dnia jest otwarte, powód jest fałszywy — wypada z braku czasu.
+  const godzinyMiejsc = mapaGodzin(k);
+  const dataDnia = k.dni[numer - 1]?.dateObj;
+  for (const n of dzien.not_scheduled ?? []) {
+    const spec = godzinyMiejsc.get(kluczGodzin(n.name));
+    if (!spec || !dataDnia || !n.reason) continue;
+    if (!/zamk|nieczyn|closed|geschlossen/i.test(n.reason) || /^zamknięte o zaplanowanej godzinie$/.test(n.reason)) continue;
+    if ((openIntervalsOn(spec, dataDnia) ?? []).length > 0) {
+      n.reason = 'Nie zmieściło się w planie tego dnia — przenieś na inny dzień albo wydłuż okno.';
+    }
+  }
   dzien.not_scheduled = (dzien.not_scheduled || [])
     .filter((n) => n?.name && kotwice.has(String(n.name).trim().toLowerCase()))
     .filter((n, i, arr) =>
@@ -1621,6 +1643,53 @@ export function dopiszNieznaneGodziny(k: KontekstPlanu, dzien: DzienPlanu, numer
   if (!bez.length) return;
   const lista = bez.length <= 3 ? bez.map((n) => `„${n}”`).join(', ') : `${bez.length} miejsc tego dnia`;
   (dzien.warnings ??= []).push(`Godzin otwarcia nie znamy dla: ${lista} — sprawdź je przed wyjściem.`);
+}
+
+/**
+ * „Lunch w okolicy Christianii” to nie miejsce: nie da się go pokazać na mapie ani
+ * sprawdzić godzin (zasada 7 z promptu). Model wpisuje takie pozycje, gdy nie ma
+ * lokalu pod ręką — a lokale są w puli dnia. Wpis bez nazwy własnej zastępuje
+ * najbliższy lokal otwarty o tej porze; gdy żadnego nie ma, zostaje jak był.
+ */
+export function zastapPosilekBezLokalu(k: KontekstPlanu, dzien: DzienPlanu, numer: number): void {
+  const info = k.dni[numer - 1];
+  const pula = (k.lokaleDnia[numer - 1]?.length ? k.lokaleDnia[numer - 1] : k.lokale) ?? [];
+  if (!pula.length || !info) return;
+  const nazwaPosilku = /^(lunch|obiad|kolacja|[śs]niadanie|posi[łl]ek|przekąska|przekaska|kawa|przerwa na (lunch|obiad|kaw[ęe]))\b/i;
+  const znane = new Set<string>([
+    ...k.lokale.map((c) => kluczGodzin(c.name)),
+    ...k.zadanie.places.map((p) => kluczGodzin(p.name)),
+  ]);
+  const zajete = new Set<string>([
+    ...dzien.items.map((p) => kluczGodzin(p.name)),
+    ...k.grupy.flat().map((p) => kluczGodzin(p.name)),
+  ]);
+  const bazaPkt: { lat: number; lng: number } | null = k.baza ? { lat: k.baza.lat, lng: k.baza.lng } : null;
+  dzien.items.forEach((it, i) => {
+    if (it.baza || it.kind === 'walk' || !nazwaPosilku.test(it.name) || znane.has(kluczGodzin(it.name))) return;
+    const poprzedni = [...dzien.items.slice(0, i)].reverse().find((x) => !x.baza && maPunkt(x));
+    const punkt = maPunkt(it) ? { lat: it.lat!, lng: it.lng! }
+      : poprzedni ? { lat: poprzedni.lat!, lng: poprzedni.lng! } : bazaPkt;
+    if (!punkt) return;
+    const kawa = /^(kawa|przerwa na kaw)/i.test(it.name);
+    const wejscie = czasNaMinuty(it.time);
+    const wybor = pula
+      .filter((c) => typeof c.lat === 'number' && !zajete.has(kluczGodzin(c.name)))
+      .map((c) => ({ c, km: kmOd(punkt, c),
+        otwarte: Number.isFinite(wejscie) ? isOpenDuring(c.openingHours, info.dateObj, wejscie, it.minutes || 45) : null }))
+      .filter((x) => x.otwarte !== false && x.km <= 2)
+      .sort((a, b) => Number(b.otwarte === true) - Number(a.otwarte === true)
+        || Number(kawa ? b.c.kind === 'cafe' : /^(restaurant|fast_food|food_court)$/.test(String(b.c.kind || '')))
+          - Number(kawa ? a.c.kind === 'cafe' : /^(restaurant|fast_food|food_court)$/.test(String(a.c.kind || '')))
+        || a.km - b.km)[0];
+    if (!wybor) return;
+    zajete.add(kluczGodzin(wybor.c.name));
+    console.warn(`[planer] dzień ${numer}: „${it.name}” bez lokalu → „${wybor.c.name}”`);
+    Object.assign(it, {
+      name: wybor.c.name, kind: wybor.c.kind, lat: wybor.c.lat, lng: wybor.c.lng,
+      source: 'suggested' as const, approx: false, note: 'Lokal z listy, blisko poprzedniego punktu.',
+    });
+  });
 }
 
 /**
