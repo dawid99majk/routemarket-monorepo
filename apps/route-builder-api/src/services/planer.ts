@@ -1573,6 +1573,18 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
     const kandydaci = przystanki().filter((it) => it.source !== 'suggested'
       && priorytet.get(it.name.trim().toLowerCase()) === 'nice');
     if (!kandydaci.length) return;
+    // Najpierw krótsza wizyta zamiast rezygnacji (zasada 5 z promptu). W Poznaniu
+    // Cytadela (180 min) wypadała przy 20 min nadmiaru i dzień kończył się o 15:05.
+    // Skracamy najdłuższą, o ile zostaje jej co najmniej połowa i 45 min.
+    const nadmiar = Math.ceil((koniecDnia() - koniecOkna) / 5) * 5;
+    const najdluzsza = kandydaci.reduce((a, b) => ((b.minutes || 60) > (a.minutes || 60) ? b : a));
+    const skrocona = (najdluzsza.minutes || 60) - nadmiar;
+    if (skrocona >= Math.max(45, (najdluzsza.minutes || 60) / 2)) {
+      najdluzsza.note = `Skrócone do ${skrocona} min, żeby zmieścić się w oknie dnia.`;
+      najdluzsza.minutes = skrocona;
+      przesunWczesniej(dzien.items.indexOf(najdluzsza) + 1, nadmiar);
+      continue;
+    }
     const ofiara = kandydaci.reduce((a, b) => (oszczednosc(b) > oszczednosc(a) ? b : a));
     const ile = oszczednosc(ofiara);
     const od = wytnij(ofiara);
