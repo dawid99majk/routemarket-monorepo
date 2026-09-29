@@ -142,6 +142,9 @@ const CATEGORY_SELECTORS: Record<string, string[]> = {
     'node["amenity"="fountain"]["name"]',
     'nwr["amenity"~"^(theatre|marketplace)$"]["name"]',
     'nwr["amenity"="place_of_worship"]["wikipedia"]["name"]',
+    // Mała Syrenka ma tylko `tourism=artwork` — bez tego wiersza Kopenhaga nie
+    // miała swojego symbolu. Tylko z artykułem, inaczej przyjdą tysiące murali.
+    'nwr["tourism"="artwork"]["wikipedia"]["name"]',
     // Krzywa Wieża w Toruniu ma tylko `man_made=tower` i artykuł w Wikipedii —
     // bez tego wiersza żaden selektor jej nie widział.
     'nwr["man_made"="tower"]["wikipedia"]["name"]'

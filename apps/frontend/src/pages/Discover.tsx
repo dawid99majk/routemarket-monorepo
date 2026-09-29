@@ -86,6 +86,7 @@ interface CatalogPlace {
   visit_minutes: number | null;
   vibe_tags: string[];
   pin_count: number;
+  waznosc?: number | null;
   wyroznik?: string | null;
   wyroznik_i18n?: Record<string, string> | null;
 }
@@ -535,10 +536,12 @@ export default function Discover() {
         if (aCmentarz !== bCmentarz) return aCmentarz - bCmentarz;
       }
 
-      // 3. Miejsca z wyróżnikiem redakcyjnym wyżej
-      const aWyr = a.wyroznik ? 1 : 0;
-      const bWyr = b.wyroznik ? 1 : 0;
-      if (bWyr !== aWyr) return bWyr - aWyr;
+      // 3. Rozpoznawalność (wersje językowe Wikipedii). Wcześniej wyżej szły miejsca
+      //    z wyróżnikiem — a wyróżnik to zdanie od modelu, które filtr potrafi
+      //    odrzucić: Zamek Rosenborg (38 wersji) spadał za Operę i kościoły tylko
+      //    dlatego, że jego zdanie trzy razy odpadło na zakazanym słowie.
+      const w = (b.waznosc ?? -1) - (a.waznosc ?? -1);
+      if (w !== 0) return w;
 
       return (b.pin_count ?? 0) - (a.pin_count ?? 0);
     });
@@ -550,8 +553,14 @@ export default function Discover() {
    * co jest blisko siebie, a nie wszystko, co miasto ma do zaoferowania.
    * Miejsca bez współrzędnych zostają zawsze: nie da się orzec, czy są w kadrze.
    */
+  const [szerokiEkran, setSzerokiEkran] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
   const wObszarze = useMemo(() => {
     if (!pokazMape || !tylkoZObszaru || !obszar) return visible;
+    // Mapa schowana (wąski ekran w trybie „Lista”) — jej ostatni kadr nie może
+    // przycinać listy. W Kopenhadze znikały tak Mała Syrenka, Amalienborg
+    // i Rosenborg: lista pokazywała 51 z 61 miejsc według niewidocznej mapy.
+    if (!szerokiEkran && !mapaMobilna) return visible;
     // Kadr o zerowej rozpiętości znaczy, że mapa nie ma rozmiaru — filtrowanie
     // po nim wycięłoby wszystko.
     if (obszar.pn - obszar.pd < 1e-6 || obszar.wsch - obszar.zach < 1e-6) return visible;
@@ -559,7 +568,7 @@ export default function Discover() {
       if (p.lat == null || p.lng == null) return true;
       return p.lat <= obszar.pn && p.lat >= obszar.pd && p.lng <= obszar.wsch && p.lng >= obszar.zach;
     });
-  }, [visible, obszar, tylkoZObszaru, pokazMape]);
+  }, [visible, obszar, tylkoZObszaru, pokazMape, szerokiEkran, mapaMobilna]);
 
   /** Widoczny wycinek. Filtrowanie idzie po całości, przycinamy dopiero na końcu. */
   const widoczne = useMemo(() => wObszarze
@@ -573,7 +582,10 @@ export default function Discover() {
   useEffect(() => {
     const sm = window.matchMedia('(min-width: 640px)');
     const lg = window.matchMedia('(min-width: 1024px)');
-    const licz = () => setIleKolumn(lg.matches && !pokazMape ? 3 : sm.matches ? 2 : 1);
+    const licz = () => {
+      setIleKolumn(lg.matches && !pokazMape ? 3 : sm.matches ? 2 : 1);
+      setSzerokiEkran(lg.matches);
+    };
     licz();
     sm.addEventListener('change', licz);
     lg.addEventListener('change', licz);

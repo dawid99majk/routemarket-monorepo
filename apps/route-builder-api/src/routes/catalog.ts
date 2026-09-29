@@ -362,7 +362,9 @@ export async function zbierzMiasto(miasto: string, opcje: { take?: number; tylko
     etapy.wikidane = Date.now() - tEtap;
 
     const braki = kategorie.filter((k) => z(k).niepelny);
-    const puste = kategorie.filter((k) => !z(k).niepelny && z(k).lista.length === 0);
+    // „Sprawdzone”: Overpass odpowiedział. Pętla nie ponawia takiej kategorii, nawet
+    // gdy nic nowego nie doszło — wcześniej pytała o nią co dwie godziny bez końca.
+    const puste = kategorie.filter((k) => !z(k).niepelny);
 
     // Ten sam obiekt bywa w kilku zapytaniach — bar w zabytkowej kamienicy wraca
     // i jako nightlife, i jako food. Pierwsze wystąpienie wygrywa.
@@ -370,6 +372,25 @@ export async function zbierzMiasto(miasto: string, opcje: { take?: number; tylko
     // Obiekty wykluczone świadomie — duplikaty scalone ręcznie i wpisy odrzucone.
     // Bez tej listy scalenie duplikatu jest nietrwałe: seed wstawiłby je z powrotem.
     const wykluczone = await repo.listCatalogExclusions();
+    // Kategoria z zapytania, z którego miejsce przyszło. Zapytanie o wieczory zwraca
+    // też kina i teatry, a kategoriaZRodzaju() robiła z nich atrakcje: w Kopenhadze
+    // kino Empire Bio stało w zwiedzaniu, a Haga, Lyon, Lipsk i Wiedeń miały 0
+    // wieczorów mimo ośmiu pobranych — pętla dozbierania ponawiała je bez końca.
+    const zrodlo = new Map<PoiCandidate, Kategoria>();
+    zwiedzanie.forEach((p) => zrodlo.set(p, 'zwiedzanie'));
+    jedzenie.forEach((p) => zrodlo.set(p, 'jedzenie'));
+    wieczory.forEach((p) => zrodlo.set(p, 'wieczory'));
+    noclegi.forEach((p) => zrodlo.set(p, 'noclegi'));
+    const kategoriaMiejsca = (p: PoiCandidate) => {
+      const zRodzaju = kategoriaZRodzaju(p.kind);
+      switch (zrodlo.get(p)) {
+        case 'wieczory': return 'nightlife';
+        case 'jedzenie': return zRodzaju === 'nightlife' ? 'nightlife' : 'food';
+        case 'noclegi': return 'hotel';
+        default: return p.kind === 'cinema' ? 'nightlife' : zRodzaju;
+      }
+    };
+
     const candidates = [...zwiedzanie, ...jedzenie, ...wieczory, ...noclegi].filter((p) => {
       if (p.id && wykluczone.has(String(p.id))) return false;
       const k = String(p.id ?? `${p.name}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`);
@@ -399,8 +420,13 @@ export async function zbierzMiasto(miasto: string, opcje: { take?: number; tylko
           country: kraj,
           lat: p.lat,
           lng: p.lng,
-          category: kategoriaZRodzaju(p.kind),
+          category: kategoriaMiejsca(p),
           kind: p.kind,
+          // Ważność od razu, z tej samej miary co waznosc.py (wersje językowe
+          // Wikipedii). Skrypt bierze tagi z Overpassa, a ten potrafi pół dnia
+          // odpowiadać 504 — Kopenhaga miała wtedy 0 z 46 ocen i przypadkową kolejność.
+          ...(p.wikidata && wd.has(p.wikidata)
+            ? { waznosc: wd.get(p.wikidata)!.ile, waznosc_zrodlo: 'osm-wikidata' } : {}),
           description: '',
           photos: [] as string[],
           opening_hours: p.openingHours ?? null,
@@ -419,6 +445,10 @@ export async function zbierzMiasto(miasto: string, opcje: { take?: number; tylko
             const patch: Record<string, unknown> = { updated_at: row.updated_at };
             if (!existing.wikipedia && row.wikipedia) patch.wikipedia = row.wikipedia;
             if (!existing.opening_hours && row.opening_hours) patch.opening_hours = row.opening_hours;
+            if (existing.waznosc == null && (row as any).waznosc != null) {
+              patch.waznosc = (row as any).waznosc;
+              patch.waznosc_zrodlo = 'osm-wikidata';
+            }
             // Polska nazwa dla miejsca zebranego po staremu — tylko gdy nikt nie
             // zmieniał nazwy ręcznie (wciąż ta z OSM). Adres strony zostaje.
             if (polska && existing.name === p.name) {
