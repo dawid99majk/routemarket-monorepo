@@ -934,6 +934,13 @@ function odsiejZamkniete(k: KontekstPlanu, dzien: DzienPlanu, numer: number): vo
     // z godziną z danych, a nie z pamięci modelu.
     if (spec && wejscie > 0 && poz.minutes && isOpenDuring(spec, info.dateObj, wejscie, poz.minutes) === false) {
       const przedzial = (openIntervalsOn(spec, info.dateObj) ?? []).find((i) => wejscie >= i.from && wejscie < i.to);
+      // Propozycja agenta, na którą zostaje mniej niż połowa czasu, to wypełniacz
+      // na siłę (Poznań: muzeum wojskowe o 16:30 przy zamknięciu o 17:00 — 30 z 75
+      // min). Zasada 5 („lepiej godzina niż nic”) dotyczy miejsc użytkownika.
+      if (przedzial && poz.source === 'suggested' && (przedzial.to - wejscie) * 2 < poz.minutes) {
+        wyciete++;
+        continue;
+      }
       if (przedzial) {
         (dzien.warnings ??= []).push(
           `${poz.name}: zamykają o ${minutyNaCzas(przedzial.to)} — na zwiedzanie zostaje ${przedzial.to - wejscie} z ${poz.minutes} min.`
@@ -1051,6 +1058,7 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   oznaczPrzejscia(dzien);
   przypnijBaze(k, dzien);
   uzupelnijWspolrzedne(k, dzien);
+  przywrocKotwice(k, dzien, numer);
   sprawdzOdleglosci(k, dzien, numer);
   // Przesiewamy na pełnej liście, zanim strażnik godzin cokolwiek wytnie — uwaga
   // modelu o wyciętym miejscu przeczyłaby temu, co o nim napisze kod.
@@ -1432,6 +1440,17 @@ export function dopnijBazeDoDnia(k: KontekstPlanu, dzien: DzienPlanu): void {
     }
     items.push(nocleg(godzina, 'Powrót do noclegu.'));
   }
+
+  // Powrót, który wstawił model, miał jego godzinę — po wycięciu pozycji z końca
+  // dnia zostawał o 19:05, choć ostatni punkt kończył się o 16:00. Liczymy z osi.
+  const realne = items.filter((it) => it.kind !== 'walk' && !it.baza && GODZINA.test(it.time));
+  const ostatni = realne[realne.length - 1];
+  const powrot = [...items].reverse().find((it) => it.kind !== 'walk');
+  if (powrot?.baza && ostatni) {
+    let koniec = czasNaMinuty(ostatni.time) + (ostatni.minutes || 0);
+    if (maPunkt(ostatni) && !ostatni.approx) koniec += dojsciePieszo(baza, ostatni);
+    powrot.time = minutyNaCzas(koniec);
+  }
 }
 
 /**
@@ -1492,6 +1511,9 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
     return koniec;
   };
   const wytnij = (it: PozycjaDnia) => {
+    // Ostrzeżenia o wyciętym miejscu też wychodzą: w Poznaniu zostawało
+    // „Palmiarnia: zamykają o 17:00” przy planie, w którym Palmiarni już nie było.
+    dzien.warnings = (dzien.warnings ?? []).filter((t) => !t.includes(`„${it.name}”`) && !t.startsWith(`${it.name}:`));
     const i = dzien.items.indexOf(it);
     // Przejście prowadzące do wyciętej pozycji wychodzi razem z nią.
     const od = i > 0 && dzien.items[i - 1].kind === 'walk' ? i - 1 : i;
@@ -1538,12 +1560,16 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
       name: ofiara.name,
       reason: 'Nie zmieściło się w oknie dnia (było „być może”) — przenieś na inny dzień albo wydłuż okno.',
     } as any);
-    // Kolejne pozycje dochodzą wcześniej o zaoszczędzony czas — ale nie posiłki,
-    // bo te stoją o swojej porze, i nie wcześniej, niż pozwala dojście.
+    // Kolejne pozycje dochodzą wcześniej o zaoszczędzony czas. Posiłek stoi tylko
+    // wtedy, gdy jego godzina jest stałym punktem dnia („Kolacja o 19:00”) — bez
+    // tego Pyra Bar zostawał o 18:25 po wycięciu Palmiarni i dzień kończył się
+    // o 19:20 przy oknie do 18:00. Nie wcześniej, niż pozwala dojście.
+    const staleGodziny = new Set((k.zadanie.fixed ?? []).map((f) => f.time));
     for (let j = od; j < dzien.items.length; j++) {
       const it = dzien.items[j];
       if (!GODZINA.test(it.time) || it.baza) continue;
-      if (POSILEK_LUB_WIECZOR.test(String(it.kind || ''))) break;
+      if (POSILEK_LUB_WIECZOR.test(String(it.kind || '')) && staleGodziny.size) break;
+      if (staleGodziny.has(it.time)) break;
       it.time = minutyNaCzas(czasNaMinuty(it.time) - ile);
     }
     przeliczGodziny(k, dzien);
@@ -1568,6 +1594,55 @@ export function dopiszNieznaneGodziny(k: KontekstPlanu, dzien: DzienPlanu, numer
   if (!bez.length) return;
   const lista = bez.length <= 3 ? bez.map((n) => `„${n}”`).join(', ') : `${bez.length} miejsc tego dnia`;
   (dzien.warnings ??= []).push(`Godzin otwarcia nie znamy dla: ${lista} — sprawdź je przed wyjściem.`);
+}
+
+/**
+ * Kotwica „na pewno” wraca do dnia, jeśli model ją pominął, a była otwarta.
+ *
+ * Prompt mówi to wprost (zasada 1: kotwice przed propozycjami), a mimo to w planie
+ * Poznania (audyt 10) model wyrzucił przypięty „Pyra Bar” z uzasadnieniem
+ * „preferowano elegancką restaurację Essere” — własną propozycję postawił nad
+ * decyzją użytkownika. Reguła w prompcie to prośba; tu jest kod. Kotwica zajmuje
+ * miejsce propozycji tego samego rodzaju (posiłek za posiłek, atrakcja za
+ * najbliższą atrakcję), a gdy takiej nie ma — staje przed powrotem do noclegu.
+ */
+export function przywrocKotwice(k: KontekstPlanu, dzien: DzienPlanu, numer: number): void {
+  const info = k.dni[numer - 1];
+  const oknoOd = czasNaMinuty(k.zadanie.window.start), oknoDo = czasNaMinuty(k.zadanie.window.end);
+  const w = (n: string) => n.trim().toLowerCase();
+  for (const p of (k.grupy[numer - 1] ?? []).filter((x) => x.priority === 'must')) {
+    if (dzien.items.some((it) => w(it.name) === w(p.name))) continue;
+    // Zamknięte tego dnia albo poza oknem — model miał prawo je pominąć.
+    if (info && mieciSieWOknie(p.opening_hours, info.dateObj, oknoOd, oknoDo, p.visit_minutes || 60) === false) continue;
+    const posilek = POSILEK_LUB_WIECZOR.test(String(p.category || '')) || p.category === 'food' || p.category === 'nightlife';
+    const propozycje = dzien.items.filter((it) => it.source === 'suggested' && it.kind !== 'walk' && !it.baza
+      && POSILEK_LUB_WIECZOR.test(String(it.kind || '')) === posilek);
+    const zPunktem = p.lat != null && p.lng != null;
+    const ofiara = propozycje.length
+      ? propozycje.reduce((a, b) => (zPunktem && typeof a.lat === 'number' && typeof b.lat === 'number'
+        && kmOd(p as any, b) < kmOd(p as any, a) ? b : a))
+      : null;
+    const kotwica: PozycjaDnia = {
+      time: ofiara?.time ?? '', name: p.name, kind: posilek ? 'restaurant' : (p.category || 'attraction'),
+      minutes: p.visit_minutes || ofiara?.minutes || 60, source: 'pinned',
+      ...(zPunktem ? { lat: p.lat as number, lng: p.lng as number } : {}),
+    };
+    if (ofiara) {
+      const i = dzien.items.indexOf(ofiara);
+      dzien.items[i] = kotwica;
+    } else {
+      // Przed powrotem do noclegu (albo na końcu), o godzinie końca poprzedniej pozycji.
+      let i = dzien.items.length;
+      while (i > 0 && dzien.items[i - 1].baza) i--;
+      const prev = dzien.items[i - 1];
+      kotwica.time = prev && GODZINA.test(prev.time)
+        ? minutyNaCzas(czasNaMinuty(prev.time) + (prev.minutes || 0)) : (k.zadanie.window.start);
+      dzien.items.splice(i, 0, kotwica);
+    }
+    dzien.not_scheduled = (dzien.not_scheduled ?? []).filter((n) => w(n.name) !== w(p.name));
+    console.warn(`[planer] dzień ${numer}: model pominął kotwicę „${p.name}” — przywrócona`
+      + (ofiara ? ` w miejsce „${ofiara.name}”` : ' przed końcem dnia'));
+  }
 }
 
 /**
