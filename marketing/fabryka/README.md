@@ -30,6 +30,15 @@ Wymaga Node 20+, ffmpeg i Chromium z Playwrighta (`npx playwright install chromi
 Plik `.env` zawiera adres Supabase i **publiczny** klucz anon (ten sam, który strona
 wysyła każdej przeglądarce) — wzór w `.env.przyklad`.
 
+## Pozostałe skrypty
+
+- `node og.mjs` — obrazek podglądu linku (1200×630) dla strony głównej.
+- `node marka.mjs` — awatar, logo, favicon, okładka Facebooka, baner YouTube (`wyniki/marka/`).
+- `node zdjecia_licencje.mjs [--raport|--odswiez]` — uzupełnia w bazie autora i licencję zdjęć
+  z Commons dla podpisów w serwisie. Działa na VPS, z crona co godzinę (17. minuta).
+  Wspólna ocena licencji z fabryką: `lib/licencje.mjs`.
+- `kit-kont.md` — bio, tablice Pinteresta, pierwsze posty, szkice odpowiedzi, konfiguracja narzędzi.
+
 ## Zasady wbudowane w generator
 
 **Zdjęcia tylko z licencją, która na to pozwala.** Każde zdjęcie przechodzi przez
