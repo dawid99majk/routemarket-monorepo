@@ -1,0 +1,13 @@
+{
+  "name": "routemarket-fabryka",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generator materiałów promocyjnych RouteMarket: karuzele, rolki, piny, stories i podpisy z danych publicznych",
+  "scripts": {
+    "fabryka": "node fabryka.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.57.0"
+  }
+}
