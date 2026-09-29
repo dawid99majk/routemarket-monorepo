@@ -5,7 +5,7 @@ import { SUPPORTED_UI_LANGUAGES } from '@/i18n';
 
 const SITE_URL = 'https://routemarket.io';
 const SITE_NAME = 'RouteMarket';
-const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`;
+const DEFAULT_IMAGE = `${SITE_URL}/og-image-2026.png`;
 
 export interface SEOProps {
   title?: string;
