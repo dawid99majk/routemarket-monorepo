@@ -951,6 +951,13 @@ function odsiejZamkniete(k: KontekstPlanu, dzien: DzienPlanu, numer: number): vo
   }
 
   if (wyciete) console.warn(`[planer] dzień ${numer}: wycięto ${wyciete} poz. zaplanowanych na zamknięte godziny`);
+  // Ostrzeżenia o przejściu do wyciętego miejsca („Z „Pyra Bar” do „Ogród
+  // Botaniczny” jest ok. 5,2 km”) zostawały, choć tego punktu w planie już nie ma.
+  // Własne uwagi strażnika („X: tego dnia nieczynne”) są bez cudzysłowów i zostają.
+  const wyrzucone = dzien.items.filter((it) => !zostaja.includes(it)).map((it) => `„${it.name}”`);
+  if (wyrzucone.length) {
+    dzien.warnings = (dzien.warnings ?? []).filter((t) => !wyrzucone.some((n) => t.includes(n)));
+  }
   dzien.items = zostaja;
 }
 
