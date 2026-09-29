@@ -51,6 +51,10 @@ function czyscAutora(s) {
   const m = a.match(/(?:taken|photo(?:graph)?(?:ed)?|made|created)\s+by\s+([^.,;(]+)/i);
   if (m) a = m[1];
   a = a.replace(/\s*\[\d+\]/g, '').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/^(photo|foto|fot\.?|by)\s*:?\s*/i, '').replace(/\s*\(talk\)|\s*\(discussion\)/ig, '').trim();
+  // Dopiski stron dyskusji z Commons („(discuter/talk/hablar)”, „(talk | contribs)”) i powtórzenia.
+  a = a.replace(/\((?:[^)]*\b(?:talk|discuter|hablar|falar|diskussion|dyskusja|contribs)\b[^)]*)\)/ig, '').trim();
+  a = a.replace(/^(.+?)\s+\1$/i, '$1');
+  if (/^(unknown|anonymous|nieznany)\b/i.test(a)) return null;
   if (a.length > 40) a = a.split(/[.;,(]/)[0].trim();
   if (a.length > 40) a = a.slice(0, 38).trim() + '…';
   return a || null;
