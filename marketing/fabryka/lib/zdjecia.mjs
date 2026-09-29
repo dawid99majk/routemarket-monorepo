@@ -55,6 +55,8 @@ function czyscAutora(s) {
   a = a.replace(/\((?:[^)]*\b(?:talk|discuter|hablar|falar|diskussion|dyskusja|contribs)\b[^)]*)\)/ig, '').trim();
   a = a.replace(/^(.+?)\s+\1$/i, '$1');
   if (/^(unknown|anonymous|nieznany)\b/i.test(a)) return null;
+  // „Uris took this photograph…”, „Erik Zachte at Dutch Wikipedia…” — samo nazwisko.
+  a = a.replace(/^(.+?)\s+(?:took|made|shot)\s+this\b.*$/i, '$1').replace(/^(.+?)\s+at\s+\w+\s+Wikipedia\b.*$/i, '$1').trim();
   if (a.length > 40) a = a.split(/[.;,(]/)[0].trim();
   if (a.length > 40) a = a.slice(0, 38).trim() + '…';
   return a || null;
