@@ -7,7 +7,7 @@ description: Promocja routemarket.io w mediach — fabryka gotowych karuzel, rol
 
 Materiały robi fabryka: `~/Documents/routemarket-fabryka` na Macu (kod w repo:
 `marketing/fabryka`, README tamże). Plan promocji z audytem, kanałami i narzędziami:
-https://claude.ai/code/artifact — „Plan promocji RouteMarket” (lista artefaktów).
+https://claude.ai/artifact/VFzX5Ta1pHTA7AQC4bBMm8
 
 ## Polecenia
 
