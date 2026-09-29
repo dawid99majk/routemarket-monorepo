@@ -1,3 +1,19 @@
+# Ścieżki, które istnieją w aplikacji (apps/frontend/src/App.tsx). Aplikacja jest
+# jednostronicowa, więc kontener frontu na każdy adres odpowiada 200 i swoim
+# index.html — wyszukiwarka widziała /blog czy /en jako prawdziwe strony („soft 404”).
+# Adres spoza tej listy dostaje ten sam index.html (React pokaże NotFound), ale ze
+# statusem 404. Nowa trasa w App.tsx = nowy wpis tutaj.
+map $uri $rm_znana_sciezka {
+    default 0;
+    "/" 1;
+    ~^/[^/]+\.[A-Za-z0-9]+$ 1;
+    ~^/(assets|fonts|images|locales)/ 1;
+    ~^/(lab/globe|auth|auth/callback|auth/error|contact|brand|zapisane|tablice|marketing|tablica|ulubione|kolekcje|start|odkrywaj|my-routes|plany|profile|create|route-builder-v2|admin)/?$ 1;
+    ~^/legal/(terms|privacy|cookies|documents|refunds|dsa-compliance|creator-agreement|acceptable-use|copyright)/?$ 1;
+    ~^/(kolekcje|kolekcja|plany)/[^/]+/?$ 1;
+    ~^/admin/(dashboard|users|atlas)/?$ 1;
+}
+
 server {
     listen 80;
     server_name routemarket.io www.routemarket.io supabase.routemarket.io;
@@ -59,7 +75,27 @@ server {
         proxy_set_header Host $host;
     }
 
+    # Galeria publicznych tablic: API dokłada listę tablic w zwykłym HTML, żeby robot
+    # doszedł do każdej tablicy bez uruchamiania JavaScriptu.
+    location = /tablice {
+        proxy_pass http://127.0.0.1:8081/tablice;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Strona 404 to ta sama aplikacja (NotFound), ale z prawdziwym statusem.
+    # error_page bez „=” zachowuje kod 404 przy wewnętrznym przekierowaniu.
+    location = /__404 {
+        internal;
+        proxy_pass http://127.0.0.1:8089/index.html;
+        proxy_set_header Host $host;
+    }
+
     location / {
+        error_page 404 /__404;
+        if ($rm_znana_sciezka = 0) {
+            return 404;
+        }
         proxy_pass http://127.0.0.1:8089;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

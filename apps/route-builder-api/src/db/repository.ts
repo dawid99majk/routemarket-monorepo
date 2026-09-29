@@ -251,13 +251,22 @@ export class RouteBuilderRepository {
 
     const { data: places } = await supabase
       .from('trip_project_places')
-      .select('name, image_url, priority')
+      .select('name, image_url, priority, visit_minutes, catalog_id')
       .eq('project_id', id)
       .order('sort_order', { ascending: true });
 
     const lista = places ?? [];
+    // Adresy stron miejsc do treści dla robotów: z tablicy prowadzą linki do katalogu.
+    const idKatalogu = lista.map((p: any) => p.catalog_id).filter(Boolean);
+    const { data: kat } = idKatalogu.length
+      ? await supabase.from('place_catalog').select('id, slug').in('id', idKatalogu)
+      : { data: [] as any[] };
+    const slugi = Object.fromEntries((kat ?? []).map((k: any) => [k.id, k.slug]));
     return {
       ...b,
+      places: lista
+        .filter((p: any) => p.priority !== 'rejected')
+        .map((p: any) => ({ name: p.name, priority: p.priority, minutes: p.visit_minutes ?? null, slug: slugi[p.catalog_id] ?? null })),
       place_count: lista.length,
       // Nazwy z kubełka „na pewno": to one opisują tablicę, a nie odrzucone pomysły.
       sample_names: lista.filter((p: any) => p.priority === 'must').map((p: any) => p.name).slice(0, 6),
@@ -269,18 +278,36 @@ export class RouteBuilderRepository {
   async catalogCardBySlug(slug: string): Promise<any | null> {
     const { data } = await supabase
       .from('place_catalog')
-      .select('slug, name, city, country, lat, lng, description, wiki_extract, photos')
+      .select('slug, name, nazwa_lokalna, city, country, lat, lng, description, wiki_extract, wyroznik, photos, opening_hours, visit_minutes')
       .eq('slug', slug).maybeSingle();
     return data ?? null;
   }
 
+  /** Publiczne tablice (do strony /tablice i linków ze stron miejsc). */
+  async publicBoardsList(miasto?: string): Promise<any[]> {
+    let q = supabase.from('trip_projects')
+      .select('id, name, destination, days, is_example, updated_at')
+      .eq('is_public', true)
+      .order('updated_at', { ascending: false });
+    if (miasto) q = q.eq('destination', miasto);
+    const { data } = await q.limit(200);
+    return data ?? [];
+  }
+
   /** Adresy do mapy strony: publiczne tablice i wszystkie miejsca katalogu. */
   async sitemapEntries(): Promise<{ boards: any[]; places: any[] }> {
-    const [{ data: boards }, { data: places }] = await Promise.all([
-      supabase.from('trip_projects').select('id, updated_at').eq('is_public', true),
-      supabase.from('place_catalog').select('slug, updated_at').limit(5000),
-    ]);
-    return { boards: boards ?? [], places: places ?? [] };
+    const { data: boards } = await supabase.from('trip_projects').select('id, updated_at').eq('is_public', true);
+    const places: any[] = [];
+    const STRONA = 1000;
+    for (let od = 0; od < 50_000; od += STRONA) {
+      const { data, error } = await supabase.from('place_catalog')
+        .select('slug, updated_at').not('slug', 'is', null)
+        .order('slug', { ascending: true }).range(od, od + STRONA - 1);
+      if (error) throw new Error(error.message);
+      places.push(...(data ?? []));
+      if (!data || data.length < STRONA) break;
+    }
+    return { boards: boards ?? [], places };
   }
 
   async listCatalogByCity(city: string, limit = 40): Promise<any[]> {

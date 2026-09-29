@@ -4,7 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import { RouteRequirementsSchema } from './types/index.js';
 import { repo, type AuthenticatedRouteBuilderUser } from './db/repository.js';
 import { geocodingService } from './services/geocoding.js';
-import { wizytowkaTablicy, wizytowkaMiejsca, stronaZWizytowka } from './services/wizytowki.js';
+import { wizytowkaTablicy, wizytowkaMiejsca, wizytowkaGalerii, stronaZWizytowka } from './services/wizytowki.js';
 import { routingService } from './services/routing.js';
 import { gpxService } from './services/gpx.js';
 import { reportService } from './services/report.js';
@@ -827,6 +827,15 @@ app.post('/marketing/tresci', async (c) => {
   } catch (err: any) {
     console.error('[marketing]', err.message);
     return c.json({ error: err.message }, 500);
+  }
+});
+
+app.get('/tablice', async (c) => {
+  try {
+    return c.html(await stronaZWizytowka(await wizytowkaGalerii()));
+  } catch (err: any) {
+    console.warn('[wizytowka/tablice]', err.message);
+    return c.html(await stronaZWizytowka(null));
   }
 });
 

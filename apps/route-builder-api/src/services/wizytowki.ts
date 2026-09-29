@@ -42,6 +42,46 @@ export interface Wizytowka {
   url: string;
   typ: 'article' | 'website';
   dane?: Record<string, unknown>;
+  /**
+   * Treść strony w zwykłym HTML, wstawiana do <div id="root">. Google renderuje
+   * JavaScript z opóźnieniem, a Bing, podglądy linków i roboty modeli językowych
+   * wcale — bez tego widziały pustą powłokę aplikacji. React przy starcie i tak
+   * zastępuje zawartość #root, więc człowiek widzi aplikację, a robot to samo,
+   * co aplikacja pokazuje, tylko bez interakcji.
+   */
+  tresc?: string;
+}
+
+/** Opis do znacznika: pełne zdania do 158 znaków, nigdy ucięte w pół słowa. */
+export function skrocOpis(tekst: string, limit = 158): string {
+  const t = tekst.replace(/\s+/g, ' ').trim();
+  if (t.length <= limit) return t;
+  const zdania = t.match(/[^.!?]+[.!?]+/g) ?? [];
+  let wynik = '';
+  for (const z of zdania) {
+    if ((wynik + z).trim().length > limit) break;
+    wynik += z;
+  }
+  if (wynik.trim()) return wynik.trim();
+  const ciecie = t.slice(0, limit - 1);
+  return ciecie.slice(0, ciecie.lastIndexOf(' ')).replace(/[,;:—–-]\s*$/, '') + '…';
+}
+
+const h = (s: unknown) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const czasZwiedzania = (min: number | null) => {
+  if (!min) return null;
+  const g = Math.floor(min / 60), m = min % 60;
+  return g ? (m ? `${g} g ${m} min` : `${g} g`) : `${m} min`;
+};
+
+/** Wspólna oprawa treści dla robotów: prosty, czytelny HTML bez zależności od CSS aplikacji. */
+function oprawa(srodek: string): string {
+  return `<main style="font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 16px;line-height:1.55;color:#25243A">
+${srodek}
+<nav style="margin-top:32px"><a href="/">RouteMarket — planer wyjazdów</a> · <a href="/tablice">Tablice od podróżników</a></nav>
+</main>`;
 }
 
 /**
@@ -81,6 +121,13 @@ function podmienZnaczniki(html: string, w: Wizytowka): string {
       `<meta name="twitter:title" content="${t}" />`)
     .replace(/<meta name="twitter:description" content="[^"]*"\s*\/?>/i,
       `<meta name="twitter:description" content="${o}" />`);
+
+  if (w.tresc) {
+    // index.html ma w #root treść strony głównej między znacznikami tresc;
+    // podstrona dostaje w tym miejscu własną, a nie duplikat strony głównej.
+    out = out.replace(/<div id="root">(?:<!--tresc-->[\s\S]*?<!--\/tresc-->)?<\/div>/,
+      () => `<div id="root">${w.tresc}</div>`);
+  }
 
   if (w.dane) {
     out = out.replace('</head>',
@@ -122,9 +169,20 @@ export async function wizytowkaTablicy(id: string): Promise<Wizytowka | null> {
     typ: 'article',
     dane: {
       '@context': 'https://schema.org', '@type': 'ItemList',
-      name: t.name, numberOfItems: ile,
-      author: { '@type': 'Person', name: t.author_display || 'Podróżnik' },
+      name: t.name, numberOfItems: (t.places ?? []).length,
+      author: t.is_example
+        ? { '@type': 'Organization', name: 'RouteMarket' }
+        : { '@type': 'Person', name: t.author_display || 'Podróżnik' },
+      itemListElement: (t.places ?? []).map((p: any, i: number) => ({
+        '@type': 'ListItem', position: i + 1, name: p.name,
+        ...(p.slug ? { url: `https://routemarket.io/miejsce/${p.slug}` } : {}),
+      })),
     },
+    tresc: oprawa(`<h1>${h(t.name)}</h1>
+<p>${h(czesci.join(' · '))}${t.is_example ? ' · przykładowy plan RouteMarket' : t.author_display ? ` · ${h(t.author_display)}` : ''}</p>
+<p>Tablica wyjazdu w RouteMarket: miejsca podzielone na „na pewno” i „być może”. Z tablicy agent układa plan dni z godzinami otwarcia i kolejnością, a na koniec daje plik GPX. Możesz ją skopiować do siebie i zmienić, co nie pasuje.</p>
+<h2>Miejsca na tablicy</h2>
+<ol>${(t.places ?? []).map((p: any) => `<li>${p.slug ? `<a href="/miejsce/${h(p.slug)}">${h(p.name)}</a>` : h(p.name)}${czasZwiedzania(p.minutes) ? ` — ${czasZwiedzania(p.minutes)} zwiedzania` : ''}${p.priority === 'nice' ? ' (być może)' : ''}</li>`).join('')}</ol>`),
   };
 }
 
@@ -135,11 +193,25 @@ export async function wizytowkaMiejsca(slug: string): Promise<Wizytowka | null> 
 
   const gdzie = [m.city, m.country].filter(Boolean).join(', ');
   const opis = (m.description || m.wiki_extract || '').trim();
+  const tablice = m.city ? await repo.publicBoardsList(m.city).catch(() => []) : [];
+  const fakty = [
+    czasZwiedzania(m.visit_minutes) ? `<li>Czas zwiedzania: ${czasZwiedzania(m.visit_minutes)}</li>` : '',
+    m.opening_hours ? `<li>Godziny otwarcia (OpenStreetMap): ${h(m.opening_hours)}</li>` : '',
+    m.nazwa_lokalna && m.nazwa_lokalna !== m.name ? `<li>Nazwa lokalna: ${h(m.nazwa_lokalna)}</li>` : '',
+  ].join('');
+  const tresc = oprawa(`<h1>${h(m.name)}</h1>
+${gdzie ? `<p>${h(gdzie)}</p>` : ''}
+${m.wyroznik ? `<p><strong>${h(m.wyroznik)}</strong></p>` : ''}
+${opis ? `<p>${h(opis)}</p>` : ''}
+${fakty ? `<ul>${fakty}</ul>` : ''}
+<p>Dodaj to miejsce do tablicy wyjazdu w RouteMarket — agent ułoży wokół niego plan dnia z godzinami otwarcia.</p>
+${tablice.length ? `<h2>Tablice z miasta ${h(m.city)}</h2><ul>${tablice.slice(0, 8).map((b: any) => `<li><a href="/tablica/${h(b.id)}">${h(b.name)}</a></li>`).join('')}</ul>` : ''}`);
   return {
     tytul: `${m.name}${gdzie ? ` — ${gdzie}` : ''} | RouteMarket`,
     opis: opis
-      ? opis.slice(0, 200)
+      ? skrocOpis(opis)
       : `${m.name}${gdzie ? ` w ${gdzie}` : ''} — dodaj to miejsce do tablicy wyjazdu i zaplanuj wokół niego dzień.`,
+    tresc,
     obrazek: Array.isArray(m.photos) && m.photos.length ? m.photos[0] : null,
     url: `https://routemarket.io/miejsce/${slug}`,
     typ: 'article',
@@ -150,6 +222,31 @@ export async function wizytowkaMiejsca(slug: string): Promise<Wizytowka | null> 
       geo: m.lat != null ? { '@type': 'GeoCoordinates', latitude: m.lat, longitude: m.lng } : undefined,
       image: Array.isArray(m.photos) && m.photos.length ? m.photos[0] : undefined,
     },
+  };
+}
+
+/** Galeria publicznych tablic — /tablice, jedyna ścieżka robota do wszystkich tablic naraz. */
+export async function wizytowkaGalerii(): Promise<Wizytowka> {
+  const tablice = await repo.publicBoardsList();
+  const wg = new Map<string, any[]>();
+  for (const t of tablice) {
+    const k = t.destination || 'Inne';
+    wg.set(k, [...(wg.get(k) ?? []), t]);
+  }
+  const miasta = [...wg.keys()].sort((a, b) => a.localeCompare(b, 'pl'));
+  return {
+    tytul: 'Tablice od podróżników — gotowe plany wyjazdów | RouteMarket',
+    opis: skrocOpis(`Publiczne tablice wyjazdów z ${miasta.length} miast: miejsca podzielone na „na pewno” i „być może”, gotowe do skopiowania i przerobienia pod własny wyjazd.`),
+    obrazek: null,
+    url: 'https://routemarket.io/tablice',
+    typ: 'website',
+    dane: {
+      '@context': 'https://schema.org', '@type': 'CollectionPage',
+      name: 'Tablice od podróżników', url: 'https://routemarket.io/tablice',
+    },
+    tresc: oprawa(`<h1>Tablice od podróżników</h1>
+<p>Nie zaczynaj od pustej tablicy. Skopiuj tablicę kogoś, kto był tam przed Tobą, i wyrzuć z niej to, co do Ciebie nie pasuje.</p>
+${miasta.map((m) => `<h2>${h(m)}</h2><ul>${wg.get(m)!.map((t: any) => `<li><a href="/tablica/${h(t.id)}">${h(t.name)}</a>${t.days ? ` · ${t.days} ${odmiana(t.days, 'dzień', 'dni', 'dni')}` : ''}</li>`).join('')}</ul>`).join('\n')}`),
   };
 }
 
