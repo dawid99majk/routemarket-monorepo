@@ -34,6 +34,7 @@ import { routeProjectsRouter } from './routes/route-projects.js';
 import { TOKEN_PRICES, ensureTokens } from './services/tokens.js';
 import { punktyDnia, wstawPoDrodze, podejscie, PROFIL_TRYBU, type TrybTrasy } from './services/trasa-dnia.js';
 import { catalogRouter } from './routes/catalog.js';
+import { mcpRouter } from './routes/mcp.js';
 
 const app = new Hono<{ Variables: { user: any, userId: string } }>();
 
@@ -929,6 +930,8 @@ app.route('/places', placesRouter);
 
 // Katalog miejsc: seed/upsert/enrich/submit/refresh-photos itd. — patrz routes/catalog.ts.
 app.route('/', catalogRouter);
+// Serwer MCP i połączenia agentów AI (Claude, ChatGPT, Gemini) — patrz routes/mcp.ts.
+app.route('/', mcpRouter);
 
 
 
