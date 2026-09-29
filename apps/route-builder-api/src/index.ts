@@ -4,7 +4,8 @@ import { zValidator } from '@hono/zod-validator';
 import { RouteRequirementsSchema } from './types/index.js';
 import { repo, type AuthenticatedRouteBuilderUser } from './db/repository.js';
 import { geocodingService } from './services/geocoding.js';
-import { wizytowkaTablicy, wizytowkaMiejsca, wizytowkaGalerii, stronaZWizytowka } from './services/wizytowki.js';
+import { wizytowkaTablicy, wizytowkaMiejsca, wizytowkaGalerii, wizytowkaMiasta, stronaZWizytowka } from './services/wizytowki.js';
+import { slugMiasta } from './services/strony-miast.js';
 import { routingService } from './services/routing.js';
 import { gpxService } from './services/gpx.js';
 import { reportService } from './services/report.js';
@@ -830,6 +831,17 @@ app.post('/marketing/tresci', async (c) => {
   }
 });
 
+app.get('/miasto/:slug', async (c) => {
+  try {
+    const w = await wizytowkaMiasta(c.req.param('slug'));
+    // Nieznane miasto: ta sama aplikacja (pokaże „nie mamy tego miasta”), ale 404.
+    return c.html(await stronaZWizytowka(w), w ? 200 : 404);
+  } catch (err: any) {
+    console.warn('[wizytowka/miasto]', err.message);
+    return c.html(await stronaZWizytowka(null));
+  }
+});
+
 app.get('/tablice', async (c) => {
   try {
     return c.html(await stronaZWizytowka(await wizytowkaGalerii()));
@@ -841,7 +853,7 @@ app.get('/tablice', async (c) => {
 
 app.get('/sitemap.xml', async (c) => {
   try {
-    const { boards, places } = await repo.sitemapEntries();
+    const [{ boards, places }, miasta] = await Promise.all([repo.sitemapEntries(), repo.catalogCities()]);
     const dzien = (d: any) => (d ? String(d).slice(0, 10) : new Date().toISOString().slice(0, 10));
     const wpis = (loc: string, lastmod: string, prio: string) =>
       `  <url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><priority>${prio}</priority></url>`;
@@ -849,6 +861,7 @@ app.get('/sitemap.xml', async (c) => {
     const wiersze = [
       wpis('https://routemarket.io/', dzien(null), '1.0'),
       wpis('https://routemarket.io/tablice', dzien(null), '0.9'),
+      ...miasta.map((m) => wpis(`https://routemarket.io/miasto/${slugMiasta(m)}`, dzien(null), '0.9')),
       ...boards.map((b: any) => wpis(`https://routemarket.io/tablica/${b.id}`, dzien(b.updated_at), '0.8')),
       ...places.map((p: any) => wpis(`https://routemarket.io/miejsce/${p.slug}`, dzien(p.updated_at), '0.6')),
     ];

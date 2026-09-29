@@ -15,6 +15,7 @@ import contour from '@/assets/patterns/contour.svg';
 import TablicaKafelek from '@/components/TablicaKafelek';
 import { toast } from 'sonner';
 import SEO from '@/components/SEO';
+import { slugMiasta } from '@/lib/miasta';
 import { odmien } from '@/lib/odmiana';
 import AgentDymek from '@/components/AgentDymek';
 import { useTranslation } from 'react-i18next';
@@ -231,7 +232,8 @@ export default function Index() {
       wybranaTablica={null}
       wybraneMiasto=""
       onWybierzTablice={(id) => navigate(`/odkrywaj?wyjazd=${id}`)}
-      onWybierzMiasto={(miasto) => navigate(`/odkrywaj?miasto=${encodeURIComponent(miasto)}`)}
+      // Odkrywaj wymaga konta; gość dostaje stronę miasta, która jest publiczna.
+      onWybierzMiasto={(miasto) => navigate(user ? `/odkrywaj?miasto=${encodeURIComponent(miasto)}` : `/miasto/${slugMiasta(miasto)}`)}
       onNowyWyjazd={() => navigate(user ? '/start' : '/auth')}
       onWszystkieWyjazdy={() => navigate(user ? '/plany' : '/auth')}
     />

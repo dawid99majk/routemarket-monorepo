@@ -87,7 +87,7 @@ export async function tablica(id) {
 
 /** Najważniejsze atrakcje miasta z katalogu (kolejność wg „ważności”). */
 export async function miasto(nazwa, { limit = 10 } = {}) {
-  const wiersze = await rest(`place_catalog?select=${POLA_MIEJSCA}&city=eq.${encodeURIComponent(nazwa)}&kind=eq.attraction&order=waznosc.desc.nullslast&limit=${limit * 2}`);
+  const wiersze = await rest(`place_catalog?select=${POLA_MIEJSCA}&city=eq.${encodeURIComponent(nazwa)}&category=eq.attraction&kind=not.in.(cinema,parking,power_plant)&order=waznosc.desc.nullslast&limit=${limit * 2}`);
   if (!wiersze.length) throw new Error(`Brak miasta „${nazwa}” w katalogu.`);
   return wiersze
     .filter((w) => (w.photos ?? []).length > 0)

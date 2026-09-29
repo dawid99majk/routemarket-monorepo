@@ -69,6 +69,14 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Strony miast: API wstawia listę atrakcji z czasem zwiedzania w zwykłym HTML,
+    # a nieznane miasto oddaje z kodem 404 (aplikacja pokaże „nie mamy tego miasta”).
+    location ^~ /miasto/ {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # Mapa strony budowana z bazy zamiast pliku sprzed pół roku.
     location = /sitemap.xml {
         proxy_pass http://127.0.0.1:8081/sitemap.xml;

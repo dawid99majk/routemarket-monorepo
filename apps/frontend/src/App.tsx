@@ -45,6 +45,7 @@ function leniwie<T extends { default: React.ComponentType<any> }>(zaladuj: () =>
 const GlobeLab = leniwie(() => import("./pages/GlobeLab"));
 const MyRoutes = leniwie(() => import("./pages/MyRoutes"));
 const PlacePage = leniwie(() => import("./pages/PlacePage"));
+const Miasto = leniwie(() => import("./pages/Miasto"));
 const Start = leniwie(() => import('./pages/Start'));
 const Discover = leniwie(() => import("./pages/Discover"));
 const Collections = leniwie(() => import("./pages/Collections"));
@@ -149,6 +150,7 @@ const App = () => (
                   <Route path="/start" element={<ProtectedRoute><Start /></ProtectedRoute>} />
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/miejsce/:slug" element={<PlacePage />} />
+                  <Route path="/miasto/:slug" element={<Miasto />} />
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/plany/:id" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />

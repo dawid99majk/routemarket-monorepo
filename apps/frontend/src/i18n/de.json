@@ -582,5 +582,32 @@
     "nic_tu_jeszcze_nie_ma": "Hier ist noch nichts",
     "od_oz_do_kolekcji": "Zur Sammlung hinzufügen",
     "usun_z_zapisanych": "Aus den gespeicherten entfernen"
+  },
+  "miasto": {
+    "nadtytul": "RouteMarket-Katalog · OpenStreetMap und Wikipedia",
+    "co_zobaczyc": "Was man in {{miasto}} sehen sollte",
+    "czas_zwiedzania": "{{czas}} Besichtigung",
+    "ile_dni_one": "{{count}} Tag",
+    "ile_dni_other": "{{count}} Tage",
+    "wniosek": "{{ile}} ergeben {{czas}} reine Besichtigung. Bei {{godzin}} Stunden am Tag, ohne Wege und Essen, sind das {{dni}}.",
+    "brak_czasu_one": "Für {{count}} Ort habe ich keine Besichtigungsdauer.",
+    "brak_czasu_other": "Für {{count}} Orte habe ich keine Besichtigungsdauer.",
+    "ile_dni_tytul": "Wie viele Tage man braucht",
+    "ile_dni_opis": "Die bekanntesten Orte der Reihe nach, solange {{godzin}} Stunden Besichtigung am Tag passen. Nur Besichtigung, ohne Wege und Essen — den Plan mit Öffnungszeiten und Route erstellt der Agent.",
+    "miejsca_tytul": "Die wichtigsten Orte",
+    "zrodlo": "Sortiert nach Bekanntheit. Daten: OpenStreetMap und Wikipedia.",
+    "godziny": "Öffnungszeiten",
+    "tablice_tytul": "Fertige Boards für diese Stadt",
+    "tablice_opis": "Kopiere ein Board und wirf raus, was nicht zu dir passt.",
+    "cta_tytul": "Plane deine eigene Reise: {{miasto}}",
+    "cta_opis": "Sammle Orte auf einem Board: sicher, vielleicht, nein. Der Agent macht daraus Tage mit Öffnungszeiten und Reihenfolge und gibt dir eine GPX-Datei.",
+    "cta_przycisk": "Planung starten",
+    "inne_miasta": "Andere Städte",
+    "nie_znaleziono": "Diese Stadt ist nicht in unserem Katalog.",
+    "zobacz_tablice": "Fertige Boards ansehen",
+    "wczytuje": "Stadt wird geladen…",
+    "blad_zakladania": "Ich konnte die Reise nicht anlegen.",
+    "opis_seo": "{{miasto}}: {{ile}} mit Besichtigungsdauer und Öffnungszeiten. Insgesamt {{czas}} — bei 6 Stunden am Tag sind das {{dni}}.",
+    "link_z_miejsca": "alle Orte mit Besichtigungsdauer"
   }
 }

@@ -283,6 +283,23 @@ export class RouteBuilderRepository {
     return data ?? null;
   }
 
+  /** Miasta katalogu — ta sama funkcja bazy, której używa front. */
+  async catalogCities(): Promise<string[]> {
+    const { data } = await supabase.rpc('catalog_cities');
+    return ((data ?? []) as { city: string }[]).map((r) => r.city).filter(Boolean);
+  }
+
+  /** Atrakcje miasta od najbardziej rozpoznawalnych (strona /miasto/:slug). */
+  async atrakcjeMiasta(miasto: string, rodzajePoza: string, limit: number): Promise<any[]> {
+    const { data } = await supabase.from('place_catalog')
+      .select('slug, name, photos, visit_minutes, opening_hours, wyroznik, lat, lng, waznosc')
+      .eq('city', miasto).eq('category', 'attraction').not('kind', 'in', rodzajePoza)
+      .neq('status', 'hidden')
+      .order('waznosc', { ascending: false, nullsFirst: false })
+      .limit(limit);
+    return data ?? [];
+  }
+
   /** Publiczne tablice (do strony /tablice i linków ze stron miejsc). */
   async publicBoardsList(miasto?: string): Promise<any[]> {
     let q = supabase.from('trip_projects')

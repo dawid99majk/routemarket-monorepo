@@ -582,5 +582,32 @@
     "nic_tu_jeszcze_nie_ma": "Nothing here yet",
     "od_oz_do_kolekcji": "Put in collection",
     "usun_z_zapisanych": "Remove from saved"
+  },
+  "miasto": {
+    "nadtytul": "RouteMarket catalogue · OpenStreetMap and Wikipedia",
+    "co_zobaczyc": "What to see in {{miasto}}",
+    "czas_zwiedzania": "{{czas}} of sightseeing",
+    "ile_dni_one": "{{count}} day",
+    "ile_dni_other": "{{count}} days",
+    "wniosek": "{{ile}} add up to {{czas}} of sightseeing alone. At {{godzin}} hours a day, without walking between them or meals, that is {{dni}}.",
+    "brak_czasu_one": "I have no visiting time for {{count}} place.",
+    "brak_czasu_other": "I have no visiting time for {{count}} places.",
+    "ile_dni_tytul": "How many days you need",
+    "ile_dni_opis": "The best-known places in order, as long as {{godzin}} hours of sightseeing a day fit. Sightseeing only, without walking or meals — the agent builds the plan with opening hours and the route.",
+    "miejsca_tytul": "Top places",
+    "zrodlo": "Ordered by how well known each place is. Data: OpenStreetMap and Wikipedia.",
+    "godziny": "Hours",
+    "tablice_tytul": "Ready-made boards for this city",
+    "tablice_opis": "Copy a board and remove whatever doesn't suit you.",
+    "cta_tytul": "Plan your own trip: {{miasto}}",
+    "cta_opis": "Collect places on a board: definitely, maybe, no. The agent turns them into days with opening hours and order, and gives you a GPX file.",
+    "cta_przycisk": "Start planning",
+    "inne_miasta": "Other cities",
+    "nie_znaleziono": "This city isn't in our catalogue.",
+    "zobacz_tablice": "See ready-made boards",
+    "wczytuje": "Loading the city…",
+    "blad_zakladania": "I couldn't create the trip.",
+    "opis_seo": "{{miasto}}: {{ile}} with visiting times and opening hours. {{czas}} in total — at 6 hours a day that is {{dni}}.",
+    "link_z_miejsca": "all places with visiting times"
   }
 }

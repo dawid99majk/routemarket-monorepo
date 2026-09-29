@@ -13,6 +13,7 @@
  * potem normalnie i przejmuje stronę; robot czyta to, co zdążył dostać.
  */
 import { repo } from '../db/repository.js';
+import { slugMiasta, tytulMiasta, coSieZmiesci, dniNaZwiedzanie, GODZIN_DZIENNIE, RODZAJE_POZA, ILE_MIEJSC } from './strony-miast.js';
 
 const SZABLON_URL = 'https://routemarket.io/index.html';
 const SZABLON_TTL_MS = 60_000;
@@ -204,6 +205,7 @@ ${gdzie ? `<p>${h(gdzie)}</p>` : ''}
 ${m.wyroznik ? `<p><strong>${h(m.wyroznik)}</strong></p>` : ''}
 ${opis ? `<p>${h(opis)}</p>` : ''}
 ${fakty ? `<ul>${fakty}</ul>` : ''}
+${m.city ? `<p><a href="/miasto/${h(slugMiasta(m.city))}">${h(tytulMiasta(m.city))} — wszystkie miejsca z czasem zwiedzania</a></p>` : ''}
 <p>Dodaj to miejsce do tablicy wyjazdu w RouteMarket — agent ułoży wokół niego plan dnia z godzinami otwarcia.</p>
 ${tablice.length ? `<h2>Tablice z miasta ${h(m.city)}</h2><ul>${tablice.slice(0, 8).map((b: any) => `<li><a href="/tablica/${h(b.id)}">${h(b.name)}</a></li>`).join('')}</ul>` : ''}`);
   return {
@@ -246,7 +248,67 @@ export async function wizytowkaGalerii(): Promise<Wizytowka> {
     },
     tresc: oprawa(`<h1>Tablice od podróżników</h1>
 <p>Nie zaczynaj od pustej tablicy. Skopiuj tablicę kogoś, kto był tam przed Tobą, i wyrzuć z niej to, co do Ciebie nie pasuje.</p>
-${miasta.map((m) => `<h2>${h(m)}</h2><ul>${wg.get(m)!.map((t: any) => `<li><a href="/tablica/${h(t.id)}">${h(t.name)}</a>${t.days ? ` · ${t.days} ${odmiana(t.days, 'dzień', 'dni', 'dni')}` : ''}</li>`).join('')}</ul>`).join('\n')}`),
+${miasta.map((m) => `<h2>${m === 'Inne' ? h(m) : `<a href="/miasto/${h(slugMiasta(m))}">${h(m)}</a>`}</h2><ul>${wg.get(m)!.map((t: any) => `<li><a href="/tablica/${h(t.id)}">${h(t.name)}</a>${t.days ? ` · ${t.days} ${odmiana(t.days, 'dzień', 'dni', 'dni')}` : ''}</li>`).join('')}</ul>`).join('\n')}`),
+  };
+}
+
+/**
+ * Strona miasta: najważniejsze atrakcje z czasem zwiedzania, suma, „ile dni”
+ * i tablice z miasta. Ta sama arytmetyka co strona we froncie (Miasto.tsx),
+ * więc robot i człowiek widzą te same liczby.
+ */
+export async function wizytowkaMiasta(slug: string): Promise<Wizytowka | null> {
+  const miasta = await repo.catalogCities();
+  const miasto = miasta.find((m) => slugMiasta(m) === slug);
+  if (!miasto) return null;
+
+  const [wszystkie, tablice] = await Promise.all([
+    repo.atrakcjeMiasta(miasto, RODZAJE_POZA, ILE_MIEJSC * 2),
+    repo.publicBoardsList(miasto).catch(() => []),
+  ]);
+  const miejsca = wszystkie.filter((m: any) => Array.isArray(m.photos) && m.photos.length).slice(0, ILE_MIEJSC);
+  if (!miejsca.length) return null;
+
+  const suma = miejsca.reduce((s: number, m: any) => s + (m.visit_minutes ?? 0), 0);
+  const dni = dniNaZwiedzanie(suma);
+  const ileM = `${miejsca.length} ${odmiana(miejsca.length, 'miejsce', 'miejsca', 'miejsc')}`;
+  const ileD = (n: number) => `${n} ${odmiana(n, 'dzień', 'dni', 'dni')}`;
+  const tytul = tytulMiasta(miasto);
+  const url = `https://routemarket.io/miasto/${slug}`;
+
+  const warianty = [1, 2, 3].map((d) => ({ d, ...coSieZmiesci(miejsca, d) }));
+  const tresc = oprawa(`<h1>${h(tytul)}</h1>
+<p>${h(ileM)} · ${h(czasZwiedzania(suma) ?? '')} zwiedzania · ${h(ileD(dni))}</p>
+<p>${h(ileM)} to ${h(czasZwiedzania(suma) ?? '')} samego zwiedzania. Przy ${GODZIN_DZIENNIE} godzinach dziennie, bez dojść i jedzenia, to ${h(ileD(dni))}.</p>
+<h2>Ile dni na zwiedzanie</h2>
+<p>Najbardziej znane miejsca po kolei, dopóki mieści się ${GODZIN_DZIENNIE} godzin zwiedzania dziennie. Samo zwiedzanie, bez dojść i jedzenia — plan z godzinami otwarcia i trasą ułoży agent RouteMarket.</p>
+${warianty.map((w) => `<h3>${h(ileD(w.d))} — ${h(czasZwiedzania(w.minuty) ?? '0 min')}</h3><ul>${w.miejsca.map((m: any) => `<li>${h(m.name)} (${h(czasZwiedzania(m.visit_minutes) ?? '')})</li>`).join('')}</ul>`).join('\n')}
+<h2>Najważniejsze miejsca</h2>
+<p>Kolejność według rozpoznawalności miejsca. Dane: OpenStreetMap i Wikipedia.</p>
+<ol>${miejsca.map((m: any) => `<li><a href="/miejsce/${h(m.slug)}">${h(m.name)}</a>${czasZwiedzania(m.visit_minutes) ? ` — ${czasZwiedzania(m.visit_minutes)} zwiedzania` : ''}${m.wyroznik ? `. ${h(m.wyroznik)}` : ''}${m.opening_hours ? ` Godziny: ${h(m.opening_hours)}.` : ''}</li>`).join('')}</ol>
+${tablice.length ? `<h2>Gotowe tablice z tego miasta</h2><ul>${tablice.slice(0, 12).map((b: any) => `<li><a href="/tablica/${h(b.id)}">${h(b.name)}</a></li>`).join('')}</ul>` : ''}
+<h2>Inne miasta</h2>
+<ul>${miasta.filter((m) => m !== miasto).map((m) => `<li><a href="/miasto/${h(slugMiasta(m))}">${h(m)}</a></li>`).join('')}</ul>`);
+
+  return {
+    tytul: `${tytul}: ${ileM} i czas zwiedzania | RouteMarket`,
+    opis: skrocOpis(`${miasto}: ${ileM} z czasem zwiedzania i godzinami otwarcia — ${miejsca.slice(0, 3).map((m: any) => m.name).join(', ')}. Razem ${czasZwiedzania(suma)}, przy ${GODZIN_DZIENNIE} godzinach dziennie to ${ileD(dni)}.`),
+    obrazek: miejsca[0].photos[0] ?? null,
+    url,
+    typ: 'article',
+    dane: {
+      '@context': 'https://schema.org', '@type': 'ItemList',
+      name: tytul, url, numberOfItems: miejsca.length,
+      itemListElement: miejsca.map((m: any, i: number) => ({
+        '@type': 'ListItem', position: i + 1,
+        item: {
+          '@type': 'TouristAttraction', name: m.name, url: `https://routemarket.io/miejsce/${m.slug}`,
+          ...(m.lat != null ? { geo: { '@type': 'GeoCoordinates', latitude: m.lat, longitude: m.lng } } : {}),
+          ...(m.photos?.[0] ? { image: m.photos[0] } : {}),
+        },
+      })),
+    },
+    tresc,
   };
 }
 

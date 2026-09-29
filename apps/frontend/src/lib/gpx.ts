@@ -7,6 +7,8 @@
  * widać, gdzie się zatrzymać, a nie tylko którędy iść.
  */
 
+import { zdarzenie } from '@/lib/zdarzenia';
+
 const xml = (s: string): string => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -61,6 +63,7 @@ export function nazwaPliku(s: string): string {
 }
 
 export function pobierzPlik(nazwa: string, tresc: string, typ = 'application/gpx+xml'): void {
+  if (typ.includes('gpx')) zdarzenie('gpx_pobrany', { punkty: (tresc.match(/<wpt /g) ?? []).length });
   const url = URL.createObjectURL(new Blob([tresc], { type: typ }));
   const a = document.createElement('a');
   a.href = url;

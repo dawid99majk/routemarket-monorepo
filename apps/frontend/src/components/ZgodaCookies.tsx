@@ -31,6 +31,9 @@ function wlaczPomiar() {
   w.gtag = function () { w.dataLayer.push(arguments); };
   w.gtag('js', new Date());
   w.gtag('config', POMIAR, { send_page_view: false, anonymize_ip: true });
+  // Bez tego sygnału strona, na której padła zgoda — często ta z linku z posta,
+  // z parametrami kampanii — nie dostawała odsłony wcale (use-ga-pageview).
+  window.dispatchEvent(new Event('rm:pomiar'));
 }
 
 export default function ZgodaCookies() {

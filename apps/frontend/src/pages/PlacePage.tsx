@@ -20,6 +20,7 @@ import type { AxisValues } from '@/lib/tripPresets';
 import { mojeTablice } from '@/lib/mojeTablice';
 import { etykietaRodzaju } from '@/lib/rodzaj';
 import SEO from '@/components/SEO';
+import { slugMiasta, tytulMiasta } from '@/lib/miasta';
 
 interface CatalogPlace {
   id: string; slug: string; name: string; city: string | null; country: string | null;
@@ -489,6 +490,15 @@ export default function PlacePage() {
                 </div>
               ))}
             </div>
+
+            {place.city && (
+              <a href={`/miasto/${slugMiasta(place.city)}`}
+                onClick={(e) => { e.preventDefault(); navigate(`/miasto/${slugMiasta(place.city!)}`); }}
+                className="mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium underline underline-offset-4 hover:no-underline">
+                {(i18n.language || 'pl').startsWith('pl') ? tytulMiasta(place.city) : t('miasto.co_zobaczyc', { miasto: place.city })}
+                <span className="text-muted-foreground font-normal">· {t('miasto.link_z_miejsca')}</span>
+              </a>
+            )}
 
             {place.vibe_tags?.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-6">
