@@ -333,6 +333,46 @@ function kolejnoscPoDrodze(g: MiejsceWejscie[], baza: { lat: number; lng: number
   return [...najlepsza, ...bez];
 }
 
+/**
+ * Lokale wokół kotwic każdego dnia. Pula z jednego zapytania wokół środka miasta jest
+ * ucinana geograficznie (limit elementów w Overpassie), więc w Kopenhadze cała leżała
+ * na zachód od centrum, a dzień z Christianią i Rosenborgiem (2–3 km na wschód) nie
+ * miał w pobliżu żadnego lokalu — model wpisywał „Lunch w okolicy”. Dla dnia, który
+ * ma mniej niż cztery lokale w promieniu 1,5 km od swoich kotwic, dopytujemy o okolicę
+ * jego środka. Po jednym zapytaniu naraz (równoległe Overpass odrzuca z 504), najwyżej
+ * trzy na plan i w budżecie 25 s; wynik ląduje w poi_cache, więc kolejny plan w tej
+ * okolicy jest darmowy. Gdy Overpass milczy, plan powstaje z tym, co już jest.
+ */
+async function dolozLokaleWokolKotwic(
+  lokale: PoiCandidate[], grupy: MiejsceWejscie[][], zapas: { lat: number; lng: number } | null,
+  pomin: (c: PoiCandidate) => boolean,
+): Promise<PoiCandidate[]> {
+  const wynik = [...lokale];
+  const klucz = (c: PoiCandidate) => String(c.id ?? c.name.toLowerCase());
+  const znane = new Set(wynik.map(klucz));
+  const koniec = Date.now() + 25_000;
+  let zapytan = 0;
+  for (const g of grupy) {
+    if (zapytan >= 3 || Date.now() > koniec) break;
+    const srodek = srodekKotwic(g) ?? zapas;
+    if (!srodek) continue;
+    if (wynik.filter((l) => kmOd(srodek, l) <= 1.5).length >= 4) continue;
+    zapytan++;
+    const limit = new Promise<PoiCandidate[]>((r) => setTimeout(() => r([]), Math.max(3000, koniec - Date.now())));
+    const dodatkowe = await Promise.race([
+      poiService.fetchCandidates(srodek, 'food', { radiusKm: 1.5, limit: 25 }).catch(() => [] as PoiCandidate[]),
+      limit,
+    ]);
+    let nowe = 0;
+    for (const c of dodatkowe) {
+      if (znane.has(klucz(c)) || pomin(c)) continue;
+      znane.add(klucz(c)); wynik.push(c); nowe++;
+    }
+    console.log(`[planer] lokale wokół kotwic dnia (${srodek.lat.toFixed(3)},${srodek.lng.toFixed(3)}): +${nowe}`);
+  }
+  return wynik;
+}
+
 interface InfoDnia { index: number; date: string; weekday: string; dateObj: Date }
 
 export interface KontekstPlanu {
@@ -529,6 +569,8 @@ export async function przygotujKontekst(
     const nieprzypiete = (c: any) => !przypiete.has(c.name.toLowerCase());
     fillerSights = sights.filter(nieprzypiete);
     fillerFood = (food as PoiCandidate[]).filter(nieprzypiete);
+    fillerFood = await dolozLokaleWokolKotwic(fillerFood, grupy, bazaWczesnie ?? center,
+      (c) => przypiete.has(c.name.toLowerCase()));
     fillerPois = [...fillerSights, ...fillerFood];
   } catch (err: any) {
     console.warn('[planer] Pula POI niedostępna:', err.message);
