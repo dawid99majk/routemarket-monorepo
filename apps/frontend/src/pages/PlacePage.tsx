@@ -93,6 +93,13 @@ export default function PlacePage() {
     if (!slug) return;
     setLoading(true);
     const { data } = await supabase.from('place_catalog').select('*').eq('slug', slug).maybeSingle();
+    if (!data) {
+      // Adres sprzed poprawki transliteracji („pa-ac-gorkow”). Wejście z zewnątrz
+      // przekierowuje serwer (301), ale link zapisany w aplikacji trafia tutaj.
+      const { data: nowy } = await supabase.from('place_catalog').select('slug')
+        .contains('slugi_poprzednie', [slug]).limit(1).maybeSingle();
+      if (nowy?.slug) { navigate(`/miejsce/${nowy.slug}`, { replace: true }); return; }
+    }
     setPlace(data ? ({ ...data, photos: jakoZdjecia(data.photos) } as CatalogPlace) : null);
     setLoading(false);
     setPhotoIdx(0);

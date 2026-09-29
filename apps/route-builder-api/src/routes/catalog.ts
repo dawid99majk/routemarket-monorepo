@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { repo } from '../db/repository.js';
 import { geocodingService } from '../services/geocoding.js';
-import { poiService, poiClusterCenter } from '../services/poi.js';
+import { poiService, poiClusterCenter, type PoiCandidate } from '../services/poi.js';
 import { callGeminiTracked } from '../services/ai-usage.js';
 import { jezykZadania, JEZYKI_UI, type KodJezyka } from '../services/jezyki.js';
 import { przetlumaczPaczke } from '../services/tlumaczenia.js';
@@ -168,109 +168,235 @@ async function dociagnijZdjecia(
   console.log(`[catalog/seed] ${city}: zdjęcia w tle dla ${zdjecia} z ${lista.length} miejsc w ${Date.now() - t0} ms`);
 }
 
-catalogRouter.post('/catalog/seed', async (c) => {
-  try {
-    const { city, limit } = await c.req.json() as { city: string; limit?: number };
-    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+/**
+ * Wersja reguł zbierania. Podbicie sprawia, że pętla dozbierania przejdzie jeszcze
+ * raz przez wszystkie miasta. v2 (28.09.2026): ranking zwiedzania po liczbie wersji
+ * językowych Wikipedii, polskie nazwy, jedna karta na obiekt Wikidanych.
+ */
+const WERSJA_ZBIERANIA = 2;
 
+type Kategoria = 'zwiedzanie' | 'jedzenie' | 'wieczory' | 'noclegi';
+const KATEGORIE: Kategoria[] = ['zwiedzanie', 'jedzenie', 'wieczory', 'noclegi'];
+
+/** Promień zwiedzania. 4 km odcinało Schönbrunn (4,6 km od katedry św. Szczepana). */
+const PROMIEN_ZWIEDZANIA_KM = 5;
+
+const NIE_WIKIPEDIA = new Set(['commonswiki', 'specieswiki', 'metawiki', 'wikidatawiki', 'sourceswiki',
+  'incubatorwiki', 'mediawikiwiki', 'foundationwiki', 'outreachwiki']);
+
+/**
+ * Q-id → liczba wersji językowych Wikipedii i polska etykieta. Ta sama miara co
+ * waznosc.py, tylko liczona PRZED odcięciem kandydatów. Wcześniej o tym, co trafi
+ * do katalogu, decydowała ocena z tagów OSM — prawie płaska (6–8) — więc wygrywała
+ * odległość od centrum: pręgierz przy rynku wchodził, katedra poznańska 1,1 km dalej
+ * (52. miejsce) nie, a ważność liczona później nie miała już czego ułożyć.
+ */
+async function rozpoznawalnosc(qidy: string[]): Promise<Map<string, { ile: number; pl?: string }>> {
+  const wynik = new Map<string, { ile: number; pl?: string }>();
+  const unikalne = [...new Set(qidy.filter((q) => /^Q\d+$/.test(q)))];
+  for (let i = 0; i < unikalne.length; i += 50) {
+    const u = 'https://www.wikidata.org/w/api.php?' + new URLSearchParams({
+      action: 'wbgetentities', ids: unikalne.slice(i, i + 50).join('|'),
+      props: 'sitelinks|labels', languages: 'pl', format: 'json',
+    });
+    try {
+      const r = await fetch(u, {
+        headers: { 'User-Agent': 'RouteMarket/1.0 (https://routemarket.io)' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d: any = await r.json();
+      for (const [q, e] of Object.entries<any>(d.entities ?? {})) {
+        if (e.missing !== undefined) continue;
+        const ile = Object.keys(e.sitelinks ?? {})
+          .filter((k) => /^[a-z][a-z0-9_-]*wiki$/.test(k) && !NIE_WIKIPEDIA.has(k)).length;
+        wynik.set(q, { ile, pl: e.labels?.pl?.value });
+      }
+    } catch (err: any) {
+      console.warn(`[catalog/seed] Wikidane nie odpowiedziały: ${err.message}`);
+    }
+  }
+  return wynik;
+}
+
+const bezOgonkow = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** „Katedra św. Szczepana w Wiedniu” → „Katedra św. Szczepana”: miasto i tak stoi przy nazwie. */
+export function bezMiasta(etykieta: string, miasto: string): string {
+  // Odmiana zmienia spółgłoskę: Ryga → w Rydze, Haga → w Hadze. Krótkie nazwy: 2 litery.
+  const rdzen = bezOgonkow(miasto).slice(0, miasto.length <= 4 ? 2 : 3);
+  const w = etykieta.match(/^(.+?)\s+we?\s+([A-ZĄĆĘŁŃÓŚŹŻ].*)$/);
+  // Jedno słowo po obcięciu („Katedra”) nic nie mówi — wtedy miasto zostaje.
+  if (w && bezOgonkow(w[2]).startsWith(rdzen) && w[1].includes(' ')) return w[1];
+  const n = etykieta.match(/^(.+?)\s+\(([^)]+)\)$/);
+  if (n && bezOgonkow(n[2]).startsWith(rdzen) && n[1].includes(' ')) return n[1];
+  return etykieta;
+}
+
+/**
+ * Polska nazwa dla karty za granicą: „Colosseo” → „Koloseum”. Najpierw `name:pl`
+ * z OSM, potem polska etykieta Wikidanych — ale tylko dla atrakcji: bar w Durrës
+ * z tagiem wikidata amfiteatru nazwałby się „Amfiteatr”.
+ */
+const slowa = (s: string) => new Set(bezOgonkow(s).match(/[a-z0-9]+/g) ?? []);
+/** „Casa di Colombo” wobec „Casa di Cristoforo Colombo”: skrót tej samej nazwy, nie przekład. */
+function tenSamJezyk(a: string, b: string): boolean {
+  const sa = slowa(a), sb = slowa(b);
+  const zawiera = (x: Set<string>, y: Set<string>) => [...x].every((w) => y.has(w));
+  return sa.size > 0 && sb.size > 0 && (zawiera(sa, sb) || zawiera(sb, sa));
+}
+
+function nazwaPolska(p: PoiCandidate, miasto: string, kraj: string | null,
+  wd: Map<string, { ile: number; pl?: string }>): string | null {
+  if (kraj === 'PL') return null;
+  let n = bezMiasta(p.namePl?.trim() || '', miasto);
+  if (!n && p.wikidata && kategoriaZRodzaju(p.kind) === 'attraction') {
+    const pl = wd.get(p.wikidata)?.pl?.trim();
+    if (pl && pl.length <= 60) n = bezMiasta(pl, miasto);
+    if (n && tenSamJezyk(n, p.name)) n = '';
+  }
+  // „Matki Bożej Śnieżnej” to dopełniacz wyjęty z nazwy kościoła, nie nazwa.
+  if (/^(Matki|Świętego|Świętej|Najświętszej|Najświętszego|Panny|Pana)\b/.test(n)) return null;
+  return n && n.toLowerCase() !== p.name.toLowerCase() ? n : null;
+}
+
+/** Zwiedzanie po rozpoznawalności; jeden obiekt Wikidanych = jedna karta. */
+function uporzadkujZwiedzanie(lista: PoiCandidate[], wd: Map<string, { ile: number }>): PoiCandidate[] {
+  const ocenione = lista.map((p) => {
+    const ile = p.wikidata ? wd.get(p.wikidata)?.ile ?? 0 : 0;
+    const odl = Math.min(1, (p.distanceKm ?? 0) / PROMIEN_ZWIEDZANIA_KM);
+    // Rozpoznawalność rządzi, odległość tylko hamuje. Bez artykułu — na koniec,
+    // w dawnej kolejności z tagów.
+    const ocena = ile > 0 ? ile * (1 - 0.35 * odl) : -1 + (p.rank ?? 0) / 100;
+    return { p, ocena };
+  }).sort((a, b) => b.ocena - a.ocena);
+  const widziane = new Set<string>();
+  const wynik: PoiCandidate[] = [];
+  for (const { p } of ocenione) {
+    // „Zamek Cesarski” i „Zamek Cesarski w Poznaniu” to dwa obiekty OSM jednego zamku.
+    if (p.wikidata) {
+      if (widziane.has(p.wikidata)) continue;
+      widziane.add(p.wikidata);
+    }
+    wynik.push(p);
+  }
+  return wynik;
+}
+
+/**
+ * Jedna kategoria z Overpassa. `proby` > 1 tylko tam, gdzie brak boli najbardziej
+ * (zwiedzanie) — 504 trwa ~25 s, a użytkownik czeka na ekranie zbierania. Resztę
+ * ponawia pętla dozbierania w tle.
+ */
+async function pobierzKategorie(pt: { lat: number; lng: number }, kat: Kategoria, take: number, proby = 1):
+  Promise<{ lista: PoiCandidate[]; niepelny: boolean }> {
+  const [typ, opcje] = ({
+    zwiedzanie: ['city_walk', { radiusKm: PROMIEN_ZWIEDZANIA_KM, limit: 300 }],
+    // Promień dla jedzenia mniejszy: knajpa cztery kilometry za centrum nie jest
+    // odpowiedzią na pytanie „gdzie zjeść przy okazji zwiedzania”.
+    jedzenie: ['food', { radiusKm: 2, limit: Math.max(6, Math.round(take / 2)) }],
+    wieczory: ['nightlife', { radiusKm: 2, limit: Math.max(4, Math.round(take / 4)) }],
+    // Noclegów garść, nie lista do przeglądania: mają służyć podpowiedziom
+    // punktu startowego, nie wypełniać feedu.
+    noclegi: ['hotel', { radiusKm: 3, limit: 10 }],
+  } as const)[kat];
+  for (let proba = 0; proba < proby; proba++) {
+    if (proba > 0) await new Promise((r) => setTimeout(r, 5000 * proba));
+    const stan = { niepelny: false };
+    const lista = await poiService.fetchCandidates(pt, typ, { ...opcje, stan })
+      .catch((err: any) => { console.warn(`[catalog/seed] ${kat}: ${err.message}`); stan.niepelny = true; return []; });
+    if (lista.length > 0 || !stan.niepelny) return { lista, niepelny: false };
+  }
+  return { lista: [], niepelny: true };
+}
+
+/** Miasta zbierane w tej chwili — pętla w tle nie wchodzi w drogę użytkownikowi. */
+const zbieraneTeraz = new Set<string>();
+
+export async function zbierzMiasto(miasto: string, opcje: { take?: number; tylko?: Kategoria[]; ponowienie?: boolean } = {}) {
+  const city = miasto.trim();
+  const klucz = city.toLowerCase();
+  zbieraneTeraz.add(klucz);
+  try {
     // Pomiar etapów: bez niego "trwa 40-60 s" jest odczuciem, a nie liczbą.
     const t0 = Date.now();
     const etapy: Record<string, number> = {};
     let tEtap = Date.now();
     let center = await geocodingService.geocodeSettlement(city);
     etapy.geokoder = Date.now() - tEtap;
-    const take = Math.min(40, Math.max(6, limit ?? 24));
+    const take = Math.min(40, Math.max(6, opcje.take ?? 30));
+    const kategorie = opcje.tylko?.length ? opcje.tylko : KATEGORIE;
+    const pelne = kategorie.length === KATEGORIE.length;
     tEtap = Date.now();
 
-    // Zbieranie pytało wyłącznie o zwiedzanie, więc katalog był w całości
-    // atrakcjami — restauracja mogła trafić na tablicę tylko przez wyszukiwanie
-    // tekstowe, nigdy przez katalog miasta. Warstwa POI ma osobne zapytania do
-    // Overpassa dla jedzenia i wieczorów; wystarczyło zacząć ich używać.
-    //
-    // Promień dla jedzenia jest mniejszy: knajpa cztery kilometry za centrum nie
-    // jest odpowiedzią na pytanie „gdzie zjeść przy okazji zwiedzania".
-    const fetchAll = (pt: { lat: number; lng: number }) => Promise.all([
-      poiService.fetchCandidates(pt, 'city_walk',
-        { radiusKm: 4, limit: take }),
-      poiService.fetchCandidates(pt, 'food',
-        { radiusKm: 2, limit: Math.max(6, Math.round(take / 2)) }),
-      poiService.fetchCandidates(pt, 'nightlife',
-        { radiusKm: 2, limit: Math.max(4, Math.round(take / 4)) }),
-      // Noclegów zbieramy garść, nie listę do przeglądania: bazę wybiera się raz,
-      // a nie porównuje czterdziestu hoteli w planerze. Mają służyć podpowiedziom
-      // punktu startowego, nie wypełniać feed miejsc do zobaczenia.
-      poiService.fetchCandidates(pt, 'hotel',
-        { radiusKm: 3, limit: 10 }).catch(() => []),
-    ]);
-
-    let [zwiedzanie, jedzenie, wieczory, noclegi] = await fetchAll({ lat: center.lat, lng: center.lng });
+    const pobierzWszystko = (pt: { lat: number; lng: number }) =>
+      Promise.all(kategorie.map((k) => pobierzKategorie(pt, k, take, k === 'zwiedzanie' ? 2 : 1)));
+    let wyniki = await pobierzWszystko(center);
+    const z = (k: Kategoria) => wyniki[kategorie.indexOf(k)] ?? { lista: [], niepelny: false };
 
     // Geokoder dla rozległego miasta bywa oddaje centroid granic administracyjnych
-    // zamiast realnego centrum (patrz poiClusterCenter w services/poi.ts — ten sam
-    // problem co w /chat-interview). Środek ciężkości najlepiej ocenionych atrakcji
-    // ze zwiedzania koryguje go, gdy odchylenie jest realne (>1 km), i wtedy
-    // odpytujemy Overpassa ponownie dla tego samego miasta wokół nowego środka.
-    const cluster = poiClusterCenter(zwiedzanie);
-    if (cluster) {
-      const dLat = (cluster.lat - center.lat) * 111;
-      const dLng = (cluster.lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180);
-      const shiftKm = Math.sqrt(dLat * dLat + dLng * dLng);
-      if (shiftKm > 1) {
-        console.log(`[catalog/seed] ${city}: środek atrakcji przesunięty o ${shiftKm.toFixed(1)} km: `
-          + `${center.lat.toFixed(4)},${center.lng.toFixed(4)} -> ${cluster.lat.toFixed(4)},${cluster.lng.toFixed(4)}`);
-        center = { ...center, lat: cluster.lat, lng: cluster.lng };
-        [zwiedzanie, jedzenie, wieczory, noclegi] = await fetchAll({ lat: center.lat, lng: center.lng });
+    // zamiast realnego centrum (patrz poiClusterCenter). Środek ciężkości atrakcji
+    // koryguje go, gdy odchylenie jest realne (>1 km), i wtedy pytamy jeszcze raz.
+    if (kategorie.includes('zwiedzanie')) {
+      const cluster = poiClusterCenter(z('zwiedzanie').lista);
+      if (cluster) {
+        const dLat = (cluster.lat - center.lat) * 111;
+        const dLng = (cluster.lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180);
+        const shiftKm = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (shiftKm > 1) {
+          console.log(`[catalog/seed] ${city}: środek atrakcji przesunięty o ${shiftKm.toFixed(1)} km: `
+            + `${center.lat.toFixed(4)},${center.lng.toFixed(4)} -> ${cluster.lat.toFixed(4)},${cluster.lng.toFixed(4)}`);
+          center = { ...center, lat: cluster.lat, lng: cluster.lng };
+          wyniki = await pobierzWszystko(center);
+        }
       }
     }
+    etapy.overpass = Date.now() - tEtap;
+
+    tEtap = Date.now();
+    const surowe = z('zwiedzanie').lista;
+    const wd = await rozpoznawalnosc([...surowe, ...z('jedzenie').lista, ...z('wieczory').lista]
+      .map((p) => p.wikidata).filter((q): q is string => !!q));
+    const zwiedzanie = uporzadkujZwiedzanie(surowe, wd).slice(0, take);
+    const jedzenie = z('jedzenie').lista, wieczory = z('wieczory').lista, noclegi = z('noclegi').lista;
+    etapy.wikidane = Date.now() - tEtap;
+
+    const braki = kategorie.filter((k) => z(k).niepelny);
+    const puste = kategorie.filter((k) => !z(k).niepelny && z(k).lista.length === 0);
 
     // Ten sam obiekt bywa w kilku zapytaniach — bar w zabytkowej kamienicy wraca
-    // i jako nightlife, i jako food. Pierwsze wystąpienie wygrywa, bo listy idą
-    // w kolejności ważności dla planowania.
+    // i jako nightlife, i jako food. Pierwsze wystąpienie wygrywa.
     const widziane = new Set<string>();
     // Obiekty wykluczone świadomie — duplikaty scalone ręcznie i wpisy odrzucone.
-    // Bez tej listy scalenie duplikatu jest nietrwałe: seed pyta Overpassa
-    // o miasto i wstawia z powrotem wszystko, czego nie zna, więc obiekt z żywym
-    // identyfikatorem OSM wraca przy najbliższym zbieraniu. „Torre dos Clérigos"
-    // wróciła tak na tablicę przykładową Porto obok samej siebie pod pełną nazwą.
+    // Bez tej listy scalenie duplikatu jest nietrwałe: seed wstawiłby je z powrotem.
     const wykluczone = await repo.listCatalogExclusions();
-
     const candidates = [...zwiedzanie, ...jedzenie, ...wieczory, ...noclegi].filter((p) => {
       if (p.id && wykluczone.has(String(p.id))) return false;
-      const klucz = String(p.id ?? `${p.name}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`);
-      if (widziane.has(klucz)) return false;
-      widziane.add(klucz);
+      const k = String(p.id ?? `${p.name}:${p.lat.toFixed(5)}:${p.lng.toFixed(5)}`);
+      if (widziane.has(k)) return false;
+      widziane.add(k);
       return true;
     });
-    etapy.overpass = Date.now() - tEtap;
-    if (candidates.length === 0) return c.json({ city, added: 0, places: [] });
 
-    // Model nie odzywa się na tym etapie. Pomiar pokazał, że jedno zapytanie
-    // o opisy dla wszystkich miejsc naraz zjadało siedemdziesiąt procent czasu
-    // (23,4 s z 33,1 s dla Gdańska), a przez ten czas użytkownik nie widział nic.
-    // Fakty z OpenStreetMap wystarczą, żeby pokazać karty; opisy dochodzą osobno
-    // przez /catalog/enrich.
-
-    // Zapis BEZ zdjęć, zdjęcia w tle. Pomiar Lublina (27.09): zbieranie trwało
-    // 42 s, z czego 31,5 s to Commons — Overpass zajął 10 s. Przez cały ten czas
-    // użytkownik patrzył na „zbieram miejsca”, choć nazwy, godziny i położenie
-    // były gotowe. Opisy od dawna dochodzą osobno (/catalog/enrich); zdjęcia
-    // dochodzą teraz tak samo, a front i tak przeładowuje listę po każdej partii
-    // opisów, więc galerie pojawiają się same.
+    // Zapis BEZ zdjęć i opisów: jedno i drugie dochodzi w tle (dociagnijZdjecia,
+    // dokonczMiasto). Nazwy, godziny i położenie są gotowe od razu.
     const saved: any[] = [];
     const doZdjec: { id: string; name: string; lat: number; lng: number; wikipedia?: string | null }[] = [];
     tEtap = Date.now();
+    const kraj = center.countryCode ?? null;
     const BATCH = 10;
     for (let i = 0; i < candidates.length; i += BATCH) {
       const batch = candidates.slice(i, i + BATCH);
       await Promise.all(batch.map(async (p) => {
-        const slug = placeSlug(p.name, city, p.lat, p.lng);
+        const polska = nazwaPolska(p, city, kraj, wd);
+        const nazwa = polska ?? p.name;
+        const slug = placeSlug(nazwa, city, p.lat, p.lng);
         const row = {
           slug,
-          name: p.name,
+          name: nazwa,
+          nazwa_lokalna: polska ? p.name : null,
           city,
-          country: center.countryCode ?? null,
+          country: kraj,
           lat: p.lat,
           lng: p.lng,
           category: kategoriaZRodzaju(p.kind),
@@ -292,6 +418,13 @@ catalogRouter.post('/catalog/seed', async (c) => {
           if (existing) {
             const patch: Record<string, unknown> = { updated_at: row.updated_at };
             if (!existing.wikipedia && row.wikipedia) patch.wikipedia = row.wikipedia;
+            if (!existing.opening_hours && row.opening_hours) patch.opening_hours = row.opening_hours;
+            // Polska nazwa dla miejsca zebranego po staremu — tylko gdy nikt nie
+            // zmieniał nazwy ręcznie (wciąż ta z OSM). Adres strony zostaje.
+            if (polska && existing.name === p.name) {
+              patch.name = polska;
+              patch.nazwa_lokalna = p.name;
+            }
             await repo.updateCatalogPlace(existing.id, patch);
             saved.push(existing);
             if (!existing.photos || existing.photos.length === 0) {
@@ -299,7 +432,8 @@ catalogRouter.post('/catalog/seed', async (c) => {
             }
           } else {
             const nowy = await repo.insertCatalogPlace(row);
-            saved.push(nowy);
+            saved.push({ ...nowy, __nowe: true });
+            // Zdjęć szukamy po nazwie z OSM — Commons opisuje je po miejscowemu.
             doZdjec.push({ id: nowy.id, name: p.name, lat: p.lat, lng: p.lng, wikipedia: p.wikipedia });
           }
         } catch (err: any) {
@@ -308,23 +442,140 @@ catalogRouter.post('/catalog/seed', async (c) => {
       }));
     }
     void dociagnijZdjecia(city, doZdjec);
-
     etapy.zapis = Date.now() - tEtap;
-    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc `
-      + `(zwiedzanie ${zwiedzanie.length}, jedzenie ${jedzenie.length}, `
-      + `wieczory ${wieczory.length}, noclegi ${noclegi.length}) `
-      + `w ${Date.now() - t0} ms ` +
-      `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
-    // needs_enrich mówi klientowi, że warto od razu poprosić o opisy.
-    return c.json({
-      city, added: saved.length, needs_enrich: saved.length > 0,
-      center: { lat: center.lat, lng: center.lng }
+
+    const nowe = saved.filter((s) => s.__nowe).length;
+    await repo.zapiszStanMiasta(city, {
+      ostatnia_proba: new Date().toISOString(),
+      braki,
+      puste,
+      // Wersję podbija tylko pełne zbieranie, w którym zwiedzanie się udało.
+      ...(pelne && !braki.includes('zwiedzanie') ? { wersja_zbierania: WERSJA_ZBIERANIA } : {}),
     });
+
+    // Jedno ponowienie po półtorej minuty, samo, bez użytkownika. Zapytanie o jedzenie
+    // padało przy każdym zbieraniu (Zamość, Wrocław, Poznań): idzie równolegle z trzema
+    // innymi, a Overpass limituje równoległe zapytania z jednego adresu. Osobno,
+    // chwilę później, zwykle przechodzi; jeśli nie — zajmie się nim pętla dozbierania.
+    if (braki.length && !opcje.ponowienie) {
+      setTimeout(() => {
+        zbierzMiasto(city, { tylko: braki, ponowienie: true })
+          .then(() => dokonczMiasto(city))
+          .catch((err: any) => console.warn(`[catalog/seed] ${city}: ponowienie ${braki.join(', ')}: ${err.message}`));
+      }, 90_000);
+    }
+
+    console.log(`[catalog/seed] ${city}: zapisano ${saved.length} miejsc, nowych ${nowe} `
+      + `(zwiedzanie ${zwiedzanie.length}, jedzenie ${jedzenie.length}, `
+      + `wieczory ${wieczory.length}, noclegi ${noclegi.length})`
+      + (braki.length ? `, NIE PRZYSZŁO: ${braki.join(', ')}` : '')
+      + ` w ${Date.now() - t0} ms `
+      + `(${Object.entries(etapy).map(([k, v]) => `${k} ${v}ms`).join(', ')}, kandydatów ${candidates.length})`);
+    return { city, added: saved.length, nowe, braki, center: { lat: center.lat, lng: center.lng } };
+  } finally {
+    zbieraneTeraz.delete(klucz);
+  }
+}
+
+/** Miasta, dla których właśnie powstają opisy — drugi przebieg nie płaci drugi raz. */
+const dokanczane = new Set<string>();
+
+/**
+ * Opisy i wyróżniki po zbieraniu — na serwerze, w tle. Wcześniej wołał je front,
+ * a oba endpointy są tylko dla administratora: każdy inny użytkownik dostawał nowe
+ * miasto bez jednego opisu (audyt 10 — testy szły z konta administratora).
+ */
+export async function dokonczMiasto(city: string): Promise<void> {
+  const klucz = city.trim().toLowerCase();
+  if (dokanczane.has(klucz)) return;
+  dokanczane.add(klucz);
+  try {
+    // Jedno wywołanie opisuje najwyżej 24 miejsca; limit rund chroni przed pętlą.
+    for (let runda = 0; runda < 10; runda++) {
+      const o = await opiszBraki(city, 24, null);
+      if (!o.enriched || !o.remaining) break;
+    }
+    // Wyróżniki DOPIERO TERAZ: zdanie „czym to się różni od sąsiadów” potrzebuje
+    // opisów i tagów, które powstają wyżej. Partia bez zapisu kończy przebieg.
+    for (let runda = 0; runda < 10; runda++) {
+      const o = await dopiszWyrozniki(city, 20, null);
+      if (!o.opisane || !o.pozostalo) break;
+    }
+  } catch (err: any) {
+    console.warn(`[catalog/dokoncz] ${city}: ${err.message}`);
+  } finally {
+    dokanczane.delete(klucz);
+  }
+}
+
+catalogRouter.post('/catalog/seed', async (c) => {
+  try {
+    const { city, limit } = await c.req.json() as { city: string; limit?: number };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    if (!process.env.GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+    const w = await zbierzMiasto(city, { take: limit });
+    void dokonczMiasto(w.city);
+    // opisy_w_tle: front nie woła już /catalog/enrich (tylko dla administratora),
+    // tylko odświeża listę, aż opisy dojdą.
+    return c.json({ ...w, needs_enrich: w.added > 0, opisy_w_tle: true });
   } catch (err: any) {
     console.error('[catalog/seed] Error:', err);
     return c.json({ error: err.message }, 500);
   }
 });
+
+/**
+ * Dozbieranie w tle. Co kilka minut jedno miasto, któremu czegoś brakuje:
+ *  - zebrane starszą wersją reguł → pełne zbieranie (dochodzą pominięte zabytki),
+ *  - kategoria, która padła na 504 albo nigdy nie była zbierana → tylko ona,
+ *  - miejsca bez opisu (np. restart w trakcie) → same opisy.
+ * Jedno miasto naraz i nie częściej niż co dwie godziny to samo — Overpass jest
+ * współdzielony, a 504 w szczycie to norma. Kategorię, dla której Overpass
+ * odpowiedział poprawnie i pusto, zostawiamy w spokoju (`puste`).
+ */
+let dozbieranieWToku = false;
+async function dozbierajJednoMiasto(): Promise<void> {
+  if (dozbieranieWToku || !process.env.GEMINI_API_KEY) return;
+  dozbieranieWToku = true;
+  try {
+    const teraz = Date.now();
+    const DWIE_GODZINY = 2 * 3600_000;
+    const kolejka = (await repo.katalogBraki())
+      .filter((m: any) => !zbieraneTeraz.has(String(m.city).toLowerCase()))
+      .filter((m: any) => !m.ostatnia_proba || teraz - Date.parse(m.ostatnia_proba) > DWIE_GODZINY)
+      .map((m: any) => {
+        const puste = new Set<string>(m.puste ?? []);
+        if ((m.wersja ?? 0) < WERSJA_ZBIERANIA) return { m, tylko: [...KATEGORIE] };
+        const tylko: Kategoria[] = [];
+        if (!m.jedzenie && !puste.has('jedzenie')) tylko.push('jedzenie');
+        if (!m.wieczory && !puste.has('wieczory')) tylko.push('wieczory');
+        if (!m.noclegi && !puste.has('noclegi')) tylko.push('noclegi');
+        return { m, tylko };
+      })
+      .filter(({ m, tylko }: any) => tylko.length > 0 || Number(m.bez_opisu) > 0)
+      // Najpierw braki kategorii (użytkownik widzi pusty filtr), potem stare wersje.
+      .sort((a: any, b: any) => Number(b.tylko.length < KATEGORIE.length && b.tylko.length > 0)
+        - Number(a.tylko.length < KATEGORIE.length && a.tylko.length > 0));
+    const nast = kolejka[0];
+    if (!nast) return;
+    const { m, tylko } = nast;
+    if (tylko.length) {
+      console.log(`[catalog/dozbieranie] ${m.city}: ${tylko.length === KATEGORIE.length ? 'pełne zbieranie v' + WERSJA_ZBIERANIA : tylko.join(', ')}`);
+      await zbierzMiasto(m.city, { tylko: tylko.length === KATEGORIE.length ? undefined : tylko });
+    } else {
+      await repo.zapiszStanMiasta(m.city, { ostatnia_proba: new Date().toISOString() });
+    }
+    await dokonczMiasto(m.city);
+  } catch (err: any) {
+    console.warn('[catalog/dozbieranie]', err.message);
+  } finally {
+    dozbieranieWToku = false;
+  }
+}
+if (process.env.NODE_ENV !== 'test') {
+  setTimeout(() => { void dozbierajJednoMiasto(); }, 90_000);
+  setInterval(() => { void dozbierajJednoMiasto(); }, 6 * 60_000);
+}
 
 /**
  * Uzupełnienie kraju tam, gdzie go brakuje. Kolumna istniała od początku, ale
@@ -381,35 +632,32 @@ catalogRouter.post('/catalog/backfill-country', async (c) => {
  * Rusza wyłącznie pozycje, które mają już opis, a nie mają wyróżnika. Opisów
  * nie dotyka.
  */
-catalogRouter.post('/catalog/wyrozniki', async (c) => {
-  try {
-    const { city, limit = 20 } = await c.req.json() as { city: string; limit?: number };
-    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+export async function dopiszWyrozniki(city: string, limit = 20, userId: string | null = null): Promise<{ city: string; opisane: number; odrzucone?: number; pozostalo: number }> {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
 
-    const wszystkie = await repo.listCatalogAll(city.trim(), 200);
-    const opis = (m: any) => String(m.description_i18n?.pl ?? m.description ?? '').trim();
-    const maWyroznik = (m: any) =>
-      !!String(m.wyroznik_i18n?.pl ?? m.wyroznik ?? '').trim();
-    // Bez opisu nie ma z czym kontrastować — takie miejsca idą najpierw przez
-    // /catalog/enrich, nie tędy.
-    const brakujace = wszystkie.filter((m: any) => opis(m) && !maWyroznik(m));
-    const doOpisania = brakujace.slice(0, limit);
-    if (doOpisania.length === 0) return c.json({ city, opisane: 0, pozostalo: 0 });
+  const wszystkie = await repo.listCatalogAll(city.trim(), 200);
+  const opis = (m: any) => String(m.description_i18n?.pl ?? m.description ?? '').trim();
+  const maWyroznik = (m: any) =>
+    !!String(m.wyroznik_i18n?.pl ?? m.wyroznik ?? '').trim();
+  // Bez opisu nie ma z czym kontrastować — takie miejsca idą najpierw przez
+  // /catalog/enrich, nie tędy.
+  const brakujace = wszystkie.filter((m: any) => opis(m) && !maWyroznik(m));
+  const doOpisania = brakujace.slice(0, limit);
+  if (doOpisania.length === 0) return { city, opisane: 0, pozostalo: 0 };
 
-    // Sąsiedzi liczą się tą samą funkcją, która zasila pasek na karcie —
-    // model kontrastuje z tym, co użytkownik naprawdę zobaczy pod spodem.
-    const sasiedzi = await Promise.all(
-      doOpisania.map((m: any) => repo.podobneNazwy(m.id, 4).catch(() => [] as string[]))
-    );
+  // Sąsiedzi liczą się tą samą funkcją, która zasila pasek na karcie —
+  // model kontrastuje z tym, co użytkownik naprawdę zobaczy pod spodem.
+  const sasiedzi = await Promise.all(
+    doOpisania.map((m: any) => repo.podobneNazwy(m.id, 4).catch(() => [] as string[]))
+  );
 
-    const lista = doOpisania.map((p: any, i: number) => {
-      const obok = sasiedzi[i].length ? sasiedzi[i].join(', ') : 'brak podobnych w katalogu';
-      return `${i + 1}. ${p.name}\n   podobne obok: ${obok}\n   opis: ${opis(p).slice(0, 400)}`;
-    }).join('\n\n');
+  const lista = doOpisania.map((p: any, i: number) => {
+    const obok = sasiedzi[i].length ? sasiedzi[i].join(', ') : 'brak podobnych w katalogu';
+    return `${i + 1}. ${p.name}\n   podobne obok: ${obok}\n   opis: ${opis(p).slice(0, 400)}`;
+  }).join('\n\n');
 
-    const prompt = `Piszesz PO POLSKU dla serwisu planowania wyjazdów. Miasto: ${city}.
+  const prompt = `Piszesz PO POLSKU dla serwisu planowania wyjazdów. Miasto: ${city}.
 
 Dla każdego miejsca napisz JEDNO zdanie z faktem, który ODRÓŻNIA je od podobnych
 miejsc wymienionych obok.
@@ -419,159 +667,163 @@ NIE WIDZI żadnej listy — czyta samo zdanie pod nazwą miejsca.
 
 Zasady:
 - Nazwę sąsiada wstaw TYLKO wtedy, gdy porównanie wnosi realną wartość dla podróżnika:
-  "W przeciwieństwie do zatłoczonego rynku, ma ukryty ogród w cieniu starych drzew" — tak.
-  "w odróżnieniu od Muzeum Narodowego" doklejone sztucznie na końcu — nie, to puste.
+"W przeciwieństwie do zatłoczonego rynku, ma ukryty ogród w cieniu starych drzew" — tak.
+"w odróżnieniu od Muzeum Narodowego" doklejone sztucznie na końcu — nie, to puste.
 - ZAKAZANE zwroty: "wśród wymienionych", "z wymienionych", "spośród podobnych".
-  Użytkownik nie wie, o jakiej liście mowa.
+Użytkownik nie wie, o jakiej liście mowa.
 - NIE ZACZYNAJ od nazwy tego miejsca. Nazwa stoi na karcie tuż nad tym zdaniem. Zacznij od cechy lub doświadczenia.
 - Wskazuj na autentyczną cechę: klimat, widok, unikalne danie, rodzaj doświadczenia (interaktywne vs tradycyjne, kameralne vs monumentalne), sekretne wejście, specyfikę pory dnia.
 - ZAKAZANE słowa: wyjątkowy, niesamowity, magiczny, klejnot, perła, must-see, "warto zobaczyć", "nie do przegapienia".
 - NIE POWTARZAJ faktów z opisu.
 - Konkret, nie nastrój: co tam jest albo co tam robisz. Bez „szeptów historii”,
-  ruin, które „opowiadają”, „oaz ciszy” i „tętniącego życiem” placu.
+ruin, które „opowiadają”, „oaz ciszy” i „tętniącego życiem” placu.
 - NIE KOŃCZ zdania dopiskiem „w odróżnieniu od innych …” / „w przeciwieństwie do
-  innych …” — skoro zdanie podaje różnicę, dopisek niczego nie dodaje.
+innych …” — skoro zdanie podaje różnicę, dopisek niczego nie dodaje.
 - Jedno zdanie, najwyżej 25 słów. Nie zaczynaj od "Wybierz", "Odwiedź", "Zobacz".
 
 Dobre zdania:
-  "W odróżnieniu od tradycyjnych galerii, wszystkiego można tu dotknąć i samodzielnie eksperymentować."
-  "Jedyny punkt widokowy w dzielnicy z otwartym tarasem 360° bez szyb i bez konieczności rezerwacji."
-  "Zamiast gwarnych sal oferuje kameralny dziedziniec z własną rzemieślniczą palarnią kawy."
+"W odróżnieniu od tradycyjnych galerii, wszystkiego można tu dotknąć i samodzielnie eksperymentować."
+"Jedyny punkt widokowy w dzielnicy z otwartym tarasem 360° bez szyb i bez konieczności rezerwacji."
+"Zamiast gwarnych sal oferuje kameralny dziedziniec z własną rzemieślniczą palarnią kawy."
 
 Miejsca:
 ${lista}
 
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [{"name": "...", "wyroznik": "..."}]}`;
 
-    const data = await callGeminiTracked(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'object',
-            properties: {
-              places: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { name: { type: 'string' }, wyroznik: { type: 'string' } },
-                  required: ['name', 'wyroznik']
-                }
+  const data = await callGeminiTracked(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            places: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { name: { type: 'string' }, wyroznik: { type: 'string' } },
+                required: ['name', 'wyroznik']
               }
-            },
-            required: ['places']
+            }
           },
-          // Tyle samo co /catalog/enrich. Przy 8192 partia dwudziestu miejsc
-          // potrafiła urwać się w środku JSON-a: model liczy do tego limitu
-          // także tokeny rozumowania, nie samą odpowiedź.
-          maxOutputTokens: 32768
-        }
-      },
-      { operation: 'catalog-wyrozniki', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
-    );
+          required: ['places']
+        },
+        // Tyle samo co /catalog/enrich. Przy 8192 partia dwudziestu miejsc
+        // potrafiła urwać się w środku JSON-a: model liczy do tego limitu
+        // także tokeny rozumowania, nie samą odpowiedź.
+        maxOutputTokens: 32768
+      }
+    },
+    { operation: 'catalog-wyrozniki', model: 'gemini-2.5-flash', userId: userId }
+  );
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let wynik: any[] = [];
-    try {
-      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const first = cleaned.indexOf('{');
-      const last = cleaned.lastIndexOf('}');
-      if (first >= 0 && last > first) wynik = JSON.parse(cleaned.slice(first, last + 1)).places || [];
-    } catch {
-      console.warn('[catalog/wyrozniki] Nie udało się sparsować odpowiedzi');
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let wynik: any[] = [];
+  try {
+    const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const first = cleaned.indexOf('{');
+    const last = cleaned.lastIndexOf('}');
+    if (first >= 0 && last > first) wynik = JSON.parse(cleaned.slice(first, last + 1)).places || [];
+  } catch {
+    console.warn('[catalog/wyrozniki] Nie udało się sparsować odpowiedzi');
+  }
+
+  /* Czy zdanie to przebranie opisu. Liczymy tylko słowa 6+ znaków, bo krótkie
+     to spójniki i przyimki, które siedzą wszędzie. Próg 70% wyszedł z pomiaru
+     pierwszego przebiegu: przy tej wartości odpadają streszczenia, a zostają
+     zdania niosące nowy fakt. */
+  const przebranieOpisu = (zdanie: string, tekstOpisu: string) => {
+    const slowa = zdanie.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 6);
+    if (slowa.length === 0) return false;
+    const opisMaly = tekstOpisu.toLowerCase();
+    return slowa.filter((w) => opisMaly.includes(w)).length / slowa.length >= 0.7;
+  };
+
+  const wgNazwy = new Map(wynik.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
+  let zmienione = 0;
+  let odrzucone = 0;
+  for (const m of doOpisania) {
+    const klucz = String(m.name).trim().toLowerCase();
+    // Ten sam zapas co przy opisach: model potrafi dokleić adnotację do nazwy,
+    // a nazwa źródłowa jest wtedy przedrostkiem.
+    const d = wgNazwy.get(klucz)
+      ?? wynik.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
+    // Model dokleja na końcu „, w odróżnieniu od innych muzeów.” mimo zakazu
+    // w prompcie — w Toruniu co drugie zdanie. Dopisek bez nazwy niczego nie
+    // porównuje, więc go ucinamy; zdanie przed nim zostaje.
+    const zdanie = String(d?.wyroznik ?? '').trim()
+      .replace(/,?\s*(w odróżnieniu|w przeciwieństwie) (od|do) (innych|pozostałych|okolicznych|typowych|tradycyjnych)[^.,;]*\.?$/i, '.')
+      .replace(/\.\.$/, '.');
+    // Puste pole jest dozwoloną odpowiedzią: nie każde miejsce ma czym się
+    // różnić i wolimy nie pokazać wiersza, niż pokazać pusty komunał.
+    if (!zdanie) continue;
+    if (przebranieOpisu(zdanie, opis(m))) {
+      // Treść, nie tylko licznik: bez niej nie da się ocenić, czy próg wycina
+      // streszczenia, czy dobre zdania.
+      console.log(`[catalog/wyrozniki] odrzucone (powtarza opis) "${m.name}": ${zdanie.slice(0, 90)}`);
+      odrzucone++; continue;
     }
-
-    /* Czy zdanie to przebranie opisu. Liczymy tylko słowa 6+ znaków, bo krótkie
-       to spójniki i przyimki, które siedzą wszędzie. Próg 70% wyszedł z pomiaru
-       pierwszego przebiegu: przy tej wartości odpadają streszczenia, a zostają
-       zdania niosące nowy fakt. */
-    const przebranieOpisu = (zdanie: string, tekstOpisu: string) => {
-      const slowa = zdanie.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 6);
-      if (slowa.length === 0) return false;
-      const opisMaly = tekstOpisu.toLowerCase();
-      return slowa.filter((w) => opisMaly.includes(w)).length / slowa.length >= 0.7;
-    };
-
-    const wgNazwy = new Map(wynik.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
-    let zmienione = 0;
-    let odrzucone = 0;
-    for (const m of doOpisania) {
-      const klucz = String(m.name).trim().toLowerCase();
-      // Ten sam zapas co przy opisach: model potrafi dokleić adnotację do nazwy,
-      // a nazwa źródłowa jest wtedy przedrostkiem.
-      const d = wgNazwy.get(klucz)
-        ?? wynik.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
-      // Model dokleja na końcu „, w odróżnieniu od innych muzeów.” mimo zakazu
-      // w prompcie — w Toruniu co drugie zdanie. Dopisek bez nazwy niczego nie
-      // porównuje, więc go ucinamy; zdanie przed nim zostaje.
-      const zdanie = String(d?.wyroznik ?? '').trim()
-        .replace(/,?\s*(w odróżnieniu|w przeciwieństwie) (od|do) (innych|pozostałych|okolicznych|typowych|tradycyjnych)[^.,;]*\.?$/i, '.')
-        .replace(/\.\.$/, '.');
-      // Puste pole jest dozwoloną odpowiedzią: nie każde miejsce ma czym się
-      // różnić i wolimy nie pokazać wiersza, niż pokazać pusty komunał.
-      if (!zdanie) continue;
-      if (przebranieOpisu(zdanie, opis(m))) {
-        // Treść, nie tylko licznik: bez niej nie da się ocenić, czy próg wycina
-        // streszczenia, czy dobre zdania.
-        console.log(`[catalog/wyrozniki] odrzucone (powtarza opis) "${m.name}": ${zdanie.slice(0, 90)}`);
-        odrzucone++; continue;
-      }
-      /* Zdanie zdradzające konstrukcję promptu. Użytkownik nie widzi żadnej listy
-         "wymienionych", więc takie odniesienie jest dla niego bez sensu. Instrukcja
-         w prompcie to za mało — w poprzednim przebiegu przeszło sześć takich. */
-      if (/w[śs]r[óo]d wymienionych|z wymienionych|spo[śs]r[óo]d podobnych|wymienionych (obok|powy[żz]ej)/i.test(zdanie)) {
-        console.log(`[catalog/wyrozniki] odrzucone (framing promptu) "${m.name}": ${zdanie.slice(0, 90)}`);
-        odrzucone++; continue;
-      }
-      /* Słowa z listy zakazanych. Prompt ich zabrania, ale prompt to prośba:
-         na 411 gotowych zdań dwa przemyciły „barokowe perły" i „o jego
-         wyjątkowości". Ta sama lekcja co przy powtórzeniach opisu — reguła,
-         która ma obowiązywać, musi stać po stronie serwera. */
-      if (/wyj[ąa]tkow|niesamowit|magiczn|klejnot|per[łl][ayąe]|must-see|warto zobaczy[ćc]|nie do przegapienia|szepcz|niezapomnian|zachwyc|urzek|oaz[aęy] (ciszy|spokoju)|t[ęe]tni[ąa]c/i.test(zdanie)) {
-        console.log(`[catalog/wyrozniki] odrzucone (zakazane słowo) "${m.name}": ${zdanie.slice(0, 90)}`);
-        odrzucone++; continue;
-      }
-      await repo.updateCatalogPlace(m.id, {
-        wyroznik: zdanie,
-        wyroznik_i18n: { ...(m.wyroznik_i18n ?? {}), pl: zdanie },
-        updated_at: new Date().toISOString()
-      });
-      zmienione++;
+    /* Zdanie zdradzające konstrukcję promptu. Użytkownik nie widzi żadnej listy
+       "wymienionych", więc takie odniesienie jest dla niego bez sensu. Instrukcja
+       w prompcie to za mało — w poprzednim przebiegu przeszło sześć takich. */
+    if (/w[śs]r[óo]d wymienionych|z wymienionych|spo[śs]r[óo]d podobnych|wymienionych (obok|powy[żz]ej)/i.test(zdanie)) {
+      console.log(`[catalog/wyrozniki] odrzucone (framing promptu) "${m.name}": ${zdanie.slice(0, 90)}`);
+      odrzucone++; continue;
     }
+    /* Słowa z listy zakazanych. Prompt ich zabrania, ale prompt to prośba:
+       na 411 gotowych zdań dwa przemyciły „barokowe perły" i „o jego
+       wyjątkowości". Ta sama lekcja co przy powtórzeniach opisu — reguła,
+       która ma obowiązywać, musi stać po stronie serwera. */
+    if (/wyj[ąa]tkow|niesamowit|magiczn|klejnot|per[łl][ayąe]|must-see|warto zobaczy[ćc]|nie do przegapienia|szepcz|niezapomnian|zachwyc|urzek|oaz[aęy] (ciszy|spokoju)|t[ęe]tni[ąa]c/i.test(zdanie)) {
+      console.log(`[catalog/wyrozniki] odrzucone (zakazane słowo) "${m.name}": ${zdanie.slice(0, 90)}`);
+      odrzucone++; continue;
+    }
+    await repo.updateCatalogPlace(m.id, {
+      wyroznik: zdanie,
+      wyroznik_i18n: { ...(m.wyroznik_i18n ?? {}), pl: zdanie },
+      updated_at: new Date().toISOString()
+    });
+    zmienione++;
+  }
 
-    /* `pozostalo` liczy się od zapisanych, nie od przetworzonych. Odrzucone
-       zostają w puli i trafią do kolejnej partii — to celowe, bo przy następnym
-       losowaniu model bywa trafniejszy. Przed zapętleniem chroni warunek po
-       stronie wołającego: partia, która nie zapisała NICZEGO, kończy przebieg. */
-    const pozostalo = Math.max(0, brakujace.length - zmienione);
-    console.log(`[catalog/wyrozniki] ${city}: zapisano ${zmienione}, odrzucono ${odrzucone} `
-      + `(powtórzenie opisu) z ${doOpisania.length}, zostaje ${pozostalo}`);
-    return c.json({ city, opisane: zmienione, odrzucone, pozostalo });
+  /* `pozostalo` liczy się od zapisanych, nie od przetworzonych. Odrzucone
+     zostają w puli i trafią do kolejnej partii — to celowe, bo przy następnym
+     losowaniu model bywa trafniejszy. Przed zapętleniem chroni warunek po
+     stronie wołającego: partia, która nie zapisała NICZEGO, kończy przebieg. */
+  const pozostalo = Math.max(0, brakujace.length - zmienione);
+  console.log(`[catalog/wyrozniki] ${city}: zapisano ${zmienione}, odrzucono ${odrzucone} `
+    + `(powtórzenie opisu) z ${doOpisania.length}, zostaje ${pozostalo}`);
+  return { city, opisane: zmienione, odrzucone, pozostalo };
+}
+
+catalogRouter.post('/catalog/wyrozniki', async (c) => {
+  try {
+    const { city, limit = 20 } = await c.req.json() as { city: string; limit?: number };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    return c.json(await dopiszWyrozniki(city, limit, c.get('userId') || null));
   } catch (e: any) {
     console.error('[catalog/wyrozniki]', e);
     return c.json({ error: e.message }, 500);
   }
 });
 
-catalogRouter.post('/catalog/enrich', async (c) => {
-  try {
-    const { city, limit = 24 } = await c.req.json() as { city: string; limit?: number };
-    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
+export async function opiszBraki(city: string, limit = 24, userId: string | null = null): Promise<{ city: string; enriched: number; remaining: number }> {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) throw new Error('Missing GEMINI_API_KEY');
 
-    const wszystkie = await repo.listCatalogAll(city.trim(), 200);
-    // Opis moze siedziec w starej kolumnie albo w wymiarze jezykowym — brak
-    // liczy sie dopiero wtedy, gdy nie ma go w zadnym z tych miejsc.
-    const bezOpisu = (m: any) =>
-      !String(m.description ?? '').trim() && !String(m.description_i18n?.pl ?? '').trim();
-    const brakujace = wszystkie.filter(bezOpisu);
-    const doOpisania = brakujace.slice(0, limit);
-    if (doOpisania.length === 0) return c.json({ city, enriched: 0, remaining: 0 });
+  const wszystkie = await repo.listCatalogAll(city.trim(), 200);
+  // Opis moze siedziec w starej kolumnie albo w wymiarze jezykowym — brak
+  // liczy sie dopiero wtedy, gdy nie ma go w zadnym z tych miejsc.
+  const bezOpisu = (m: any) =>
+    !String(m.description ?? '').trim() && !String(m.description_i18n?.pl ?? '').trim();
+  const brakujace = wszystkie.filter(bezOpisu);
+  const doOpisania = brakujace.slice(0, limit);
+  if (doOpisania.length === 0) return { city, enriched: 0, remaining: 0 };
 
-    const prompt = `Piszesz praktyczny przewodnik po mieście ${city} dla ludzi, którzy układają plan wyjazdu. Piszesz PO POLSKU niezależnie od kraju.
+  const prompt = `Piszesz praktyczny przewodnik po mieście ${city} dla ludzi, którzy układają plan wyjazdu. Piszesz PO POLSKU niezależnie od kraju.
 
 Miejsca (nazwy skopiuj DOKŁADNIE):
 ${doOpisania.map((p: any, i: number) => `${i + 1}. ${p.name}${p.kind ? ` (${p.kind})` : ''}`).join('\n')}
@@ -580,93 +832,100 @@ Dla każdego zwróć:
 - "name": nazwa dokładnie jak wyżej
 - "description": 2-3 zdania: czym jest to miejsce, co tam realnie robisz i dla kogo to jest. Daty budowy i style architektoniczne tylko wtedy, gdy to z ich powodu ludzie tam idą.
 
-  Kolejne opisy nie mogą zaczynać się tą samą konstrukcją (zawsze od nazwy,
-  zawsze od „To miejsce…”) — użytkownik czyta karty jedna po drugiej i powtarzalne
-  otwarcie zdradza szablon.
+Kolejne opisy nie mogą zaczynać się tą samą konstrukcją (zawsze od nazwy,
+zawsze od „To miejsce…”) — użytkownik czyta karty jedna po drugiej i powtarzalne
+otwarcie zdradza szablon.
 - "vibe_tags": 2-4 znaczniki WYŁĄCZNIE z tej listy: ${VIBE_TAGS.join(', ')}
 - "visit_minutes": ile realnie zajmuje pobyt
 
 ${STYL_OPISU}
 Odpowiedz WYŁĄCZNIE obiektem JSON: {"places": [...]}`;
 
-    const data = await callGeminiTracked(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'object',
-            properties: {
-              places: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    description: { type: 'string' },
-                    vibe_tags: { type: 'array', items: { type: 'string' } },
-                    visit_minutes: { type: 'integer' }
-                  },
-                  required: ['name']
-                }
+  const data = await callGeminiTracked(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'object',
+          properties: {
+            places: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  description: { type: 'string' },
+                  vibe_tags: { type: 'array', items: { type: 'string' } },
+                  visit_minutes: { type: 'integer' }
+                },
+                required: ['name']
               }
-            },
-            required: ['places']
+            }
           },
-          maxOutputTokens: 32768
-        }
-      },
-      { operation: 'catalog-enrich', model: 'gemini-2.5-flash', userId: c.get('userId') || null }
-    );
+          required: ['places']
+        },
+        maxOutputTokens: 32768
+      }
+    },
+    { operation: 'catalog-enrich', model: 'gemini-2.5-flash', userId: userId }
+  );
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    let opisane: any[] = [];
-    try {
-      const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const first = cleaned.indexOf('{');
-      const last = cleaned.lastIndexOf('}');
-      if (first >= 0 && last > first) opisane = JSON.parse(cleaned.slice(first, last + 1)).places || [];
-    } catch {
-      console.warn('[catalog/enrich] Nie udało się sparsować odpowiedzi');
-    }
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  let opisane: any[] = [];
+  try {
+    const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const first = cleaned.indexOf('{');
+    const last = cleaned.lastIndexOf('}');
+    if (first >= 0 && last > first) opisane = JSON.parse(cleaned.slice(first, last + 1)).places || [];
+  } catch {
+    console.warn('[catalog/enrich] Nie udało się sparsować odpowiedzi');
+  }
 
-    const wgNazwy = new Map(opisane.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
-    let zmienione = 0;
-    for (const m of doOpisania) {
-      const klucz = String(m.name).trim().toLowerCase();
-      // Dopasowanie dokładne najpierw. Model czasem doklejał adnotację rodzaju
-      // z listy z powrotem do nazwy -- "Aereo Lockheed F104-S (Starfighter)"
-      // (rodzaj: monument) wracało jako "Aereo Lockheed F104-S (Starfighter)
-      // (monument)", więc dokładny klucz nie trafiał mimo poprawnego opisu.
-      // Nazwa źródłowa jest zawsze prefiksem takiej pomyłki, więc to bezpieczny
-      // fallback -- nie zgadujemy, tylko akceptujemy dopisek na końcu.
-      const d = wgNazwy.get(klucz)
-        ?? opisane.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
-      if (!d?.description) continue;
-      const tags = Array.isArray(d.vibe_tags)
-        ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)
-        : [];
-      // Zapis w obie strony: stara kolumna zostaje jako zapas dla miejsc, ktore
-      // czytaja ja wprost, a wymiar jezykowy jest tym, z ktorego korzysta front
-      // i z ktorego tlumaczy sie na pozostale jezyki.
-      await repo.updateCatalogPlace(m.id, {
-        description: d.description,
-        description_i18n: { ...(m.description_i18n ?? {}), pl: d.description },
-        vibe_tags: tags,
-        visit_minutes: d.visit_minutes ?? m.visit_minutes ?? null,
-        updated_at: new Date().toISOString()
-      });
-      zmienione++;
-    }
+  const wgNazwy = new Map(opisane.map((d: any) => [String(d.name).trim().toLowerCase(), d]));
+  let zmienione = 0;
+  for (const m of doOpisania) {
+    const klucz = String(m.name).trim().toLowerCase();
+    // Dopasowanie dokładne najpierw. Model czasem doklejał adnotację rodzaju
+    // z listy z powrotem do nazwy -- "Aereo Lockheed F104-S (Starfighter)"
+    // (rodzaj: monument) wracało jako "Aereo Lockheed F104-S (Starfighter)
+    // (monument)", więc dokładny klucz nie trafiał mimo poprawnego opisu.
+    // Nazwa źródłowa jest zawsze prefiksem takiej pomyłki, więc to bezpieczny
+    // fallback -- nie zgadujemy, tylko akceptujemy dopisek na końcu.
+    const d = wgNazwy.get(klucz)
+      ?? opisane.find((o: any) => String(o.name ?? '').trim().toLowerCase().startsWith(klucz));
+    if (!d?.description) continue;
+    const tags = Array.isArray(d.vibe_tags)
+      ? d.vibe_tags.filter((t: string) => VIBE_TAGS.includes(t)).slice(0, 4)
+      : [];
+    // Zapis w obie strony: stara kolumna zostaje jako zapas dla miejsc, ktore
+    // czytaja ja wprost, a wymiar jezykowy jest tym, z ktorego korzysta front
+    // i z ktorego tlumaczy sie na pozostale jezyki.
+    await repo.updateCatalogPlace(m.id, {
+      description: d.description,
+      description_i18n: { ...(m.description_i18n ?? {}), pl: d.description },
+      vibe_tags: tags,
+      visit_minutes: d.visit_minutes ?? m.visit_minutes ?? null,
+      updated_at: new Date().toISOString()
+    });
+    zmienione++;
+  }
 
-    // `remaining` mówi wołającemu, że jedno wywołanie NIE WYSTARCZYŁO. Bez tego
-    // pola front pytał raz i uznawał sprawę za zamkniętą -- Haga (42 miejsca)
-    // dostawała opisy dla dwudziestu czterech i ani jednego więcej, bo nic nie
-    // powiedziało, że osiemnaście wciąż czeka.
-    const pozostalo = Math.max(0, brakujace.length - zmienione);
-    console.log(`[catalog/enrich] ${city}: opisano ${zmienione} z ${doOpisania.length}, zostaje ${pozostalo}`);
-    return c.json({ city, enriched: zmienione, remaining: pozostalo });
+  // `remaining` mówi wołającemu, że jedno wywołanie NIE WYSTARCZYŁO. Bez tego
+  // pola front pytał raz i uznawał sprawę za zamkniętą -- Haga (42 miejsca)
+  // dostawała opisy dla dwudziestu czterech i ani jednego więcej, bo nic nie
+  // powiedziało, że osiemnaście wciąż czeka.
+  const pozostalo = Math.max(0, brakujace.length - zmienione);
+  console.log(`[catalog/enrich] ${city}: opisano ${zmienione} z ${doOpisania.length}, zostaje ${pozostalo}`);
+  return { city, enriched: zmienione, remaining: pozostalo };
+}
+
+catalogRouter.post('/catalog/enrich', async (c) => {
+  try {
+    const { city, limit = 24 } = await c.req.json() as { city: string; limit?: number };
+    if (!city?.trim()) return c.json({ error: 'city jest wymagane' }, 400);
+    return c.json(await opiszBraki(city, limit, c.get('userId') || null));
   } catch (e: any) {
     console.error('[catalog/enrich]', e);
     return c.json({ error: e.message }, 500);

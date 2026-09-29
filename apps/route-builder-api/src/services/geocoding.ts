@@ -211,7 +211,8 @@ export class GeocodingService {
     return this.geocodeSinglePoint(query);
   }
 
-  async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number): Promise<GeocodedPlace> {
+  async geocodeSinglePoint(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number,
+    tylkoWRegionie = false): Promise<GeocodedPlace> {
     const key = cacheKey(query, biasPoint, maxRadiusKm);
     const cached = readCache(key);
     if (cached) {
@@ -220,7 +221,7 @@ export class GeocodingService {
     }
 
     try {
-      const place = await this.geocodeSinglePointUncached(query, biasPoint, maxRadiusKm);
+      const place = await this.geocodeSinglePointUncached(query, biasPoint, maxRadiusKm, tylkoWRegionie);
       writeCache(key, { at: Date.now(), place });
       return place;
     } catch (err: any) {
@@ -229,7 +230,8 @@ export class GeocodingService {
     }
   }
 
-  private async geocodeSinglePointUncached(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number): Promise<GeocodedPlace> {
+  private async geocodeSinglePointUncached(query: string, biasPoint?: {lat: number, lng: number}, maxRadiusKm?: number,
+    tylkoWRegionie = false): Promise<GeocodedPlace> {
     const parts = query.split(',').map((p) => p.trim()).filter(Boolean);
     const variants: string[] = [query];
     // "A, B, C" -> "A, B" -> "A"
@@ -241,7 +243,10 @@ export class GeocodingService {
     let lastError: any = null;
     // Najpierw wszystkie warianty nazwy w obrębie regionu trasy, dopiero potem
     // wyszukiwanie globalne — inaczej pospolita nazwa trafia w drugi koniec kraju.
-    const passes = biasPoint ? [true, false] : [false];
+    // tylkoWRegionie: wołający i tak odrzuci wynik spoza promienia (wyszukiwanie
+    // agentem), więc drugi, globalny przebieg to tylko kolejne zapytania w kolejce
+    // geokodera — w Poznaniu całe wyszukiwanie trwało 43 s przy 15 s modelu.
+    const passes = biasPoint ? (tylkoWRegionie ? [true] : [true, false]) : [false];
     for (const bounded of passes) {
       for (const variant of variants) {
         try {

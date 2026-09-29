@@ -3,8 +3,17 @@
  * miasta, a krótki przyrostek z współrzędnych rozróżnia dwa "Rynki" w dwóch
  * miastach o tej samej nazwie.
  */
+/** Litery, których NFD nie rozkłada na literę bazową i znak diakrytyczny. */
+const BEZ_ROZKLADU: Record<string, string> = {
+  'ł': 'l', 'Ł': 'l', 'ø': 'o', 'Ø': 'o', 'ß': 'ss', 'æ': 'ae', 'Æ': 'ae', 'œ': 'oe', 'Œ': 'oe',
+  'đ': 'd', 'Đ': 'd', 'ð': 'd', 'Ð': 'd', 'þ': 'th', 'Þ': 'th', 'ı': 'i', 'ħ': 'h', 'Ħ': 'h',
+  'ŋ': 'n', 'Ŋ': 'n',
+};
+
 export function placeSlug(name: string, city: string | null, lat: number, lng: number): string {
+  // Bez tej zamiany „ł” znikało: „Pałac Górków” dostawał adres pa-ac-gorkow.
   const base = [name, city].filter(Boolean).join(' ')
+    .replace(/[łŁøØßæÆœŒđĐðÐþÞıħĦŋŊ]/g, (z) => BEZ_ROZKLADU[z] ?? z)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
   const suffix = Math.abs(Math.round(lat * 10000) ^ Math.round(lng * 10000)).toString(36).slice(0, 5);

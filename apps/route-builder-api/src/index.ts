@@ -294,7 +294,7 @@ WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, b
         for (const zapytanie of zapytania) {
           if (lat != null) break;
           try {
-            const geo = await geocodingService.geocodeSinglePoint(zapytanie, { lat: center.lat, lng: center.lng }, KM_LIMIT);
+            const geo = await geocodingService.geocodeSinglePoint(zapytanie, { lat: center.lat, lng: center.lng }, KM_LIMIT, true);
             if (geo && kmFromCenter(geo.lat, geo.lng) <= KM_LIMIT) {
               lat = geo.lat;
               lng = geo.lng;
@@ -306,9 +306,13 @@ WAŻNE: odpowiedz WYŁĄCZNIE obiektem JSON {"places": [...]} — bez wstępu, b
           return null;
         }
 
+        // Zdjęcia z limitem: Commons potrafi odpowiadać kilkanaście sekund, a wynik
+        // bez galerii jest lepszy niż wynik, na który czeka się dwa razy dłużej.
+        const zLimitem = <T,>(p: Promise<T>, ms: number, zapas: T) =>
+          Promise.race([p, new Promise<T>((r) => setTimeout(() => r(zapas), ms))]);
         const [wiki, photos] = await Promise.all([
-          fetchWikiCard(matched?.wikipedia),
-          fetchNearbyPhotos(pl.name, lat, lng, 3, undefined, matched?.wikipedia)
+          zLimitem(fetchWikiCard(matched?.wikipedia), 6000, {} as Awaited<ReturnType<typeof fetchWikiCard>>),
+          zLimitem(fetchNearbyPhotos(pl.name, lat, lng, 3, undefined, matched?.wikipedia).catch(() => [] as string[]), 6000, [] as string[]),
         ]);
 
         return {
@@ -677,7 +681,14 @@ app.get('/tablica/:id', async (c) => {
 
 app.get('/miejsce/:slug', async (c) => {
   try {
-    const w = await wizytowkaMiejsca(c.req.param('slug'));
+    const slug = c.req.param('slug');
+    const w = await wizytowkaMiejsca(slug);
+    if (!w) {
+      // Adres sprzed poprawki transliteracji („pa-ac-gorkow”) — stałe przekierowanie,
+      // żeby wyszukiwarki przeniosły wpis zamiast zgubić stronę.
+      const nowy = await repo.catalogSlugZPoprzedniego(slug);
+      if (nowy) return c.redirect(`/miejsce/${nowy}`, 301);
+    }
     return c.html(await stronaZWizytowka(w));
   } catch (err: any) {
     console.warn('[wizytowka/miejsce]', err.message);

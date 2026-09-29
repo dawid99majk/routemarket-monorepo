@@ -283,6 +283,30 @@ export type Database = {
         }
         Relationships: []
       }
+      katalog_miasta: {
+        Row: {
+          braki: string[]
+          city: string
+          ostatnia_proba: string | null
+          puste: string[]
+          wersja_zbierania: number
+        }
+        Insert: {
+          braki?: string[]
+          city: string
+          ostatnia_proba?: string | null
+          puste?: string[]
+          wersja_zbierania?: number
+        }
+        Update: {
+          braki?: string[]
+          city?: string
+          ostatnia_proba?: string | null
+          puste?: string[]
+          wersja_zbierania?: number
+        }
+        Relationships: []
+      }
       katalog_wykluczenia: {
         Row: {
           created_at: string
@@ -411,12 +435,14 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          nazwa_lokalna: string | null
           opening_hours: string | null
           osm_id: string | null
           photos: Json
           pin_count: number
           report_count: number
           slug: string
+          slugi_poprzednie: string[]
           source: string
           status: string
           updated_at: string
@@ -443,12 +469,14 @@ export type Database = {
           lat: number
           lng: number
           name: string
+          nazwa_lokalna?: string | null
           opening_hours?: string | null
           osm_id?: string | null
           photos?: Json
           pin_count?: number
           report_count?: number
           slug: string
+          slugi_poprzednie?: string[]
           source?: string
           status?: string
           updated_at?: string
@@ -475,12 +503,14 @@ export type Database = {
           lat?: number
           lng?: number
           name?: string
+          nazwa_lokalna?: string | null
           opening_hours?: string | null
           osm_id?: string | null
           photos?: Json
           pin_count?: number
           report_count?: number
           slug?: string
+          slugi_poprzednie?: string[]
           source?: string
           status?: string
           updated_at?: string
@@ -1261,6 +1291,20 @@ export type Database = {
           failures: number | null
           operation: string | null
           total_cost_usd: number | null
+        }
+        Relationships: []
+      }
+      katalog_braki: {
+        Row: {
+          bez_opisu: number | null
+          city: string | null
+          jedzenie: number | null
+          noclegi: number | null
+          ostatnia_proba: string | null
+          puste: string[] | null
+          wersja: number | null
+          wieczory: number | null
+          zwiedzanie: number | null
         }
         Relationships: []
       }

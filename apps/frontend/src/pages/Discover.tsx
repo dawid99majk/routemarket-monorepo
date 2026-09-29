@@ -465,6 +465,33 @@ export default function Discover() {
     return wynik;
   }, [places]);
 
+  /**
+   * Ten sam budynek (do 15 m): Muzeum Historii Miasta i koziołki w poznańskim
+   * Ratuszu to jedna wizyta, a stały jako trzy karty obok siebie (audyt 10).
+   * Próg jest ciasny celowo — Dwór Artusa i Fontanna Neptuna (20–30 m) zostają
+   * osobno, z dopiskiem „tuż obok”. Schowane miejsce jest odnośnikiem na karcie
+   * głównej, a samodzielną kartę dostaje, gdy ktoś go szuka albo już je zaznaczył.
+   */
+  const wBudynku = useMemo(() => {
+    const rodzic: Record<string, string> = {};
+    const dzieci: Record<string, CatalogPlace[]> = {};
+    const atrakcje = places.filter((m) => m.category === 'attraction' && m.lat != null && m.lng != null);
+    atrakcje.forEach((m, i) => {
+      for (let j = 0; j < i; j++) {
+        const q = atrakcje[j];
+        if (rodzic[q.id]) continue;
+        const dLat = (m.lat - q.lat) * 111_000;
+        const dLng = (m.lng - q.lng) * 111_000 * Math.cos((m.lat * Math.PI) / 180);
+        if (Math.hypot(dLat, dLng) < 15) {
+          rodzic[m.id] = q.id;
+          (dzieci[q.id] ??= []).push(m);
+          break;
+        }
+      }
+    });
+    return { rodzic, dzieci };
+  }, [places]);
+
   /** Filtrowanie na bieżąco, filtr i wyszukiwarka działają łącznie. */
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -535,7 +562,28 @@ export default function Discover() {
   }, [visible, obszar, tylkoZObszaru, pokazMape]);
 
   /** Widoczny wycinek. Filtrowanie idzie po całości, przycinamy dopiero na końcu. */
-  const widoczne = useMemo(() => wObszarze.slice(0, ileWidocznych), [wObszarze, ileWidocznych]);
+  const widoczne = useMemo(() => wObszarze
+    .filter((p) => !wBudynku.rodzic[p.id] || query.trim() || marks[p.id])
+    .slice(0, ileWidocznych), [wObszarze, ileWidocznych, wBudynku, query, marks]);
+
+  /* Kolumny czytane wierszami. CSS `columns` układał karty w dół pierwszej
+     kolumny, więc obok nr 1 stał nr 13 — ranking było widać tylko w lewej
+     kolumnie. Rozkład po kolei (1, 2 / 3, 4 …) zachowuje kolejność w wierszach. */
+  const [ileKolumn, setIleKolumn] = useState(1);
+  useEffect(() => {
+    const sm = window.matchMedia('(min-width: 640px)');
+    const lg = window.matchMedia('(min-width: 1024px)');
+    const licz = () => setIleKolumn(lg.matches && !pokazMape ? 3 : sm.matches ? 2 : 1);
+    licz();
+    sm.addEventListener('change', licz);
+    lg.addEventListener('change', licz);
+    return () => { sm.removeEventListener('change', licz); lg.removeEventListener('change', licz); };
+  }, [pokazMape]);
+  const kolumnyKart = useMemo(() => {
+    const k: { p: CatalogPlace; idx: number }[][] = Array.from({ length: ileKolumn }, () => []);
+    widoczne.forEach((p, idx) => k[idx % ileKolumn].push({ p, idx }));
+    return k;
+  }, [widoczne, ileKolumn]);
 
   /* Kolekcje to ekran startowy, nie kolejny filtr. Znikają, gdy użytkownik już
      czegoś szuka albo zawęził widok — wtedy odpowiedź jest na dole, nie na górze. */
@@ -865,7 +913,7 @@ export default function Discover() {
     if (!city.trim()) return toast.error(t('odkrywaj.podaj_miasto_ktore_mamy_przejrzec'));
     setSeeding(true);
     try {
-      const data = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 24 }, { timeoutMs: 180_000 });
+      const data = await apiPost<any>('/catalog/seed', { city: city.trim(), limit: 30 }, { timeoutMs: 180_000 });
       // Pole dostaje nazwę w postaci, w jakiej miejsca faktycznie zapisano — inaczej
       // filtr dalej szukałby tego, co użytkownik wpisał, a nie tego, co jest w bazie.
       if (data.city) {
@@ -881,34 +929,21 @@ export default function Discover() {
       if (data.needs_enrich) {
         setOpisyWToku(true);
         const miasto = data.city || city.trim();
-        // Jedno wywołanie opisuje najwyżej dwadzieścia cztery miejsca. Haga miała
-        // ich czterdzieści dwa -- bez pętli osiemnaście zostawało bez opisu na
-        // zawsze, bo nic nie mówiło frontowi, że trzeba spytać drugi raz.
-        // Limit dziesięciu rund to zabezpieczenie przed nieskończoną pętlą, gdyby
-        // `remaining` z jakiegoś powodu nigdy nie doszło do zera -- w praktyce
-        // miasto z pobierania ma kilkadziesiąt miejsc, więc dwie-trzy rundy
-        // wystarczają.
+        // Opisy i wyróżniki powstają na serwerze w tle (/catalog/seed → dokonczMiasto).
+        // Wcześniej wołał je front, a oba endpointy są tylko dla administratora:
+        // każdy inny użytkownik dostawał nowe miasto bez jednego opisu (audyt 10).
+        // Tu tylko odświeżamy listę, aż opisy dojdą — najdłużej ok. trzech minut.
         (async () => {
-          for (let runda = 0; runda < 10; runda++) {
-            const odp = await apiPost<any>('/catalog/enrich', { city: miasto }, { timeoutMs: 180_000 })
-              .catch((e) => { console.warn('Nie udało się dociągnąć opisów:', e); return null; });
-            if (!odp) break;
+          for (let runda = 0; runda < 36; runda++) {
+            await new Promise((r) => setTimeout(r, 5000));
+            const { count } = await supabase.from('place_catalog')
+              .select('id', { count: 'exact', head: true })
+              .eq('city', miasto).eq('description', '');
             await load(miasto, true);
-            if (!odp.remaining) break;
+            if (!count) break;
           }
-
-          // Wyróżniki DOPIERO TERAZ. Zdanie „czym to się różni od sąsiadów"
-          // potrzebuje własnego opisu i tagów u sąsiadów, a jedno i drugie
-          // powstaje w pętli wyżej. Puszczone równolegle dostałoby miasto bez
-          // tagów i nie miałoby czego porównywać.
-          for (let runda = 0; runda < 10; runda++) {
-            const odp = await apiPost<any>('/catalog/wyrozniki', { city: miasto }, { timeoutMs: 180_000 })
-              .catch((e) => { console.warn('Nie udało się dociągnąć wyróżników:', e); return null; });
-            // Partia bez zapisu kończy przebieg. Odrzucone zdania zostają w puli
-            // i wracałyby w kolejnej rundzie, więc bez tego warunku pętla chodzi
-            // po tych samych miejscach do limitu rund i płaci za każdą próbę.
-            if (!odp || !odp.opisane || !odp.pozostalo) break;
-          }
+          // Wyróżniki dochodzą chwilę po opisach — jeszcze jedno odświeżenie.
+          await new Promise((r) => setTimeout(r, 20000));
           await load(miasto, true);
         })().finally(() => setOpisyWToku(false));
       }
@@ -1326,10 +1361,10 @@ export default function Discover() {
             )}
           </div>
           ) : (
-          <div className={`${mapaMobilna ? 'hidden lg:block ' : ''}${pokazMape
-            ? '[column-gap:20px] columns-1 sm:columns-2'
-            : '[column-gap:24px] columns-1 sm:columns-2 lg:columns-3'}`}>
-            {widoczne.map((p, idx) => {
+          <div className={`${mapaMobilna ? 'hidden lg:flex ' : 'flex '}items-start ${pokazMape ? 'gap-5' : 'gap-6'}`}>
+            {kolumnyKart.map((kolumna, k) => (
+            <div key={k} className="flex-1 min-w-0">
+            {kolumna.map(({ p, idx }) => {
               const mk = marks[p.id];
               const duration = formatDuration(p.visit_minutes);
               return (
@@ -1399,11 +1434,25 @@ export default function Discover() {
                           {p.city}{p.country ? ` / ${p.country}` : ''}
                         </p>
                       )}
-                      {tuzObok[p.id] && (
+                      {tuzObok[p.id] && !wBudynku.rodzic[p.id] && (
                         <p className="font-mono text-[11px] mt-0.5 text-muted-foreground">
                           {t('odkrywaj.tuz_obok', { nazwa: tuzObok[p.id] })}
                         </p>
                       )}
+                      {wBudynku.dzieci[p.id]?.length ? (
+                        <p className="text-[12px] mt-1 text-muted-foreground">
+                          W tym samym miejscu:{' '}
+                          {wBudynku.dzieci[p.id].map((d, i) => (
+                            <span key={d.id}>
+                              {i > 0 && ', '}
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setKarta(d); }}
+                                className="underline underline-offset-2 hover:text-foreground">
+                                {d.name}
+                              </button>
+                            </span>
+                          ))}
+                        </p>
+                      ) : null}
                       {wyroznikMiejsca(p) ? (
                         <p className="text-[13px] font-medium text-foreground/90 mt-2 border-l-2 border-foreground/25 pl-2.5 leading-snug line-clamp-2 text-pretty">
                           {wyroznikMiejsca(p)}
@@ -1429,6 +1478,8 @@ export default function Discover() {
                 </article>
               );
             })}
+            </div>
+            ))}
           </div>
           )}
 

@@ -226,6 +226,113 @@ function wyrownajGrupy<T extends { lat?: number | null; lng?: number | null }>(
   }
 }
 
+/**
+ * Trasa dnia w minutach marszu: od noclegu (albo pierwszego punktu) do najbliższego
+ * nieodwiedzonego i z powrotem. Najbliższy sąsiad to przybliżenie, ale wystarcza,
+ * żeby odróżnić dzień zwarty od dnia rozrzuconego po przeciwnych krańcach miasta.
+ */
+function minutyTrasy(g: MiejsceWejscie[], baza: { lat: number; lng: number } | null): number {
+  const pkt = g.filter((p) => p.lat != null && p.lng != null) as (MiejsceWejscie & { lat: number; lng: number })[];
+  if (!pkt.length) return 0;
+  const zostaly = [...pkt];
+  let obecny: { lat: number; lng: number } = baza ?? zostaly.shift()!;
+  let km = 0;
+  while (zostaly.length) {
+    let i = 0;
+    for (let j = 1; j < zostaly.length; j++) if (kmOd(obecny, zostaly[j]) < kmOd(obecny, zostaly[i])) i = j;
+    km += kmOd(obecny, zostaly[i]);
+    obecny = zostaly.splice(i, 1)[0];
+  }
+  if (baza) km += kmOd(obecny, baza);
+  return km * 1.3 * 15;
+}
+
+/**
+ * Dopracowanie podziału na dni po KOSZCIE dnia: zwiedzanie + marsz + kara za
+ * wyjście poza okno. Grupowanie po odległości i wyrównanie po liczbie miejsc
+ * dało w Poznaniu (audyt 10) dzień 1 z 1,8 km i dzień 2 z 11,9 km: dwa punkty
+ * najbardziej oddalone od centrum (Palmiarnia na zachodzie, Cytadela na północy)
+ * trafiły razem, bo były zalążkami grup, a dzień wyszedł 110 min za okno.
+ * Przenosimy pojedyncze punkty i zamieniamy pary, dopóki koszt spada.
+ */
+function dopracujPodzial(grupy: MiejsceWejscie[][], baza: { lat: number; lng: number } | null, minutNaDzien: number): void {
+  if (grupy.length < 2 || !minutNaDzien) return;
+  const minutyDnia = (g: MiejsceWejscie[]) => g.reduce((s, p) => s + (p.visit_minutes || 60), 0) + minutyTrasy(g, baza);
+  const koszt = () => {
+    const m = grupy.map(minutyDnia);
+    const nadmiar = m.reduce((s, x) => s + Math.max(0, x - minutNaDzien), 0);
+    // Marsz liczy się raz, nadmiar ponad okno czterokrotnie, a różnica między
+    // dniami lekko — żeby jeden dzień nie był pusty, a drugi pełny.
+    const marsz = grupy.reduce((s, g) => s + minutyTrasy(g, baza), 0);
+    return marsz + nadmiar * 4 + (Math.max(...m) - Math.min(...m)) * 0.3;
+  };
+  let obecny = koszt();
+  for (let runda = 0; runda < 60; runda++) {
+    let poprawa = false;
+    for (let a = 0; a < grupy.length; a++) {
+      for (const p of [...grupy[a]]) {
+        for (let b = 0; b < grupy.length; b++) {
+          if (a === b || !grupy[a].includes(p)) continue;
+          // Przeniesienie — dzień nie może zostać bez kotwicy.
+          if (grupy[a].length > 1) {
+            grupy[a].splice(grupy[a].indexOf(p), 1); grupy[b].push(p);
+            const k = koszt();
+            if (k < obecny - 0.5) { obecny = k; poprawa = true; continue; }
+            grupy[b].pop(); grupy[a].push(p);
+          }
+          // Zamiana z punktem innego dnia.
+          for (const q of [...grupy[b]]) {
+            const ia = grupy[a].indexOf(p), ib = grupy[b].indexOf(q);
+            if (ia < 0 || ib < 0) continue;
+            grupy[a][ia] = q; grupy[b][ib] = p;
+            const k = koszt();
+            if (k < obecny - 0.5) { obecny = k; poprawa = true; break; }
+            grupy[a][ia] = p; grupy[b][ib] = q;
+          }
+        }
+      }
+    }
+    if (!poprawa) break;
+  }
+}
+
+/**
+ * Kolejność kotwic „po drodze”: najbliższy sąsiad od noclegu, poprawiony 2-opt.
+ * Model dostaje kotwice w tej kolejności — wcześniej układał je sam i w Poznaniu
+ * poszedł z zachodu do centrum, znowu na zachód i na północ.
+ */
+function kolejnoscPoDrodze(g: MiejsceWejscie[], baza: { lat: number; lng: number } | null): MiejsceWejscie[] {
+  const pkt = g.filter((p) => p.lat != null && p.lng != null) as (MiejsceWejscie & { lat: number; lng: number })[];
+  const bez = g.filter((p) => p.lat == null || p.lng == null);
+  if (pkt.length < 3) return [...pkt, ...bez];
+  const zostaly = [...pkt];
+  const trasa: typeof pkt = [];
+  let obecny: { lat: number; lng: number } = baza ?? zostaly[0];
+  while (zostaly.length) {
+    let i = 0;
+    for (let j = 1; j < zostaly.length; j++) if (kmOd(obecny, zostaly[j]) < kmOd(obecny, zostaly[i])) i = j;
+    obecny = zostaly.splice(i, 1)[0];
+    trasa.push(obecny as any);
+  }
+  const dl = (t: typeof pkt) => {
+    let km = baza ? kmOd(baza, t[0]) + kmOd(t[t.length - 1], baza) : 0;
+    for (let i = 1; i < t.length; i++) km += kmOd(t[i - 1], t[i]);
+    return km;
+  };
+  let najlepsza = trasa, dlugosc = dl(trasa);
+  for (let runda = 0, poprawa = true; poprawa && runda < 30; runda++) {
+    poprawa = false;
+    for (let i = 0; i < najlepsza.length - 1; i++) {
+      for (let j = i + 1; j < najlepsza.length; j++) {
+        const t = [...najlepsza.slice(0, i), ...najlepsza.slice(i, j + 1).reverse(), ...najlepsza.slice(j + 1)];
+        const d = dl(t);
+        if (d < dlugosc - 0.01) { najlepsza = t; dlugosc = d; poprawa = true; }
+      }
+    }
+  }
+  return [...najlepsza, ...bez];
+}
+
 interface InfoDnia { index: number; date: string; weekday: string; dateObj: Date }
 
 export interface KontekstPlanu {
@@ -392,10 +499,16 @@ export async function przygotujKontekst(
     };
   });
 
+  const hWczesnie = zadanie.hotel;
+  const bazaWczesnie = hWczesnie?.name && Number.isFinite(hWczesnie.lat) && Number.isFinite(hWczesnie.lng)
+    ? { lat: hWczesnie.lat as number, lng: hWczesnie.lng as number }
+    : null;
   const suroweGrupy = ileDni > 1
     ? clusterPlacesByProximity(zadanie.places, ileDni)
     : [zadanie.places];
-  const grupy = przydzielGrupyDoDni(suroweGrupy, dni, oknoOd, minutNaDzien);
+  if (ileDni > 1) dopracujPodzial(suroweGrupy, bazaWczesnie, minutNaDzien);
+  const grupy = przydzielGrupyDoDni(suroweGrupy, dni, oknoOd, minutNaDzien)
+    .map((g) => kolejnoscPoDrodze(g, bazaWczesnie));
 
   let fillerSights: PoiCandidate[] = [];
   let fillerFood: PoiCandidate[] = [];
@@ -651,7 +764,9 @@ ${stale ? `STAŁE PUNKTY DNIA (nie do przesunięcia):\n${stale}` : ''}
 ${k.prefLines ? `PREFERENCJE UŻYTKOWNIKA — uwzględnij je przy doborze miejsc, długości postojów i kolejności:\n${k.prefLines}` : ''}
 
 MIEJSCA PRZYPIĘTE PRZEZ UŻYTKOWNIKA NA TEN DZIEŃ — to KOTWICE dnia, nie cały dzień
-(przydzielone tutaj po położeniu, dostępność policzona dla ${info.weekday}):
+(przydzielone tutaj po położeniu, dostępność policzona dla ${info.weekday}).
+Są wypisane W KOLEJNOŚCI PO DRODZE${z.hotel?.name ? ' od noclegu' : ''} — trzymaj się jej, chyba że godziny
+otwarcia albo posiłek wymagają zmiany. Propozycje i posiłki wstawiaj pomiędzy nie, blisko sąsiednich kotwic:
 ${moje.length ? moje.map(opisMiejsca).join('\n') : '(na ten dzień nie przypadło żadne przypięte miejsce — zbuduj dzień z propozycji poniżej)'}
 
 ${cudze.length ? `MIEJSCA PRZYPISANE DO INNYCH DNI TEGO WYJAZDU — nie umieszczaj ich
@@ -682,7 +797,7 @@ ZASADY:
    Gdy kotwica naprawdę się nie mieści, najpierw skróć wizytę (zasada 5). Dopiero
    gdy i to nie pomaga, wpisz ją do "not_scheduled" z prawdziwym powodem.
 2. NIGDY nie planuj wizyty w miejscu oznaczonym jako ZAMKNIĘTE tego dnia ani takiego, które NIE MIEŚCI SIĘ W OKNIE.
-3. Dzień ma być spójny geograficznie — kolejność układaj tak, żeby nie biegać przez miasto tam i z powrotem.
+3. Dzień ma być spójny geograficznie — kotwice idą w podanej kolejności po drodze; nie biegaj przez miasto tam i z powrotem.
 4. NIGDY NIE ZOSTAWIAJ PUSTEGO DNIA. "Czas wolny" na kilka godzin przy niewykorzystanych miejscach to błąd planu, nie wynik.
 5. KRÓTSZA WIZYTA ZAMIAST REZYGNACJI. Jeśli miejsce jest otwarte, ale zostało mniej czasu, niż wynosi pełne zwiedzanie, ZAPLANUJ JE NA TYLE, ILE ZOSTAŁO, i napisz to wprost w "note", np. "zamykają o 18:00 — masz 60 z 90 min, wejdź od razu". Do "not_scheduled" trafia tylko to, co jest ZAMKNIĘTE tego dnia albo czego naprawdę nie da się wcisnąć.
 6. TABLICA TO INSPIRACJA, NIE RAMA. Wypełnij wolny czas konkretnymi miejscami z listy propozycji, dobranymi do preferencji i leżącymi blisko kotwic tego dnia. W polu "source" wpisz "pinned" dla miejsc przypiętych przez użytkownika i "suggested" dla Twoich propozycji.
@@ -949,7 +1064,9 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
   odsiejZamkniete(k, dzien, numer);
   // Strażnik mógł przesunąć wejście albo wstawić zastępstwo — oś jeszcze raz.
   przeliczGodziny(k, dzien);
-  przytnijDoOkna(k, dzien);
+  nieWczesniejNizOkno(k, dzien);
+  przytnijDoOkna(k, dzien, numer);
+  dopiszNieznaneGodziny(k, dzien, numer);
   for (const it of dzien.items) delete (it as any).__zOdstepu;
   // Na końcu, żeby żaden wcześniejszy krok nie przesunął ani nie wyciął noclegu.
   dopnijBazeDoDnia(k, dzien);
@@ -1342,8 +1459,10 @@ export function przeliczGodziny(k: KontekstPlanu, dzien: DzienPlanu): void {
         ? dojsciePieszo({ lat: poprzedni.lat!, lng: poprzedni.lng! }, it) : 0;
       if (zPunktami && dojscie >= 30 && !it.baza && !poprzedni.baza) {
         const km = kmOd({ lat: poprzedni.lat!, lng: poprzedni.lng! }, it) * 1.3;
-        const tekst = `Z „${poprzedni.name}” do „${it.name}” jest ok. ${km.toFixed(1).replace('.', ',')} km — `
-          + `w planie ${dojscie} min pieszo; komunikacją będzie szybciej.`;
+        // Bez minut: oś dnia pokazuje dokładny czas przejścia, a zaokrąglenie do
+        // pięciu minut w ostrzeżeniu dawało „45 min” obok „43 min” na osi.
+        const tekst = `Z „${poprzedni.name}” do „${it.name}” jest ok. ${km.toFixed(1).replace('.', ',')} km pieszo `
+          + `— komunikacją będzie szybciej.`;
         if (!(dzien.warnings ?? []).includes(tekst)) (dzien.warnings ??= []).push(tekst);
       }
       if (czasNaMinuty(it.time) < koniec + dojscie) it.time = minutyNaCzas(koniec + dojscie);
@@ -1360,21 +1479,111 @@ const POSILEK_LUB_WIECZOR = /^(restaurant|cafe|fast_food|food_court|food|ice_cre
  * Miejsca użytkownika i posiłki zostają zawsze; gdy to one się nie mieszczą,
  * plan pokaże koniec po oknie, a nie potnie cudzych decyzji.
  */
-export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu): void {
+export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: number): void {
   const koniecOkna = czasNaMinuty(k.zadanie.window.end);
   if (!Number.isFinite(koniecOkna)) return;
-  for (let proba = 0; proba < 6; proba++) {
-    const przystanki = dzien.items.filter((it) => it.kind !== 'walk' && !it.baza && GODZINA.test(it.time));
-    const ostatni = przystanki[przystanki.length - 1];
-    if (!ostatni) return;
+  const przystanki = () => dzien.items.filter((it) => it.kind !== 'walk' && !it.baza && GODZINA.test(it.time));
+  const koniecDnia = () => {
+    const p = przystanki();
+    const ostatni = p[p.length - 1];
+    if (!ostatni) return -Infinity;
     let koniec = czasNaMinuty(ostatni.time) + (ostatni.minutes || 0);
     if (k.baza && maPunkt(ostatni) && !ostatni.approx) koniec += dojsciePieszo(k.baza, ostatni);
-    if (koniec <= koniecOkna + 15) return;
-    if (ostatni.source !== 'suggested' || POSILEK_LUB_WIECZOR.test(String(ostatni.kind || ''))) return;
-    const i = dzien.items.indexOf(ostatni);
-    // Przejście prowadzące do wyciętej propozycji wychodzi razem z nią.
+    return koniec;
+  };
+  const wytnij = (it: PozycjaDnia) => {
+    const i = dzien.items.indexOf(it);
+    // Przejście prowadzące do wyciętej pozycji wychodzi razem z nią.
     const od = i > 0 && dzien.items[i - 1].kind === 'walk' ? i - 1 : i;
     dzien.items.splice(od, i - od + 1);
+    return od;
+  };
+
+  // 1. Propozycje agenta z końca dnia to wypełniacz — odpadają pierwsze.
+  for (let proba = 0; proba < 6; proba++) {
+    if (koniecDnia() <= koniecOkna + 15) return;
+    const p = przystanki();
+    const ostatni = p[p.length - 1];
+    if (!ostatni || ostatni.source !== 'suggested' || POSILEK_LUB_WIECZOR.test(String(ostatni.kind || ''))) break;
+    wytnij(ostatni);
+  }
+
+  // 2. Potem kotwice „być może” (priorytet „jeśli wyjdzie”) — od tej, która
+  //    najbardziej wydłuża dzień. Poznań (audyt 10): dzień 2 kończył się 110 min
+  //    po oknie, bo Palmiarnia i Cytadela, obie „być może”, szły jak „na pewno”.
+  //    Trafiają do „nie zmieściło się” z powodem, więc użytkownik wie, co wypadło.
+  if (numer == null) return;
+  const priorytet = new Map((k.grupy[numer - 1] ?? []).map((p) => [p.name.trim().toLowerCase(), p.priority]));
+  for (let proba = 0; proba < 6; proba++) {
+    if (koniecDnia() <= koniecOkna + 15) return;
+    const p = przystanki();
+    const kandydaci = p.filter((it) => it.source !== 'suggested'
+      && priorytet.get(it.name.trim().toLowerCase()) === 'nice');
+    if (!kandydaci.length) return;
+    // Oszczędność = wizyta + dojście do niej i od niej − dojście na skróty.
+    const oszczednosc = (it: PozycjaDnia) => {
+      const i = p.indexOf(it);
+      const prev = i > 0 ? p[i - 1] : (k.baza as any);
+      const next = i < p.length - 1 ? p[i + 1] : (k.baza as any);
+      let m = it.minutes || 60;
+      if (maPunkt(it) && prev && next && typeof prev.lat === 'number' && typeof next.lat === 'number') {
+        m += dojsciePieszo(prev as any, it) + dojsciePieszo(it as any, next) - dojsciePieszo(prev as any, next);
+      }
+      return m;
+    };
+    const ofiara = kandydaci.reduce((a, b) => (oszczednosc(b) > oszczednosc(a) ? b : a));
+    const ile = oszczednosc(ofiara);
+    const od = wytnij(ofiara);
+    (dzien.not_scheduled ??= []).push({
+      name: ofiara.name,
+      reason: 'Nie zmieściło się w oknie dnia (było „być może”) — przenieś na inny dzień albo wydłuż okno.',
+    } as any);
+    // Kolejne pozycje dochodzą wcześniej o zaoszczędzony czas — ale nie posiłki,
+    // bo te stoją o swojej porze, i nie wcześniej, niż pozwala dojście.
+    for (let j = od; j < dzien.items.length; j++) {
+      const it = dzien.items[j];
+      if (!GODZINA.test(it.time) || it.baza) continue;
+      if (POSILEK_LUB_WIECZOR.test(String(it.kind || ''))) break;
+      it.time = minutyNaCzas(czasNaMinuty(it.time) - ile);
+    }
+    przeliczGodziny(k, dzien);
+  }
+}
+
+/**
+ * Godziny otwarcia znamy dla mniejszości atrakcji (Poznań 5 z 24, Warszawa 8 z 47).
+ * Strażnik godzin sprawdza tylko te znane — reszta szła do planu bez słowa, jakby
+ * była sprawdzona. Jedno zdanie w „Do sprawdzenia” mówi, czego nie sprawdziliśmy.
+ */
+export function dopiszNieznaneGodziny(k: KontekstPlanu, dzien: DzienPlanu, numer: number): void {
+  const znane = mapaGodzin(k);
+  // Tylko miejsca z wejściem — placu ani parku nikt nie zamyka.
+  const Z_WEJSCIEM = /muze|museum|galer|gallery|zam(ek|ku)|castle|schloss|pała|palac|palace|palais|palazz|teatr|thea|opera|kości|kosci|katedr|bazylik|church|cathedr|kirche|dom|synagog|meczet|mosque|palmiar|zoo|oceanar|akwar|planetar|wystaw|kaplic|cerkiew|klasztor|biblio|ratusz|town hall|rathaus/i;
+  const bez = dzien.items
+    .filter((it) => it.kind !== 'walk' && !it.baza && maPunkt(it)
+      && !POSILEK_LUB_WIECZOR.test(String(it.kind || ''))
+      && Z_WEJSCIEM.test(it.name)
+      && !znane.get(kluczGodzin(it.name)))
+    .map((it) => it.name);
+  if (!bez.length) return;
+  const lista = bez.length <= 3 ? bez.map((n) => `„${n}”`).join(', ') : `${bez.length} miejsc tego dnia`;
+  (dzien.warnings ??= []).push(`Godzin otwarcia nie znamy dla: ${lista} — sprawdź je przed wyjściem.`);
+}
+
+/**
+ * Dzień nie zaczyna się przed oknem. Model stawiał pierwszy punkt na 09:00, więc
+ * wyjście z noclegu wypadało o 08:35 przy oknie od 09:00 — a dzień 1 tego samego
+ * planu wychodził o 09:00. Okno to czas od wyjścia z noclegu do powrotu.
+ */
+export function nieWczesniejNizOkno(k: KontekstPlanu, dzien: DzienPlanu): void {
+  const oknoOd = czasNaMinuty(k.zadanie.window.start);
+  if (!Number.isFinite(oknoOd) || !k.baza) return;
+  const pierwszy = dzien.items.find((it) => it.kind !== 'walk' && !it.baza && GODZINA.test(it.time));
+  if (!pierwszy || !maPunkt(pierwszy) || pierwszy.approx) return;
+  const najwczesniej = oknoOd + dojsciePieszo(k.baza, pierwszy);
+  if (czasNaMinuty(pierwszy.time) < najwczesniej) {
+    pierwszy.time = minutyNaCzas(najwczesniej);
+    przeliczGodziny(k, dzien);
   }
 }
 

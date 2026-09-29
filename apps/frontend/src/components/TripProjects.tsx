@@ -1856,7 +1856,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                     from: terminOd ? parse(terminOd, 'yyyy-MM-dd', new Date()) : undefined,
                                     to: terminDo ? parse(terminDo, 'yyyy-MM-dd', new Date()) : undefined,
                                   }}
-                                  onSelect={(zakres: DateRange | undefined) => {
+                                  onSelect={(zakres: DateRange | undefined, dzien?: Date) => {
+                                    // Przy pełnym zakresie kliknięcie zaczyna nowy. Domyślnie przesuwało
+                                    // koniec: z 29.09–4.10 nie dało się przejść na 3–4.10 dwoma
+                                    // kliknięciami — trzeba było pięciu (audyt 10).
+                                    if (terminOd && terminDo && terminDo !== terminOd && dzien) {
+                                      setTerminOd(format(dzien, 'yyyy-MM-dd'));
+                                      setTerminDo('');
+                                      return;
+                                    }
                                     setTerminOd(zakres?.from ? format(zakres.from, 'yyyy-MM-dd') : '');
                                     setTerminDo(zakres?.to ? format(zakres.to, 'yyyy-MM-dd') : '');
                                   }}

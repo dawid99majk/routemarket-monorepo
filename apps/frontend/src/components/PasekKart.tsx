@@ -131,7 +131,8 @@ export default function PasekKart({
         className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1
                    [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {zbierane && (
+        {zbierane && !(czynna === 'tablice' && doPokazania.some((w) =>
+          (w.destination || '').trim().toLowerCase() === zbierane.trim().toLowerCase())) && (
           <div className="shrink-0 w-[170px] rounded-lg bg-card shadow-token-sm
                           overflow-hidden" aria-live="polite">
             <div className="h-[86px] flex items-center justify-center">
@@ -171,9 +172,11 @@ export default function PasekKart({
               <div className="px-3 py-2">
                 <p className="font-display text-[14px] leading-tight truncate">{w.destination || w.name}</p>
                 <p className="font-mono text-[10.5px] text-muted-foreground truncate mt-0.5">
-                  twój wyjazd{typeof w.liczba_miejsc === 'number'
+                  {zbierane && (w.destination || '').trim().toLowerCase() === zbierane.trim().toLowerCase()
+                    ? <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> zbieram miejsca…</span>
+                    : <>twój wyjazd{typeof w.liczba_miejsc === 'number'
                     ? ` · ${w.liczba_miejsc} ${odmien(w.liczba_miejsc, 'miejsce', 'miejsca', 'miejsc')}`
-                    : ''}
+                    : ''}</>}
                 </p>
               </div>
             </button>

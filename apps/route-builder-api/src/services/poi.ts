@@ -6,6 +6,10 @@ export interface PoiCandidate {
   kind: string;
   score: number;
   wikipedia?: string;
+  /** Q-id z tagu `wikidata` — po nim zbieranie liczy rozpoznawalność (wersje językowe). */
+  wikidata?: string;
+  /** Tag `name:pl` — polska nazwa dla kart miejsc za granicą. */
+  namePl?: string;
   distanceKm?: number;
   rank?: number;
   openingHours?: string;
@@ -308,7 +312,12 @@ export class PoiService {
   async fetchCandidates(
     center: { lat: number; lng: number },
     routeType: string,
-    options: { radiusKm?: number; limit?: number; includeMinor?: boolean } = {}
+    options: {
+      radiusKm?: number; limit?: number; includeMinor?: boolean;
+      /** Wypełniane przez funkcję: `niepelny` = Overpass zawiódł i lista jest pusta
+       *  albo okrojona. Pusta lista bez tej flagi znaczy „w okolicy naprawdę nic nie ma”. */
+      stan?: { niepelny: boolean };
+    } = {}
   ): Promise<PoiCandidate[]> {
     const typeKey = ROUTE_TYPE_ALIASES[routeType] || 'hiking';
     const radiusKm = options.radiusKm || DEFAULT_RADIUS_KM[typeKey];
@@ -379,6 +388,7 @@ export class PoiService {
         return dbCached.data.slice(0, limit);
       }
       console.error('[POI] Overpass unavailable and no cached candidates.');
+      if (options.stan) options.stan.niepelny = true;
       return [];
     }
 
@@ -410,6 +420,8 @@ export class PoiService {
         kind: kindOf(tags),
         score: scoreElement(tags),
         wikipedia: tags.wikipedia || tags['wikipedia:pl'],
+        wikidata: tags.wikidata,
+        namePl: tags['name:pl'],
         openingHours: tags.opening_hours,
         website: tags.website || tags['contact:website'],
         fee: tags.fee,
@@ -429,6 +441,7 @@ export class PoiService {
     // obiekty z Wikidaty — znikają zwykłe parki i place (krakowskie Planty), a taka
     // okrojona lista siedziałaby w cache godzinę i psuła kolejne trasy.
     if (degraded) {
+      if (options.stan) options.stan.niepelny = true;
       console.warn(`[POI] Incomplete result (${candidates.length} POI) — not caching.`);
     } else {
       cache.set(cacheKey, { at: Date.now(), data: candidates });

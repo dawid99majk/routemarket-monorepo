@@ -52,7 +52,10 @@ export class RouteBuilderRepository {
       const { data } = await supabase.from('place_catalog').select('*').eq('osm_id', osmId).maybeSingle();
       if (data) return data;
     }
-    const { data } = await supabase.from('place_catalog').select('*').eq('slug', slug).maybeSingle();
+    // Stary adres też się liczy: po poprawce transliteracji ten sam obiekt bez
+    // osm_id dostałby nowy slug i wszedłby do katalogu drugi raz.
+    const { data } = await supabase.from('place_catalog').select('*')
+      .or(`slug.eq.${slug},slugi_poprzednie.cs.{${slug}}`).limit(1).maybeSingle();
     return data ?? null;
   }
 
@@ -127,6 +130,25 @@ export class RouteBuilderRepository {
    * Scalanie duplikatu przez skasowanie wiersza nie jest trwałe — seed wstawia
    * z powrotem wszystko, czego nie zna, a obiekt w OSM dalej istnieje.
    */
+  /** Czego miastom brakuje — widok katalog_braki (pętla dozbierania w routes/catalog.ts). */
+  async katalogBraki(): Promise<any[]> {
+    const { data, error } = await supabase.from('katalog_braki').select('*');
+    if (error) { console.warn('[katalog] katalog_braki:', error.message); return []; }
+    return data ?? [];
+  }
+
+  async zapiszStanMiasta(city: string, patch: Record<string, unknown>): Promise<void> {
+    const { error } = await supabase.from('katalog_miasta').upsert({ city, ...patch }, { onConflict: 'city' });
+    if (error) console.warn(`[katalog] stan ${city}:`, error.message);
+  }
+
+  /** Nowy adres strony miejsca dla adresu sprzed poprawki transliteracji. */
+  async catalogSlugZPoprzedniego(slug: string): Promise<string | null> {
+    const { data } = await supabase.from('place_catalog').select('slug')
+      .contains('slugi_poprzednie', [slug]).limit(1).maybeSingle();
+    return data?.slug ?? null;
+  }
+
   async listCatalogExclusions(): Promise<Set<string>> {
     const { data, error } = await supabase
       .from('katalog_wykluczenia').select('osm_id');
