@@ -99,6 +99,35 @@ export async function apiPost<T = any>(
   }
 }
 
+/** Zapytania bez ciała (odczyt, odłączenie) — ta sama sesja, te same komunikaty błędów co apiPost. */
+async function apiBezCiala<T>(metoda: 'GET' | 'DELETE', path: string): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new ApiError('Sesja wygasła. Zaloguj się ponownie, żeby kontynuować.', 401);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method: metoda,
+      headers: { 'Accept-Language': jezykUzytkownika(), Authorization: `Bearer ${session.access_token}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new ApiError(messageForStatus(res.status, payload), res.status, payload?.retry_after_s);
+    }
+    return await res.json() as T;
+  } catch (err: any) {
+    if (err?.name === 'AbortError') throw new ApiError('Przekroczono czas oczekiwania na odpowiedź. Spróbuj ponownie.', 408);
+    if (err instanceof ApiError) throw err;
+    throw new ApiError('Brak połączenia z serwerem. Sprawdź sieć i spróbuj ponownie.', 0);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export const apiGet = <T = any>(path: string) => apiBezCiala<T>('GET', path);
+export const apiDelete = <T = any>(path: string) => apiBezCiala<T>('DELETE', path);
+
 /** Zdarzenie ze strumienia planera. Pole `typ` rozstrzyga, co niesie reszta. */
 export interface ZdarzenieStrumienia {
   typ: 'etap' | 'dzien' | 'blad-dnia' | 'koniec' | 'blad';

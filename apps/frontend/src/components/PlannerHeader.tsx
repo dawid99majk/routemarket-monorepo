@@ -54,7 +54,7 @@ function zakladki(tripId: string | null) {
 export default function PlannerHeader({ context, initials }: PlannerHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user: zalogowany } = useAuth();
   const { pathname, search } = useLocation();
   /* Ostatnia tablica decyduje już tylko o tym, czy pokazać zakładkę „Plan dni" —
      pigułka z jej nazwą zniknęła, bo ten sam wybór robi teraz pasek kart. */
@@ -133,6 +133,16 @@ export default function PlannerHeader({ context, initials }: PlannerHeaderProps)
             <Heart className="w-4 h-4 text-muted-foreground" />
             <span className="text-[14px] font-semibold text-muted-foreground hidden sm:inline">{t('naglowek.zapisane')}</span>
           </button>
+          {zalogowany && (
+            <button onClick={() => window.dispatchEvent(new Event('rm:agent'))}
+              aria-label="Porozmawiaj z agentem" title="Porozmawiaj z agentem"
+              className="h-10 md:h-9 [@media(pointer:coarse)]:h-11 inline-flex items-center gap-2 rounded-full bg-agent text-agent-foreground
+                         pl-1.5 pr-1.5 sm:pr-3.5 hover:shadow-token-sm transition-shadow">
+              <span aria-hidden className="w-7 h-7 md:w-6 md:h-6 rounded-full bg-agent-strong text-white
+                                           font-display font-bold text-[13px] md:text-[12px] flex items-center justify-center">A</span>
+              <span className="text-[14px] font-semibold hidden sm:inline">Agent</span>
+            </button>
+          )}
           <button onClick={() => window.dispatchEvent(new Event('rm:pomoc'))}
             aria-label={t('naglowek.pomoc', 'Jak to działa')} title={t('naglowek.pomoc', 'Jak to działa')}
             className="md:hidden w-10 h-10 rounded-full flex items-center justify-center text-muted-foreground hover:bg-card">

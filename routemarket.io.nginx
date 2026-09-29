@@ -8,7 +8,7 @@ map $uri $rm_znana_sciezka {
     "/" 1;
     ~^/[^/]+\.[A-Za-z0-9]+$ 1;
     ~^/(assets|fonts|images|locales)/ 1;
-    ~^/(lab/globe|auth|auth/callback|auth/error|contact|brand|zapisane|tablice|marketing|tablica|ulubione|kolekcje|start|odkrywaj|my-routes|plany|profile|create|route-builder-v2|admin)/?$ 1;
+    ~^/(lab/globe|auth|auth/callback|auth/error|contact|brand|zapisane|tablice|marketing|tablica|ulubione|kolekcje|start|odkrywaj|my-routes|plany|polaczenia|profile|create|route-builder-v2|admin)/?$ 1;
     ~^/legal/(terms|privacy|cookies|documents|refunds|dsa-compliance|creator-agreement|acceptable-use|copyright)/?$ 1;
     ~^/(kolekcje|kolekcja|plany)/[^/]+/?$ 1;
     ~^/admin/(dashboard|users|atlas)/?$ 1;

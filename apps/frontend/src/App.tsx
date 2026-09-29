@@ -54,6 +54,8 @@ const Tablice = leniwie(() => import("./pages/Tablice"));
 const Marketing = leniwie(() => import("./pages/Marketing"));
 const TablicaPubliczna = leniwie(() => import("./pages/TablicaPubliczna"));
 const TripPlans = leniwie(() => import("./pages/TripPlans"));
+const Polaczenia = leniwie(() => import("./pages/Polaczenia"));
+const RozmowaZAgentem = leniwie(() => import("./components/RozmowaZAgentem"));
 const RouteBuilderV2 = leniwie(() => import("./pages/v2/RouteBuilderV2"));
 
 function LegacyCreateRedirect() {
@@ -101,6 +103,7 @@ const App = () => (
               <GaTracker />
               <Suspense fallback={null}>
                 <GuideHub />
+                <RozmowaZAgentem />
                 <NavigationLauncher />
                 {/* Karta otwarta przed wdrożeniem nie pobiera już index.html — router
                     obsługuje nawigację po stronie przeglądarki, więc stary interfejs
@@ -153,6 +156,7 @@ const App = () => (
                   <Route path="/miasto/:slug" element={<Miasto />} />
                   <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
+                  <Route path="/polaczenia" element={<ProtectedRoute><Polaczenia /></ProtectedRoute>} />
                   <Route path="/plany/:id" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 

@@ -355,6 +355,34 @@ const NARZEDZIA: Narzedzie[] = [
   },
 ];
 
+// ── Wspólne wykonywanie narzędzi (MCP i agent w aplikacji) ─────────────────
+
+export const opisyNarzedzi = () => NARZEDZIA.map((n) => ({
+  name: n.name, title: n.title, description: n.description, inputSchema: n.inputSchema, annotations: n.annotations,
+}));
+
+export const czyZapisuje = (nazwa: string) => NARZEDZIA.find((n) => n.name === nazwa)?.annotations.readOnlyHint === false;
+
+/**
+ * Jedno wejście do narzędzi dla wszystkich klientów. Błąd narzędzia to wynik,
+ * nie wyjątek — agent ma go przeczytać i się poprawić. Nieznane błędy (bazy,
+ * sieci) nie wychodzą na zewnątrz ze szczegółami.
+ */
+export async function wykonajNarzedzie(nazwa: string, argumenty: Record<string, any>, userId: string):
+  Promise<{ ok: boolean; tekst: string; dane?: any } | null> {
+  const n = NARZEDZIA.find((x) => x.name === nazwa);
+  if (!n) return null;
+  try {
+    const dane = await n.wykonaj(argumenty ?? {}, userId);
+    console.log(`[mcp] ${n.name} ok (${userId.slice(0, 8)})`);
+    return { ok: true, tekst: JSON.stringify(dane, null, 2), dane };
+  } catch (e: any) {
+    const znany = e instanceof BladNarzedzia;
+    if (!znany) console.warn(`[mcp] ${n.name}: ${e.message}`);
+    return { ok: false, tekst: znany ? e.message : 'Nie udało się wykonać operacji — spróbuj za chwilę.' };
+  }
+}
+
 // ── Protokół JSON-RPC 2.0 (Streamable HTTP, bez strumienia SSE) ────────────
 
 const WERSJE = ['2025-06-18', '2025-03-26', '2024-11-05'];
@@ -381,22 +409,13 @@ export async function obsluzJsonRpc(msg: any, userId: string): Promise<any | nul
     }
     case 'ping': return odp({});
     case 'tools/list':
-      return odp({ tools: NARZEDZIA.map((n) => ({ name: n.name, title: n.title, description: n.description, inputSchema: n.inputSchema, annotations: n.annotations })) });
+      return odp({ tools: opisyNarzedzi() });
     case 'resources/list': return odp({ resources: [] });
     case 'prompts/list': return odp({ prompts: [] });
     case 'tools/call': {
-      const n = NARZEDZIA.find((x) => x.name === msg.params?.name);
-      if (!n) return blad(-32602, `Nieznane narzędzie: ${String(msg.params?.name).slice(0, 60)}`);
-      try {
-        const wynik = await n.wykonaj(msg.params?.arguments ?? {}, userId);
-        console.log(`[mcp] ${n.name} ok (${userId.slice(0, 8)})`);
-        return odp({ content: [{ type: 'text', text: JSON.stringify(wynik, null, 2) }], isError: false });
-      } catch (e: any) {
-        // Błąd narzędzia to wynik, nie błąd protokołu — agent ma go przeczytać i się poprawić.
-        const znany = e instanceof BladNarzedzia;
-        if (!znany) console.warn(`[mcp] ${n.name}: ${e.message}`);
-        return odp({ content: [{ type: 'text', text: znany ? e.message : 'Nie udało się wykonać operacji — spróbuj za chwilę.' }], isError: true });
-      }
+      const w = await wykonajNarzedzie(msg.params?.name, msg.params?.arguments ?? {}, userId);
+      if (!w) return blad(-32602, `Nieznane narzędzie: ${String(msg.params?.name).slice(0, 60)}`);
+      return odp({ content: [{ type: 'text', text: w.tekst }], isError: !w.ok });
     }
     default: return blad(-32601, `Nieobsługiwana metoda: ${msg.method.slice(0, 60)}`);
   }

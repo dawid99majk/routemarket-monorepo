@@ -140,6 +140,15 @@ export default function UserProfile() {
       </header>
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <h1 className="text-2xl font-bold">{t('profile.title')}</h1>
+        <div className="bg-card rounded-md p-6 shadow-token-sm flex flex-wrap items-center gap-4 justify-between">
+          <div className="min-w-0 basis-[260px] flex-1">
+            <h2 className="text-lg font-semibold">Agenci AI</h2>
+            <p className="text-sm text-muted-foreground mt-1 text-pretty">
+              Połącz Claude, ChatGPT albo Gemini, żeby dodawać miejsca do tablic w rozmowie.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/polaczenia')}>Połączenia</Button>
+        </div>
         <div className="bg-card rounded-md p-6 shadow-token-sm">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-muted-foreground" /> {t('profile.account_info')}</h2>
           <div className="space-y-4">

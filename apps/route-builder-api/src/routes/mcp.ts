@@ -3,7 +3,9 @@ import { authMiddleware } from '../middleware/auth.js';
 import {
   obsluzJsonRpc, uwierzytelnij, przekroczonyLimit,
   utworzPolaczenie, listaPolaczen, odlaczPolaczenie, ADRES_MCP, ADRES_SERWISU,
+  przekroczonyLimit as limitTempa,
 } from '../services/mcp.js';
+import { rozmawiajZAgentem, type WiadomoscRozmowy } from '../services/agent-rozmowa.js';
 
 /**
  * Endpoint MCP i zarządzanie połączeniami agentów.
@@ -71,4 +73,32 @@ mcpRouter.post('/polaczenia', async (c) => {
 mcpRouter.delete('/polaczenia/:id', async (c) => {
   const ok = await odlaczPolaczenie(c.get('userId'), c.req.param('id'));
   return ok ? c.json({ ok: true }) : c.json({ error: 'Nie znaleziono aktywnego połączenia' }, 404);
+});
+
+// ── Agent w aplikacji: rozmowa bez łączenia czegokolwiek ────────────────────
+
+mcpRouter.use('/agent/rozmowa', authMiddleware);
+
+mcpRouter.post('/agent/rozmowa', async (c) => {
+  const userId = c.get('userId');
+  // 40 wiadomości na godzinę: rozmowa jest darmowa, ale to wywołania modelu.
+  if (limitTempa(`agent:${userId}`, 40, 3600_000)) {
+    return c.json({ error: 'To już sporo rozmowy w ostatniej godzinie — wróć za chwilę.' }, 429, { 'Retry-After': '600' });
+  }
+  const { messages, tablica_id } = await c.req.json().catch(() => ({})) as { messages?: unknown; tablica_id?: unknown };
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 30) return c.json({ error: 'Nieprawidłowa rozmowa.' }, 400);
+  const historia: WiadomoscRozmowy[] = [];
+  for (const m of messages as any[]) {
+    if ((m?.role !== 'user' && m?.role !== 'assistant') || typeof m?.content !== 'string' || !m.content.trim()) {
+      return c.json({ error: 'Nieprawidłowa wiadomość.' }, 400);
+    }
+    historia.push({ role: m.role, content: m.content.slice(0, 2000) });
+  }
+  if (historia[historia.length - 1].role !== 'user') return c.json({ error: 'Ostatnia wiadomość musi być Twoja.' }, 400);
+  try {
+    return c.json(await rozmawiajZAgentem(userId, historia, typeof tablica_id === 'string' ? tablica_id : null));
+  } catch (e: any) {
+    console.warn('[agent] rozmowa:', e.message);
+    return c.json({ error: 'Agent chwilowo nie odpowiada — spróbuj za moment.' }, 502);
+  }
 });
