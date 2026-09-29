@@ -1510,6 +1510,18 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
     if (k.baza && maPunkt(ostatni) && !ostatni.approx) koniec += dojsciePieszo(k.baza, ostatni);
     return koniec;
   };
+  // Oszczędność = wizyta + dojście do niej i od niej − dojście na skróty.
+  const oszczednosc = (it: PozycjaDnia) => {
+    const p = przystanki();
+    const i = p.indexOf(it);
+    const prev: any = i > 0 ? p[i - 1] : k.baza;
+    const next: any = i < p.length - 1 ? p[i + 1] : k.baza;
+    let m = it.minutes || 60;
+    if (maPunkt(it) && prev && next && typeof prev.lat === 'number' && typeof next.lat === 'number') {
+      m += dojsciePieszo(prev, it) + dojsciePieszo(it as any, next) - dojsciePieszo(prev, next);
+    }
+    return Math.max(0, m);
+  };
   const wytnij = (it: PozycjaDnia) => {
     // Ostrzeżenia o wyciętym miejscu też wychodzą: w Poznaniu zostawało
     // „Palmiarnia: zamykają o 17:00” przy planie, w którym Palmiarni już nie było.
@@ -1520,14 +1532,34 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
     dzien.items.splice(od, i - od + 1);
     return od;
   };
+  // Kolejne pozycje dochodzą wcześniej o zaoszczędzony czas. Posiłek stoi tylko
+  // wtedy, gdy jego godzina jest stałym punktem dnia („Kolacja o 19:00”) — bez
+  // tego Pyra Bar zostawał o 18:25 po wycięciu Palmiarni i dzień kończył się
+  // o 19:20 przy oknie do 18:00. Nie wcześniej, niż pozwala dojście.
+  const staleGodziny = new Set((k.zadanie.fixed ?? []).map((f) => f.time));
+  const przesunWczesniej = (od: number, ile: number) => {
+    for (let j = od; j < dzien.items.length; j++) {
+      const it = dzien.items[j];
+      if (!GODZINA.test(it.time) || it.baza) continue;
+      if (POSILEK_LUB_WIECZOR.test(String(it.kind || '')) && staleGodziny.size) break;
+      if (staleGodziny.has(it.time)) break;
+      it.time = minutyNaCzas(czasNaMinuty(it.time) - ile);
+    }
+    przeliczGodziny(k, dzien);
+  };
 
-  // 1. Propozycje agenta z końca dnia to wypełniacz — odpadają pierwsze.
-  for (let proba = 0; proba < 6; proba++) {
+  // 1. Propozycje agenta (poza posiłkami) to wypełniacz — odpadają pierwsze, od
+  //    najpóźniejszej, gdziekolwiek stoją. Wcześniej tylko z samego końca dnia,
+  //    więc przy kolacji-kotwicy na końcu muzeum-propozycja w środku zostawało,
+  //    a dzień kończył się 40 min po oknie.
+  for (let proba = 0; proba < 8; proba++) {
     if (koniecDnia() <= koniecOkna + 15) return;
-    const p = przystanki();
-    const ostatni = p[p.length - 1];
-    if (!ostatni || ostatni.source !== 'suggested' || POSILEK_LUB_WIECZOR.test(String(ostatni.kind || ''))) break;
-    wytnij(ostatni);
+    const kandydaci = przystanki().filter((it) => it.source === 'suggested'
+      && !POSILEK_LUB_WIECZOR.test(String(it.kind || '')));
+    const ofiara = kandydaci[kandydaci.length - 1];
+    if (!ofiara) break;
+    const ile = oszczednosc(ofiara);
+    przesunWczesniej(wytnij(ofiara), ile);
   }
 
   // 2. Potem kotwice „być może” (priorytet „jeśli wyjdzie”) — od tej, która
@@ -1538,21 +1570,9 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
   const priorytet = new Map((k.grupy[numer - 1] ?? []).map((p) => [p.name.trim().toLowerCase(), p.priority]));
   for (let proba = 0; proba < 6; proba++) {
     if (koniecDnia() <= koniecOkna + 15) return;
-    const p = przystanki();
-    const kandydaci = p.filter((it) => it.source !== 'suggested'
+    const kandydaci = przystanki().filter((it) => it.source !== 'suggested'
       && priorytet.get(it.name.trim().toLowerCase()) === 'nice');
     if (!kandydaci.length) return;
-    // Oszczędność = wizyta + dojście do niej i od niej − dojście na skróty.
-    const oszczednosc = (it: PozycjaDnia) => {
-      const i = p.indexOf(it);
-      const prev = i > 0 ? p[i - 1] : (k.baza as any);
-      const next = i < p.length - 1 ? p[i + 1] : (k.baza as any);
-      let m = it.minutes || 60;
-      if (maPunkt(it) && prev && next && typeof prev.lat === 'number' && typeof next.lat === 'number') {
-        m += dojsciePieszo(prev as any, it) + dojsciePieszo(it as any, next) - dojsciePieszo(prev as any, next);
-      }
-      return m;
-    };
     const ofiara = kandydaci.reduce((a, b) => (oszczednosc(b) > oszczednosc(a) ? b : a));
     const ile = oszczednosc(ofiara);
     const od = wytnij(ofiara);
@@ -1560,19 +1580,7 @@ export function przytnijDoOkna(k: KontekstPlanu, dzien: DzienPlanu, numer?: numb
       name: ofiara.name,
       reason: 'Nie zmieściło się w oknie dnia (było „być może”) — przenieś na inny dzień albo wydłuż okno.',
     } as any);
-    // Kolejne pozycje dochodzą wcześniej o zaoszczędzony czas. Posiłek stoi tylko
-    // wtedy, gdy jego godzina jest stałym punktem dnia („Kolacja o 19:00”) — bez
-    // tego Pyra Bar zostawał o 18:25 po wycięciu Palmiarni i dzień kończył się
-    // o 19:20 przy oknie do 18:00. Nie wcześniej, niż pozwala dojście.
-    const staleGodziny = new Set((k.zadanie.fixed ?? []).map((f) => f.time));
-    for (let j = od; j < dzien.items.length; j++) {
-      const it = dzien.items[j];
-      if (!GODZINA.test(it.time) || it.baza) continue;
-      if (POSILEK_LUB_WIECZOR.test(String(it.kind || '')) && staleGodziny.size) break;
-      if (staleGodziny.has(it.time)) break;
-      it.time = minutyNaCzas(czasNaMinuty(it.time) - ile);
-    }
-    przeliczGodziny(k, dzien);
+    przesunWczesniej(od, ile);
   }
 }
 
