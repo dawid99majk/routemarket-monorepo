@@ -52,6 +52,36 @@ Zbierasz miejsca, które chcesz zobaczyć. Agent RouteMarket układa z nich plan
 RouteMarket to planer wyjazdów. Pokazujemy, ile czasu zajmuje zwiedzanie każdego miejsca w mieście i ile to naprawdę dni. Krótkie filmy z danych katalogu: OpenStreetMap i Wikipedia. Plan dni z godzinami otwarcia i plik GPX: routemarket.io
 ```
 
+## Instagram: odświeżenie istniejącego konta (`routemarket.io`)
+
+Konto powstało w czasach marketplace (10 obserwujących, ~56 obserwowanych, bio „Marketplace for GPX + PDF guide”,
+posty z okładkami tras). Użytkownik zostaje przy nazwie `routemarket.io`; zmienia się treść.
+Kolejność ma znaczenie: najpierw ukryć stare, dopiero potem zmienić bio, żeby nikt nie trafił
+na nowe bio nad starą siatką.
+
+1. **Zarchiwizuj stare posty, nie usuwaj.** Archiwum jest odwracalne, usunięcie nie. Profil → post → ⋯ →
+   „Archiwizuj”. Zrobić dla każdego posta z okładką trasy, o marketplace, GPX i PDF-ach. Zostawić tylko to,
+   co pasuje do planera (jeśli nic — profil będzie pusty do pierwszej publikacji, i to jest w porządku).
+2. **Zmień na konto firmowe/twórcy**, jeśli jeszcze nie jest (Ustawienia → Rodzaj konta), z kategorią
+   „Strona internetowa” albo „Aplikacja”. Powiąż ze stroną na Facebooku (Ustawienia → Centrum kont);
+   bez tego Meta Business Suite nie zaplanuje postów.
+3. **Zdjęcie profilowe:** `wyniki/marka/awatar.png` (stare to globus z czasów marketplace).
+4. **Nazwa (pole wyszukiwane, do 64 znaków):** `routemarket — planer wyjazdów`
+5. **Bio:** tekst z sekcji „Bio → Instagram” wyżej (88 znaków).
+6. **Link w bio:** `https://routemarket.io/?utm_source=instagram&utm_medium=social&utm_campaign=bio`
+7. **Wyróżnione stories:** usuń stare (jeśli są), dodaj „Jak to działa”, „Miasta”, „GPX”, „Pytania”.
+8. **Nie publikuj**, dopóki nie ma przejrzanej paczki na cały tydzień.
+
+Uwaga: 56 obserwowanych przy 10 obserwujących wygląda jak konto, które obserwuje na hurt. Przed
+publikacją warto przejrzeć listę i odobserwować konta niezwiązane z podróżami; nie robić tego masowo
+(limity Instagrama mogą zablokować akcję).
+
+## Facebook: strona
+
+Profil `profile.php?id=61576693332835` jest wpisany do danych strukturalnych strony. Sprawdź, że to
+**strona** (Page), a nie profil prywatny: strona ma przycisk „Lubię to” i osobne ustawienia w Meta
+Business Suite. Jeśli to profil prywatny, załóż stronę i przekaż nowy adres.
+
 ## Pinterest: tablice do założenia
 
 Nazwa tablicy to fraza, którą ludzie wpisują. Opis 1–2 zdania z liczbą.
