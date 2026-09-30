@@ -77,6 +77,14 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Materiały promocyjne na czas publikacji przez API Mety: publikator kopiuje tu pliki, Instagram
+    # pobiera je z adresu, publikator kasuje po publikacji. Katalog jest zwykle pusty; listing wyłączony.
+    location ^~ /promo/ {
+        alias /var/www/promo/;
+        autoindex off;
+        add_header Cache-Control "no-store";
+    }
+
     # Mapa strony budowana z bazy zamiast pliku sprzed pół roku.
     location = /sitemap.xml {
         proxy_pass http://127.0.0.1:8081/sitemap.xml;
