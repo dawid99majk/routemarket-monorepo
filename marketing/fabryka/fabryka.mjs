@@ -261,7 +261,10 @@ export async function wyprodukuj(temat, { formaty = WSZYSTKIE, nr = 0, katalog }
 async function wybierzTematy(ile) {
   const hist = fs.existsSync(HISTORIA) ? JSON.parse(fs.readFileSync(HISTORIA, 'utf8')) : [];
   const ostatnio = (k) => hist.filter((h) => h.klucz === k).map((h) => h.data).sort().pop() ?? '0000';
-  const tablice = (await dane.publiczneTablice()).filter((t) => t.miejsc >= 6 && t.zdjec >= 4)
+  // Tylko tablice przykładowe RouteMarketu: testowe tablice użytkowników („Nowy Jork z dziećmi”) potrafią
+  // otwierać się pomnikiem 11 września, a to nie jest okładka wesołego posta. Tablicę użytkownika
+  // promujemy świadomie (fabryka.mjs tablica <id>), nie z automatu.
+  const tablice = (await dane.publiczneTablice()).filter((t) => t.is_example && t.miejsc >= 6 && t.zdjec >= 4)
     .map((t) => ({ klucz: `tablica:${t.id}`, id: t.id, miasto: t.destination, waga: (t.like_count ?? 0) + (t.copy_count ?? 0) * 2 + (t.is_example ? 0 : 3) }));
   const miasta = (await dane.miasta()).map((m) => ({ klucz: `miasto:${m}`, miasto: m, waga: 0 }));
   const sortuj = (l) => l.sort((a, b) => ostatnio(a.klucz).localeCompare(ostatnio(b.klucz)) || b.waga - a.waga);
