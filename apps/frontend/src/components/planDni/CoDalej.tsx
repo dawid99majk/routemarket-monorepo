@@ -11,7 +11,6 @@ interface CoDalejProps {
   cenaTrasy?: number;
   /** Trasa tego dnia została już opłacona — każde kolejne przeliczenie jest bez opłaty. */
   oplacona: boolean;
-  tryb: 'pieszo' | 'rower';
   podejscieM: number;
   onWyznacz: () => void;
   onPobierzGpx: () => void;
@@ -28,7 +27,7 @@ interface CoDalejProps {
  * w planie, a po poprawkach przelicza sama — i stąd pobiera się plik.
  */
 export default function CoDalej({
-  nrDnia, przebieg, mozna, cenaTrasy, oplacona, tryb, podejscieM, onWyznacz, onPobierzGpx,
+  nrDnia, przebieg, mozna, cenaTrasy, oplacona, podejscieM, onWyznacz, onPobierzGpx,
   dniZTrasa, wszystkichDni, onPobierzGpxWyjazdu,
 }: CoDalejProps) {
   const { t } = useTranslation();
@@ -52,8 +51,7 @@ export default function CoDalej({
       {gotowy ? (
         <>
           <p className="font-mono text-[13px] tabular-nums text-background mt-4">
-            {t(tryb === 'rower' ? 'plan.trasa_zmierzona_rower' : 'plan.trasa_zmierzona',
-              { km: dziesietna(gotowy.km), minuty: Math.round(gotowy.h * 60) })}
+            {t('plan.trasa_zmierzona', { km: dziesietna(gotowy.km), minuty: Math.round(gotowy.h * 60) })}
             {podejscieM > 0 && t('plan.podejscie', { m: podejscieM })}
           </p>
           <button type="button" onClick={onPobierzGpx} className={przycisk}>

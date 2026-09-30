@@ -32,7 +32,7 @@ import { placesRouter } from './routes/places.js';
 import { chatInterviewRouter } from './routes/chat-interview.js';
 import { routeProjectsRouter } from './routes/route-projects.js';
 import { TOKEN_PRICES, ensureTokens } from './services/tokens.js';
-import { punktyDnia, wstawPoDrodze, podejscie, PROFIL_TRYBU, type TrybTrasy } from './services/trasa-dnia.js';
+import { punktyDnia, wstawPoDrodze, podejscie, PROFIL_TRASY } from './services/trasa-dnia.js';
 import { catalogRouter } from './routes/catalog.js';
 import { mcpRouter } from './routes/mcp.js';
 
@@ -402,7 +402,7 @@ app.post('/plan-trip', async (c) => {
  * współrzędnych nie da się wyznaczyć przebiegu.
  */
 /**
- * Trasa dnia planu: przebieg po chodnikach (albo ścieżkach rowerowych) przez
+ * Trasa dnia planu: przebieg po chodnikach przez
  * przystanki dnia, zapisywany w planie. To zastępuje przejście do osobnego
  * kreatora — plan i trasa są jedną rzeczą.
  *
@@ -414,8 +414,9 @@ app.post('/plan-trip', async (c) => {
 app.post('/plan-day-route', async (c) => {
   try {
     const user = c.get('user') as AuthenticatedRouteBuilderUser;
-    const body = await c.req.json() as { plan_id?: string; day?: number; tryb?: TrybTrasy; via?: { lat: number; lng: number }[] };
-    const tryb: TrybTrasy = body.tryb === 'rower' ? 'rower' : 'pieszo';
+    // Tryb trasy (pieszo/rower) został wycofany: trasa jest zawsze piesza, a pole `tryb`
+    // ze starszego klienta jest ignorowane, nie odrzucane.
+    const body = await c.req.json() as { plan_id?: string; day?: number; via?: { lat: number; lng: number }[] };
     const dzienNr = Number(body.day);
     if (!body.plan_id || !Number.isInteger(dzienNr) || dzienNr < 1) {
       return c.json({ error: 'Brak planu albo numeru dnia' }, 400);
@@ -448,7 +449,7 @@ app.post('/plan-day-route', async (c) => {
       name: p.name, lat: p.lat, lng: p.lng, confidence: 1, source: 'plan', provider: 'plan',
       type: i === 0 ? 'start' : (i === punkty.length - 1 ? 'end' : 'waypoint'),
     }));
-    const trasa = await routingService.getRoute(miejsca as any, PROFIL_TRYBU[tryb], { intent: 'popular' });
+    const trasa = await routingService.getRoute(miejsca as any, PROFIL_TRASY, { intent: 'popular' });
     if (!trasa.trackPoints?.length) throw new Error('Router nie zwrócił przebiegu');
 
     // Pobieramy dopiero po udanym wyznaczeniu. Zapis opłaty idzie pierwszy:
@@ -463,13 +464,12 @@ app.post('/plan-day-route', async (c) => {
     const slad = trasa.trackPoints.map((p) => [
       Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6, Math.round((p[2] ?? 0) * 10) / 10,
     ] as [number, number, number]);
-    console.log(`[plan-day-route] ${plan.projekt.name} d${dzienNr} ${tryb}: ${trasa.distance_km.toFixed(2)} km, ${punkty.length} pkt (${via.length} po drodze), ${pobrano ? `pobrano ${pobrano}` : 'bez opłaty'}`);
+    console.log(`[plan-day-route] ${plan.projekt.name} d${dzienNr}: ${trasa.distance_km.toFixed(2)} km, ${punkty.length} pkt (${via.length} po drodze), ${pobrano ? `pobrano ${pobrano}` : 'bez opłaty'}`);
     return c.json({
       track: slad,
       km: trasa.distance_km,
       h: trasa.duration_h,
       podejscie_m: podejscie(slad),
-      tryb,
       via,
       punktow: punkty.length,
       pobrano,

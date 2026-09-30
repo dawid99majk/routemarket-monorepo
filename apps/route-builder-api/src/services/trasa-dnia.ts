@@ -4,15 +4,13 @@
  *
  * Kreator dostawał od przeglądarki gotową listę punktów, zakładał osobny projekt
  * i żył dalej bez związku z planem. Tu punkty bierzemy z planu po stronie serwera:
- * klient mówi tylko, który dzień i jakim trybem, więc nie da się wyznaczyć za
+ * klient mówi tylko, który dzień i którędy po drodze, więc nie da się wyznaczyć za
  * darmo trasy przez dowolne punkty, podszywając się pod przeliczenie opłaconego dnia.
  *
  * Reguły rozpoznawania noclegu i przystanków są tymi samymi co w froncie
  * (`tripProjects/helpers.ts`: czyPrzystanek, czyBaza, punktyDnia) — mapa dnia
  * i przebieg muszą iść przez te same punkty.
  */
-
-export type TrybTrasy = 'pieszo' | 'rower';
 
 export interface PunktTrasy { name: string; lat: number; lng: number; via?: boolean }
 
@@ -113,8 +111,8 @@ export function podejscie(slad: [number, number, number?][], prog = 3): number {
 }
 
 /**
- * Profil routingu dla trybu. Spacer idzie chodnikami (GraphHopper foot), rower
- * profilem `trekking` BRoutera — `cycling` to `fastbike`, który w mieście prowadzi
- * jezdnią zamiast drogą rowerową.
+ * Profil routingu trasy dnia: spacer chodnikami (GraphHopper foot). Rower został
+ * wycofany na razie — profil `trekking` BRoutera (`bicycle` w routing.ts) wróci
+ * razem z wyborem trybu w interfejsie.
  */
-export const PROFIL_TRYBU: Record<TrybTrasy, string> = { pieszo: 'city_walk', rower: 'bicycle' };
+export const PROFIL_TRASY = 'city_walk';

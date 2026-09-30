@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -43,7 +43,6 @@ function leniwie<T extends { default: React.ComponentType<any> }>(zaladuj: () =>
 }
 
 const GlobeLab = leniwie(() => import("./pages/GlobeLab"));
-const MyRoutes = leniwie(() => import("./pages/MyRoutes"));
 const PlacePage = leniwie(() => import("./pages/PlacePage"));
 const Miasto = leniwie(() => import("./pages/Miasto"));
 const Start = leniwie(() => import('./pages/Start'));
@@ -56,12 +55,6 @@ const TablicaPubliczna = leniwie(() => import("./pages/TablicaPubliczna"));
 const TripPlans = leniwie(() => import("./pages/TripPlans"));
 const Polaczenia = leniwie(() => import("./pages/Polaczenia"));
 const RozmowaZAgentem = leniwie(() => import("./components/RozmowaZAgentem"));
-const RouteBuilderV2 = leniwie(() => import("./pages/v2/RouteBuilderV2"));
-
-function LegacyCreateRedirect() {
-  const location = useLocation();
-  return <Navigate to={`/route-builder-v2${location.search}`} replace />;
-}
 const UserProfile = leniwie(() => import("./pages/UserProfile"));
 const AuthCallback = leniwie(() => import("./pages/AuthCallback"));
 const AuthError = leniwie(() => import("./pages/AuthError"));
@@ -154,17 +147,18 @@ const App = () => (
                   <Route path="/odkrywaj" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/miejsce/:slug" element={<PlacePage />} />
                   <Route path="/miasto/:slug" element={<Miasto />} />
-                  <Route path="/my-routes" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><MyRoutes /></ProtectedRoute>} />
                   <Route path="/plany" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/polaczenia" element={<ProtectedRoute><Polaczenia /></ProtectedRoute>} />
                   <Route path="/plany/:id" element={<ProtectedRoute><TripPlans /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute allowedRoles={ALL_AUTHENTICATED}><UserProfile /></ProtectedRoute>} />
 
-                  {/* Creator routes */}
-                  {/* Stary kreator formularzowy zastąpiony wywiadem w /route-builder-v2.
-                      Przekierowanie zachowuje działanie starych linków, w tym ?projectId=. */}
-                  <Route path="/create" element={<LegacyCreateRedirect />} />
-                  <Route path="/route-builder-v2" element={<ProtectedRoute><RouteBuilderV2 /></ProtectedRoute>} />
+                  {/* Kreator trasy (Atlas) wyłączony 30.09.2026: trasa dnia liczy się teraz
+                      w planie, a osobna strona nie była do niczego potrzebna. Stare adresy
+                      i zakładki trafiają na listę wyjazdów. Pliki pages/v2 i pages/MyRoutes
+                      zostają w repo, ale nic ich nie importuje. */}
+                  <Route path="/create" element={<Navigate to="/plany" replace />} />
+                  <Route path="/route-builder-v2" element={<Navigate to="/plany" replace />} />
+                  <Route path="/my-routes" element={<Navigate to="/plany" replace />} />
 
                   {/* Admin routes */}
                   <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>

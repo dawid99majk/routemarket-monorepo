@@ -886,25 +886,24 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   /**
    * Trasa dnia — dawniej osobny kreator, teraz część planu.
    *
-   * Serwer bierze punkty z zapisanego planu, więc tu podajemy tylko dzień, tryb
-   * i punkty po drodze. Pierwsze wyznaczenie dnia kosztuje tokeny, kolejne
+   * Serwer bierze punkty z zapisanego planu, więc tu podajemy tylko dzień
+   * i punkty po drodze. Trasa jest zawsze piesza. Pierwsze wyznaczenie dnia kosztuje tokeny, kolejne
    * przeliczenia tego dnia są bez opłaty — dlatego po każdej poprawce opłacony
    * dzień przelicza się sam.
    */
-  const wyznaczTraseDnia = async (nr: number, zmiany: { tryb?: 'pieszo' | 'rower'; via?: { lat: number; lng: number }[] } = {}) => {
+  const wyznaczTraseDnia = async (nr: number, zmiany: { via?: { lat: number; lng: number }[] } = {}) => {
     const idWersji = planIdRef.current;
     const dzien = (planRef.current?.days || []).find((d: any) => d.day === nr);
     if (!idWersji || !dzien) return;
-    const tryb = zmiany.tryb ?? dzien.trasa?.tryb ?? 'pieszo';
     const via = zmiany.via ?? dzien.trasa?.via ?? [];
 
     setDayRoutes((prev) => ({ ...prev, [nr]: 'loading' }));
     try {
-      const data = await apiPost<any>('/plan-day-route', { plan_id: idWersji, day: nr, tryb, via }, { timeoutMs: 90_000 });
+      const data = await apiPost<any>('/plan-day-route', { plan_id: idWersji, day: nr, via }, { timeoutMs: 90_000 });
       const nowy = zDniem(planRef.current, nr, (d) => ({
         ...d,
         track: data.track, route_km: data.km, route_h: data.h,
-        trasa: { tryb: data.tryb, via: data.via, podejscie_m: data.podejscie_m, oplacona: true },
+        trasa: { via: data.via, podejscie_m: data.podejscie_m, oplacona: true },
       }));
       await zapiszZmianePlanu(nowy, idWersji);
       if (data.pobrano > 0) {
@@ -918,15 +917,15 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   };
 
   /**
-   * Tryb i punkty po drodze. Na opłaconym dniu trasa przelicza się od razu, bez
-   * opłaty; na nieopłaconym wybór tylko się zapisuje, a liczy się dopiero po
-   * „Wyznacz trasę" — żeby zmiana trybu nie pobierała tokenów bez pytania.
+   * Punkty po drodze. Na opłaconym dniu trasa przelicza się od razu, bez opłaty;
+   * na nieopłaconym wybór tylko się zapisuje, a liczy się dopiero po
+   * „Wyznacz trasę" — żeby dodanie punktu nie pobierało tokenów bez pytania.
    */
-  const ustawTraseDnia = async (nr: number, zmiany: { tryb?: 'pieszo' | 'rower'; via?: { lat: number; lng: number }[] }) => {
+  const ustawTraseDnia = async (nr: number, zmiany: { via?: { lat: number; lng: number }[] }) => {
     const dzien = (planRef.current?.days || []).find((d: any) => d.day === nr);
     if (!dzien) return;
     if (dzien.trasa?.oplacona) return wyznaczTraseDnia(nr, zmiany);
-    const bezPrzebiegu = zmiany.via !== undefined || (zmiany.tryb && zmiany.tryb !== (dzien.trasa?.tryb ?? 'pieszo'));
+    const bezPrzebiegu = zmiany.via !== undefined;
     await zapiszZmianePlanu(zDniem(planRef.current, nr, (d) => {
       const { track: _t, route_km: _k, route_h: _h, ...reszta } = d;
       return { ...(bezPrzebiegu ? reszta : d), trasa: { ...(d.trasa || {}), ...zmiany } };
@@ -3053,7 +3052,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       const { punkty } = punktyDnia(wszystkie, bazaWyjazdu);
                       const pts = punkty.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng, nr: p.nr, propozycja: p.propozycja }));
                       const via: { lat: number; lng: number }[] = d?.trasa?.via ?? [];
-                      const tryb: 'pieszo' | 'rower' = d?.trasa?.tryb === 'rower' ? 'rower' : 'pieszo';
                       const bazaNaMapie = bazaWyjazdu?.lat != null && bazaWyjazdu?.lng != null
                         ? { name: bazaWyjazdu.name || 'Nocleg', lat: bazaWyjazdu.lat, lng: bazaWyjazdu.lng }
                         : null;
@@ -3081,20 +3079,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             }} />
                           <div className="px-4 py-3 border-t border-border space-y-2.5">
                             <div className="flex items-center justify-between gap-3">
-                              <div role="group" aria-label={t('plan.tryb_aria')}
-                                className="inline-flex rounded-full border border-border p-0.5">
-                                {(['pieszo', 'rower'] as const).map((tr) => (
-                                  <button key={tr} type="button" aria-pressed={tryb === tr}
-                                    disabled={dr === 'loading'}
-                                    onClick={() => tryb !== tr && ustawTraseDnia(d.day, { tryb: tr })}
-                                    className={`rounded-full px-3 py-1 text-[13px] transition-colors disabled:opacity-60
-                                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                                      tryb === tr ? 'bg-foreground text-background' : 'text-foreground/70 hover:text-foreground'
-                                    }`}>
-                                    {t(`plan.tryb_${tr}`)}
-                                  </button>
-                                ))}
-                              </div>
                               <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
                                 {/* Liczymy to, co widać, a nie czego brakuje. „Bez położenia"
                                     brzmiało jak awaria danych, choć znaczy tylko tyle, że
@@ -3143,7 +3127,6 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                       mozna={punktyTrasy.length >= 2}
                       cenaTrasy={tokens?.prices?.['live-route']}
                       oplacona={!!d.trasa?.oplacona}
-                      tryb={d.trasa?.tryb === 'rower' ? 'rower' : 'pieszo'}
                       podejscieM={d.trasa?.podejscie_m ?? 0}
                       onWyznacz={() => wyznaczTraseDnia(d.day)}
                       onPobierzGpx={() => pobierzGpxDnia(d)}
