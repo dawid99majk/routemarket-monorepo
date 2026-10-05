@@ -362,7 +362,14 @@
     "za_malo_punktow": "Ce jour a trop peu de points sur la carte pour mesurer un itinéraire.",
     "za_malo_tokenow": "Tu as {{saldo}}, et un plan coûte {{cena}}.",
     "zapis_nieudany": "Je n’ai pas pu enregistrer la modification — après actualisation, l’ancienne version reviendra.",
-    "zostaw": "Garder"
+    "zostaw": "Garder",
+    "watek_etykieta": "Sujet de la balade (facultatif)",
+    "watek_placeholder": "p. ex. la ville médiévale à travers son architecture",
+    "watek_opis": "L'agent lit les lieux de ton tableau sous cet angle là où ils s'y prêtent. Il ne force pas le reste et n'ajoute aucun fait absent des descriptions.",
+    "zadanie_dnia": "Défi du jour",
+    "zwroc_uwage": "Observe",
+    "pytanie_przystanku": "Demande-toi :",
+    "zrodlo": "Source : {{zrodlo}}"
   },
   "profile": {
     "account_info": "Informations du compte",

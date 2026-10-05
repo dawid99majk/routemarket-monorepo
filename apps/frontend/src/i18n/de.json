@@ -355,7 +355,14 @@
     "za_malo_punktow": "Dieser Tag hat zu wenige Punkte auf der Karte für eine Route.",
     "za_malo_tokenow": "Du hast {{saldo}}, ein Plan kostet {{cena}}.",
     "zapis_nieudany": "Ich konnte die Änderung nicht speichern — nach dem Neuladen kommt der vorherige Stand zurück.",
-    "zostaw": "Behalten"
+    "zostaw": "Behalten",
+    "watek_etykieta": "Worum es beim Spaziergang gehen soll (optional)",
+    "watek_placeholder": "z. B. die mittelalterliche Stadt durch ihre Architektur",
+    "watek_opis": "Der Agent liest die Orte deiner Pinnwand unter diesem Blickwinkel, wo sie passen. Den Rest zwingt er nicht hinein und fügt keine Fakten hinzu, die nicht in den Beschreibungen stehen.",
+    "zadanie_dnia": "Aufgabe des Tages",
+    "zwroc_uwage": "Achte auf",
+    "pytanie_przystanku": "Frag dich:",
+    "zrodlo": "Quelle: {{zrodlo}}"
   },
   "profile": {
     "account_info": "Kontoinformationen",

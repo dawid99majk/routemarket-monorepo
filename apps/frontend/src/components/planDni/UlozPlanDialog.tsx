@@ -5,11 +5,12 @@ import { pl } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { zakresDat } from '@/lib/daty';
 
-export interface FormularzPlanu { start: string; end: string; date: string; dinner: string }
+export interface FormularzPlanu { start: string; end: string; date: string; dinner: string; watek: string }
 
 interface UlozPlanDialogProps {
   open: boolean;
@@ -63,8 +64,18 @@ export default function UlozPlanDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {/* Temat spaceru to główna dźwignia: te same miejsca czyta się inaczej pod kątem
+              „architektura średniowiecza" i „gdzie zjeść i odpocząć". Pole jest opcjonalne. */}
           <section>
-            <p className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+            <label htmlFor="plan-watek" className="text-[12px] font-bold text-muted-foreground">{t('plan.watek_etykieta')}</label>
+            <Textarea id="plan-watek" rows={2} maxLength={240} value={form.watek}
+              onChange={(e) => onForm({ watek: e.target.value })}
+              placeholder={t('plan.watek_placeholder')} className="mt-1.5 resize-none" />
+            <p className="text-[13px] text-muted-foreground mt-1.5 text-pretty">{t('plan.watek_opis')}</p>
+          </section>
+
+          <section>
+            <p className="text-[12px] font-bold text-muted-foreground">
               {t('plan.godziny_dnia')}
             </p>
             <div className="flex flex-wrap gap-2 mt-2">
@@ -96,7 +107,7 @@ export default function UlozPlanDialog({
           </section>
 
           <section>
-            <p className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+            <p className="text-[12px] font-bold text-muted-foreground">
               {t('plan.pierwszy_dzien')}
             </p>
             {termin ? (
@@ -124,7 +135,7 @@ export default function UlozPlanDialog({
 
           <section>
             <label className="block">
-              <span className="font-narrow uppercase tracking-[0.18em] text-[11px] text-muted-foreground">
+              <span className="text-[12px] font-bold text-muted-foreground">
                 {t('plan.kolacja')}
               </span>
               <Input type="time" value={form.dinner} onChange={(e) => onForm({ dinner: e.target.value })}

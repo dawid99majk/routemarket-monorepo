@@ -789,6 +789,28 @@ export class RouteBuilderRepository {
     return data as RouteArtifact;
   }
 
+  /**
+   * Opisy i zdjęcia miejsc z katalogu po nazwie w danym mieście — dla opowieści do
+   * planu dnia. Propozycje agenta nie mają wiersza na tablicy, więc bez katalogu
+   * nie byłoby z czego pisać ani czego pokazać.
+   */
+  async getCatalogOpisy(city: string, names: string[]): Promise<{ name: string; description: string | null; photos: string[]; wikipedia: string | null; waznosc: number | null; nazwa_lokalna: string | null }[]> {
+    const miasto = String(city || '').trim();
+    const nazwy = [...new Set(names.map((n) => String(n || '').trim()).filter(Boolean))].slice(0, 150);
+    if (!miasto || !nazwy.length) return [];
+    // Nazwa miasta pochodzi od użytkownika i trafia do wzorca ilike — znaki wzorca trzeba uciec.
+    const wzorzec = miasto.replace(/[\\%_]/g, '\\$&');
+    const { data, error } = await supabase.from('place_catalog')
+      .select('name, description, photos, wikipedia, waznosc, nazwa_lokalna')
+      .ilike('city', wzorzec).eq('status', 'published').in('name', nazwy);
+    if (error) throw new Error(error.message);
+    return (data || []).map((r: any) => ({
+      name: r.name, description: r.description ?? null, wikipedia: r.wikipedia || null,
+      waznosc: typeof r.waznosc === 'number' ? r.waznosc : null, nazwa_lokalna: r.nazwa_lokalna || null,
+      photos: Array.isArray(r.photos) ? r.photos.filter((u: unknown) => typeof u === 'string' && u) : [],
+    }));
+  }
+
   // --- Trasa dnia w planie -------------------------------------------------
   // Klient API działa z kluczem serwisowym, więc RLS go nie chroni. Dostęp do
   // planu sprawdzamy tu tą samą regułą co `has_project_access` w bazie:

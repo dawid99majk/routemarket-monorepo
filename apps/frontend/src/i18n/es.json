@@ -362,7 +362,14 @@
     "za_malo_punktow": "Este día tiene muy pocos puntos en el mapa para medir una ruta.",
     "za_malo_tokenow": "Tienes {{saldo}} y planificar cuesta {{cena}}.",
     "zapis_nieudany": "No pude guardar el cambio — al recargar volverá la versión anterior.",
-    "zostaw": "Conservar"
+    "zostaw": "Conservar",
+    "watek_etykieta": "De qué va el paseo (opcional)",
+    "watek_placeholder": "p. ej. la ciudad medieval a través de su arquitectura",
+    "watek_opis": "El agente lee los lugares de tu tablero desde ese ángulo donde encajan. No fuerza el resto ni añade hechos que no estén en las descripciones.",
+    "zadanie_dnia": "Reto del día",
+    "zwroc_uwage": "Fíjate en",
+    "pytanie_przystanku": "Pregúntate:",
+    "zrodlo": "Fuente: {{zrodlo}}"
   },
   "profile": {
     "account_info": "Información de la cuenta",

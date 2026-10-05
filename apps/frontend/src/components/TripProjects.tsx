@@ -145,7 +145,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   // Okno domyślne to pełny dzień zwiedzania. Wcześniejsze 17:00-21:00 pochodziło
   // z przykładu "trzy popołudnia" i dla kogoś planującego cały dzień z dziećmi
   // dawało plan na późny wieczór.
-  const [planForm, setPlanForm] = useState({ start: '09:00', end: '17:00', date: '', dinner: '' });
+  const [planForm, setPlanForm] = useState({ start: '09:00', end: '17:00', date: '', dinner: '', watek: '' });
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -162,6 +162,11 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   useEffect(() => {
     setPlanForm((f) => ({ ...f, date: active?.start_date ?? '' }));
   }, [active?.id, active?.start_date]);
+
+  // Temat spaceru należy do wyjazdu: przy zmianie tablicy zaczynamy z pustym polem.
+  useEffect(() => {
+    setPlanForm((f) => ({ ...f, watek: '' }));
+  }, [active?.id]);
 
   /** Nocleg z ustawień wyjazdu — punkt, z którego wychodzi i do którego wraca każdy dzień planu. */
   const bazaWyjazdu = useMemo<BazaWyjazdu | null>(
@@ -765,6 +770,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const otworzPlan = (sp: any) => {
     setPlan(sp.plan);
     setPlanId(sp.id);
+    setPlanForm((f) => ({ ...f, watek: typeof sp.plan?.watek === 'string' ? sp.plan.watek : '' }));
     const zapisane: Record<number, { km: number; h: number; track: [number, number][] | null }> = {};
     for (const d of sp.plan?.days || []) {
       if (Array.isArray(d.track) && d.track.length > 1) {
@@ -1317,6 +1323,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         start_date: planForm.date || active.start_date || undefined,
         fill_percent: active.fill_percent ?? 70,
         fixed: planForm.dinner ? [{ time: planForm.dinner, label: 'kolacja', minutes: 60 }] : [],
+        // Opcjonalny temat spaceru — agent czyta miejsca pod tym kątem tam, gdzie pasują.
+        watek: planForm.watek.trim() || undefined,
         // Odrzucone zostają na tablicy, ale do planu nie idą.
         places: places.filter((p) => p.priority !== 'rejected').map((p) => ({
           name: p.name, category: p.category, priority: p.priority,
@@ -1391,7 +1399,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
         toast.warning(`Część planu się nie policzyła (${stan.blad}). Reszta jest gotowa.`);
       }
 
-      const data = zebrane;
+      // Wątek zostaje przy planie, żeby „Ułóż plan ponownie" go pamiętało.
+      const data = zadanie.watek ? { ...zebrane, watek: zadanie.watek } : zebrane;
       // Każdy wygenerowany plan zostaje — z jednej tablicy może powstać ich wiele
       const { data: saved } = await supabase
         .from('trip_plans')
@@ -2721,6 +2730,9 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </span>
                             )}
                           </span>
+                          {d.title && (
+                            <span className="block text-[13px] text-foreground/80 mt-0.5 truncate" title={d.title}>{d.title}</span>
+                          )}
                           <span className="block font-mono text-[12px] tabular-nums text-muted-foreground mt-1">
                             {t('plan.przystankow', { count: przystanki })}
                             {kmDnia > 0 && ` · ok. ${dziesietna(kmDnia * 1.3)} km`}
@@ -2766,6 +2778,24 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                         </span>
                       </span>
                     </div>
+                    {/* Spacer z pomysłem: nazwa, jak czytać ten dzień i zadanie na drogę. Głos agenta
+                        idzie przez AgentDymek — jedyny kształt, w jakim agent mówi. */}
+                    {(day.title || day.idea || day.question || day.challenge) && (
+                      <div className="px-4 pt-4 pb-3 space-y-3">
+                        {day.title && <h3 className="font-display text-[22px] leading-tight text-balance">{day.title}</h3>}
+                        {(day.idea || day.question) && (
+                          <AgentDymek maly>
+                            {day.idea && <span className="block">{day.idea}</span>}
+                            {day.question && <span className={`block font-semibold ${day.idea ? 'mt-1.5' : ''}`}>{day.question}</span>}
+                          </AgentDymek>
+                        )}
+                        {day.challenge && (
+                          <p className="rounded-md bg-secondary px-3.5 py-2.5 text-[14px] leading-snug text-pretty">
+                            <span className="font-bold">{t('plan.zadanie_dnia')}:</span> {day.challenge}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {/* Uwagi tego dnia na górze dnia, nie zbiorczo pod planem — ostrzeżenie
                         o zamkniętym muzeum w sobotę nie dotyczy piątku. */}
                     {(day.warnings || []).length > 0 && (
@@ -2904,7 +2934,8 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                               </span>
                             </div>
                           )}
-                          <div className="flex gap-3 px-4 py-2.5 text-sm items-start hover:bg-muted/40 transition-colors">
+                          <div className={`flex gap-3 px-4 text-sm items-start hover:bg-muted/40 transition-colors ${
+                            it.story ? 'py-4' : 'py-2.5'}`}>
                             <span className="w-14 shrink-0 pt-0.5">
                               <span className="font-mono text-[13px] tabular-nums block">{it.time}</span>
                               {it.minutes && !wBazie && (
@@ -2942,7 +2973,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 className="w-6 h-6 rounded-full shrink-0 mt-0.5 border border-dashed border-border" />
                             )}
                             <div className="min-w-0 flex-1">
-                              <div className="font-display text-[15px] flex items-center gap-2 flex-wrap">
+                              <div className={`font-display flex items-center gap-2 flex-wrap ${it.story ? 'text-[17px]' : 'text-[15px]'}`}>
                                 <button
                                   onClick={() => openPlaceCard({ ...it, nr: nrNaMapie })}
                                   className="text-left hover:underline decoration-dotted underline-offset-2"
@@ -2958,7 +2989,35 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                                 )}
                               </div>
                               {it.note && <div className="text-xs text-muted-foreground">{it.note}</div>}
+                              {/* Po co tu stajemy, na co spojrzeć, o co zapytać. Tekst tylko przy
+                                  przystankach, o których agent miał z czego pisać. */}
+                              {it.story && (
+                                <p className="text-[14px] leading-relaxed text-foreground/85 mt-1.5 text-pretty">{it.story}</p>
+                              )}
+                              {Array.isArray(it.look_for) && it.look_for.length > 0 && (
+                                <p className="text-[13px] text-foreground/80 mt-1.5 text-pretty">
+                                  <span className="font-bold">{t('plan.zwroc_uwage')}:</span> {it.look_for.join(' · ')}
+                                </p>
+                              )}
+                              {it.ask && (
+                                <p className="text-[13px] text-foreground/80 mt-1 text-pretty">
+                                  <span className="font-bold">{t('plan.pytanie_przystanku')}</span> {it.ask}
+                                </p>
+                              )}
+                              {it.zrodlo && (
+                                <p className="text-[12px] text-muted-foreground mt-1">{t('plan.zrodlo', { zrodlo: it.zrodlo })}</p>
+                              )}
                             </div>
+                            {/* Zdjęcie przy każdym przystanku, który je ma: z tablicy albo z katalogu
+                                (propozycje agenta nie mają wiersza na tablicy). */}
+                            {!wBazie && !przejscie && (() => {
+                              const foto = it.photo || places.find((p) => p.name === it.name)?.image_url;
+                              return foto ? (
+                                <Zdjecie src={foto} gdzie={250} alt=""
+                                  className={`shrink-0 rounded-md object-cover bg-placeholder-photo ${
+                                    it.story ? 'w-24 h-24' : 'w-14 h-14'}`} />
+                              ) : null;
+                            })()}
                             {suggested && !alreadyPinned && (
                               <button
                                 onClick={() => pinSuggestion(it)}

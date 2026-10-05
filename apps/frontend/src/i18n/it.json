@@ -359,7 +359,14 @@
     "za_malo_punktow": "Questo giorno ha troppo pochi punti sulla mappa per misurare un percorso.",
     "za_malo_tokenow": "Hai {{saldo}} e un piano costa {{cena}}.",
     "zapis_nieudany": "Non sono riuscito a salvare la modifica — ricaricando tornerà la versione precedente.",
-    "zostaw": "Tieni"
+    "zostaw": "Tieni",
+    "watek_etykieta": "Di cosa parla la passeggiata (facoltativo)",
+    "watek_placeholder": "es. la città medievale attraverso la sua architettura",
+    "watek_opis": "L'agente legge i luoghi della tua bacheca da questa prospettiva dove si prestano. Non forza il resto e non aggiunge fatti assenti dalle descrizioni.",
+    "zadanie_dnia": "Sfida del giorno",
+    "zwroc_uwage": "Osserva",
+    "pytanie_przystanku": "Chiediti:",
+    "zrodlo": "Fonte: {{zrodlo}}"
   },
   "profile": {
     "account_info": "Informazioni account",

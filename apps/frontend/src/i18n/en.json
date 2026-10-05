@@ -355,7 +355,14 @@
     "za_malo_punktow": "This day has too few points on the map to measure a route.",
     "za_malo_tokenow": "You have {{saldo}}, and building a plan costs {{cena}}.",
     "zapis_nieudany": "I could not save the change — after a refresh the previous layout will come back.",
-    "zostaw": "Keep"
+    "zostaw": "Keep",
+    "watek_etykieta": "What the walk is about (optional)",
+    "watek_placeholder": "e.g. the medieval city through its architecture",
+    "watek_opis": "The agent reads the places on your board from that angle where they fit. It does not force the rest and does not add facts that are not in the descriptions.",
+    "zadanie_dnia": "Task for the day",
+    "zwroc_uwage": "Look out for",
+    "pytanie_przystanku": "Ask yourself:",
+    "zrodlo": "Source: {{zrodlo}}"
   },
   "profile": {
     "account_info": "Account information",

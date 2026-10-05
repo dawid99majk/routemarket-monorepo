@@ -27,6 +27,9 @@ import { geocodingService } from './geocoding.js';
 import { poiService, type PoiCandidate } from './poi.js';
 import { describeAvailability, isOpenDuring, openIntervalsOn } from './opening-hours.js';
 import { instrukcjaJezyka, type KodJezyka } from './jezyki.js';
+import { dodajNarracje } from './narracja-dnia.js';
+import { rozdzielKotwice, opisSzkieletu, type WpisSzkieletu } from './rozdzial-dni.js';
+import { repo } from '../db/repository.js';
 
 export interface MiejsceWejscie {
   name: string;
@@ -37,6 +40,10 @@ export interface MiejsceWejscie {
   opening_hours?: string | null;
   visit_minutes?: number | null;
   description?: string | null;
+  /** Ważność z katalogu (0–176) — po niej wybieramy, co zostaje, gdy miejsca brakuje. */
+  waznosc?: number | null;
+  /** Inne nazwy tego samego miejsca (np. lokalna): propozycje agenta pod nimi nie dublują kotwicy. */
+  alias?: string[];
 }
 
 export interface ZadaniePlanu {
@@ -49,6 +56,8 @@ export interface ZadaniePlanu {
   fixed?: { time: string; label: string; minutes?: number }[];
   places: MiejsceWejscie[];
   creator_preferences?: Record<string, number>;
+  /** O czym ma być spacer — opcjonalny temat od użytkownika, np. „średniowieczne miasto od strony architektury". */
+  watek?: string;
 }
 
 export interface PozycjaDnia {
@@ -57,6 +66,16 @@ export interface PozycjaDnia {
   lat?: number; lng?: number; approx?: boolean;
   /** Pozycja w noclegu (start lub koniec dnia) — punkt z ustawień wyjazdu, nie z modelu. */
   baza?: boolean;
+  /** Po co stajemy tutaj w tym spacerze — z narracja-dnia.ts, tylko przy przystanku z opisem. */
+  story?: string;
+  /** Do trzech rzeczy do zauważenia na miejscu. */
+  look_for?: string[];
+  /** Pytanie do zadania sobie na miejscu — bez twierdzeń o świecie. */
+  ask?: string;
+  /** Skąd fakty w opowieści, gdy poza opisem z katalogu użyto zewnętrznego źródła (np. „Wikipedia"). */
+  zrodlo?: string;
+  /** Zdjęcie z katalogu dla propozycji agenta, które nie mają wiersza na tablicy. */
+  photo?: string;
 }
 
 export interface DzienPlanu {
@@ -64,6 +83,12 @@ export interface DzienPlanu {
   date?: string;
   weekday?: string;
   summary?: string;
+  /** Nazwa spaceru, pomysł i pytanie prowadzące — z narracja-dnia.ts. */
+  title?: string;
+  idea?: string;
+  question?: string;
+  /** Zadanie na cały dzień do wykonania na każdym przystanku — bez faktów. */
+  challenge?: string;
   items: PozycjaDnia[];
   not_scheduled?: { name: string; reason?: string }[];
   warnings?: string[];
@@ -397,6 +422,10 @@ export interface KontekstPlanu {
   center: { lat: number; lng: number } | null;
   /** Punkt startowy wyjazdu ze współrzędnymi — nocleg, z którego wychodzi każdy dzień. */
   baza: { name: string; lat: number; lng: number } | null;
+  /** Miejsca z tablicy, które nie weszły do żadnego dnia — z powodem policzonym z danych. */
+  odpadle: { name: string; reason: string }[];
+  /** Policzony szkielet kotwic każdego dnia: godzina startu i czas wizyty. */
+  szkielet: WpisSzkieletu[][];
 }
 
 /**
@@ -543,12 +572,40 @@ export async function przygotujKontekst(
   const bazaWczesnie = hWczesnie?.name && Number.isFinite(hWczesnie.lat) && Number.isFinite(hWczesnie.lng)
     ? { lat: hWczesnie.lat as number, lng: hWczesnie.lng as number }
     : null;
-  const suroweGrupy = ileDni > 1
-    ? clusterPlacesByProximity(zadanie.places, ileDni)
-    : [zadanie.places];
-  if (ileDni > 1) dopracujPodzial(suroweGrupy, bazaWczesnie, minutNaDzien);
-  const grupy = przydzielGrupyDoDni(suroweGrupy, dni, oknoOd, minutNaDzien)
-    .map((g) => kolejnoscPoDrodze(g, bazaWczesnie));
+  // Ważność i nazwy lokalne z katalogu. Po ważności wybieramy, co zostaje, gdy okno jest za
+  // ciasne; po nazwach lokalnych odsiewamy propozycje, które są tym samym miejscem pod obcą
+  // nazwą (Yerebatan Sarnıcı przy przypiętej Cysternie Bazyliki zajmowało slot w planie Stambułu).
+  try {
+    const meta = await repo.getCatalogOpisy(zadanie.destination, zadanie.places.map((p) => p.name));
+    const poNazwie = new Map(meta.map((m) => [kluczNazwy(m.name), m]));
+    zadanie.places = zadanie.places.map((p) => {
+      const m = poNazwie.get(kluczNazwy(p.name));
+      return m ? { ...p, waznosc: m.waznosc, alias: m.nazwa_lokalna ? [m.nazwa_lokalna] : [] } : p;
+    });
+  } catch (err: any) {
+    console.warn('[planer] katalog niedostępny, plan bez ważności miejsc:', err.message);
+  }
+
+  // Przydział według czasu, godzin otwarcia i ważności (rozdzial-dni.ts). Stary podział
+  // geograficzny zostaje jako droga odwrotu na wypadek błędu.
+  let grupy: MiejsceWejscie[][];
+  let odpadle: { name: string; reason: string }[] = [];
+  let szkielet: WpisSzkieletu[][] = [];
+  try {
+    const w = rozdzielKotwice(zadanie.places, dni, oknoOd, oknoDo, bazaWczesnie);
+    grupy = w.grupy;
+    szkielet = w.szkielet;
+    odpadle = w.odpadle.map((o) => ({ name: o.p.name, reason: o.powod }));
+    for (const o of w.odpadle) console.log(`[planer] poza planem: ${o.p.name} [${o.p.priority}] — ${o.powod}`);
+  } catch (err: any) {
+    console.warn('[planer] przydział według czasu nie wyszedł, wracam do podziału geograficznego:', err.message);
+    const suroweGrupy = ileDni > 1
+      ? clusterPlacesByProximity(zadanie.places, ileDni)
+      : [zadanie.places];
+    if (ileDni > 1) dopracujPodzial(suroweGrupy, bazaWczesnie, minutNaDzien);
+    grupy = przydzielGrupyDoDni(suroweGrupy, dni, oknoOd, minutNaDzien)
+      .map((g) => kolejnoscPoDrodze(g, bazaWczesnie));
+  }
 
   let fillerSights: PoiCandidate[] = [];
   let fillerFood: PoiCandidate[] = [];
@@ -565,7 +622,7 @@ export async function przygotujKontekst(
       // rozdzielPoi wybierze z niego lokale bliskie kotwicom każdego dnia.
       poiService.fetchCandidates({ lat: center.lat, lng: center.lng }, 'food', { limit: 60 }).catch(() => []),
     ]);
-    const przypiete = new Set(zadanie.places.map((p) => p.name.toLowerCase()));
+    const przypiete = new Set(zadanie.places.flatMap((p) => [p.name, ...(p.alias ?? [])]).map((s) => s.toLowerCase()));
     const nieprzypiete = (c: any) => !przypiete.has(c.name.toLowerCase());
     fillerSights = sights.filter(nieprzypiete);
     fillerFood = (food as PoiCandidate[]).filter(nieprzypiete);
@@ -607,6 +664,8 @@ export async function przygotujKontekst(
     pulaWspolrzednych,
     center,
     baza,
+    odpadle,
+    szkielet,
   };
 }
 
@@ -779,14 +838,19 @@ function promptDnia(k: KontekstPlanu, numer: number): string {
   const moje = k.grupy[numer - 1] ?? [];
   const cudze = k.grupy.flatMap((g, i) => (i === numer - 1 ? [] : g));
 
+  const szkieletDnia = k.szkielet[numer - 1] ?? [];
   const opisMiejsca = (pl: MiejsceWejscie) => {
-    const minuty = pl.visit_minutes || 60;
+    const sk = szkieletDnia.find((s) => s.name === pl.name);
+    const pelne = pl.visit_minutes || 60;
+    // Czas ze szkieletu: skrócony, gdy godziny otwarcia w oknie nie dają pełnego.
+    const minuty = sk ? sk.minuty : pelne;
     const mieciSie = mieciSieWOknie(
       pl.opening_hours, info.dateObj,
       czasNaMinuty(z.window.start), czasNaMinuty(z.window.end), minuty);
     const dostepnosc = describeAvailability(pl.opening_hours, info.dateObj);
     const werdykt = mieciSie === false ? ' — NIE MIEŚCI SIĘ W TWOIM OKNIE' : '';
-    return `- "${pl.name}" [${pl.priority === 'must' ? 'KONIECZNIE' : 'jeśli wyjdzie'}, ${pl.category || 'attraction'}, ok. ${minuty} min] ${dostepnosc}${werdykt}`;
+    const skrocone = sk && sk.minuty < pelne ? ` (SKRÓCONE z ${pelne} min — tyle pozwalają godziny otwarcia w oknie)` : '';
+    return `- "${pl.name}" [${pl.priority === 'must' ? 'KONIECZNIE' : 'jeśli wyjdzie'}, ${pl.category || 'attraction'}, ok. ${minuty} min${skrocone}] ${dostepnosc}${werdykt}`;
   };
 
   const opisPoi = (c: any) =>
@@ -816,6 +880,7 @@ Są wypisane W KOLEJNOŚCI PO DRODZE${z.hotel?.name ? ' od noclegu' : ''} — tr
 otwarcia albo posiłek wymagają zmiany. Propozycje i posiłki wstawiaj pomiędzy nie, blisko sąsiednich kotwic:
 ${moje.length ? moje.map(opisMiejsca).join('\n') : '(na ten dzień nie przypadło żadne przypięte miejsce — zbuduj dzień z propozycji poniżej)'}
 
+${szkieletDnia.length ? `SZKIELET KOTWIC TEGO DNIA — policzony z godzin otwarcia, dojść i okna. Kolejność i godziny startu kotwic są WIĄŻĄCE (dojścia doliczy aplikacja); propozycje i posiłki wstawiaj w przerwy między nimi:\n${opisSzkieletu(szkieletDnia)}\n` : ''}
 ${cudze.length ? `MIEJSCA PRZYPISANE DO INNYCH DNI TEGO WYJAZDU — nie umieszczaj ich
 tutaj, żeby się nie zdublowały. To NIE są miejsca odrzucone przez użytkownika:
 NIE wpisuj ich do "not_scheduled" i nie tłumacz się z ich nieobecności, bo są
@@ -831,7 +896,7 @@ ${lokaleDnia}` : ''}
 
 BILANS DNIA: kotwice to ok. ${Math.round(minutyWizyt / 60 * 10) / 10} h, a całe okno to ${Math.round(k.minutNaDzien / 60 * 10) / 10} h.
 
-WYPEŁNIENIE DNIA: ${k.fillPercent}%. Zaplanuj ok. ${Math.round(budzetDnia / 60 * 10) / 10} h konkretnych punktów, a POZOSTAŁE ${Math.round((k.minutNaDzien - budzetDnia) / 60 * 10) / 10} h ZOSTAW PUSTE Z ROZMYSŁU. To nie jest czas do zapełnienia — użytkownik świadomie poprosił o luz na włóczenie się, przypadkowe przystanki i dłuższe siedzenie tam, gdzie mu się spodoba.${k.fillPercent <= 40 ? ' Przy tak niskim wypełnieniu wybierz TYLKO najważniejsze kotwice i nie dokładaj propozycji z listy.' : ''}${k.fillPercent >= 90 ? ' Przy tak wysokim wypełnieniu możesz zagęścić dzień i dołożyć propozycje z listy.' : ''}
+WYPEŁNIENIE DNIA: ${k.fillPercent}%. Zaplanuj ok. ${Math.round(budzetDnia / 60 * 10) / 10} h konkretnych punktów, a POZOSTAŁE ${Math.round((k.minutNaDzien - budzetDnia) / 60 * 10) / 10} h ZOSTAW PUSTE Z ROZMYSŁU. To nie jest czas do zapełnienia — użytkownik świadomie poprosił o luz na włóczenie się, przypadkowe przystanki i dłuższe siedzenie tam, gdzie mu się spodoba.${k.fillPercent <= 40 ? ' Przy tak niskim wypełnieniu wybierz TYLKO najważniejsze kotwice i nie dokładaj propozycji z listy.' : ''}${k.fillPercent >= 90 ? ' Przy tak wysokim wypełnieniu możesz zagęścić dzień i dołożyć propozycje z listy.' : ''}${minutyWizyt >= budzetDnia ? ' Kotwice tego dnia zajmują całe wypełnienie albo więcej — mają pierwszeństwo przed luzem: NIE dokładaj propozycji poza ewentualnym posiłkiem.' : ''}
 W polu "summary" napisz jednym zdaniem, co można zrobić w wolnej chwili w tej okolicy. NIE podawaj w nim liczby godzin ani minut — czas wolny policzy aplikacja po doliczeniu przejść. Godziny pozycji układaj z przejściami między miejscami (pieszo ok. 15 min na kilometr) i przerwami.
 
 ZASADY:
@@ -1156,6 +1221,10 @@ export async function ulozDzien(k: KontekstPlanu, numer: number): Promise<DzienP
     .filter((n) => n?.name && kotwice.has(String(n.name).trim().toLowerCase()))
     .filter((n, i, arr) =>
       arr.findIndex((x) => String(x.name).trim().toLowerCase() === String(n.name).trim().toLowerCase()) === i);
+
+  // Ostatni krok, na ostatecznej kolejności: opowieść do dnia. Nie zmienia godzin ani
+  // pozycji, a jego awaria zostawia plan bez opowieści, nie bez dnia.
+  await dodajNarracje(k, dzien, numer);
 
   return dzien;
 }

@@ -377,7 +377,14 @@
     "za_malo_punktow": "Ten dzień ma za mało punktów na mapie, żeby wyznaczyć trasę.",
     "za_malo_tokenow": "Masz {{saldo}}, a ułożenie planu kosztuje {{cena}}.",
     "zapis_nieudany": "Nie zapisałem zmiany w planie — po odświeżeniu strony wróci poprzedni układ.",
-    "zostaw": "Zostaw"
+    "zostaw": "Zostaw",
+    "watek_etykieta": "O czym ma być spacer (opcjonalnie)",
+    "watek_placeholder": "np. średniowieczne miasto od strony architektury",
+    "watek_opis": "Agent przeczyta miejsca z Twojej tablicy pod tym kątem tam, gdzie do siebie pasują. Reszty nie naciąga i nie dopisuje faktów, których nie ma w opisach.",
+    "zadanie_dnia": "Zadanie dnia",
+    "zwroc_uwage": "Zwróć uwagę na",
+    "pytanie_przystanku": "Zadaj sobie pytanie:",
+    "zrodlo": "Źródło: {{zrodlo}}"
   },
   "profile": {
     "account_info": "Informacje o koncie",

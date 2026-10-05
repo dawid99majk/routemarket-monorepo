@@ -378,7 +378,11 @@ app.post('/plan-trip', async (c) => {
     if (!dni.length) throw new Error('Nie udało się ułożyć żadnego dnia. Spróbuj ponownie.');
     for (const w of wyniki) if (!w.ok) console.warn(`[plan-trip] dzień ${w.numer}: ${w.blad}`);
 
-    const nieZaplanowane = dni.flatMap((d) => d.not_scheduled ?? []);
+    // Miejsca odrzucone już przy podziale na dni (z powodem z danych) idą na początek listy.
+    const nieZaplanowane = [
+      ...kontekst.odpadle.map((o) => ({ name: o.name, reason: o.reason })),
+      ...dni.flatMap((d) => d.not_scheduled ?? []),
+    ];
     const plan = {
       days: dni,
       warnings: [...new Set(dni.flatMap((d) => d.warnings ?? []))],
@@ -767,7 +771,8 @@ app.post('/plan-trip/stream', async (c) => {
       );
 
       const ostrzezenia: string[] = [];
-      const nieZaplanowane: { name: string; reason?: string }[] = [];
+      // Miejsca odrzucone już przy podziale na dni (z powodem z danych) idą na początek listy.
+      const nieZaplanowane: { name: string; reason?: string }[] = kontekst.odpadle.map((o) => ({ name: o.name, reason: o.reason }));
       let udane = 0;
 
       for (const oczekiwane of wRobocie) {
