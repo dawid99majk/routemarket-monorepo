@@ -11,7 +11,7 @@ export default function AcceptableUse() {
   return (
     <LegalLayout docKey="acceptable-use">
       <h1>Acceptable Use Policy</h1>
-      <p className="text-sm text-muted-foreground">RouteMarket — last updated 18 August 2026</p>
+      <p className="text-sm text-muted-foreground">RouteMarket — last updated 6 October 2026</p>
 
       <h2>1. What this covers</h2>
       <p>
@@ -38,6 +38,8 @@ export default function AcceptableUse() {
         <li>promotes violence, terrorism or self-harm;</li>
         <li>you do not have the right to publish — see the{' '}
             <a href="/legal/copyright">Copyright Policy</a>;</li>
+        <li>is a photograph in which a person is recognisable and has not agreed to be
+            shown, or a close-up of a face, a document or a vehicle registration plate;</li>
         <li>is advertising dressed up as a recommendation, or exists to drive traffic
             somewhere else;</li>
         <li>deliberately misleads — invented places, fake opening hours, descriptions of

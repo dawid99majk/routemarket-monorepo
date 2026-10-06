@@ -53,6 +53,7 @@ import { gpxDnia, gpxTras, nazwaPliku, pobierzPlik } from '@/lib/gpx';
 import { formatujGodziny } from '@/lib/godziny';
 import AgentDymek from '@/components/AgentDymek';
 import PrzelacznikDecyzji from '@/components/PrzelacznikDecyzji';
+import DodajMiejsceDialog, { type DodaneMiejsce } from '@/components/DodajMiejsceDialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -63,6 +64,7 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
   const [projects, setProjects] = useState<TripProject[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [places, setPlaces] = useState<PinnedPlace[]>([]);
+  const [dodajMiejsce, setDodajMiejsce] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mojeGlosy, setMojeGlosy] = useState<Set<string>>(new Set());
 
@@ -588,6 +590,25 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
     } as any, priority);
     setWyluskane((prev) => (prev ?? []).filter((x) => x.name !== m.name));
   };
+
+  /** Własne miejsce użytkownika: wpis w katalogu już istnieje, tu tylko trafia na tablicę z wybraną decyzją. */
+  const dodanoWlasne = async (m: DodaneMiejsce, decyzja: 'must' | 'nice' | null) => {
+    await pin({
+      name: m.name, lat: m.lat, lng: m.lng, category: m.category || 'attraction',
+      description: m.description || '', opening_hours: null, website: m.website,
+      visit_minutes: m.visit_minutes, image_url: null, wiki_extract: null,
+    } as any, decyzja ?? 'nice');
+  };
+
+  /** Środek mapy w oknie „własne miejsce": średnia z tablicy albo punkt startowy. Bez nich mapy nie pokazujemy. */
+  const srodekTablicy = (() => {
+    const pts = places.filter((p) => typeof p.lat === 'number' && typeof p.lng === 'number');
+    if (pts.length) {
+      return { lat: pts.reduce((s, p) => s + (p.lat as number), 0) / pts.length, lng: pts.reduce((s, p) => s + (p.lng as number), 0) / pts.length };
+    }
+    const a: any = active;
+    return typeof a?.start_lat === 'number' && typeof a?.start_lng === 'number' ? { lat: a.start_lat, lng: a.start_lng } : null;
+  })();
 
   const search = async (q: string) => {
     if (!active || !q.trim()) return;
@@ -2050,6 +2071,17 @@ export default function TripProjects({ onContextChange, projectId }: TripProject
                             </div>
                           </div>
                         )}
+                      </div>
+
+                      {/* Własne miejsce: gdy wyszukiwarka go nie zna */}
+                      <div className="rounded-md bg-card shadow-token-sm p-3.5 space-y-2">
+                        <p className="font-narrow uppercase tracking-[0.18em] text-[10px] text-muted-foreground">
+                          {t('wklad.miejsce_naglowek_karty')}
+                        </p>
+                        <p className="text-xs text-muted-foreground text-pretty">{t('wklad.miejsce_opis_karty')}</p>
+                        <Button size="sm" variant="outline" onClick={() => setDodajMiejsce(true)}>{t('wklad.miejsce_dodaj')}</Button>
+                        <DodajMiejsceDialog open={dodajMiejsce} onOpenChange={setDodajMiejsce} miasto={active.destination}
+                          centrum={srodekTablicy} naTablice onDodano={dodanoWlasne} />
                       </div>
 
                       {/* Wklejony tekst */}

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Zdjecie from '@/components/Zdjecie';
+import ZdjeciaPodroznych from '@/components/ZdjeciaPodroznych';
+import OpisPelnySzczegoly, { useOpisPelny } from '@/components/OpisPelny';
 import GaleriaZdjec from '@/components/GaleriaZdjec';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ExternalLink, Heart, Loader2 } from 'lucide-react';
@@ -209,6 +211,7 @@ export default function PlacePage() {
     }
   };
 
+  const opisPelny = useOpisPelny(place?.id);
   const photos = useMemo(() => (place?.photos ?? []).filter((u) => !broken.has(u)), [place, broken]);
 
   /** Zapis na wskazaną tablicę; drugi klik w tę samą decyzję ją zdejmuje. */
@@ -471,11 +474,12 @@ export default function PlacePage() {
               </p>
             )}
 
-            {(place.description || place.wiki_extract) && (
+            {(opisPelny || place.description || place.wiki_extract) && (
               <p className="text-[17px] leading-[1.6] mt-5 max-w-[60ch] text-foreground/85 text-pretty">
-                {opisMiejsca(place)}
+                {opisPelny?.opis ?? opisMiejsca(place)}
               </p>
             )}
+            {opisPelny && <OpisPelnySzczegoly dane={opisPelny} />}
 
             {/* Pasek trzech danych, ograniczony liniami góra i dół */}
             <div className="mt-10 border-y border-border grid grid-cols-3">
@@ -507,6 +511,8 @@ export default function PlacePage() {
                 ))}
               </div>
             )}
+
+            <ZdjeciaPodroznych placeId={place.id} placeName={place.name} />
 
             {similar.length > 0 && (
               <section className="mt-12">

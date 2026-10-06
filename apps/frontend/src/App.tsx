@@ -66,6 +66,7 @@ const AdminLayout = leniwie(() => import("./components/AdminLayout"));
 const AdminDashboard = leniwie(() => import("./pages/admin/AdminDashboard"));
 const AdminUsers = leniwie(() => import("./pages/admin/AdminUsers"));
 const AdminAtlas = leniwie(() => import("./pages/admin/AdminAtlas"));
+const AdminWklad = leniwie(() => import("./pages/admin/AdminWklad"));
 const GuideHub = leniwie(() => import("./components/GuideHub"));
 const NavigationLauncher = leniwie(() => import("./components/NavigationLauncher"));
 const NowaWersja = leniwie(() => import("./components/NowaWersja"));
@@ -166,6 +167,7 @@ const App = () => (
                     <Route path="dashboard" element={<AdminDashboard />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="atlas" element={<AdminAtlas />} />
+                    <Route path="wklad" element={<AdminWklad />} />
                   </Route>
 
                   <Route path="*" element={<NotFound />} />

@@ -10,7 +10,7 @@ export default function Terms() {
   return (
     <LegalLayout docKey="terms">
       <h1>Terms of Service</h1>
-      <p className="text-sm text-muted-foreground">RouteMarket — last updated 18 August 2026</p>
+      <p className="text-sm text-muted-foreground">RouteMarket — last updated 6 October 2026</p>
 
       <h2>1. Who we are</h2>
       <p>
@@ -81,6 +81,17 @@ export default function Terms() {
         What you may and may not publish is set out in the{' '}
         <a href="/legal/acceptable-use">Acceptable Use Policy</a>. Rules on material belonging
         to someone else are in the <a href="/legal/copyright">Copyright Policy</a>.
+      </p>
+
+      <p>
+        Photographs and places you add to the public catalogue are different from your
+        private boards: they are shown to everyone who visits the page of that place. By
+        adding one you confirm that the photograph is yours or that you have the right to
+        share it, and you give us a non-exclusive, free licence to display it in the Service
+        together with your display name, for as long as it stays there. You can delete your
+        own photograph at any time. We hold back material that our automated check or other
+        users flag, and we may remove it — see the{' '}
+        <a href="/legal/acceptable-use">Acceptable Use Policy</a>.
       </p>
 
       <h2>5. Tokens</h2>

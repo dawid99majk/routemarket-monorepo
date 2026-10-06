@@ -10,7 +10,7 @@ export default function Privacy() {
   return (
     <LegalLayout docKey="privacy">
       <h1>Privacy Policy</h1>
-      <p className="text-sm text-muted-foreground">RouteMarket — last updated 18 August 2026</p>
+      <p className="text-sm text-muted-foreground">RouteMarket — last updated 6 October 2026</p>
 
       <h2>1. Who is responsible for your data</h2>
       <p>
@@ -46,6 +46,14 @@ export default function Privacy() {
             <td>This is the content of the Service. Without storing it there is nothing
                 to come back to.</td>
             <td>Performance of our agreement (Art. 6(1)(b))</td>
+          </tr>
+          <tr>
+            <td>Photographs and places you add to the public catalogue, with the display name you signed them with</td>
+            <td>To show them to other visitors of the place's page. Location and camera data
+                embedded in a photograph are removed before it is stored. You can delete
+                your photograph yourself at any time.</td>
+            <td>Performance of our agreement (Art. 6(1)(b)); a photograph that shows
+                a person — our legitimate interest in moderating the Service (Art. 6(1)(f))</td>
           </tr>
           <tr>
             <td>Trip preferences — pace, popularity, effort, crowds and similar</td>
@@ -101,6 +109,13 @@ export default function Privacy() {
                 or password.</td>
             <td>When you generate a plan, ask the assistant for a hint, or search for places
                 in natural language</td>
+          </tr>
+          <tr>
+            <td>Google (Gemini API)</td>
+            <td>A reduced-size copy of a photograph you upload (without embedded metadata) or
+                the text of a place you add, so that it can be checked for unsuitable
+                content before publication. Not your email address or account identifier.</td>
+            <td>When you upload a photograph or add a place</td>
           </tr>
           <tr>
             <td>Google (Analytics)</td>
@@ -194,6 +209,12 @@ export default function Privacy() {
         collected and the preferences you set. This affects the content of a suggestion — it
         does not produce any decision with legal effect or similarly significant consequences
         for you within the meaning of Art. 22 GDPR.
+      </p>
+      <p>
+        Photographs and places added to the public catalogue are checked automatically
+        before they are shown. If the check is unsure or fails, the material is held back
+        and a person reviews it; if you think a photograph was wrongly held back or removed,
+        write to us and a person will look at it again.
       </p>
       <p>
         We do not build advertising profiles and do not use your content to train AI models.

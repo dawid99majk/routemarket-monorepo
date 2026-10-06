@@ -9,7 +9,7 @@ export default function Copyright() {
   return (
     <LegalLayout docKey="copyright">
       <h1>Copyright Policy</h1>
-      <p className="text-sm text-muted-foreground">RouteMarket — last updated 18 August 2026</p>
+      <p className="text-sm text-muted-foreground">RouteMarket — last updated 6 October 2026</p>
 
       <h2>1. The short version</h2>
       <p>
@@ -52,10 +52,19 @@ export default function Copyright() {
         that.
       </p>
 
+      <p>
+        Photographs you add to a place page are shown to every visitor of that page, with
+        your display name. Add only photographs you took yourself or that you have the
+        right to share — not images from a website, a magazine, a guidebook or another
+        person's social media account. Embedded location and camera data are removed from
+        the file before it is stored. You keep the rights to your photograph; we only get
+        permission to display it in the Service while it stays there.
+      </p>
+
       <h2>4. Reporting an infringement</h2>
       <p>
         Write to <a href="mailto:contact@routemarket.io">contact@routemarket.io</a> with the
-        subject "Copyright". Please include:
+        subject "Copyright", or use the "Report" button next to a photograph from a traveller. Please include:
       </p>
       <ul>
         <li>identification of the work concerned, and evidence that the rights are yours or

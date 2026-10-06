@@ -147,6 +147,9 @@ server {
 
     location /route-builder-api/ {
         proxy_pass http://127.0.0.1:8081/;
+        # Zdjęcia od użytkowników: dwa JPEG-i (pełny do ok. 1,5 MB i miniatura) w jednym zapytaniu.
+        # Domyślny 1 MB ucinałby je jako 413.
+        client_max_body_size 6m;
         proxy_http_version 1.1;
         # Tura wywiadu to Gemini + geokodowanie kilkunastu nazw + dwa przebiegi
         # routingu; domyślne 60 s ucinało ją jako 504, a użytkownik widział

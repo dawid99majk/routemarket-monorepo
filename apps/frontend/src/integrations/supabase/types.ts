@@ -421,6 +421,87 @@ export type Database = {
         }
         Relationships: []
       }
+      opisy_dostawy: {
+        Row: {
+          created_at: string
+          id: string
+          kontrola: Json
+          partia_id: string
+          place_id: string | null
+          status: string
+          surowe: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kontrola?: Json
+          partia_id: string
+          place_id?: string | null
+          status?: string
+          surowe: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kontrola?: Json
+          partia_id?: string
+          place_id?: string | null
+          status?: string
+          surowe?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opisy_dostawy_partia_id_fkey"
+            columns: ["partia_id"]
+            isOneToOne: false
+            referencedRelation: "opisy_partie"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opisy_dostawy_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opisy_partie: {
+        Row: {
+          created_at: string
+          id: string
+          liczba: number
+          miasto: string
+          rodzaj: string
+          status: string
+          updated_at: string
+          uwagi: string | null
+          zlecenie: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          liczba?: number
+          miasto: string
+          rodzaj?: string
+          status?: string
+          updated_at?: string
+          uwagi?: string | null
+          zlecenie?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          liczba?: number
+          miasto?: string
+          rodzaj?: string
+          status?: string
+          updated_at?: string
+          uwagi?: string | null
+          zlecenie?: string | null
+        }
+        Relationships: []
+      }
       place_catalog: {
         Row: {
           category: string
@@ -599,6 +680,145 @@ export type Database = {
           },
         ]
       }
+      place_opisy: {
+        Row: {
+          ciekawostki: string[]
+          co_zobaczyc: string[]
+          created_at: string
+          dostawa_id: string | null
+          model: string | null
+          opis: string
+          opis_i18n: Json
+          place_id: string
+          praktyka: Json
+          updated_at: string
+          zrodla: Json
+        }
+        Insert: {
+          ciekawostki?: string[]
+          co_zobaczyc?: string[]
+          created_at?: string
+          dostawa_id?: string | null
+          model?: string | null
+          opis: string
+          opis_i18n?: Json
+          place_id: string
+          praktyka?: Json
+          updated_at?: string
+          zrodla?: Json
+        }
+        Update: {
+          ciekawostki?: string[]
+          co_zobaczyc?: string[]
+          created_at?: string
+          dostawa_id?: string | null
+          model?: string | null
+          opis?: string
+          opis_i18n?: Json
+          place_id?: string
+          praktyka?: Json
+          updated_at?: string
+          zrodla?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_opisy_dostawa_id_fkey"
+            columns: ["dostawa_id"]
+            isOneToOne: false
+            referencedRelation: "opisy_dostawy"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "place_opisy_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: true
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_photo_reports: {
+        Row: {
+          created_at: string
+          photo_id: string
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          photo_id: string
+          reason?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          photo_id?: string
+          reason?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_photo_reports_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "place_photos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      place_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          height: number
+          id: string
+          moderacja: Json
+          path: string
+          place_id: string
+          report_count: number
+          status: string
+          thumb_path: string
+          user_id: string
+          width: number
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          height: number
+          id?: string
+          moderacja?: Json
+          path: string
+          place_id: string
+          report_count?: number
+          status?: string
+          thumb_path: string
+          user_id: string
+          width: number
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          height?: number
+          id?: string
+          moderacja?: Json
+          path?: string
+          place_id?: string
+          report_count?: number
+          status?: string
+          thumb_path?: string
+          user_id?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_photos_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "place_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       place_reports: {
         Row: {
           created_at: string
@@ -687,6 +907,39 @@ export type Database = {
           data?: Json
           key?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      polaczenia_agentow: {
+        Row: {
+          agent: string
+          id: string
+          nazwa: string
+          ostatnio_uzyte: string | null
+          token_hash: string
+          uniewaznione: string | null
+          user_id: string
+          utworzone: string
+        }
+        Insert: {
+          agent?: string
+          id?: string
+          nazwa: string
+          ostatnio_uzyte?: string | null
+          token_hash: string
+          uniewaznione?: string | null
+          user_id: string
+          utworzone?: string
+        }
+        Update: {
+          agent?: string
+          id?: string
+          nazwa?: string
+          ostatnio_uzyte?: string | null
+          token_hash?: string
+          uniewaznione?: string | null
+          user_id?: string
+          utworzone?: string
         }
         Relationships: []
       }
